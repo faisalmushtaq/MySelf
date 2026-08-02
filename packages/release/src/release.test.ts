@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { allInstruments, allModules, allScales } from "@myself/library";
 import { allScoring } from "@myself/scoring";
@@ -13,7 +15,7 @@ const registries: Registries = {
 };
 
 const meta = {
-  version: "3.0.0",
+  version: "3.1.0",
   publishedAt: "2026-08-02T12:00:00.000Z",
   publishedBy: "faisalmushtaq",
   engineVersion: "0.1.0",
@@ -30,12 +32,12 @@ describe("canonical JSON", () => {
   });
 });
 
-describe("YBM release r3.0.0", () => {
+describe("YBM release r3.1.0", () => {
   it("passes the publish gate and produces a verifiable manifest", () => {
     const manifest = buildRelease(ybmComposition, registries, meta);
     expect(manifest.hash).toMatch(/^sha256:[0-9a-f]{64}$/);
     expect(verifyManifestHash(manifest)).toBe(true);
-    expect(manifest.release.key).toBe("ybm_nd2026_standard_r3_0_0");
+    expect(manifest.release.key).toBe("ybm_nd2026_standard_r3_1_0");
   });
 
   it("is deterministic: identical inputs give an identical hash", () => {
@@ -53,6 +55,28 @@ describe("YBM release r3.0.0", () => {
       expect.arrayContaining(["score.sdq25_s", "score.rcads25", "score.swemwbs", "score.stai5", "score.bisbas12_ybm", "score.ehi_sf"]),
     );
     expect(Object.keys(manifest.scales).length).toBeGreaterThanOrEqual(25);
+  });
+
+  it("matches the manifest committed to releases/ — a published release never drifts", () => {
+    // The frozen file is what devices actually run. If someone edits an item,
+    // a scale or the composition without republishing, this fails: the release
+    // on disk would no longer be the release the sources describe.
+    const path = fileURLToPath(new URL("../../../releases/ybm_nd2026_standard_r3.1.0.manifest.json", import.meta.url));
+    const committed = JSON.parse(readFileSync(path, "utf8")) as {
+      hash: string;
+      release: { version: string; publishedAt: string; publishedBy: string; engineVersion: string; decisionRefs: string[] };
+    };
+    expect(verifyManifestHash(committed as never)).toBe(true);
+    // Rebuilt with the release's own publication metadata, so only a change to
+    // the instruments, scales, scoring or composition can move the hash.
+    const rebuilt = buildRelease(ybmComposition, registries, {
+      version: committed.release.version,
+      publishedAt: committed.release.publishedAt,
+      publishedBy: committed.release.publishedBy,
+      engineVersion: committed.release.engineVersion,
+      decisionRefs: committed.release.decisionRefs,
+    });
+    expect(rebuilt.hash).toBe(committed.hash);
   });
 
   it("tampering with a frozen manifest invalidates its hash", () => {

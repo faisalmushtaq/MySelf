@@ -187,6 +187,7 @@ export const ybmIdentity: ModuleInput = {
             {
               key: "house_digit",
               label: "First digit of your house number",
+              kind: "numeric",
               required: true,
               maxChars: 1,
               pattern: "^[0-9]$",
@@ -225,6 +226,7 @@ export const ybmIdentity: ModuleInput = {
             {
               key: "digits",
               label: "All digits after three letters",
+              kind: "numeric",
               required: true,
               maxChars: 10,
               pattern: "^[0-9]{2,}$",

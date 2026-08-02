@@ -5,8 +5,11 @@ import { VitePWA } from "vite-plugin-pwa";
 // Base path: GitHub Pages serves the app at /<repo-name>/.
 const base = process.env["MYSELF_BASE"] ?? "/MySelf/";
 
+const buildStamp = new Date().toISOString().slice(0, 16).replace("T", " ");
+
 export default defineConfig({
   base,
+  define: { __BUILD_STAMP__: JSON.stringify(buildStamp) },
   plugins: [
     react(),
     VitePWA({

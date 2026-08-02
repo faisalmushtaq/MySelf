@@ -132,9 +132,15 @@ export function SurveyScreen(props: SurveyScreenProps) {
   // nobody should be able to move past a field the screen is calling wrong,
   // and no earlier valid value should be carried forward behind an error.
   const draftBlocked = draft !== null && !draft.ok;
+  // Once a control reports on itself, what is on screen is the truth — not what
+  // happens to be in the store. So a complete draft counts as answered before
+  // the autosave debounce fires (nobody waits on a disabled button after typing
+  // a good answer), and clearing a field back to blank stops counting as one
+  // even if an earlier value was already recorded.
+  const satisfied = (draft !== null ? draft.complete : answered) && consentComplete;
   const canAdvance =
     item.responseType === "info" ||
-    (!draftBlocked && (item.required === "hard" ? answered && consentComplete && (draft?.complete ?? true) : true));
+    (!draftBlocked && (item.required === "hard" ? satisfied : true));
 
   const handleAnswer = (value: AnswerValue, autoAdvance: boolean) => {
     props.onRecord(unit, value);
@@ -147,9 +153,11 @@ export function SurveyScreen(props: SurveyScreenProps) {
   const handleNext = () => {
     if (item.responseType === "info") return props.onAdvance(index, "next");
     if (draftBlocked) return; // button is disabled; belt and braces
-    if (answered && consentComplete) return props.onAdvance(index, "next");
+    if (satisfied) return props.onAdvance(index, "next");
     if (item.required === "hard") return; // button disabled anyway
-    // Unanswered and skippable: ask once, in place, before letting it go.
+    // Blank and skippable — including a field the participant has just emptied,
+    // which is recorded as a skip so the data matches what was left on screen.
+    // Ask once, in place, before letting it go.
     if (effort.confirmSkip && !confirmingSkip) {
       setConfirmingSkip(true);
       return;

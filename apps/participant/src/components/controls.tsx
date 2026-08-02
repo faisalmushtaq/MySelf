@@ -311,9 +311,28 @@ export function NumericControl({ item, value, onAnswer, onValidity, onSubmit }: 
   const [error, setError] = useState<string | null>(null);
   useEffect(() => setText(current), [current]);
 
-  const commit = (raw: string) => {
+  // Only characters that can form a valid answer are accepted at all: a
+  // participant cannot type or paste "12e5" or "--3" and be told off later.
+  const allowNegative = (item.min ?? 0) < 0;
+  const clean = (raw: string) => {
+    let s = raw.replace(item.integerOnly ? /[^0-9-]/g : /[^0-9.-]/g, "");
+    if (!allowNegative) s = s.replace(/-/g, "");
+    else s = s[0] === "-" ? `-${s.slice(1).replace(/-/g, "")}` : s.replace(/-/g, "");
+    const dot = s.indexOf(".");
+    if (dot !== -1) s = `${s.slice(0, dot + 1)}${s.slice(dot + 1).replace(/\./g, "")}`;
+    return s;
+  };
+
+  const commit = (input: string) => {
+    const raw = clean(input);
     setText(raw);
-    if (raw.trim() === "") return;
+    if (raw.trim() === "" || raw === "-" || raw === ".") {
+      // Nothing usable on screen: valid so far, but not an answer yet, so a
+      // hard-required item stays blocked rather than keeping a stale value.
+      setError(null);
+      onValidity?.({ ok: true, complete: false });
+      return;
+    }
     const n = Number(raw);
     if (Number.isNaN(n) || (item.integerOnly && !Number.isInteger(n))) {
       setError("Please enter a whole number");
@@ -333,8 +352,13 @@ export function NumericControl({ item, value, onAnswer, onValidity, onSubmit }: 
   return (
     <div className="numeric-wrap">
       <input
-        type="number"
-        inputMode="numeric"
+        // Never type="number": it ignores maxLength, accepts "e"/"+"/"-", and
+        // reports an empty value for text the participant can still see.
+        type="text"
+        inputMode={item.integerOnly ? "numeric" : "decimal"}
+        autoComplete="off"
+        autoCorrect="off"
+        spellCheck={false}
         className="text-input numeric"
         value={text}
         aria-label={item.stem.text}
@@ -363,6 +387,23 @@ export function DateControl({ item, value, onAnswer, onValidity, onSubmit }: Con
   const current = value?.kind === "date" ? value.iso : "";
 
   /** Age plausibility, checked against today. Blocks typos, not real lives. */
+  /**
+   * Bounds handed to the native picker so impossible dates cannot be chosen
+   * in the first place — prevention, with the checks below as the backstop.
+   */
+  const today = new Date();
+  const iso0 = (d: Date) => d.toISOString().slice(0, 10);
+  const latest =
+    item.minAgeYears !== undefined
+      ? iso0(new Date(today.getFullYear() - item.minAgeYears, today.getMonth(), today.getDate()))
+      : iso0(today); // never the future
+  const earliest =
+    item.maxAgeYears !== undefined
+      ? iso0(new Date(today.getFullYear() - item.maxAgeYears, today.getMonth(), today.getDate()))
+      : item.minYear
+        ? `${item.minYear}-01-01`
+        : undefined;
+
   const check = (iso: string): string | null => {
     const d = new Date(`${iso}T00:00:00`);
     if (Number.isNaN(d.getTime())) return "Please enter a date as day, month and year";
@@ -389,8 +430,8 @@ export function DateControl({ item, value, onAnswer, onValidity, onSubmit }: Con
         value={current}
         aria-label={item.stem.text}
         aria-invalid={error !== null}
-        min={item.minYear ? `${item.minYear}-01-01` : undefined}
-        max={item.maxYear ? `${item.maxYear}-12-31` : undefined}
+        min={earliest}
+        max={latest}
         onChange={(e) => {
           const iso = e.target.value;
           if (!iso) return;
@@ -427,7 +468,8 @@ export function TextControl({ item, value, onAnswer, onValidity, onSubmit }: Con
   const patternOf = item.responseType === "text_short" ? item.pattern : undefined;
   const patternHint = item.responseType === "text_short" ? item.patternHint : undefined;
 
-  const commit = (raw: string) => {
+  const commit = (input: string) => {
+    const raw = input.slice(0, item.maxChars); // autofill can exceed maxLength
     setText(raw);
     if (patternOf && raw.trim().length > 0 && !new RegExp(patternOf).test(raw.trim())) {
       setError(patternHint ?? "Please check the format");
@@ -483,6 +525,8 @@ export function TextControl({ item, value, onAnswer, onValidity, onSubmit }: Con
           className="text-input"
           value={text}
           maxLength={item.maxChars}
+          autoComplete="off"
+          autoCorrect="off"
           aria-label={item.stem.text}
           onChange={(e) => commit(e.target.value)}
           onKeyDown={(e) => {
@@ -515,7 +559,13 @@ export function FormFieldsControl({ item, value, onAnswer, onValidity, onSubmit 
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pending = useRef<Record<string, string> | null>(null);
 
-  const commit = (key: string, v: string) => {
+  const commit = (key: string, raw: string) => {
+    // Truncate here, not only via maxLength: iOS AutoFill/QuickType inserts
+    // values programmatically and bypasses the attribute entirely.
+    // A numeric field never holds a letter: strip rather than accept-and-scold.
+    const field0 = item.responseType === "form_fields" ? item.fields.find((f) => f.key === key) : undefined;
+    const cleaned = field0?.kind === "numeric" ? raw.replace(/[^0-9]/g, "") : raw;
+    const v = field0 ? cleaned.slice(0, field0.maxChars) : cleaned;
     const next = { ...values, [key]: v };
     setValues(next);
     if (item.responseType !== "form_fields") return;
@@ -567,9 +617,15 @@ export function FormFieldsControl({ item, value, onAnswer, onValidity, onSubmit 
         <label key={f.key} className="field">
           <span className="field-label">{f.label}</span>
           <input
-            type={f.kind === "numeric" ? "number" : "text"}
+            // Always type=text: type=number ignores maxLength and accepts "e",
+            // "+" and "-". inputMode drives the on-screen keyboard instead.
+            type="text"
+            inputMode={f.kind === "numeric" || /^\^\[0-9\]/.test(f.pattern ?? "") ? "numeric" : "text"}
             className="text-input"
             maxLength={f.maxChars}
+            autoComplete="off"
+            autoCorrect="off"
+            spellCheck={false}
             value={values[f.key] ?? ""}
             aria-invalid={errors[f.key] !== undefined}
             onChange={(e) => commit(f.key, e.target.value)}

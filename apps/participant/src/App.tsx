@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { AnswerStore, Walker, type AnswerValue, type PresentableUnit } from "@myself/engine";
 import { releaseManifest, responseScale, type ReleaseManifest, type ResponseScale } from "@myself/schema";
-import rawManifest from "../../../releases/ybm_nd2026_standard_r3.0.0.manifest.json";
+import rawManifest from "../../../releases/ybm_nd2026_standard_r3.1.0.manifest.json";
 import { flattenManifest } from "./lib/flatten.js";
 import {
   appendEvent,
@@ -16,7 +16,7 @@ import { SurveyScreen } from "./components/SurveyScreen.js";
 
 /**
  * MySelf Go — participant application (preview build).
- * Renders the frozen YBM r3.0.0 release entirely from its manifest, saves
+ * Renders the frozen YBM r3.1.0 release entirely from its manifest, saves
  * every response to encrypted IndexedDB before advancing, works offline via
  * the service worker, and returns to a neutral start screen on handover.
  */
@@ -241,8 +241,11 @@ export default function App() {
               autoCapitalize="characters"
               autoComplete="off"
               aria-invalid={codeError !== null}
+              maxLength={16}
               onChange={(e) => {
-                setCode(e.target.value);
+                // Codes are letters and digits only; punctuation and spaces
+                // are dropped as they are typed rather than rejected later.
+                setCode(e.target.value.replace(/[^A-Za-z0-9]/g, "").toUpperCase().slice(0, 16));
                 if (codeError) setCodeError(null);
               }}
               onKeyDown={(e) => {
@@ -260,7 +263,8 @@ export default function App() {
           </button>
           <p className="hint demo-note">
             Preview build · release {manifest.release.version} · {manifest.hash?.slice(7, 19)} ·{" "}
-            {counts.completed} completed session{counts.completed === 1 ? "" : "s"} stored on this device
+            {counts.completed} completed session{counts.completed === 1 ? "" : "s"} stored on this device · build{" "}
+            {__BUILD_STAMP__}
           </p>
         </div>
       )}

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { AnswerStore, Walker } from "@myself/engine";
 import { releaseManifest } from "@myself/schema";
-import rawManifest from "../../../releases/ybm_nd2026_standard_r3.0.0.manifest.json";
+import rawManifest from "../../../releases/ybm_nd2026_standard_r3.1.0.manifest.json";
 import { flattenManifest } from "./lib/flatten.js";
 import { resolveText } from "./lib/pipes.js";
 
@@ -39,6 +39,37 @@ describe("manifest flattening", () => {
     expect(visible).toContain("stai5_s");
     expect(visible).toContain("bisbas12_ybm");
     expect(visible).toContain("ybm_future_self");
+  });
+
+  it("carries the entry-validation rules the app enforces", () => {
+    // These rules are what stop implausible identifiers and dates of birth
+    // reaching the raw data. If a release ever ships without them the app
+    // would silently accept anything, so the manifest is asserted directly.
+    expect(manifest.composition.participantCode?.pattern).toBe("^[A-Za-z]{3}[0-9]{2,}$");
+
+    const find = (key: string) => flattened.units.find((u) => u.item.key === key)?.item;
+
+    const psId = find("ps_id");
+    expect(psId?.responseType).toBe("form_fields");
+    if (psId?.responseType === "form_fields") {
+      // every component of the derived participant ID is format-constrained
+      expect(psId.fields.every((f) => f.pattern !== undefined && f.patternHint !== undefined)).toBe(true);
+      expect(psId.fields.find((f) => f.key === "mother_initials")?.maxChars).toBe(2);
+      expect(psId.fields.find((f) => f.key === "house_digit")?.kind).toBe("numeric");
+    }
+
+    const valId = find("val_id");
+    if (valId?.responseType === "form_fields") {
+      expect(valId.fields[0]?.kind).toBe("numeric");
+      expect(valId.fields[0]?.pattern).toBe("^[0-9]{2,}$");
+    }
+
+    const dob = find("dob");
+    expect(dob?.responseType).toBe("date");
+    if (dob?.responseType === "date") {
+      expect(dob.minAgeYears).toBe(4); // nobody younger than 4 completes this
+      expect(dob.maxAgeYears).toBe(100);
+    }
   });
 
   it("resolves the consent withdrawal-date pipe from the session start", () => {

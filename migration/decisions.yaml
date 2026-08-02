@@ -281,3 +281,39 @@ decisions:
       Long-form narrative text keeps Enter for line breaks. The handler routes
       through the same disabled-state check as the Next button, so it can
       never bypass a validation error.
+
+  - id: D-22
+    topic: Entry hardening — invalid values are prevented, not just flagged
+    decision: prevent-at-the-control
+    detail: >
+      Researcher direction 2026-08-02, after implausible identifiers and a
+      future date of birth were still accepted on the deployed preview.
+      The principle adopted is prevention over correction: a field that cannot
+      hold a value must not accept it in the first place, and a message is the
+      backstop rather than the mechanism.
+      (a) LENGTH: every text and form field truncates in JavaScript on commit,
+      not only via the maxLength attribute. Platform AutoFill and predictive
+      keyboards write the value programmatically, and that path ignores
+      maxLength entirely — reproduced in the browser with a six-character name
+      landing in a two-character field.
+      (b) CHARACTER CLASS: numeric fields strip non-digits as they are typed or
+      pasted, so letters never appear at all. type="number" is not used
+      anywhere: it ignores maxLength, accepts "e", "+" and "-", and reports an
+      empty value for text the participant can still see. Fields are
+      type="text" with inputMode driving the on-screen keyboard.
+      (c) DATE BOUNDS: the date input carries min/max computed from
+      minAgeYears/maxAgeYears, so the native picker cannot offer a future date
+      or an implausible age; the plausibility check remains as the backstop for
+      typed entry.
+      (d) PARTICIPANT CODE: punctuation and spaces are dropped and letters
+      upper-cased as the code is typed, before the pattern is applied.
+      (e) SCREEN TRUTH: once a control reports on itself, what is on screen
+      governs whether the participant may advance — a complete entry counts
+      immediately (no waiting out the autosave debounce), and clearing a field
+      back to blank stops counting even though an earlier value was recorded.
+      Emptying a skippable field advances as a skip, so the raw data matches
+      what was left on screen.
+      (f) BUILD VISIBILITY: the service worker force-updates and reloads on
+      controllerchange, and the start screen shows the build stamp, so a cached
+      build can no longer make a shipped fix look absent.
+      Released as r3.1.0 (validation configuration is participant-visible).
