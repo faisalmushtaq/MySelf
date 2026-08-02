@@ -1,4 +1,6 @@
-# Micro-Narrative Module — Design
+# Micro-Narrative Module ("MyStory") — Design
+
+> Naming (decision D-16): micro-narrative protocols are presented to participants as **MyStory**, visually and verbally separated from the **MyThoughts** questionnaire experience. The separation is not cosmetic — it reinforces the platform rule that model-mediated interaction remains distinguishable from the canonical survey engine.
 
 > **Source audit complete (2026-08-02).** The codebase (`Code_010726.zip`) was received and audited in full — see §8. It is the KCL **Micro-narratives** application (Skeggs et al., CHI 2025), distributed under an academic non-commercial licence with citation requirements. The audit confirmed the design below and sharpened it in several places (staged records map cleanly onto the app's existing conversational stages; its quality-control tracing and persona-based generation are scientifically load-bearing and are carried forward as first-class protocol features).
 

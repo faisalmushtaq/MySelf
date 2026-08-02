@@ -168,3 +168,18 @@ decisions:
       adapt -> confirm), generalised from the CHI 2025 app. np.future_self is
       not built as a protocol; the Future Self question remains a plain
       open-text item in the YBM questionnaire.
+
+  - id: D-16
+    topic: Product naming — separating surveys from LLM narratives
+    decision: mythoughts-and-mystory
+    detail: >
+      Researcher decision 2026-08-02: within the MySelf platform, the two
+      participant-facing experiences are named and visually separated —
+      "MyThoughts" for conventional questionnaire/survey modules and
+      "MyStory" for LLM-supported micro-narrative protocols. MySelf remains
+      the platform and umbrella brand; the composer tags each assessment
+      component as a MyThoughts or MyStory experience; participant screens
+      show the sub-brand of the active experience so participants always know
+      whether they are answering questions or telling a story (this also
+      reinforces the design rule that model-mediated interaction must be
+      distinguishable from the canonical survey engine).

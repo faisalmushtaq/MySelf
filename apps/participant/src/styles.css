@@ -41,7 +41,11 @@ body {
 .screen { flex: 1; display: flex; flex-direction: column; padding: 12px 20px calc(env(safe-area-inset-bottom, 0px) + 16px); overflow-y: auto; }
 .screen.start, .screen.finish { justify-content: center; gap: 18px; text-align: center; }
 .brand { font-size: 2.6rem; margin: 0; color: var(--accent); letter-spacing: -0.02em; }
-.study-title { color: var(--ink-soft); margin: 0 0 12px; }
+.subbrand {
+  margin: 2px 0 0; font-size: 1.05rem; font-weight: 700; letter-spacing: 0.12em;
+  text-transform: uppercase; color: var(--ink-soft);
+}
+.study-title { color: var(--ink-soft); margin: 8px 0 12px; }
 .demo-note { margin-top: 24px; }
 
 /* Survey chrome */

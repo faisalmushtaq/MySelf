@@ -176,6 +176,7 @@ export default function App() {
       {phase.kind === "start" && (
         <div className="screen start">
           <h1 className="brand">MySelf</h1>
+          <p className="subbrand">MyThoughts</p>
           <p className="study-title">{manifest.composition.title}</p>
           <label className="field">
             <span className="field-label">Enter your participant code</span>

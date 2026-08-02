@@ -5,8 +5,8 @@
 MySelf is a research-grade, offline-first platform for self-report and LLM-supported micro-narrative research with children, adolescents and adults. It pairs a consumer-quality participant experience — one thing per screen, instant, calm, touch-first — with the reproducibility guarantees longitudinal science needs: versioned instruments, immutable published releases, append-only raw data, complete provenance for every model call, and exports that carry everything needed to reconstruct exactly what each participant saw.
 
 Two interfaces, one canonical definition layer:
-- **MySelf Go** (participant PWA): installable on iPads from Safari, fully functional offline for conventional survey content, autosaving after every response.
-- **MySelf Studio** (researcher app): instrument library, assessment composer, publishing, device/session monitoring, exports, instrument & narrative-protocol management.
+- **Participant PWA**: installable on iPads from Safari, fully functional offline for conventional survey content, autosaving after every response. Per decision D-16 it presents two clearly separated experiences under the MySelf umbrella: **MyThoughts** (conventional questionnaire modules) and **MyStory** (LLM-supported micro-narrative protocols) — participants always know whether they are answering questions or telling a story.
+- **MySelf Studio** (researcher app): instrument library, assessment composer, publishing, device/session monitoring, exports, instrument & narrative-protocol management. Components are tagged MyThoughts or MyStory in the composer.
 
 Design north stars: participant effort minimised; nothing requires training; validity beats personalisation; published = immutable; raw ≠ derived, ever; offline is first-class; model text is always distinguishable from human text.
 
