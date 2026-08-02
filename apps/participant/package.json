@@ -11,7 +11,6 @@
     "test": "vitest run"
   },
   "dependencies": {
-    
     "@fontsource/newsreader": "^5.3.0",
     "@myself/engine": "workspace:*",
     "@myself/schema": "workspace:*",
