@@ -33,6 +33,14 @@ const baseItem = {
   allowDecline: z.boolean().default(false),
   /** Intra-module display condition (e.g. Age_smartphone if smartphone owned). */
   displayIf: logicExpr.optional(),
+  /** Illustration token drawn beside the question (e.g. "object:pen"). */
+  illustration: z.string().optional(),
+  /**
+   * Plain-language help revealed on request, or offered automatically when a
+   * participant dwells on the item. Never shown by default — it must not
+   * become extra reading for people who are managing fine.
+   */
+  hint: z.string().optional(),
   a11yNote: z.string().optional(),
   researcherNote: z.string().optional(),
 };
@@ -47,8 +55,14 @@ export const itemDefinition = z.discriminatedUnion("responseType", [
     responseType: z.literal("single_choice"),
     scale: dottedKey, // response-scale key
     scaleVersion: semver,
-    /** "grid" tiles illustrated options (see scaleOption.illustration). */
-    presentation: z.enum(["cards", "dropdown", "wheel", "grid"]).default("cards"),
+    /**
+     * "grid" tiles illustrated options; "spectrum" lays them along a left-to-
+     * right axis so the spatial arrangement carries the meaning (handedness).
+     */
+    presentation: z.enum(["cards", "dropdown", "wheel", "grid", "spectrum"]).default("cards"),
+    /** Display the spectrum in reverse option order (presentation only —
+     * response codes are never affected). */
+    spectrumReverse: z.boolean().default(false),
     autoAdvance: z.boolean().default(true),
   }),
   z.object({
@@ -93,12 +107,19 @@ export const itemDefinition = z.discriminatedUnion("responseType", [
     responseType: z.literal("date"),
     minYear: z.number().int().optional(),
     maxYear: z.number().int().optional(),
+    /** Plausibility bounds for dates of birth, checked against session date. */
+    minAgeYears: z.number().int().min(0).optional(),
+    maxAgeYears: z.number().int().min(0).optional(),
   }),
   z.object({
     ...baseItem,
     responseType: z.literal("text_short"),
     minChars: z.number().int().min(0).default(0),
     maxChars: z.number().int().positive().default(200),
+    /** Anchored regular expression the answer must match. */
+    pattern: z.string().optional(),
+    /** Plain-language description of the expected format, shown on mismatch. */
+    patternHint: z.string().optional(),
   }),
   z.object({
     ...baseItem,
@@ -117,6 +138,8 @@ export const itemDefinition = z.discriminatedUnion("responseType", [
           kind: z.enum(["text", "numeric"]).default("text"),
           required: z.boolean().default(false),
           maxChars: z.number().int().positive().default(100),
+          pattern: z.string().optional(),
+          patternHint: z.string().optional(),
         }),
       )
       .min(1),

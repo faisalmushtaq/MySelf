@@ -41,6 +41,9 @@ The visual language is inherited from the **BrainPop lab website** (`faisalmusht
 - **Progress is segmented hairlines**, one per reachable section — never a percentage where branching makes remaining length uncertain.
 - **Motion is minimal**: 0.15–0.2 s colour/border transitions, a 1 px card lift on hover. No page transitions, no parallax, no confetti.
 - **Vertically centred question block** with the action pinned bottom-right; falls back to top-aligned under 620 px height.
+- **Skipping is deliberate, never blocked.** Pressing Next on an unanswered item asks "Leave this one blank?" in the footer's reserved strip — nothing above it moves, and no red alarm appears. "I'll answer it" is the prominent button; "Skip" is the quiet one. After three consecutive skips a check-in screen offers a route back to the first one.
+- **Help is offered, not imposed.** A quiet "Remind me what this is about" reveals the item hint and the instrument instructions that framed it. After a long dwell on one item it changes to "Need a hand with this one?" — the only unprompted nudge in the interface.
+- **Validation speaks plainly** and never blocks progress with jargon: "That would make you 2 — please check the year you were born", not "Invalid date".
 
 ## 4. Components
 
@@ -49,6 +52,7 @@ The visual language is inherited from the **BrainPop lab website** (`faisalmusht
 - **Text inputs**: underline-only in display serif for short answers (feels like writing on paper, not filling a form); bordered paper block for long-form narrative.
 - **Primary button**: near-black pill, white text. **Start/finish** use the accent pill. **Decline** is an underlined muted link — always available where the protocol permits, never disguised.
 - **Ladder** (MacArthur): a drawn ladder — two rails, numbered rungs, highest at top — that responds to tap, drag and arrow keys, with researcher-authored anchor text at each end and a spoken-language confirmation ("You chose rung 8"). Exposed as `role=slider` with `aria-valuetext`.
+- **Spectrum** (`.spectrum`): options on a left-to-right axis where the arrangement carries the meaning (handedness: Always left … Always right), with a drawing of the object above. Collapses to a vertical card list under 560 px. Display order may be reversed for a scale listed in the opposite direction — presentation only, codes never change.
 - **Chips + ranked list**: pill chips for membership, numbered list with 44 px reorder buttons — the accessible two-step alternative to drag.
 
 ## 5. Accessibility (non-negotiable)

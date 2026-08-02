@@ -19,6 +19,9 @@ const and = (a: LogicExpr | undefined, b: LogicExpr | undefined): LogicExpr | un
 
 export interface FlattenedRelease {
   units: PresentableUnit[];
+  /** Unit index -> the instrument instructions that framed it, so a
+   * participant who has forgotten the context can ask for it again. */
+  context: Map<number, string>;
   /** Section key -> participant-facing transition text. */
   transitions: Map<string, string>;
   sectionTitles: Map<string, string>;
@@ -26,6 +29,7 @@ export interface FlattenedRelease {
 
 export function flattenManifest(manifest: ReleaseManifest): FlattenedRelease {
   const units: PresentableUnit[] = [];
+  const context = new Map<number, string>();
   const transitions = new Map<string, string>();
   const sectionTitles = new Map<string, string>();
 
@@ -70,6 +74,7 @@ export function flattenManifest(manifest: ReleaseManifest): FlattenedRelease {
           });
           instructionsEmitted = true;
         }
+        if (form.instructions) context.set(units.length, form.instructions);
         units.push({
           instrument: ref.instrument,
           sectionKey: section.key,
@@ -80,5 +85,5 @@ export function flattenManifest(manifest: ReleaseManifest): FlattenedRelease {
     }
   }
 
-  return { units, transitions, sectionTitles };
+  return { units, context, transitions, sectionTitles };
 }

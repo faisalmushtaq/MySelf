@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { AnswerStore, Walker } from "@myself/engine";
 import { releaseManifest } from "@myself/schema";
-import rawManifest from "../../../releases/ybm_nd2026_standard_r2.0.0.manifest.json";
+import rawManifest from "../../../releases/ybm_nd2026_standard_r3.0.0.manifest.json";
 import { flattenManifest } from "./lib/flatten.js";
 import { resolveText } from "./lib/pipes.js";
 

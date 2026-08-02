@@ -13,7 +13,7 @@ const registries: Registries = {
 };
 
 const meta = {
-  version: "2.0.0",
+  version: "3.0.0",
   publishedAt: "2026-08-02T12:00:00.000Z",
   publishedBy: "faisalmushtaq",
   engineVersion: "0.1.0",
@@ -30,12 +30,12 @@ describe("canonical JSON", () => {
   });
 });
 
-describe("YBM release r2.0.0", () => {
+describe("YBM release r3.0.0", () => {
   it("passes the publish gate and produces a verifiable manifest", () => {
     const manifest = buildRelease(ybmComposition, registries, meta);
     expect(manifest.hash).toMatch(/^sha256:[0-9a-f]{64}$/);
     expect(verifyManifestHash(manifest)).toBe(true);
-    expect(manifest.release.key).toBe("ybm_nd2026_standard_r2_0_0");
+    expect(manifest.release.key).toBe("ybm_nd2026_standard_r3_0_0");
   });
 
   it("is deterministic: identical inputs give an identical hash", () => {
