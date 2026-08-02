@@ -165,19 +165,14 @@ export const ehiSf: InstrumentInput = {
 // MacArthur Scale of Subjective Social Status – Youth
 // ---------------------------------------------------------------------------
 
-const ladderIntro = (key: string, variable: string, legacy: string, text: string): ItemInput => ({
-  responseType: "info",
-  key,
-  revision: 1,
-  variable,
-  legacyVariable: legacy,
-  stem: { text },
-});
-
+// The ladder and its explanation share one screen (D-23). Previously each
+// ladder was preceded by two click-through pages, so the framing was gone by
+// the time the rungs appeared — and the wording said "the ladder below" when
+// there was no ladder on that screen at all.
 const societyLadderText =
-  "At the top of the ladder are the people who are the best off — those who have the most money, the highest amount of schooling, and the jobs that bring the most respect. At the bottom are people who are the worst off — those who have the least money, little or no education, no job, or jobs that no one wants or respects. Now think about your family. Please tell us where you think your family would be on this ladder.";
+  "This ladder stands for where people sit in British society. At the top are the people who are best off — the most money, the most schooling, and the jobs that bring the most respect. At the bottom are the people who are worst off — the least money, little or no education, no job, or jobs nobody wants.";
 const schoolLadderText =
-  "At the top of the ladder are the people in your school with the most respect, the highest grades, and the highest standing. At the bottom are the people whom no one respects, whom no one wants to hang around, and who have the worst grades. Where would you place yourself on this ladder?";
+  "This ladder stands for where people sit in your school. At the top are the people with the most respect, the highest grades and the highest standing. At the bottom are the people nobody respects, nobody wants to be around, and who have the worst grades.";
 
 export const macarthurSsy: InstrumentInput = {
   instrument: "macarthur_ssy",
@@ -194,29 +189,27 @@ export const macarthurSsy: InstrumentInput = {
       language: "en-GB",
       label: "Canonical discrete 10-rung ladders (D-08)",
       items: [
-        ladderIntro("society_intro", "ses_society_intro", "Ladder_ses", "Imagine that the ladder below pictures how British society is set up."),
-        ladderIntro("society_desc", "ses_society_desc", "Ladder_image", societyLadderText),
         {
           responseType: "ladder",
           key: "family",
           revision: 1,
           variable: "ses_family",
           legacyVariable: "SES_Family_4",
-          stem: { text: "Mark the rung that best represents where your family would be on this ladder." },
+          stem: { text: "Where would your family be on this ladder?" },
+          lede: { text: societyLadderText },
           rungs: 10,
           lowestValue: 1,
           topLabel: "The people who are best off",
           bottomLabel: "The people who are worst off",
         },
-        ladderIntro("school_intro", "ses_school_intro", "ladder_school", "Imagine that the ladder below pictures how your school or university is set up."),
-        ladderIntro("school_desc", "ses_school_desc", "Ladder_image2", schoolLadderText),
         {
           responseType: "ladder",
           key: "self",
           revision: 1,
           variable: "ses_self",
           legacyVariable: "SES_Self_4",
-          stem: { text: "Mark the rung that best represents where you would be on this ladder." },
+          stem: { text: "Where would you be on this ladder?" },
+          lede: { text: schoolLadderText },
           rungs: 10,
           lowestValue: 1,
           topLabel: "The people with the most respect and highest standing",
@@ -229,27 +222,25 @@ export const macarthurSsy: InstrumentInput = {
       variant: "ybm-asadmin",
       label: "As administered: continuous 0-10 sliders (A-20; legacy values may be non-integer)",
       items: [
-        ladderIntro("society_intro", "ses_society_intro", "Ladder_ses", "Imagine that the ladder below pictures how British society is set up."),
-        ladderIntro("society_desc", "ses_society_desc", "Ladder_image", societyLadderText),
         {
           responseType: "slider",
           key: "family",
           revision: 1,
           variable: "ses_family",
           legacyVariable: "SES_Family_4",
-          stem: { text: "Mark the rung that best represents where your family would be on this ladder." },
+          stem: { text: "Where would your family be on this ladder?" },
+          lede: { text: societyLadderText },
           min: 0,
           max: 10,
         },
-        ladderIntro("school_intro", "ses_school_intro", "ladder_school", "Imagine that the ladder below pictures how your school or university is set up."),
-        ladderIntro("school_desc", "ses_school_desc", "Ladder_image2", schoolLadderText),
         {
           responseType: "slider",
           key: "self",
           revision: 1,
           variable: "ses_self",
           legacyVariable: "SES_Self_4",
-          stem: { text: "Mark the rung that best represents where you would be on this ladder." },
+          stem: { text: "Where would you be on this ladder?" },
+          lede: { text: schoolLadderText },
           min: 0,
           max: 10,
         },
@@ -258,7 +249,8 @@ export const macarthurSsy: InstrumentInput = {
   ],
   timeEstimates: est([90, 70]),
   changelog:
-    "1.0: encoded from QSF. Canonical form uses discrete 10-rung ladders per D-08; administered continuous 0-10 sliders (Qualtrics JS ladder background) preserved as ybm-asadmin.",
+    "1.0: encoded from QSF. Canonical form uses discrete 10-rung ladders per D-08; administered continuous 0-10 sliders (Qualtrics JS ladder background) preserved as ybm-asadmin. " +
+    "2.0 (D-23): the two click-through pages before each ladder are gone — the explanation now sits with the ladder on one screen as a lede, and 'imagine that the ladder below…' is rewritten for how it is actually presented. Response codes and anchors unchanged.",
   owner: "ybm",
 };
 
@@ -291,7 +283,7 @@ export const swemwbs: InstrumentInput = {
       language: "en-GB",
       label: "SWEMWBS (en-GB) — administered form matches canonical",
       instructions:
-        "Below are some statements about feelings and thoughts. Please tick the box that best describes your experience of each over the last 2 weeks.",
+        "The next few screens each show a statement about feelings and thoughts. For each one, choose the answer that best describes your experience over the last 2 weeks.",
       items: swemwbsItems.map(([key, text], i) =>
         row(key, `swemwbs_q${i + 1}`, `Mental well-being_${i + 1}`, text, "scale.swemwbs_5pt"),
       ),
@@ -336,7 +328,7 @@ const sdqStems: string[] = [
 ];
 
 const sdqIntro =
-  "For each item, please mark the box for Not True, Somewhat True or Certainly True. It would help us if you answered all items as best you can even if you are not absolutely certain. Please give your answers on the basis of how things have been for you over the last six months.";
+  "For each statement, choose Not True, Somewhat True or Certainly True. It would help us if you answered them all as best you can, even if you are not absolutely certain. Answer on the basis of how things have been for you over the last six months.";
 
 const sdqForm = (variant: string | undefined, label: string, scale: string) => ({
   language: "en-GB" as const,
@@ -502,7 +494,7 @@ export const stai5S: InstrumentInput = {
       language: "en-GB",
       label: "STAI-5 state (en-GB)",
       instructions:
-        "A number of statements which people have used to describe themselves are given below. Read each statement and then choose the appropriate statement to indicate how you feel right now, that is, at this moment. There are no right or wrong answers. Do not spend too much time on any one statement but give the answer which seems to describe your present feelings best.",
+        "The next few screens each show a statement people have used to describe themselves. Read the statement and choose the answer that indicates how you feel right now, that is, at this moment. There are no right or wrong answers. Do not spend too much time on any one statement — give the answer that seems to describe your present feelings best.",
       items: staiStems.map(([key, text], i) => row(key, `stai5_q${i + 1}`, `STAI-S_${i + 1}`, text, "scale.stai_4pt")),
     },
   ],
@@ -547,7 +539,7 @@ export const bisbas12Ybm: InstrumentInput = {
       language: "en-GB",
       label: "BIS/BAS 12-item subset as administered in YBM 2026",
       instructions:
-        "Each item of this questionnaire is a statement that a person may either agree with or disagree with. For each item, indicate how much you agree or disagree with what the item says. Please respond to all the items; do not leave any blank. Please be as accurate and honest as you can be. Respond to each item as if it were the only item. That is, don't worry about being \"consistent\" in your responses.",
+        "Each of the next screens shows a statement that a person may either agree with or disagree with. For each one, say how much you agree or disagree. Please answer them all. Be as accurate and honest as you can, and treat each statement on its own — don't worry about being \"consistent\" across them.",
       items: bisbasRows.map(([key, text, legacyRow]) =>
         row(key, `bisbas12_${key}`, `bisbas_${legacyRow}`, text, "scale.bisbas_4pt"),
       ),
@@ -591,7 +583,7 @@ export const doomscroll4: InstrumentInput = {
     {
       language: "en-GB",
       label: "Doomscrolling 4-item set as administered (7-point, disagree-first — A-18)",
-      instructions: "Please indicate your agreement with the following statements.",
+      instructions: "The next few screens each show a statement. For each one, say how much you agree.",
       items: doomStems.map((text, i) => row(`q${i + 1}`, `doomscroll_q${i + 1}`, `Doomscrolling _${i + 1}`, text, "scale.doomscroll_7pt")),
     },
   ],

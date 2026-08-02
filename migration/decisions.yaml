@@ -317,3 +317,90 @@ decisions:
       controllerchange, and the start screen shows the build stamp, so a cached
       build can no longer make a shipped fix look absent.
       Released as r3.1.0 (validation configuration is participant-visible).
+
+  - id: D-23
+    topic: Entry flow, presentation of long option lists, and granular timing
+    decision: staged-entry-open-options-and-full-paradata
+    detail: >
+      Researcher direction 2026-08-02, from walking the deployed preview.
+      (a) OPENING SCREEN: the code the research team issues is entered once, on
+      the first screen, with instructions saying where it comes from and what
+      to do without one. Format is three letters and four digits. The in-flow
+      "validation ID" question is removed as redundant — it was asking again
+      for something already given, and the second attempt is the one that gets
+      mistyped. The code is stored against `val_id`, so the legacy variable is
+      still populated without anyone retyping it.
+      (b) SECRET CODE IN STAGES: the four ps_id components are now four screens,
+      each with one instruction and its own validation, preceded by a screen
+      explaining what the code is for: it lets the participant recover or
+      withdraw their data, and the team cannot reverse it. Birth month is
+      chosen from a list of twelve rather than typed, so it cannot be mistyped
+      at all. Legacy ps_id is derived from the four components at export.
+      (c) OPTIONS OVER MENUS: dropdowns are gone wherever the list can be laid
+      out. Four-, five- and nine-band scales are cards; ages and months are
+      compact chips; the twenty census ethnicity categories are a full tappable
+      list. The presentation is now decided in the library per item — the
+      app no longer falls back to a menu on option count.
+      (d) LADDERS: each MacArthur ladder shares one screen with its
+      explanation. The two click-through pages that preceded each are removed,
+      and "imagine that the ladder below…" is rewritten, since there was no
+      ladder on that screen. Selecting a rung advances on release, like tapping
+      a card; dragging up and down does not jump the screen mid-decision.
+      (e) NARRATION: every stem and instruction was audited for wording written
+      for a paper form — "below are some statements", "the information
+      presented above". Where a screen tells the participant to read something
+      that is not on it, the wording is wrong, and a test now fails on the
+      pattern. Instrument instructions keep their substance; only the
+      delivery-specific words change. The mid-battery reminder shows the last
+      sentence of the instructions — the part that says how to answer — rather
+      than the opening sentence describing what is coming.
+      (f) HAIR TYPES: the 1a-4c classification codes are no longer shown.
+      Participants match a picture and a plain description; the code moves to
+      the scale's `codeLabel` for the codebook.
+      (g) SKIP CONFIRMATION: "Skip" moves to the quiet left position where Next
+      was, and "I'll answer it" takes the prominent right-hand one, so the tap
+      that opened the strip cannot land on Skip.
+      (h) BACK: an explicit grey "Back" beside the arrow. A bare chevron in a
+      corner was missed by people who wanted to change an answer.
+      (i) TIMING PARADATA: every viewing of every item is opened and closed in
+      the event log, carrying visit number and dwell. Total time, time in the
+      foreground, time to first response, revisits and answer changes are all
+      reconstructable from the log alone. The app being backgrounded is
+      recorded and stops the clock, so an iPad left on a desk does not read as
+      deliberation.
+      (j) TOO-FAST ANSWERS: an answer given in under two seconds is flagged in
+      the paradata (`response.too_fast`). The answer is always kept — the raw
+      data is never edited — and after three in a row the participant is asked
+      once, without accusation, whether they want to take more time. A revisit
+      is never flagged: changing an answer you have already read is care, not
+      haste.
+      Released as r4.0.0.
+
+  - id: D-24
+    topic: First-screen framing, data-handling transparency, and the typeface
+    decision: newsreader-throughout-and-privacy-on-request
+    detail: >
+      Researcher direction 2026-08-02.
+      (a) TYPEFACE: everything is set in Newsreader. D-21 unified the interface
+      on one family but picked the sans; the serif is the distinctive one and
+      is the one intended. `--font-ui` remains the single switch point, so the
+      accessible-font option is still a one-line change.
+      (b) INTRODUCTION: the study information screen has a real title and a
+      readable body, rather than one undifferentiated block whose first line
+      happened to be the title. Approved wording is unchanged — only its
+      arrangement on screen.
+      (c) INTERSTITIAL SIZE: short information screens are set at question
+      size. At body size they read as footnotes next to every screen around
+      them.
+      (d) DATA HANDLING: a plain-language account of what is collected, where
+      it is kept, who sees it, what the secret code is for and how to withdraw,
+      available from the first screen behind its own label. Every claim
+      restates the approved information sheet; none of it is new permission.
+      (e) STUDY LABEL: participants see a short label — the site and the year —
+      not the catalogue title of the questionnaire. Researcher-set per
+      fielding (`studyLabel`); the full title stays on the release for
+      catalogues, exports and audit.
+      (f) FIRST-SCREEN FOOTER: ethics reference and contact address, quiet, at
+      the foot of the opening screen. The hairline under the Start button is
+      removed — it read as a boundary the button was pressed against.
+      Released as r4.0.0.

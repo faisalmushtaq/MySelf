@@ -17,6 +17,23 @@ const and = (a: LogicExpr | undefined, b: LogicExpr | undefined): LogicExpr | un
   return a ?? b;
 };
 
+/**
+ * The reminder shown when someone asks "what is this about again?" mid-battery.
+ *
+ * Instrument instructions open by describing what is coming ("the next few
+ * screens each show a statement…"), which is exactly wrong as a reminder: by
+ * then the statement is already on screen. The useful part is the last
+ * sentence, which says how to answer. Take that.
+ */
+export function reminderOf(instructions: string): string {
+  const sentences = instructions
+    .trim()
+    .split(/(?<=[.!?])\s+/)
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
+  return sentences[sentences.length - 1] ?? instructions;
+}
+
 export interface FlattenedRelease {
   units: PresentableUnit[];
   /** Unit index -> the instrument instructions that framed it, so a
@@ -74,7 +91,7 @@ export function flattenManifest(manifest: ReleaseManifest): FlattenedRelease {
           });
           instructionsEmitted = true;
         }
-        if (form.instructions) context.set(units.length, form.instructions);
+        if (form.instructions) context.set(units.length, reminderOf(form.instructions));
         units.push({
           instrument: ref.instrument,
           sectionKey: section.key,

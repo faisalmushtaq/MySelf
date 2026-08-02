@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { AnswerStore, Walker, type AnswerValue, type PresentableUnit } from "@myself/engine";
 import { releaseManifest, responseScale, type ReleaseManifest, type ResponseScale } from "@myself/schema";
-import rawManifest from "../../../releases/ybm_nd2026_standard_r3.1.0.manifest.json";
+import rawManifest from "../../../releases/ybm_nd2026_standard_r4.0.0.manifest.json";
 import { flattenManifest } from "./lib/flatten.js";
 import {
   appendEvent,
@@ -12,11 +12,12 @@ import {
   loadAnswers,
   type SessionRow,
 } from "./lib/db.js";
+import { SessionTiming } from "./lib/timing.js";
 import { SurveyScreen } from "./components/SurveyScreen.js";
 
 /**
  * MySelf Go — participant application (preview build).
- * Renders the frozen YBM r3.1.0 release entirely from its manifest, saves
+ * Renders the frozen YBM r4.0.0 release entirely from its manifest, saves
  * every response to encrypted IndexedDB before advancing, works offline via
  * the service worker, and returns to a neutral start screen on handover.
  */
@@ -31,10 +32,17 @@ type Phase =
   | { kind: "start" }
   | { kind: "running"; session: SessionRow; index: number }
   | { kind: "checkin"; session: SessionRow; index: number; firstSkipped: number }
+  | { kind: "pace"; session: SessionRow; index: number }
   | { kind: "finished"; session: SessionRow };
+
+const unitKeyOf = (i: number) => {
+  const u = flattened.units[i];
+  return u ? `${u.instrument}.${u.item.key}` : "";
+};
 
 const effort = manifest.composition.effort;
 const codeRule = manifest.composition.participantCode;
+const contact = manifest.composition.contact;
 
 export default function App() {
   const [phase, setPhase] = useState<Phase>({ kind: "start" });
@@ -47,6 +55,10 @@ export default function App() {
   // Consecutive skips, and where the run began, so a check-in can offer to
   // take the participant back to the first one they left blank.
   const skipRun = useRef<{ count: number; firstIndex: number | null }>({ count: 0, firstIndex: null });
+  // Timing paradata for the live session, and the run of answers given faster
+  // than the question could have been read.
+  const timing = useRef(new SessionTiming(effort.tooFastSeconds));
+  const fastRun = useRef(0);
   // The AnswerStore is a mutable engine structure; bump re-renders explicitly
   // whenever it changes so controls reflect the recorded answer.
   const [, bumpAnswers] = useReducer((c: number) => c + 1, 0);
@@ -98,12 +110,31 @@ export default function App() {
         session = existing;
       } else {
         session = await createSession(trimmed, manifest.release.key, manifest.hash ?? "");
-        await appendEvent(session, "session.started", undefined, { releaseHash: manifest.hash }, 0, tMono());
+        await appendEvent(
+          session,
+          "session.started",
+          undefined,
+          // The study code is captured here and stored against its variable, so
+          // the survey never has to ask for it a second time (D-23).
+          { releaseHash: manifest.hash, ...(codeRule?.variable ? { [codeRule.variable]: trimmed } : {}) },
+          0,
+          tMono(),
+        );
       }
       storeRef.current = store;
       skipRun.current = { count: 0, firstIndex: null };
+      fastRun.current = 0;
+      timing.current = new SessionTiming(effort.tooFastSeconds);
       const w = new Walker(flattened.units, store, manifest.composition.allowBackNavigation);
       const index = existing ? Math.min(session.currentIndex, flattened.units.length - 1) : (w.first() ?? 0);
+      if (existing) {
+        await appendEvent(session, "session.resumed", undefined, { resumedAtIndex: index }, index, tMono());
+      }
+      const firstKey = unitKeyOf(index);
+      if (firstKey) {
+        const { visit, returning } = timing.current.enter(firstKey);
+        void appendEvent(session, "item.presented", firstKey, { visit, returning }, index, tMono());
+      }
       setPhase({ kind: "running", session, index });
     } finally {
       setBusy(false);
@@ -114,17 +145,36 @@ export default function App() {
     async (unit: PresentableUnit, value: AnswerValue) => {
       if (phase.kind !== "running") return;
       const ref = { instrument: unit.instrument, item: unit.item.key, revision: unit.item.revision };
+      const itemKey = `${unit.instrument}.${unit.item.key}`;
       const had = storeRef.current.get(ref)?.status === "answered";
       storeRef.current.set(ref, { status: "answered", value });
       bumpAnswers();
+      const t = timing.current.recordResponse(itemKey, had);
       await appendEvent(
         phase.session,
         had ? "response.changed" : "response.recorded",
-        `${unit.instrument}.${unit.item.key}`,
-        value,
+        itemKey,
+        // Timing rides with the response so a single event carries both what
+        // was answered and how long it took to answer it.
+        { value, timing: t },
         phase.index,
         tMono(),
       );
+      // The answer stands either way — this only records that it arrived
+      // faster than the question could have been read.
+      if (t.tooFast) {
+        fastRun.current += 1;
+        await appendEvent(
+          phase.session,
+          "response.too_fast",
+          itemKey,
+          { sinceShownMs: t.sinceShownMs, thresholdMs: effort.tooFastSeconds * 1000, run: fastRun.current },
+          phase.index,
+          tMono(),
+        );
+      } else {
+        fastRun.current = 0;
+      }
       setSavedAt(new Date().toLocaleTimeString());
     },
     [phase],
@@ -142,6 +192,31 @@ export default function App() {
         phase.index,
         tMono(),
       );
+    },
+    [phase],
+  );
+
+  /** Open a viewing of an item: `item.presented` carries the visit number, so
+   *  returning to a question is visible in the log rather than inferred. */
+  const enterItem = useCallback(
+    (index: number) => {
+      if (phase.kind === "start" || phase.kind === "finished") return;
+      const key = unitKeyOf(index);
+      if (!key) return;
+      const { visit, returning } = timing.current.enter(key);
+      void appendEvent(phase.session, "item.presented", key, { visit, returning }, index, tMono());
+    },
+    [phase],
+  );
+
+  /** Close a viewing of an item, recording how long it was on screen. */
+  const leaveItem = useCallback(
+    async (index: number, answered: boolean) => {
+      if (phase.kind === "start" || phase.kind === "finished") return;
+      const key = unitKeyOf(index);
+      if (!key) return;
+      const payload = timing.current.leave(key, answered);
+      if (payload) await appendEvent(phase.session, "item.left", key, payload, index, tMono());
     },
     [phase],
   );
@@ -172,6 +247,10 @@ export default function App() {
         skipRun.current = { count: 0, firstIndex: null };
       }
 
+      // Close this viewing of the item: one event per visit, carrying the dwell
+      // for that visit and the running total across visits.
+      await leaveItem(from, kind !== "skip" && kind !== "decline");
+
       const w = new Walker(flattened.units, storeRef.current, manifest.composition.allowBackNavigation);
       const next = w.next(from);
 
@@ -187,12 +266,21 @@ export default function App() {
         return;
       }
 
+      // A run of answers given faster than they could be read: ask once,
+      // without accusing anyone, then reset and carry on either way.
+      if (next !== null && effort.tooFastRunPrompt > 0 && fastRun.current >= effort.tooFastRunPrompt) {
+        fastRun.current = 0;
+        await appendEvent(phase.session, "effort.pace_prompt_shown", undefined, undefined, next, tMono());
+        setPhase({ kind: "pace", session: phase.session, index: next });
+        return;
+      }
+
       if (next === null) {
-        await appendEvent(phase.session, "session.completed", undefined, undefined, from, tMono());
+        await appendEvent(phase.session, "session.completed", undefined, timing.current.summary(), from, tMono());
         await completeSession(phase.session);
         setPhase({ kind: "finished", session: phase.session });
       } else {
-        void appendEvent(phase.session, "item.presented", `${flattened.units[next]!.instrument}.${flattened.units[next]!.item.key}`, undefined, next, tMono());
+        void enterItem(next);
         setPhase({ kind: "running", session: phase.session, index: next });
       }
     },
@@ -205,15 +293,41 @@ export default function App() {
       const w = new Walker(flattened.units, storeRef.current, manifest.composition.allowBackNavigation);
       const prev = w.back(from);
       if (prev !== null) {
+        await leaveItem(from, false);
         await appendEvent(phase.session, "navigation.back", undefined, { from, to: prev }, prev, tMono());
+        enterItem(prev);
         setPhase({ kind: "running", session: phase.session, index: prev });
       }
     },
     [phase],
   );
 
+  /**
+   * The iPad being locked, handed over or switched away from is part of how a
+   * session actually went. Recording it means a long gap can be told apart
+   * from a long think, and stops "time on question" quietly counting the
+   * lunch break.
+   */
+  useEffect(() => {
+    if (phase.kind !== "running") return;
+    const session = phase.session;
+    const onVisibility = () => {
+      if (document.hidden) {
+        const s = timing.current.suspend();
+        if (s) void appendEvent(session, "session.suspended", undefined, s, phase.index, tMono());
+      } else {
+        const r = timing.current.resume();
+        if (r) void appendEvent(session, "session.resumed", undefined, r, phase.index, tMono());
+      }
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => document.removeEventListener("visibilitychange", onVisibility);
+  }, [phase.kind, phase.kind === "running" ? phase.index : -1]);
+
   const handover = useCallback(() => {
     storeRef.current = new AnswerStore();
+    timing.current = new SessionTiming(effort.tooFastSeconds);
+    fastRun.current = 0;
     setCode("");
     setSavedAt(null);
     setPhase({ kind: "start" });
@@ -231,13 +345,19 @@ export default function App() {
         <div className="screen start">
           <h1 className="brand">MySelf</h1>
           <p className="subbrand">MyThoughts</p>
-          <p className="study-title">{manifest.composition.title}</p>
+          {manifest.composition.studyLabel && (
+            <p className="study-title">{manifest.composition.studyLabel}</p>
+          )}
+          {/* The code the research team issued, entered once before anything
+              else. It used to be asked again mid-survey; now it is captured
+              here and carried through, so nobody types it twice. */}
+          {codeRule?.instructions && <p className="start-instructions">{codeRule.instructions}</p>}
           <label className="field code-field">
-            <span className="field-label">Your participant code</span>
+            <span className="field-label">{codeRule?.label ?? "Your participant code"}</span>
             <input
               className="text-input code"
               value={code}
-              placeholder="NDC000"
+              placeholder={codeRule?.placeholder ?? "NDC0000"}
               autoCapitalize="characters"
               autoComplete="off"
               aria-invalid={codeError !== null}
@@ -266,6 +386,13 @@ export default function App() {
             {counts.completed} completed session{counts.completed === 1 ? "" : "s"} stored on this device · build{" "}
             {__BUILD_STAMP__}
           </p>
+          {contact && (
+            <p className="start-footer">
+              {contact.ethicsReference && <>Ethics reference {contact.ethicsReference}. </>}
+              Any questions, email <a href={`mailto:${contact.email}`}>{contact.email}</a>.
+              {contact.note && <> {contact.note}</>}
+            </p>
+          )}
         </div>
       )}
 
@@ -287,6 +414,28 @@ export default function App() {
         />
       )}
 
+      {phase.kind === "pace" && (
+        <div className="screen checkin">
+          <h1>No rush</h1>
+          <p>
+            The last few answers came in very quickly. There&apos;s no time limit here, and no right answers — take
+            as long as you like reading each one.
+          </p>
+          <div className="checkin-actions">
+            <button
+              type="button"
+              className="next big"
+              onClick={() => {
+                enterItem(phase.index);
+                setPhase({ kind: "running", session: phase.session, index: phase.index });
+              }}
+            >
+              Carry on
+            </button>
+          </div>
+        </div>
+      )}
+
       {phase.kind === "checkin" && (
         <div className="screen checkin">
           <h1>Just checking in</h1>
@@ -300,6 +449,7 @@ export default function App() {
               className="next big"
               onClick={() => {
                 void appendEvent(phase.session, "effort.checkin_returned", undefined, { to: phase.firstSkipped }, phase.firstSkipped, tMono());
+                enterItem(phase.firstSkipped);
                 setPhase({ kind: "running", session: phase.session, index: phase.firstSkipped });
               }}
             >
@@ -308,7 +458,10 @@ export default function App() {
             <button
               type="button"
               className="decline"
-              onClick={() => setPhase({ kind: "running", session: phase.session, index: phase.index })}
+              onClick={() => {
+                enterItem(phase.index);
+                setPhase({ kind: "running", session: phase.session, index: phase.index });
+              }}
             >
               Keep going
             </button>

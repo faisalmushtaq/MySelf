@@ -28,6 +28,12 @@ export const scaleOption = z.object({
   illustration: z.string().optional(),
   /** Short plain-language gloss shown under an illustrated option. */
   description: z.string().optional(),
+  /**
+   * Source-system label for the option (e.g. the "2c" hair-typing code), kept
+   * for the codebook and crosswalk but never shown to participants — they
+   * choose by looking at the picture, not by decoding a classification.
+   */
+  codeLabel: z.string().optional(),
 });
 
 export const responseScale = z.object({

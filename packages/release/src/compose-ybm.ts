@@ -26,6 +26,10 @@ export const ybmComposition: AssessmentDraftInput = {
   key: "ybm_nd2026_standard",
   study: "ybm",
   title: "Yorkshire Brain Map — NotreDame 2026 standard questionnaire",
+  // What a participant sees: the site and the year, not the catalogue title.
+  // Researcher-set per fielding (D-24).
+  studyLabel: "Notre Dame · 2026",
+  contact: { email: "brainpop@leeds.ac.uk", ethicsReference: "PSCETHS-1449" },
   // r2.0.0 presentation changes (D-17/D-18): hair type is an illustrated
   // tappable grid, MacArthur ladders are tap/drag ladder graphics with anchor
   // labels. Item wording, response options and codes are unchanged from r1.
@@ -33,11 +37,26 @@ export const ybmComposition: AssessmentDraftInput = {
   readingLevel: "standard",
   ageBand: "14-16",
   allowBackNavigation: true, // matches Qualtrics BackButton=true (docs/10 §1)
+  // The validation ID is entered here, once, before anything else — it used to
+  // be asked again mid-survey, which was redundant and easy to get wrong the
+  // second time (D-23). It is stored against `val_id`, so the legacy variable
+  // is still populated without the participant retyping it.
   participantCode: {
-    pattern: "^[A-Za-z]{3}[0-9]{2,}$",
-    hint: "Three letters then at least two numbers, for example NDC042",
+    label: "Your study code",
+    pattern: "^[A-Za-z]{3}[0-9]{4}$",
+    hint: "Three letters then four numbers, for example NDC0042",
+    placeholder: "NDC0042",
+    variable: "val_id",
+    instructions:
+      "The research team gave you a code for today — three letters followed by four numbers. Type it in to begin. If you haven't got one, or you're not sure, ask a member of the team before you carry on.",
   },
-  effort: { confirmSkip: true, skipRunCheckIn: 3, dwellHintSeconds: 30 },
+  effort: {
+    confirmSkip: true,
+    skipRunCheckIn: 3,
+    dwellHintSeconds: 30,
+    tooFastSeconds: 2,
+    tooFastRunPrompt: 3,
+  },
   offline: { surveyOfflineCapable: true },
   screens: {
     finish: {

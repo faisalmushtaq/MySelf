@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { dottedKey, instrumentRef, semver, sha256, slug, ulid } from "./identifiers.js";
+import { dottedKey, instrumentRef, semver, sha256, slug, ulid, variableName } from "./identifiers.js";
 import { logicExpr } from "./logic.js";
 
 /**
@@ -52,16 +52,49 @@ export const section = z.object({
 export const assessmentDraft = z.object({
   key: slug, // "ybm_nd2026_standard"
   study: slug,
+  /** Full descriptive title. Researcher-facing: catalogues, exports, audit. */
   title: z.string().min(1),
+  /**
+   * Short label shown to participants on the opening screen — in practice the
+   * site and the year ("Notre Dame · 2026"). Set per fielding by the
+   * researcher; the full title is not what a participant needs to read before
+   * starting. Omit to show nothing.
+   */
+  studyLabel: z.string().optional(),
+  /** Ethics reference and contact address, shown quietly on the first screen. */
+  contact: z
+    .object({
+      email: z.string().email(),
+      ethicsReference: z.string().optional(),
+      note: z.string().optional(),
+    })
+    .optional(),
   language: z.string().min(2),
   readingLevel: z.enum(["standard", "simplified", "early_reader"]),
   ageBand: z.enum(["8-10", "11-13", "14-16", "17-18", "adult"]),
   allowBackNavigation: z.boolean().default(true),
   resumption: z.enum(["resume_same_device", "restart", "disabled"]).default("resume_same_device"),
   progressIndicator: z.enum(["sections", "none"]).default("sections"),
-  /** Format the participant code must match, with a plain-language hint. */
+  /**
+   * The code entered on the opening screen, before anything else. This is the
+   * code the research team issues — not anything the participant invents — so
+   * it carries its own instructions as well as its format.
+   */
   participantCode: z
-    .object({ pattern: z.string(), hint: z.string() })
+    .object({
+      pattern: z.string(),
+      hint: z.string(),
+      /** Field label, e.g. "Your study code". */
+      label: z.string().default("Your participant code"),
+      /** Where the code comes from and what to do without one. */
+      instructions: z.string().optional(),
+      placeholder: z.string().optional(),
+      /**
+       * Variable the code is stored against, so it never has to be asked for a
+       * second time inside the survey.
+       */
+      variable: variableName.optional(),
+    })
     .optional(),
   /**
    * Response-effort safeguards. Skipping stays possible — these add
@@ -75,8 +108,26 @@ export const assessmentDraft = z.object({
       skipRunCheckIn: z.number().int().min(2).default(3),
       /** Seconds on one item before help is quietly offered. */
       dwellHintSeconds: z.number().int().min(5).default(30),
+      /**
+       * Below this many seconds on screen, an answer is faster than the item
+       * could plausibly have been read. The response is still recorded — it is
+       * the participant's answer and the raw data is never edited — but it is
+       * flagged in the paradata so data quality can be judged afterwards.
+       */
+      tooFastSeconds: z.number().min(0).default(2),
+      /**
+       * Consecutive too-fast answers after which the participant is asked, once
+       * and without accusation, whether they want to slow down. 0 disables.
+       */
+      tooFastRunPrompt: z.number().int().min(0).default(3),
     })
-    .default({ confirmSkip: true, skipRunCheckIn: 3, dwellHintSeconds: 30 }),
+    .default({
+      confirmSkip: true,
+      skipRunCheckIn: 3,
+      dwellHintSeconds: 30,
+      tooFastSeconds: 2,
+      tooFastRunPrompt: 3,
+    }),
   offline: z.object({
     surveyOfflineCapable: z.literal(true), // conventional content MUST work offline
     narrativeConnectivity: z.enum(["online_required", "offline_capable_with_queue"]).optional(),
@@ -161,6 +212,15 @@ export const responseEvent = z.object({
     "skip.abandoned",
     "effort.checkin_shown",
     "effort.checkin_returned",
+    // Timing paradata (D-23). item.left closes every viewing of an item and
+    // carries the dwell for that viewing, so total time on an item, number of
+    // viewings and time-to-first-response are all reconstructable from the log
+    // without any of it being derived at capture time.
+    "item.left",
+    "response.too_fast",
+    "effort.pace_prompt_shown",
+    "session.suspended",
+    "session.resumed",
   ]),
   itemRef: z
     .object({ instrument: slug, item: slug, revision: z.number().int().positive() })
@@ -169,6 +229,26 @@ export const responseEvent = z.object({
   tWall: z.string().datetime(),
   tMono: z.number(), // monotonic ms since session start
 });
+
+/**
+ * Per-item timing summary, derived from the event log rather than captured
+ * separately — the log stays the single source of truth (docs/06 §4).
+ */
+export const itemTiming = z.object({
+  itemKey: z.string().min(1),
+  /** Every separate viewing of the item, in order. */
+  visits: z.number().int().min(1),
+  /** Summed milliseconds the item was on screen across all visits. */
+  dwellMs: z.number().int().min(0),
+  /** Milliseconds from first presentation to the first recorded response. */
+  timeToFirstResponseMs: z.number().int().min(0).optional(),
+  /** Times the answer was changed after first being given. */
+  changes: z.number().int().min(0),
+  /** Answered faster than the item could plausibly have been read. */
+  tooFast: z.boolean(),
+});
+
+export type ItemTiming = z.infer<typeof itemTiming>;
 
 export type AssessmentDraft = z.infer<typeof assessmentDraft>;
 export type ReleaseManifest = z.infer<typeof releaseManifest>;

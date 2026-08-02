@@ -20,6 +20,8 @@ export interface EffortPolicy {
   confirmSkip: boolean;
   skipRunCheckIn: number;
   dwellHintSeconds: number;
+  tooFastSeconds: number;
+  tooFastRunPrompt: number;
 }
 
 export interface SurveyScreenProps {
@@ -47,6 +49,7 @@ export function SurveyScreen(props: SurveyScreenProps) {
   // Draft validity reported by the control on screen (formats, required parts).
   const [draft, setDraft] = useState<{ ok: boolean; complete: boolean } | null>(null);
   const [helpOpen, setHelpOpen] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
   const [dwelling, setDwelling] = useState(false);
   const advanceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const headingRef = useRef<HTMLHeadingElement | null>(null);
@@ -55,6 +58,7 @@ export function SurveyScreen(props: SurveyScreenProps) {
     setConfirmingSkip(false);
     setDraft(null);
     setHelpOpen(false);
+    setMoreOpen(false);
     setDwelling(false);
     headingRef.current?.focus();
     return () => {
@@ -191,9 +195,14 @@ export function SurveyScreen(props: SurveyScreenProps) {
   return (
     <div className="screen survey">
       <header className="survey-header">
+        {/* Named, not just an arrow: a bare chevron in a corner is missed, and
+            people who want to change an answer need to see the way back. */}
         {allowBack && walker.back(index) !== null ? (
-          <button type="button" className="back" aria-label="Go back" onClick={() => props.onBack(index)}>
-            ‹
+          <button type="button" className="back" onClick={() => props.onBack(index)}>
+            <span className="back-arrow" aria-hidden="true">
+              ‹
+            </span>
+            Back
           </button>
         ) : (
           <span className="back-spacer" />
@@ -206,17 +215,56 @@ export function SurveyScreen(props: SurveyScreenProps) {
       </header>
 
       <main className="survey-body">
+        {/* An information screen carrying its own body text gets a real title,
+            set like every other question. A short instruction screen is set at
+            question size too — it was reading as a footnote next to everything
+            around it. Only genuinely long prose drops to body size, where
+            question sizing would be a wall. */}
         <h1
           ref={headingRef}
           tabIndex={-1}
           className={
-            item.responseType === "info"
+            item.responseType === "info" && !item.lede && stemText.length > 600
               ? "info-text"
               : `stem${stemText.length > 110 ? " stem-long" : ""}`
           }
         >
           {stemText}
         </h1>
+        {/* Framing that used to be its own click-through page. Keeping it with
+            the control means the explanation is still on screen when the
+            answer is given. */}
+        {item.lede && (
+          <p className={`lede${item.responseType === "info" ? " lede-body" : ""}`}>
+            {resolveText(item.lede.text, item.lede.pipes, store, sessionStart)}
+          </p>
+        )}
+        {/* Detail on request — data handling, mostly. Available from the screen
+            it belongs to, never in the way of getting started. */}
+        {item.moreInfo && (
+          <div className="more-info">
+            <button
+              type="button"
+              className="more-info-toggle"
+              aria-expanded={moreOpen}
+              onClick={() => {
+                const next = !moreOpen;
+                setMoreOpen(next);
+                if (next) props.onEvent("hint.shown", { reason: "more_info", label: item.moreInfo?.label });
+              }}
+            >
+              <span className="more-info-caret" aria-hidden="true">
+                {moreOpen ? "▾" : "▸"}
+              </span>
+              {item.moreInfo.label}
+            </button>
+            {moreOpen && (
+              <div className="more-info-body">
+                {resolveText(item.moreInfo.body.text, item.moreInfo.body.pipes, store, sessionStart)}
+              </div>
+            )}
+          </div>
+        )}
         {item.illustration && (
           <span className="stem-object">
             <Illustration token={item.illustration} />
@@ -268,7 +316,15 @@ export function SurveyScreen(props: SurveyScreenProps) {
         {confirmingSkip ? (
           <div className="skip-confirm" role="alertdialog" aria-label="Skip this question?">
             <p className="skip-question">Leave this one blank?</p>
+            {/* "Skip" sits first and quiet, where the Next button was, so the
+                tap that opened this strip does not land straight on it.
+                "I'll answer it" takes the prominent right-hand position the
+                thumb returns to. Skipping stays one tap away — it is just no
+                longer the accidental one. */}
             <div className="skip-actions">
+              <button type="button" className="skip-go" onClick={handleNext}>
+                Skip
+              </button>
               <button
                 type="button"
                 className="skip-back"
@@ -278,9 +334,6 @@ export function SurveyScreen(props: SurveyScreenProps) {
                 }}
               >
                 I'll answer it
-              </button>
-              <button type="button" className="skip-go" onClick={handleNext}>
-                Skip
               </button>
             </div>
           </div>
