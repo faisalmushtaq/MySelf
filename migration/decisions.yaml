@@ -113,17 +113,28 @@ decisions:
   - id: D-11
     anomaly: A-29
     topic: Safeguarding configuration
-    decision: encode-existing-approved-protocol
+    decision: defer-rules-build-mechanism
     detail: >
-      The study's existing approved safeguarding procedure will be encoded.
-    status: input-needed  # research team to supply the protocol document
+      Updated 2026-08-02: no existing safeguarding protocol document exists yet;
+      the researcher will develop one later. The platform builds the full flag
+      mechanism (tiers, review queue, permission gating, audit) but ships with
+      no active rules. The publish gate requires an explicit safeguarding
+      declaration per narrative protocol — "no automated rules; researcher
+      review only" is a valid, deliberate declaration for early releases, and
+      participant-facing wording must not imply any monitoring.
+    status: deferred-by-researcher
 
   - id: D-12
     topic: Hosting and researcher identity provider
-    decision: cloud
+    decision: cloud-when-provisioned
     detail: >
-      Cloud deployment (AWS or Azure) with OIDC researcher sign-in.
-    status: input-needed  # cloud account, region, and IdP tenant details
+      Updated 2026-08-02: no cloud account exists yet. The MVP runs on Docker
+      Compose (Postgres + API + apps) so it works locally and moves unchanged
+      to any provider once an account is set up. Recommendation prepared for
+      that moment: AWS eu-west-2 or Azure UK South (UK data residency),
+      managed Postgres, object storage for assets/exports; researcher sign-in
+      via Keycloak initially, swappable for the university IdP (OIDC) later.
+    status: deferred-until-account-exists
 
   - id: D-13
     topic: Collection-device posture
