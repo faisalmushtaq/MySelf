@@ -25,8 +25,8 @@ The visual language is inherited from the **BrainPop lab website** (`faisalmusht
 
 ## 2. Typography
 
-- **Display — `Newsreader` (serif, weight 400):** question stems, brand wordmark, numbers in ladders/sliders, headings. Never bold; weight comes from size.
-- **Body/UI — `DM Sans` (300/400/500):** option labels, prose, buttons, labels, status chrome. 300 for prose, 400 for controls, 500 only for buttons and uppercase labels.
+- **One typeface throughout (`DM Sans`)** — question stems, options, prose, buttons, ladder numbers and the wordmark all share it (D-21). Nothing on screen changes voice mid-question. Hierarchy comes from **size and weight only**: 400 for prose and controls, 500 for stems and emphasis, 600–700 for the wordmark and headings.
+- **Single switch point for an accessible face.** `--font-ui` in `:root` is the only place the family is named; `--font-display` and `--font-body` both alias it. A dyslexia-friendly font (e.g. Atkinson Hyperlegible or OpenDyslexic via `@fontsource`) becomes a one-line change, or a body-class toggle for a per-participant setting — no component touches needed. Planned, not yet built.
 - Fonts are **bundled via `@fontsource`**, never loaded from a CDN — the app must render identically offline in a school hall.
 - **Base size is large by design**: 20px on phones, 22px from 768px up. Participants include children and low-literacy readers; small type is not an aesthetic choice we get to make.
 - Question stems: `clamp(1.75rem, 5vw, 2.4rem)`, measure capped at `30ch`. Stems longer than 110 characters step down to `1.75rem` at `46ch` (`.stem-long`) so an explanatory question reads as a paragraph.
@@ -36,7 +36,7 @@ The visual language is inherited from the **BrainPop lab website** (`faisalmusht
 
 - **One question per screen.** Grouping only where a validated instrument's administration requires it.
 - **Options show only the options.** No letter keys, numbers or shortcut badges — nothing for a participant to decode. Selection is by tap, click, or Tab + Space.
-- **Enter advances** for keyboard users, with no on-screen glyph to explain.
+- **Enter advances** everywhere, including from a typed answer — typing a name and pressing Enter moves straight on, matching how choices auto-advance. In a multi-field form, Enter walks down the fields and then advances from the last one. Long-form narrative text is the exception: Enter there inserts a line break.
 - **Auto-advance** on single-choice after ~300 ms, suppressed under `prefers-reduced-motion`.
 - **Progress is segmented hairlines**, one per reachable section — never a percentage where branching makes remaining length uncertain.
 - **Motion is minimal**: 0.15–0.2 s colour/border transitions, a 1 px card lift on hover. No page transitions, no parallax, no confetti.

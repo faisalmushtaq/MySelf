@@ -261,3 +261,23 @@ decisions:
       coverage check, (3) publish-gate validation that every age band reaches a
       complete, scorable set, and (4) export metadata recording which branch a
       participant received. To be designed with the researcher before build.
+
+  - id: D-21
+    topic: Single typeface, Enter-to-advance, and the accessible-font hook
+    decision: one-typeface-and-keyboard-parity
+    detail: >
+      Researcher direction 2026-08-02.
+      (a) TYPOGRAPHY: the serif/sans pairing is dropped — the whole interface
+      is set in one typeface (DM Sans) so nothing changes voice mid-question.
+      Hierarchy is carried by size and weight alone. The family is named in a
+      single custom property (--font-ui), which --font-display and --font-body
+      alias, so switching to a dyslexia-friendly face (Atkinson Hyperlegible,
+      OpenDyslexic) is a one-line change or a per-participant body-class
+      toggle, with no component edits. The accessible-font option itself is
+      planned, not yet built.
+      (b) ENTER ADVANCES: pressing Enter on a typed answer moves to the next
+      screen, matching the auto-advance behaviour of choice questions. In a
+      multi-field form Enter walks down the fields and advances from the last.
+      Long-form narrative text keeps Enter for line breaks. The handler routes
+      through the same disabled-state check as the Next button, so it can
+      never bypass a validation error.

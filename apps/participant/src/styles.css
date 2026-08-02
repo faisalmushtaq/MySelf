@@ -1,9 +1,9 @@
 /*
  * MySelf — participant interface
  *
- * Visual language inherited from the BrainPop lab site (editorial aesthetic):
- *   Newsreader display serif, DM Sans body, generous whitespace, hairline
- *   borders, restrained motion — on a near-white canvas with all-black text.
+ * Visual language inherited from the BrainPop lab site (editorial restraint,
+ * generous whitespace, hairline borders, minimal motion) on a near-white
+ * canvas with all-black text, set in a single typeface throughout.
  *
  * Interaction: one question per screen, large readable type, quiet chrome,
  * and controls that look like what they measure (a ladder you tap, hair
@@ -12,11 +12,10 @@
  * Design tokens mirror assets/css/style.css in brainpop-lab-website.
  */
 
-@import "@fontsource/newsreader/400.css";
-@import "@fontsource/newsreader/500.css";
 @import "@fontsource/dm-sans/300.css";
 @import "@fontsource/dm-sans/400.css";
 @import "@fontsource/dm-sans/500.css";
+@import "@fontsource/dm-sans/700.css";
 
 :root {
   --canvas: #fcfcfb;        /* near-white page */
@@ -30,8 +29,20 @@
   --accent-wash: rgba(6, 120, 67, 0.07);
   --warn: #a33b00;
 
-  --font-display: "Newsreader", Georgia, "Times New Roman", serif;
-  --font-body: "DM Sans", system-ui, -apple-system, sans-serif;
+  /*
+   * ONE typeface throughout: question stems, options, prose and numbers all
+   * share it, so nothing on screen changes voice mid-question. Size and
+   * weight carry hierarchy.
+   *
+   * Both variables point at the same family deliberately. They are the single
+   * switch point for an accessible/dyslexia-friendly face later: set
+   * --font-ui (e.g. to an OpenDyslexic or Atkinson Hyperlegible @fontsource
+   * import) on :root, or scope it to a body class toggled per participant,
+   * and every surface follows without touching component code.
+   */
+  --font-ui: "DM Sans", system-ui, -apple-system, sans-serif;
+  --font-display: var(--font-ui);
+  --font-body: var(--font-ui);
 
   --radius: 6px;
   --measure: 30ch;
@@ -63,9 +74,9 @@ body {
 h1,
 h2,
 h3 {
-  font-family: var(--font-display);
-  font-weight: 400;
-  line-height: 1.15;
+  font-family: var(--font-ui);
+  font-weight: 600;
+  line-height: 1.2;
   margin-top: 0;
 }
 
@@ -140,10 +151,10 @@ textarea {
 
 /* Start / finish — editorial masthead */
 .brand {
-  font-family: var(--font-display);
-  font-size: clamp(2.75rem, 9vw, 4rem);
-  font-weight: 400;
-  letter-spacing: -0.02em;
+  font-family: var(--font-ui);
+  font-size: clamp(2.5rem, 8vw, 3.5rem);
+  font-weight: 700;
+  letter-spacing: -0.03em;
   margin: 0;
   color: var(--text);
 }
@@ -275,11 +286,11 @@ textarea {
 }
 
 .stem {
-  font-family: var(--font-display);
-  font-size: clamp(1.75rem, 5vw, 2.4rem);
-  font-weight: 400;
-  line-height: 1.2;
-  letter-spacing: -0.01em;
+  font-family: var(--font-ui);
+  font-size: clamp(1.6rem, 4.4vw, 2.1rem);
+  font-weight: 500;
+  line-height: 1.25;
+  letter-spacing: -0.015em;
   margin: 0;
   max-width: var(--measure);
   color: var(--text);
@@ -289,8 +300,9 @@ textarea {
    measure, so a long stem reads as a paragraph rather than a wall of display
    serif. The type scale stays the same family and rhythm. */
 .stem-long {
-  font-size: clamp(1.4rem, 3.4vw, 1.75rem);
-  line-height: 1.35;
+  font-size: clamp(1.25rem, 3vw, 1.5rem);
+  font-weight: 500;
+  line-height: 1.45;
   max-width: 46ch;
 }
 
@@ -385,8 +397,8 @@ textarea {
   max-width: 42rem;
   min-height: 54px;
   padding: 0.75rem 0;
-  font-family: var(--font-display);
-  font-size: 1.4rem;
+  font-family: var(--font-ui);
+  font-size: 1.25rem;
   font-weight: 400;
   color: var(--text);
   background: transparent;
@@ -406,9 +418,9 @@ textarea {
 }
 
 .text-input.long {
-  font-family: var(--font-body);
+  font-family: var(--font-ui);
   font-size: 1.05rem;
-  font-weight: 300;
+  font-weight: 400;
   line-height: 1.7;
   min-height: 168px;
   padding: 1rem 1.1rem;
@@ -503,8 +515,9 @@ input[type="range"] {
 }
 
 .slider-value {
-  font-family: var(--font-display);
-  font-size: 2.25rem;
+  font-family: var(--font-ui);
+  font-size: 2rem;
+  font-weight: 500;
   text-align: center;
   color: var(--accent);
   line-height: 1;
@@ -558,8 +571,9 @@ input[type="range"] {
 }
 
 .ladder-number {
-  font-family: var(--font-display);
-  font-size: 19px;
+  font-family: var(--font-ui);
+  font-size: 18px;
+  font-weight: 500;
   fill: var(--text);
   paint-order: stroke;
   stroke: var(--paper);
@@ -638,8 +652,9 @@ input[type="range"] {
 }
 
 .tile-label {
-  font-family: var(--font-display);
-  font-size: 1.15rem;
+  font-family: var(--font-ui);
+  font-size: 1.1rem;
+  font-weight: 500;
   line-height: 1;
 }
 
@@ -738,8 +753,9 @@ input[type="range"] {
 
 .rank-item::before {
   content: counter(rank);
-  font-family: var(--font-display);
+  font-family: var(--font-ui);
   font-size: 1rem;
+  font-weight: 500;
   color: var(--accent);
   min-width: 1.2rem;
 }

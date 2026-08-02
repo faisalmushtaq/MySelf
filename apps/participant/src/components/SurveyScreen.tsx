@@ -164,6 +164,14 @@ export function SurveyScreen(props: SurveyScreenProps) {
     value: record?.value,
     onAnswer: handleAnswer,
     onValidity: setDraft,
+    // Enter on a typed answer advances, mirroring choice auto-advance. The
+    // handler still respects validity, so it can never skip a bad entry.
+    onSubmit: () => {
+      window.setTimeout(() => {
+        const next = document.querySelector<HTMLButtonElement>("button.next:not(:disabled)");
+        next?.click();
+      }, 0);
+    },
   };
   /**
    * Identity of the question on screen. Used as a React key so every control
