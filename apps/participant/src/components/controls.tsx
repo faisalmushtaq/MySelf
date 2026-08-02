@@ -15,6 +15,14 @@ export interface ControlProps {
   scale?: ResponseScale | undefined;
   value?: AnswerValue | undefined;
   onAnswer: (value: AnswerValue, autoAdvance: boolean) => void;
+  /**
+   * Controls that can hold an unusable draft report it here, so the screen can
+   * refuse to advance. `ok` is false while anything on screen fails its format
+   * rule; `complete` is false while a required part is still empty. Without
+   * this a participant could fix a field into an invalid state and continue,
+   * leaving the last valid value stored while the screen showed something else.
+   */
+  onValidity?: ((state: { ok: boolean; complete: boolean }) => void) | undefined;
 }
 
 const prefersReducedMotion = () =>
@@ -294,7 +302,7 @@ export function LadderControl({ item, value, onAnswer }: ControlProps) {
   );
 }
 
-export function NumericControl({ item, value, onAnswer }: ControlProps) {
+export function NumericControl({ item, value, onAnswer, onValidity }: ControlProps) {
   if (item.responseType !== "numeric") return null;
   const current = value?.kind === "number" ? String(value.value) : "";
   const [text, setText] = useState(current);
@@ -307,13 +315,16 @@ export function NumericControl({ item, value, onAnswer }: ControlProps) {
     const n = Number(raw);
     if (Number.isNaN(n) || (item.integerOnly && !Number.isInteger(n))) {
       setError("Please enter a whole number");
+      onValidity?.({ ok: false, complete: false });
       return;
     }
     if ((item.min !== undefined && n < item.min) || (item.max !== undefined && n > item.max)) {
       setError(`Please enter a number between ${item.min ?? "0"} and ${item.max ?? "∞"}`);
+      onValidity?.({ ok: false, complete: false });
       return;
     }
     setError(null);
+    onValidity?.({ ok: true, complete: true });
     onAnswer({ kind: "number", value: n }, false);
   };
 
@@ -338,7 +349,7 @@ export function NumericControl({ item, value, onAnswer }: ControlProps) {
   );
 }
 
-export function DateControl({ item, value, onAnswer }: ControlProps) {
+export function DateControl({ item, value, onAnswer, onValidity }: ControlProps) {
   const [error, setError] = useState<string | null>(null);
   if (item.responseType !== "date") return null;
   const current = value?.kind === "date" ? value.iso : "";
@@ -377,6 +388,7 @@ export function DateControl({ item, value, onAnswer }: ControlProps) {
           if (!iso) return;
           const problem = check(iso);
           setError(problem);
+          onValidity?.({ ok: problem === null, complete: problem === null });
           if (!problem) onAnswer({ kind: "date", iso }, false);
         }}
       />
@@ -389,7 +401,7 @@ export function DateControl({ item, value, onAnswer }: ControlProps) {
   );
 }
 
-export function TextControl({ item, value, onAnswer }: ControlProps) {
+export function TextControl({ item, value, onAnswer, onValidity }: ControlProps) {
   if (item.responseType !== "text_short" && item.responseType !== "text_long") return null;
   const current = value?.kind === "text" ? value.value : "";
   const [text, setText] = useState(current);
@@ -405,11 +417,13 @@ export function TextControl({ item, value, onAnswer }: ControlProps) {
     setText(raw);
     if (patternOf && raw.trim().length > 0 && !new RegExp(patternOf).test(raw.trim())) {
       setError(patternHint ?? "Please check the format");
+      onValidity?.({ ok: false, complete: false });
       pending.current = null;
       if (timer.current) clearTimeout(timer.current);
       return;
     }
     setError(null);
+    onValidity?.({ ok: true, complete: raw.trim().length > 0 });
     pending.current = raw;
     if (timer.current) clearTimeout(timer.current);
     timer.current = setTimeout(() => {
@@ -465,7 +479,7 @@ export function TextControl({ item, value, onAnswer }: ControlProps) {
   );
 }
 
-export function FormFieldsControl({ item, value, onAnswer }: ControlProps) {
+export function FormFieldsControl({ item, value, onAnswer, onValidity }: ControlProps) {
   if (item.responseType !== "form_fields") return null;
   const current = value?.kind === "fields" ? value.values : {};
   const [values, setValues] = useState<Record<string, string>>(current);
@@ -476,17 +490,29 @@ export function FormFieldsControl({ item, value, onAnswer }: ControlProps) {
   const commit = (key: string, v: string) => {
     const next = { ...values, [key]: v };
     setValues(next);
-    const field = item.responseType === "form_fields" ? item.fields.find((f) => f.key === key) : undefined;
-    if (field?.pattern && v.trim().length > 0 && !new RegExp(field.pattern).test(v.trim())) {
-      setErrors((e) => ({ ...e, [key]: field.patternHint ?? "Please check the format" }));
+    if (item.responseType !== "form_fields") return;
+    const field = item.fields.find((f) => f.key === key);
+    const bad = field?.pattern && v.trim().length > 0 && !new RegExp(field.pattern).test(v.trim());
+
+    const nextErrors = { ...errors };
+    if (bad) nextErrors[key] = field?.patternHint ?? "Please check the format";
+    else delete nextErrors[key];
+    setErrors(nextErrors);
+
+    // Validity is judged across the whole form, not just the field just typed
+    // in: a single bad entry must block the screen even if the others are fine.
+    const anyBad = item.fields.some((f) => {
+      const raw = (next[f.key] ?? "").trim();
+      return f.pattern !== undefined && raw.length > 0 && !new RegExp(f.pattern).test(raw);
+    });
+    const allRequiredPresent = item.fields.every((f) => !f.required || (next[f.key] ?? "").trim().length > 0);
+    onValidity?.({ ok: !anyBad, complete: !anyBad && allRequiredPresent });
+
+    if (bad) {
       pending.current = null;
       if (timer.current) clearTimeout(timer.current);
       return;
     }
-    setErrors((e) => {
-      const { [key]: _drop, ...rest } = e;
-      return rest;
-    });
     pending.current = next;
     if (timer.current) clearTimeout(timer.current);
     timer.current = setTimeout(() => {

@@ -44,6 +44,8 @@ export function SurveyScreen(props: SurveyScreenProps) {
   const unit = units[index];
   const walker = useMemo(() => new Walker(units, store, allowBack), [units, store, allowBack]);
   const [confirmingSkip, setConfirmingSkip] = useState(false);
+  // Draft validity reported by the control on screen (formats, required parts).
+  const [draft, setDraft] = useState<{ ok: boolean; complete: boolean } | null>(null);
   const [helpOpen, setHelpOpen] = useState(false);
   const [dwelling, setDwelling] = useState(false);
   const advanceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -51,6 +53,7 @@ export function SurveyScreen(props: SurveyScreenProps) {
 
   useEffect(() => {
     setConfirmingSkip(false);
+    setDraft(null);
     setHelpOpen(false);
     setDwelling(false);
     headingRef.current?.focus();
@@ -125,9 +128,13 @@ export function SurveyScreen(props: SurveyScreenProps) {
       record.value?.kind === "checkboxes" &&
       item.statements.filter((s) => s.required).every((s) => record.value!.kind === "checkboxes" && record.value!.checked.includes(s.key)));
 
+  // A visible format error blocks advancing whatever the requirement level:
+  // nobody should be able to move past a field the screen is calling wrong,
+  // and no earlier valid value should be carried forward behind an error.
+  const draftBlocked = draft !== null && !draft.ok;
   const canAdvance =
     item.responseType === "info" ||
-    (item.required === "hard" ? answered && consentComplete : true);
+    (!draftBlocked && (item.required === "hard" ? answered && consentComplete && (draft?.complete ?? true) : true));
 
   const handleAnswer = (value: AnswerValue, autoAdvance: boolean) => {
     props.onRecord(unit, value);
@@ -139,6 +146,7 @@ export function SurveyScreen(props: SurveyScreenProps) {
 
   const handleNext = () => {
     if (item.responseType === "info") return props.onAdvance(index, "next");
+    if (draftBlocked) return; // button is disabled; belt and braces
     if (answered && consentComplete) return props.onAdvance(index, "next");
     if (item.required === "hard") return; // button disabled anyway
     // Unanswered and skippable: ask once, in place, before letting it go.
@@ -150,7 +158,13 @@ export function SurveyScreen(props: SurveyScreenProps) {
     props.onAdvance(index, "skip");
   };
 
-  const controlProps = { item: resolvedItem, scale, value: record?.value, onAnswer: handleAnswer };
+  const controlProps = {
+    item: resolvedItem,
+    scale,
+    value: record?.value,
+    onAnswer: handleAnswer,
+    onValidity: setDraft,
+  };
   /**
    * Identity of the question on screen. Used as a React key so every control
    * remounts between questions: without it React reuses the control instance
@@ -261,7 +275,7 @@ export function SurveyScreen(props: SurveyScreenProps) {
                 Prefer not to say
               </button>
             )}
-            <button type="button" className="next" disabled={!canAdvance && item.required === "hard"} onClick={handleNext}>
+            <button type="button" className="next" disabled={!canAdvance} onClick={handleNext}>
               {item.responseType === "info" ? "Continue" : answered ? "Next" : "Next"}
             </button>
           </>
