@@ -17,9 +17,6 @@ importers:
 
   apps/participant:
     dependencies:
-      '@fontsource/dm-sans':
-        specifier: ^5.3.0
-        version: 5.3.0
       '@fontsource/newsreader':
         specifier: ^5.3.0
         version: 5.3.0
@@ -811,9 +808,6 @@ packages:
     engines: {node: '>=12'}
     cpu: [x64]
     os: [win32]
-
-  '@fontsource/dm-sans@5.3.0':
-    resolution: {integrity: sha512-lYJtMXXO28q1z+yz+z8XKd0s4hXaa9QdkETzkyD760sidCv5heI86weYA0sx0Nc4pAMAQTUuyf4gO44cYKKS9g==}
 
   '@fontsource/newsreader@5.3.0':
     resolution: {integrity: sha512-AFR6ZKY89GNL+9qBI2P2+66NhD5bhOj/v6fsLnFYLM4E0JnMB1yKb+Ro8cA64i1hwAWoBfTq5CHJGWH1toLDkw==}
@@ -2910,8 +2904,6 @@ snapshots:
 
   '@esbuild/win32-x64@0.21.5':
     optional: true
-
-  '@fontsource/dm-sans@5.3.0': {}
 
   '@fontsource/newsreader@5.3.0': {}
 
