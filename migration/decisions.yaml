@@ -215,3 +215,49 @@ decisions:
       codes are unchanged; these are presentation changes, released as r2.0.0
       because anything participant-visible requires a new immutable release
       (r1.0.0 remains in the repository untouched).
+
+  - id: D-19
+    topic: Response-effort safeguards, validation, and intuitive handedness
+    decision: friction-validation-and-spatial-controls
+    detail: >
+      Researcher direction 2026-08-02.
+      (a) SKIP FRICTION: pressing Next on an unanswered skippable item now asks
+      "Leave this one blank?" in a reserved footer strip — the question above it
+      never moves. The prominent action is "I'll answer it"; "Skip" is the
+      quiet one. Skipping stays possible for anyone who means it.
+      (b) SKIP RUN CHECK-IN: after `effort.skipRunCheckIn` consecutive skips
+      (default 3) a full screen offers to return to the first question of the
+      run. Both the prompt and the choice are recorded as paradata
+      (skip.confirmed / skip.abandoned / effort.checkin_shown /
+      effort.checkin_returned).
+      (c) DWELL HELP: after `effort.dwellHintSeconds` on one item (default 30)
+      a quiet "Need a hand with this one?" appears, revealing the item hint and
+      the instrument instructions that framed it — the context a participant
+      may have forgotten several screens ago. Recorded as hint.shown with the
+      reason, giving a response-time data-quality signal.
+      (d) VALIDATION: participant code, the ps_id components and the validation
+      ID carry anchored patterns with plain-language hints; date of birth is
+      checked for plausibility (minAgeYears 4, maxAgeYears 100, no future
+      dates). All are configured in the release manifest, not hard-coded.
+      (e) HANDEDNESS: EHI items are presented as a left-to-right spatial
+      spectrum (Always left … Always right) with a drawing of the object, so
+      the layout carries the meaning. The canonical form lists options
+      right-first, so it sets spectrumReverse — display order only, response
+      codes unchanged.
+      Released as r3.0.0 (participant-visible presentation change).
+
+  - id: D-20
+    topic: Age-adaptive assessments
+    decision: planned-next
+    detail: >
+      The researcher confirmed assessments will eventually be adaptive —
+      different item sets by age group and other participant characteristics.
+      Nothing in the current design blocks this: the logic AST already gates
+      sections, components and items on prior answers; instruments carry
+      age ranges and reading-level forms; and the composition carries an age
+      band. What is still needed, and is scheduled rather than half-built:
+      (1) participant attributes (age/school year) available as logic operands
+      alongside item answers, (2) composer UI for age-banded branches with a
+      coverage check, (3) publish-gate validation that every age band reaches a
+      complete, scorable set, and (4) export metadata recording which branch a
+      participant received. To be designed with the researcher before build.

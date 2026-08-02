@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { AnswerStore, Walker, type AnswerValue, type PresentableUnit } from "@myself/engine";
 import { releaseManifest, responseScale, type ReleaseManifest, type ResponseScale } from "@myself/schema";
-import rawManifest from "../../../releases/ybm_nd2026_standard_r2.0.0.manifest.json";
+import rawManifest from "../../../releases/ybm_nd2026_standard_r3.0.0.manifest.json";
 import { flattenManifest } from "./lib/flatten.js";
 import {
   appendEvent,
@@ -16,7 +16,7 @@ import { SurveyScreen } from "./components/SurveyScreen.js";
 
 /**
  * MySelf Go — participant application (preview build).
- * Renders the frozen YBM r2.0.0 release entirely from its manifest, saves
+ * Renders the frozen YBM r3.0.0 release entirely from its manifest, saves
  * every response to encrypted IndexedDB before advancing, works offline via
  * the service worker, and returns to a neutral start screen on handover.
  */
@@ -27,7 +27,14 @@ const scaleMap = new Map<string, ResponseScale>(
   Object.entries(manifest.scales).map(([k, v]) => [k, responseScale.parse(v)]),
 );
 
-type Phase = { kind: "start" } | { kind: "running"; session: SessionRow; index: number } | { kind: "finished"; session: SessionRow };
+type Phase =
+  | { kind: "start" }
+  | { kind: "running"; session: SessionRow; index: number }
+  | { kind: "checkin"; session: SessionRow; index: number; firstSkipped: number }
+  | { kind: "finished"; session: SessionRow };
+
+const effort = manifest.composition.effort;
+const codeRule = manifest.composition.participantCode;
 
 export default function App() {
   const [phase, setPhase] = useState<Phase>({ kind: "start" });
@@ -36,6 +43,10 @@ export default function App() {
   const [savedAt, setSavedAt] = useState<string | null>(null);
   const [counts, setCounts] = useState({ inProgress: 0, completed: 0 });
   const [busy, setBusy] = useState(false);
+  const [codeError, setCodeError] = useState<string | null>(null);
+  // Consecutive skips, and where the run began, so a check-in can offer to
+  // take the participant back to the first one they left blank.
+  const skipRun = useRef<{ count: number; firstIndex: number | null }>({ count: 0, firstIndex: null });
   // The AnswerStore is a mutable engine structure; bump re-renders explicitly
   // whenever it changes so controls reflect the recorded answer.
   const [, bumpAnswers] = useReducer((c: number) => c + 1, 0);
@@ -68,6 +79,11 @@ export default function App() {
   const start = useCallback(async () => {
     const trimmed = code.trim();
     if (trimmed.length < 2 || busy) return;
+    if (codeRule && !new RegExp(codeRule.pattern).test(trimmed)) {
+      setCodeError(codeRule.hint);
+      return;
+    }
+    setCodeError(null);
     setBusy(true);
     try {
       const existing = await findResumableSession(trimmed, manifest.hash ?? "");
@@ -85,6 +101,7 @@ export default function App() {
         await appendEvent(session, "session.started", undefined, { releaseHash: manifest.hash }, 0, tMono());
       }
       storeRef.current = store;
+      skipRun.current = { count: 0, firstIndex: null };
       const w = new Walker(flattened.units, store, manifest.composition.allowBackNavigation);
       const index = existing ? Math.min(session.currentIndex, flattened.units.length - 1) : (w.first() ?? 0);
       setPhase({ kind: "running", session, index });
@@ -113,6 +130,22 @@ export default function App() {
     [phase],
   );
 
+  const emit = useCallback(
+    (type: string, payload?: Record<string, unknown>) => {
+      if (phase.kind !== "running") return;
+      const unit = flattened.units[phase.index];
+      void appendEvent(
+        phase.session,
+        type,
+        unit ? `${unit.instrument}.${unit.item.key}` : undefined,
+        payload,
+        phase.index,
+        tMono(),
+      );
+    },
+    [phase],
+  );
+
   const advance = useCallback(
     async (from: number, kind: "next" | "skip" | "decline") => {
       if (phase.kind !== "running") return;
@@ -131,8 +164,29 @@ export default function App() {
         );
         setSavedAt(new Date().toLocaleTimeString());
       }
+      // Track runs of consecutive skips/declines so we can check in gently.
+      if (kind === "skip" || kind === "decline") {
+        if (skipRun.current.count === 0) skipRun.current.firstIndex = from;
+        skipRun.current.count += 1;
+      } else {
+        skipRun.current = { count: 0, firstIndex: null };
+      }
+
       const w = new Walker(flattened.units, storeRef.current, manifest.composition.allowBackNavigation);
       const next = w.next(from);
+
+      if (
+        next !== null &&
+        skipRun.current.count >= effort.skipRunCheckIn &&
+        skipRun.current.firstIndex !== null
+      ) {
+        const firstSkipped = skipRun.current.firstIndex;
+        skipRun.current = { count: 0, firstIndex: null };
+        await appendEvent(phase.session, "effort.checkin_shown", undefined, { firstSkipped }, next, tMono());
+        setPhase({ kind: "checkin", session: phase.session, index: next, firstSkipped });
+        return;
+      }
+
       if (next === null) {
         await appendEvent(phase.session, "session.completed", undefined, undefined, from, tMono());
         await completeSession(phase.session);
@@ -186,11 +240,20 @@ export default function App() {
               placeholder="NDC000"
               autoCapitalize="characters"
               autoComplete="off"
-              onChange={(e) => setCode(e.target.value)}
+              aria-invalid={codeError !== null}
+              onChange={(e) => {
+                setCode(e.target.value);
+                if (codeError) setCodeError(null);
+              }}
               onKeyDown={(e) => {
                 if (e.key === "Enter") void start();
               }}
             />
+            {codeError && (
+              <span className="error" role="alert">
+                {codeError}
+              </span>
+            )}
           </label>
           <button type="button" className="next big" disabled={code.trim().length < 2 || busy} onClick={() => void start()}>
             Start
@@ -211,10 +274,42 @@ export default function App() {
           sectionTitles={flattened.sectionTitles}
           index={phase.index}
           sessionStart={new Date(phase.session.startedAt)}
+          effort={effort}
+          context={flattened.context.get(phase.index)}
           onRecord={(u, v) => void record(u, v)}
           onAdvance={(f, k) => void advance(f, k)}
           onBack={(f) => void goBack(f)}
+          onEvent={emit}
         />
+      )}
+
+      {phase.kind === "checkin" && (
+        <div className="screen checkin">
+          <h1>Just checking in</h1>
+          <p>
+            You&apos;ve left the last few questions blank. That&apos;s completely allowed — but if any of them
+            were skipped by accident, you can go back to them now.
+          </p>
+          <div className="checkin-actions">
+            <button
+              type="button"
+              className="next big"
+              onClick={() => {
+                void appendEvent(phase.session, "effort.checkin_returned", undefined, { to: phase.firstSkipped }, phase.firstSkipped, tMono());
+                setPhase({ kind: "running", session: phase.session, index: phase.firstSkipped });
+              }}
+            >
+              Go back to them
+            </button>
+            <button
+              type="button"
+              className="decline"
+              onClick={() => setPhase({ kind: "running", session: phase.session, index: phase.index })}
+            >
+              Keep going
+            </button>
+          </div>
+        </div>
       )}
 
       {phase.kind === "finished" && (

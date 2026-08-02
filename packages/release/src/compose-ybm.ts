@@ -33,6 +33,11 @@ export const ybmComposition: AssessmentDraftInput = {
   readingLevel: "standard",
   ageBand: "14-16",
   allowBackNavigation: true, // matches Qualtrics BackButton=true (docs/10 §1)
+  participantCode: {
+    pattern: "^[A-Za-z]{3}[0-9]{2,}$",
+    hint: "Three letters then at least two numbers, for example NDC042",
+  },
+  effort: { confirmSkip: true, skipRunCheckIn: 3, dwellHintSeconds: 30 },
   offline: { surveyOfflineCapable: true },
   screens: {
     finish: {

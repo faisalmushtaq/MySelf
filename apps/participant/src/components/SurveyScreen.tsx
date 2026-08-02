@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { AnswerStore, Walker, type AnswerValue, type PresentableUnit } from "@myself/engine";
 import type { ItemDefinition, ResponseScale } from "@myself/schema";
 import { resolveText } from "../lib/pipes.js";
+import { Illustration } from "./illustrations.js";
 import {
   CheckboxSetControl,
   DateControl,
@@ -15,6 +16,12 @@ import {
   TextControl,
 } from "./controls.js";
 
+export interface EffortPolicy {
+  confirmSkip: boolean;
+  skipRunCheckIn: number;
+  dwellHintSeconds: number;
+}
+
 export interface SurveyScreenProps {
   units: PresentableUnit[];
   scales: Map<string, ResponseScale>;
@@ -23,26 +30,48 @@ export interface SurveyScreenProps {
   sectionTitles: Map<string, string>;
   index: number;
   sessionStart: Date;
+  effort: EffortPolicy;
+  /** Instrument instructions for this item, re-shown on request. */
+  context?: string | undefined;
   onRecord: (unit: PresentableUnit, value: AnswerValue) => void;
   onAdvance: (from: number, kind: "next" | "skip" | "decline") => void;
   onBack: (from: number) => void;
+  onEvent: (type: string, payload?: Record<string, unknown>) => void;
 }
 
 export function SurveyScreen(props: SurveyScreenProps) {
-  const { units, scales, store, allowBack, index, sessionStart } = props;
+  const { units, scales, store, allowBack, index, sessionStart, effort } = props;
   const unit = units[index];
   const walker = useMemo(() => new Walker(units, store, allowBack), [units, store, allowBack]);
-  const [softPrompted, setSoftPrompted] = useState(false);
+  const [confirmingSkip, setConfirmingSkip] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
+  const [dwelling, setDwelling] = useState(false);
   const advanceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const headingRef = useRef<HTMLHeadingElement | null>(null);
 
   useEffect(() => {
-    setSoftPrompted(false);
+    setConfirmingSkip(false);
+    setHelpOpen(false);
+    setDwelling(false);
     headingRef.current?.focus();
     return () => {
       if (advanceTimer.current) clearTimeout(advanceTimer.current);
     };
   }, [index]);
+
+  /**
+   * Dwell detection: if someone sits on one question far longer than it takes
+   * to read it, quietly offer help rather than leaving them stuck. The offer
+   * appears once per item and is recorded as paradata (response-time flag).
+   */
+  useEffect(() => {
+    if (unit?.item.responseType === "info") return;
+    const t = setTimeout(() => {
+      setDwelling(true);
+      props.onEvent("hint.shown", { reason: "dwell", seconds: effort.dwellHintSeconds });
+    }, effort.dwellHintSeconds * 1000);
+    return () => clearTimeout(t);
+  }, [index, effort.dwellHintSeconds]);
 
   /**
    * Enter continues, for anyone using a keyboard. Ignored while typing in a
@@ -112,10 +141,12 @@ export function SurveyScreen(props: SurveyScreenProps) {
     if (item.responseType === "info") return props.onAdvance(index, "next");
     if (answered && consentComplete) return props.onAdvance(index, "next");
     if (item.required === "hard") return; // button disabled anyway
-    if (item.required === "soft" && !softPrompted && !answered) {
-      setSoftPrompted(true);
+    // Unanswered and skippable: ask once, in place, before letting it go.
+    if (effort.confirmSkip && !confirmingSkip) {
+      setConfirmingSkip(true);
       return;
     }
+    props.onEvent("skip.confirmed");
     props.onAdvance(index, "skip");
   };
 
@@ -156,6 +187,11 @@ export function SurveyScreen(props: SurveyScreenProps) {
         >
           {stemText}
         </h1>
+        {item.illustration && (
+          <span className="stem-object">
+            <Illustration token={item.illustration} />
+          </span>
+        )}
         <SingleChoice key={`sc-${unitKey}`} {...controlProps} />
         <MultiChoice key={`mc-${unitKey}`} {...controlProps} />
         <SliderControl key={`sl-${unitKey}`} {...controlProps} />
@@ -167,22 +203,69 @@ export function SurveyScreen(props: SurveyScreenProps) {
         <RankGroupControl key={`rg-${unitKey}`} {...controlProps} />
         <CheckboxSetControl key={`cb-${unitKey}`} {...controlProps} />
 
-        {softPrompted && !answered && (
-          <p className="soft-prompt" role="status">
-            If you'd rather not answer, you can continue — but your answer really helps if you can give one.
-          </p>
+        {/* Context and help: opened by the participant, or offered after a long
+            pause. Rendered inside the body so nothing below it moves. */}
+        {(props.context || item.hint) && (
+          <div className="help-area">
+            {!helpOpen && (
+              <button
+                type="button"
+                className={`help-toggle${dwelling ? " nudge" : ""}`}
+                onClick={() => {
+                  setHelpOpen(true);
+                  props.onEvent("hint.shown", { reason: "requested" });
+                }}
+              >
+                {dwelling ? "Need a hand with this one?" : "Remind me what this is about"}
+              </button>
+            )}
+            {helpOpen && (
+              <div className="help-panel" role="status">
+                {item.hint && <p className="help-hint">{item.hint}</p>}
+                {props.context && <p className="help-context">{props.context}</p>}
+                <button type="button" className="help-close" onClick={() => setHelpOpen(false)}>
+                  Got it
+                </button>
+              </div>
+            )}
+          </div>
         )}
       </main>
 
       <footer className="survey-footer">
-        {item.allowDecline && !answered && (
-          <button type="button" className="decline" onClick={() => props.onAdvance(index, "decline")}>
-            Prefer not to say
-          </button>
+        {/* Skip confirmation lives in a reserved strip: asking never reflows
+            the question above it. */}
+        {confirmingSkip ? (
+          <div className="skip-confirm" role="alertdialog" aria-label="Skip this question?">
+            <p className="skip-question">Leave this one blank?</p>
+            <div className="skip-actions">
+              <button
+                type="button"
+                className="skip-back"
+                onClick={() => {
+                  setConfirmingSkip(false);
+                  props.onEvent("skip.abandoned");
+                }}
+              >
+                I'll answer it
+              </button>
+              <button type="button" className="skip-go" onClick={handleNext}>
+                Skip
+              </button>
+            </div>
+          </div>
+        ) : (
+          <>
+            {item.allowDecline && !answered && (
+              <button type="button" className="decline" onClick={() => props.onAdvance(index, "decline")}>
+                Prefer not to say
+              </button>
+            )}
+            <button type="button" className="next" disabled={!canAdvance && item.required === "hard"} onClick={handleNext}>
+              {item.responseType === "info" ? "Continue" : answered ? "Next" : "Next"}
+            </button>
+          </>
         )}
-        <button type="button" className="next" disabled={!canAdvance && item.required === "hard"} onClick={handleNext}>
-          {item.responseType === "info" ? "Continue" : answered ? "Next" : item.required === "hard" ? "Next" : softPrompted ? "Skip" : "Next"}
-        </button>
       </footer>
     </div>
   );

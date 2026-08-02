@@ -1,3 +1,5 @@
+import type React from "react";
+
 /**
  * MySelf-authored illustrations.
  *
@@ -76,7 +78,64 @@ export function HairPattern({ code }: { code: string }) {
   );
 }
 
+/**
+ * Everyday objects, drawn simply. Used where naming the object in words is
+ * less immediate than showing it (handedness: "Writing" + a pen).
+ */
+export function ObjectDrawing({ name }: { name: string }) {
+  const stroke = {
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: 3,
+    strokeLinecap: "round" as const,
+    strokeLinejoin: "round" as const,
+  };
+  const wrap = (children: React.ReactNode) => (
+    <svg viewBox="0 0 64 64" width="100%" height="100%" aria-hidden="true" focusable="false">
+      {children}
+    </svg>
+  );
+
+  switch (name) {
+    case "pen":
+      return wrap(
+        <>
+          <path d="M14 50 L18 40 L44 14 L50 20 L24 46 Z" {...stroke} />
+          <path d="M40 18 L46 24" {...stroke} />
+          <path d="M14 50 L20 48" {...stroke} />
+        </>,
+      );
+    case "ball":
+      // Tennis-ball seams read as a ball; equator + meridians read as a globe.
+      return wrap(
+        <>
+          <circle cx="32" cy="32" r="18" {...stroke} />
+          <path d="M17 22 C 26 30, 26 40, 19 46" {...stroke} />
+          <path d="M47 22 C 38 30, 38 40, 45 46" {...stroke} />
+        </>,
+      );
+    case "toothbrush":
+      return wrap(
+        <>
+          <path d="M20 50 L38 22" {...stroke} />
+          <path d="M36 20 q 6 -8 12 -4 q 4 4 -2 10 Z" {...stroke} />
+          <path d="M38 12 v -5 M44 15 v -5 M49 20 v -5" {...stroke} />
+        </>,
+      );
+    case "spoon":
+      return wrap(
+        <>
+          <path d="M26 52 L36 32" {...stroke} />
+          <ellipse cx="40" cy="22" rx="9" ry="12" transform="rotate(24 40 22)" {...stroke} />
+        </>,
+      );
+    default:
+      return null;
+  }
+}
+
 export function Illustration({ token }: { token: string }) {
   if (token.startsWith("hair:")) return <HairPattern code={token.slice(5)} />;
+  if (token.startsWith("object:")) return <ObjectDrawing name={token.slice(7)} />;
   return null;
 }

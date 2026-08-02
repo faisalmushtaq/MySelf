@@ -59,6 +59,24 @@ export const assessmentDraft = z.object({
   allowBackNavigation: z.boolean().default(true),
   resumption: z.enum(["resume_same_device", "restart", "disabled"]).default("resume_same_device"),
   progressIndicator: z.enum(["sections", "none"]).default("sections"),
+  /** Format the participant code must match, with a plain-language hint. */
+  participantCode: z
+    .object({ pattern: z.string(), hint: z.string() })
+    .optional(),
+  /**
+   * Response-effort safeguards. Skipping stays possible — these add
+   * deliberation, not obstruction (docs/11 §3).
+   */
+  effort: z
+    .object({
+      /** Ask for confirmation before an unanswered item is skipped. */
+      confirmSkip: z.boolean().default(true),
+      /** Consecutive skips after which a check-in screen is shown. */
+      skipRunCheckIn: z.number().int().min(2).default(3),
+      /** Seconds on one item before help is quietly offered. */
+      dwellHintSeconds: z.number().int().min(5).default(30),
+    })
+    .default({ confirmSkip: true, skipRunCheckIn: 3, dwellHintSeconds: 30 }),
   offline: z.object({
     surveyOfflineCapable: z.literal(true), // conventional content MUST work offline
     narrativeConnectivity: z.enum(["online_required", "offline_capable_with_queue"]).optional(),
@@ -138,6 +156,11 @@ export const responseEvent = z.object({
     "session.started",
     "session.completed",
     "narrative.stage",
+    "hint.shown",
+    "skip.confirmed",
+    "skip.abandoned",
+    "effort.checkin_shown",
+    "effort.checkin_returned",
   ]),
   itemRef: z
     .object({ instrument: slug, item: slug, revision: z.number().int().positive() })

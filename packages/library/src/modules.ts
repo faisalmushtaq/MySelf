@@ -176,10 +176,38 @@ export const ybmIdentity: ModuleInput = {
             text: "PARTICIPANT ID: Please provide the following information to help us generate a unique identifier for you:\n\nFor example, if your mother's name is Jane, your house number is 123, you were born in January, and your postcode is AB1 2CD, your participant ID would be JA101CD.",
           },
           fields: [
-            { key: "mother_initials", label: "First two letters of mother's first name", required: true, maxChars: 2 },
-            { key: "house_digit", label: "First digit of your house number", required: true, maxChars: 1 },
-            { key: "birth_month", label: "Month you were born", required: true, maxChars: 12 },
-            { key: "postcode_letters", label: "Last two letters of your postcode", required: true, maxChars: 2 },
+            {
+              key: "mother_initials",
+              label: "First two letters of mother's first name",
+              required: true,
+              maxChars: 2,
+              pattern: "^[A-Za-z]{2}$",
+              patternHint: "Two letters, for example JA",
+            },
+            {
+              key: "house_digit",
+              label: "First digit of your house number",
+              required: true,
+              maxChars: 1,
+              pattern: "^[0-9]$",
+              patternHint: "A single number, for example 1",
+            },
+            {
+              key: "birth_month",
+              label: "Month you were born",
+              required: true,
+              maxChars: 12,
+              pattern: "^([A-Za-z]{3,9}|0?[1-9]|1[0-2])$",
+              patternHint: "The month name or its number, for example January or 01",
+            },
+            {
+              key: "postcode_letters",
+              label: "Last two letters of your postcode",
+              required: true,
+              maxChars: 2,
+              pattern: "^[A-Za-z]{2}$",
+              patternHint: "Two letters, for example CD",
+            },
           ],
           researcherNote: "Quasi-identifying components — identity-schema routed; derived code used for legacy matching (A-27/D-09).",
         },
@@ -193,7 +221,16 @@ export const ybmIdentity: ModuleInput = {
           stem: {
             text: "We also need you to put the validation ID. This ID starts with three letters (e.g. NDC), followed by two or more digits. This ID should have been provided by the research team. If you have not received it, please ask one of our team.",
           },
-          fields: [{ key: "digits", label: "All digits after three letters", required: true, maxChars: 10 }],
+          fields: [
+            {
+              key: "digits",
+              label: "All digits after three letters",
+              required: true,
+              maxChars: 10,
+              pattern: "^[0-9]{2,}$",
+              patternHint: "At least two numbers, for example 042",
+            },
+          ],
           researcherNote: "Typos in the administered stem fixed per D-07 ('haven not', 'pleas', 'i.e,').",
         },
         {
@@ -205,7 +242,11 @@ export const ybmIdentity: ModuleInput = {
           required: "hard",
           stem: { text: "Date of Birth (dd/mm/yyyy)" },
           minYear: 1990,
-          maxYear: 2020,
+          maxYear: 2026,
+          // Plausibility only — a mistyped year is caught, an unusual but real
+          // date is not blocked (D-19).
+          minAgeYears: 4,
+          maxAgeYears: 100,
           researcherNote: "Direct identifier — identity-schema routed (D-09). Legacy tag carries a trailing space.",
         },
       ],

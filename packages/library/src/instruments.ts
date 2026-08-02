@@ -90,19 +90,40 @@ export const kss: InstrumentInput = {
 // Edinburgh Handedness Inventory - Short Form
 // ---------------------------------------------------------------------------
 
-const ehiTasks: [string, string, string][] = [
-  ["writing", "Writing", "Handedness_1"],
-  ["throwing", "Throwing", "Handedness_3"],
-  ["toothbrush", "Toothbrush", "Handedness_5"],
-  ["spoon", "Spoon", "Handedness_7"],
+/** [key, item text, legacy variable, object illustration, plain-language hint] */
+const ehiTasks: [string, string, string, string, string][] = [
+  ["writing", "Writing", "Handedness_1", "object:pen", "Which hand do you write with?"],
+  ["throwing", "Throwing", "Handedness_3", "object:ball", "Which hand do you throw a ball with?"],
+  ["toothbrush", "Toothbrush", "Handedness_5", "object:toothbrush", "Which hand do you hold your toothbrush in?"],
+  ["spoon", "Spoon", "Handedness_7", "object:spoon", "Which hand do you hold a spoon in?"],
 ];
 
-const ehiForm = (variant: string | undefined, label: string, scale: string, instructions: string) => ({
+/**
+ * Handedness is answered spatially: the response options run left-to-right so
+ * the layout itself carries the meaning, with a drawing of the object above.
+ * `spectrumReverse` is set on the canonical form only, whose options are
+ * listed right-first (Always right … Always left) — display order changes,
+ * response codes never do.
+ */
+const ehiForm = (
+  variant: string | undefined,
+  label: string,
+  scale: string,
+  instructions: string,
+  reverse: boolean,
+) => ({
   language: "en-GB" as const,
   ...(variant ? { variant } : {}),
   label,
   instructions,
-  items: ehiTasks.map(([key, text, legacy]) => row(key, `ehi_${key}`, legacy, text, scale)),
+  items: ehiTasks.map(([key, text, legacy, illustration, hint]) =>
+    row(key, `ehi_${key}`, legacy, text, scale, {
+      presentation: "spectrum",
+      spectrumReverse: reverse,
+      illustration,
+      hint,
+    }),
+  ),
 });
 
 export const ehiSf: InstrumentInput = {
@@ -121,19 +142,21 @@ export const ehiSf: InstrumentInput = {
       "EHI-SF canonical (Veale 2014 anchors — VERIFY wording before approval)",
       "scale.ehi_sf_5pt",
       "Please indicate your preferences in the use of hands in the following activities.",
+      true,
     ),
     ehiForm(
       "ybm-asadmin",
       "EHI as administered, YBM 2026 (left-anchored 5-point — A-19)",
       "scale.ehi_sf_5pt_ybm",
       "Please indicate your preference in using your left or your right hand in the following tasks. If the preference is so strong you would never use the other hand, unless absolutely forced to please choose strongly preferred.",
+      false,
     ),
   ],
   subscales: [{ key: "lq", name: "Laterality quotient", itemKeys: ehiTasks.map(([k]) => k) }],
   scoringKey: "score.ehi_sf",
   timeEstimates: est([60, 45]),
   changelog:
-    "1.0: encoded from QSF. Canonical form uses Veale (2014) right-anchored responses per D-08; administered left-anchored form preserved as ybm-asadmin. Legacy matrix rows were coded 1,3,5,7.",
+    "1.0: encoded from QSF. Canonical form uses Veale (2014) right-anchored responses per D-08; administered left-anchored form preserved as ybm-asadmin. Legacy matrix rows were coded 1,3,5,7. Presented as a left-to-right spatial spectrum with object illustrations (D-19, presentation only).",
   owner: "ybm",
   researcherNotes: "Canonical anchor wording and LQ cutoffs must be verified against Veale (2014) before approval.",
 };

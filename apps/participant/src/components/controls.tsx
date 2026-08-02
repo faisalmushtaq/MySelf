@@ -48,6 +48,31 @@ export function SingleChoice({ item, scale, value, onAnswer }: ControlProps) {
     );
   }
 
+  // Spectrum: options laid along a left-to-right axis so the arrangement
+  // itself conveys the answer (used for handedness).
+  if (item.presentation === "spectrum") {
+    const ordered = item.spectrumReverse ? [...scale.options].reverse() : scale.options;
+    return (
+      <div className="spectrum" role="radiogroup" aria-label={item.stem.text}>
+        <div className="spectrum-row">
+          {ordered.map((o) => (
+            <button
+              key={o.code}
+              type="button"
+              role="radio"
+              aria-checked={selected === o.code}
+              className={`spectrum-option${selected === o.code ? " selected" : ""}`}
+              onClick={() => onAnswer({ kind: "choice", code: o.code }, auto)}
+            >
+              <span className="spectrum-dot" aria-hidden="true" />
+              <span className="spectrum-label">{o.label}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
   const asPicker = item.presentation === "dropdown" || item.presentation === "wheel" || scale.options.length > 12;
 
   if (asPicker) {
@@ -314,20 +339,53 @@ export function NumericControl({ item, value, onAnswer }: ControlProps) {
 }
 
 export function DateControl({ item, value, onAnswer }: ControlProps) {
+  const [error, setError] = useState<string | null>(null);
   if (item.responseType !== "date") return null;
   const current = value?.kind === "date" ? value.iso : "";
+
+  /** Age plausibility, checked against today. Blocks typos, not real lives. */
+  const check = (iso: string): string | null => {
+    const d = new Date(`${iso}T00:00:00`);
+    if (Number.isNaN(d.getTime())) return "Please enter a date as day, month and year";
+    const now = new Date();
+    let age = now.getFullYear() - d.getFullYear();
+    const before =
+      now.getMonth() < d.getMonth() || (now.getMonth() === d.getMonth() && now.getDate() < d.getDate());
+    if (before) age -= 1;
+    if (d > now) return "That date is in the future — please check the year";
+    if (item.minAgeYears !== undefined && age < item.minAgeYears) {
+      return `That would make you ${age} — please check the year you were born`;
+    }
+    if (item.maxAgeYears !== undefined && age > item.maxAgeYears) {
+      return "Please check the year you were born";
+    }
+    return null;
+  };
+
   return (
-    <input
-      type="date"
-      className="text-input"
-      value={current}
-      aria-label={item.stem.text}
-      min={item.minYear ? `${item.minYear}-01-01` : undefined}
-      max={item.maxYear ? `${item.maxYear}-12-31` : undefined}
-      onChange={(e) => {
-        if (e.target.value) onAnswer({ kind: "date", iso: e.target.value }, false);
-      }}
-    />
+    <div className="date-wrap">
+      <input
+        type="date"
+        className="text-input"
+        value={current}
+        aria-label={item.stem.text}
+        aria-invalid={error !== null}
+        min={item.minYear ? `${item.minYear}-01-01` : undefined}
+        max={item.maxYear ? `${item.maxYear}-12-31` : undefined}
+        onChange={(e) => {
+          const iso = e.target.value;
+          if (!iso) return;
+          const problem = check(iso);
+          setError(problem);
+          if (!problem) onAnswer({ kind: "date", iso }, false);
+        }}
+      />
+      {error && (
+        <p className="error" role="alert">
+          {error}
+        </p>
+      )}
+    </div>
   );
 }
 
@@ -338,9 +396,20 @@ export function TextControl({ item, value, onAnswer }: ControlProps) {
   const long = item.responseType === "text_long";
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pending = useRef<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const patternOf = item.responseType === "text_short" ? item.pattern : undefined;
+  const patternHint = item.responseType === "text_short" ? item.patternHint : undefined;
 
   const commit = (raw: string) => {
     setText(raw);
+    if (patternOf && raw.trim().length > 0 && !new RegExp(patternOf).test(raw.trim())) {
+      setError(patternHint ?? "Please check the format");
+      pending.current = null;
+      if (timer.current) clearTimeout(timer.current);
+      return;
+    }
+    setError(null);
     pending.current = raw;
     if (timer.current) clearTimeout(timer.current);
     timer.current = setTimeout(() => {
@@ -382,6 +451,11 @@ export function TextControl({ item, value, onAnswer }: ControlProps) {
           onChange={(e) => commit(e.target.value)}
         />
       )}
+      {error && (
+        <p className="error" role="alert">
+          {error}
+        </p>
+      )}
       {long && item.maxChars < 100000 && (
         <p className="hint">
           {text.length} / {item.maxChars}
@@ -395,12 +469,24 @@ export function FormFieldsControl({ item, value, onAnswer }: ControlProps) {
   if (item.responseType !== "form_fields") return null;
   const current = value?.kind === "fields" ? value.values : {};
   const [values, setValues] = useState<Record<string, string>>(current);
+  const [errors, setErrors] = useState<Record<string, string>>({});
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pending = useRef<Record<string, string> | null>(null);
 
   const commit = (key: string, v: string) => {
     const next = { ...values, [key]: v };
     setValues(next);
+    const field = item.responseType === "form_fields" ? item.fields.find((f) => f.key === key) : undefined;
+    if (field?.pattern && v.trim().length > 0 && !new RegExp(field.pattern).test(v.trim())) {
+      setErrors((e) => ({ ...e, [key]: field.patternHint ?? "Please check the format" }));
+      pending.current = null;
+      if (timer.current) clearTimeout(timer.current);
+      return;
+    }
+    setErrors((e) => {
+      const { [key]: _drop, ...rest } = e;
+      return rest;
+    });
     pending.current = next;
     if (timer.current) clearTimeout(timer.current);
     timer.current = setTimeout(() => {
@@ -431,8 +517,14 @@ export function FormFieldsControl({ item, value, onAnswer }: ControlProps) {
             className="text-input"
             maxLength={f.maxChars}
             value={values[f.key] ?? ""}
+            aria-invalid={errors[f.key] !== undefined}
             onChange={(e) => commit(f.key, e.target.value)}
           />
+          {errors[f.key] && (
+            <span className="error" role="alert">
+              {errors[f.key]}
+            </span>
+          )}
         </label>
       ))}
     </div>
