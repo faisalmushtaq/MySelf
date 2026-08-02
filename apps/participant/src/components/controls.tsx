@@ -19,6 +19,12 @@ export interface ControlProps {
 const prefersReducedMotion = () =>
   typeof matchMedia !== "undefined" && matchMedia("(prefers-reduced-motion: reduce)").matches;
 
+/** Letter key for an option position (A, B, C…): the affordance participants
+ * can also type. Beyond 26 options we fall back to no key rather than
+ * inventing confusing labels. */
+export const optionKey = (index: number): string | null =>
+  index < 26 ? String.fromCharCode(65 + index) : null;
+
 export function SingleChoice({ item, scale, value, onAnswer }: ControlProps) {
   if (item.responseType !== "single_choice" || !scale) return null;
   const selected = value?.kind === "choice" ? value.code : undefined;
@@ -50,19 +56,32 @@ export function SingleChoice({ item, scale, value, onAnswer }: ControlProps) {
 
   return (
     <div className="cards" role="radiogroup" aria-label={item.stem.text}>
-      {scale.options.map((o) => (
-        <button
-          key={o.code}
-          type="button"
-          role="radio"
-          aria-checked={selected === o.code}
-          className={`card${selected === o.code ? " selected" : ""}${o.kind !== "substantive" ? " quiet" : ""}`}
-          onClick={() => onAnswer({ kind: "choice", code: o.code }, auto)}
-        >
-          <span className="card-label">{o.label}</span>
-          {selected === o.code && <span className="tick" aria-hidden="true">✓</span>}
-        </button>
-      ))}
+      {scale.options.map((o, i) => {
+        const letter = optionKey(i);
+        return (
+          <button
+            key={o.code}
+            type="button"
+            role="radio"
+            aria-checked={selected === o.code}
+            data-option-key={letter ?? undefined}
+            className={`card${selected === o.code ? " selected" : ""}${o.kind !== "substantive" ? " quiet" : ""}`}
+            onClick={() => onAnswer({ kind: "choice", code: o.code }, auto)}
+          >
+            {letter && (
+              <span className="key" aria-hidden="true">
+                {letter}
+              </span>
+            )}
+            <span className="card-label">{o.label}</span>
+            {selected === o.code && (
+              <span className="tick" aria-hidden="true">
+                ✓
+              </span>
+            )}
+          </button>
+        );
+      })}
     </div>
   );
 }
@@ -82,22 +101,36 @@ export function MultiChoice({ item, scale, value, onAnswer }: ControlProps) {
     <div className="cards" role="group" aria-label={item.stem.text}>
       {max !== undefined && (
         <p className="hint" aria-live="polite">
-          {selected.length} of up to {max} selected
+          Choose up to {max} — {selected.length} selected
         </p>
       )}
-      {scale.options.map((o) => (
-        <button
-          key={o.code}
-          type="button"
-          role="checkbox"
-          aria-checked={selected.includes(o.code)}
-          className={`card${selected.includes(o.code) ? " selected" : ""}`}
-          onClick={() => toggle(o.code)}
-        >
-          <span className="card-label">{o.label}</span>
-          {selected.includes(o.code) && <span className="tick" aria-hidden="true">✓</span>}
-        </button>
-      ))}
+      {scale.options.map((o, i) => {
+        const letter = optionKey(i);
+        const on = selected.includes(o.code);
+        return (
+          <button
+            key={o.code}
+            type="button"
+            role="checkbox"
+            aria-checked={on}
+            data-option-key={letter ?? undefined}
+            className={`card${on ? " selected" : ""}`}
+            onClick={() => toggle(o.code)}
+          >
+            {letter && (
+              <span className="key" aria-hidden="true">
+                {letter}
+              </span>
+            )}
+            <span className="card-label">{o.label}</span>
+            {on && (
+              <span className="tick" aria-hidden="true">
+                ✓
+              </span>
+            )}
+          </button>
+        );
+      })}
     </div>
   );
 }
@@ -223,14 +256,29 @@ export function TextControl({ item, value, onAnswer }: ControlProps) {
   const [text, setText] = useState(current);
   const long = item.responseType === "text_long";
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pending = useRef<string | null>(null);
 
   const commit = (raw: string) => {
     setText(raw);
+    pending.current = raw;
     if (timer.current) clearTimeout(timer.current);
     timer.current = setTimeout(() => {
+      pending.current = null;
       if (raw.trim().length > 0) onAnswer({ kind: "text", value: raw }, false);
     }, 400); // debounce keystrokes; every commit is still an autosaved event
   };
+
+  // Flush on unmount so advancing before the debounce elapses never drops the
+  // last keystrokes. The captured onAnswer belongs to this item, so the value
+  // is always recorded against the question it was typed for.
+  useEffect(
+    () => () => {
+      if (timer.current) clearTimeout(timer.current);
+      const raw = pending.current;
+      if (raw !== null && raw.trim().length > 0) onAnswer({ kind: "text", value: raw }, false);
+    },
+    [],
+  );
 
   return (
     <div className="text-wrap">
@@ -267,15 +315,30 @@ export function FormFieldsControl({ item, value, onAnswer }: ControlProps) {
   const current = value?.kind === "fields" ? value.values : {};
   const [values, setValues] = useState<Record<string, string>>(current);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pending = useRef<Record<string, string> | null>(null);
 
   const commit = (key: string, v: string) => {
     const next = { ...values, [key]: v };
     setValues(next);
+    pending.current = next;
     if (timer.current) clearTimeout(timer.current);
     timer.current = setTimeout(() => {
+      pending.current = null;
       if (Object.values(next).some((x) => x.trim().length > 0)) onAnswer({ kind: "fields", values: next }, false);
     }, 400);
   };
+
+  // Flush pending field edits on unmount (see TextControl).
+  useEffect(
+    () => () => {
+      if (timer.current) clearTimeout(timer.current);
+      const next = pending.current;
+      if (next && Object.values(next).some((x) => x.trim().length > 0)) {
+        onAnswer({ kind: "fields", values: next }, false);
+      }
+    },
+    [],
+  );
 
   return (
     <div className="fields">

@@ -183,3 +183,17 @@ decisions:
       whether they are answering questions or telling a story (this also
       reinforces the design rule that model-mediated interaction must be
       distinguishable from the canonical survey engine).
+
+  - id: D-17
+    topic: Visual and interaction style system
+    decision: brainpop-editorial-plus-conversational-survey
+    detail: >
+      Researcher decision 2026-08-02: MySelf adopts the BrainPop lab website's
+      editorial visual language (cream #FAF6F0 canvas, Newsreader display
+      serif, DM Sans body, green #067843 accent, hairline borders, restrained
+      motion) applied to conversational-survey interaction patterns
+      (one question per screen, lettered option keys with keyboard parity,
+      auto-advance, segmented progress). Documented in docs/11-style-guide.md,
+      which is binding for the participant app, MySelf Studio and all future
+      surfaces. Fonts are bundled locally (@fontsource) rather than loaded from
+      a CDN so the interface renders identically offline.
