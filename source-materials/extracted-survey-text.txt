@@ -1,0 +1,667 @@
+[H2] Yorkshire Brain Map - NotreDame2026
+[H2] Survey Flow
+[SFGray] Standard: Introduction (1 Question)
+[SFGray] Standard: Consent (1 Question)
+[SFGray] Standard: Demographics (8 Questions)
+[SFGray] Standard: Hair Type (1 Question)
+[SFGray] Standard: Edinburgh Handedness Inventory - Short Form (1 Question)
+[SFGray] Standard: McArthur Scale (6 Questions)
+[SFGray] Standard: Karolinska (3 Questions)
+[SFGray] Standard: Mental Well-Being (1 Question)
+[SFGray] Block: SDQ 25 Items (2 Questions)
+[SFGray] Standard: RCADS-25 (1 Question)
+[SFGray] Standard: Smartphone Ownership (4 Questions)
+[SFBlue] Branch: New Branch
+[SFBlue] If
+[SFBlue] If Do you currently use social media? Yes Is Selected 
+[SFGray] Block: Social media rank and time (adapted from AoW) (15 Questions)
+[SFGray] Block: Screen control, social media impact and doomscrolling's  (3 Questions)
+[SFGray] Standard: Gaming (4 Questions)
+[SFGray] Standard: STAI Short (1 Question)
+[SFGray] Block: BIS-BAS (2 Questions)
+<<TABLE>>
+Page Break | 
+<</TABLE>>
+ // 
+[BlockSeparator] 
+[BlockStartLabel] Start of Block: Introduction
+<<TABLE>>
+<</TABLE>>
+Introduction Yorkshire Brain Map School Workshop - Citizen Neuroscience - NotreDame
+
+
+Thank you for taking part in this workshop.
+
+
+
+In this study, we'll use a special tool called electroencephalography (EEG) to collect information about your brain. We'll put sensors on your head, and they'll record your brain activity. You'll also help collect brain data from another person. This new way helps us gather brain data quickly with help from people who aren't experts. The EEG headset should not feel uncomfortable, so if it does at any point, just let a member of the research team know. EEG is safe, pain free, and non-invasive.
+
+
+
+In addition to EEG, we'll also ask questions about your life and how you feel. We made a list of questions that ask about things like who you are, how you feel, and how happy you are. We care about keeping your answers private so we'll give you an anonymous code so your answers stay confidential during the study.
+
+
+
+Joining this study is your choice, and you can leave at any time with no problems. If you want to leave, please let a member of the research team or a teacher know.
+
+
+
+Our study has permission from the School of Psychology Ethics Committee (Ethics Reference: PSCETHS-1449, Date of Approval: 5/6/25).
+
+
+
+The questions you're about to answer should take about 10 minutes to answer. Please finish the survey quickly and carefully so we can stay on schedule. Thank you for joining our study! If you have questions or worries, please feel free to ask.
+[BlockEndLabel] End of Block: Introduction
+[BlockSeparator] 
+[BlockStartLabel] Start of Block: Consent
+<<TABLE>>
+<</TABLE>>
+Consent Please click to indicate you understand and agree to these statements and consent to take part.
+[ListParagraph] I understand that anonymized results from this study may be disseminated through conference presentations, publication in peer reviewed journals, compiled as part of a report, used in future projects, included on institutional websites, presented in electronic theses and may be made available on online data repositories.  (2) 
+[ListParagraph] I understand that my name will not be linked with the research materials, and I will not be identified or identifiable in the report or reports that result from the research.  (3) 
+[ListParagraph] I understand that if I choose to withdraw my data by contacting the primary researcher within 24 hours of submission (up until ${date://OtherDate/SL/+2%20day}) that my responses will be removed from the dataset and not used for analysis  (4) 
+[ListParagraph] I understand that I am free to withdraw at any time without giving any reason and without there being any negative consequences  (5) 
+[ListParagraph] I have read and understood the information on the study presented above and have been offered the opportunity to ask the research team questions via email (m.faizah@leeds.ac.uk)  (6) 
+[ListParagraph] I agree to take part in this study  (7) 
+[BlockEndLabel] End of Block: Consent
+[BlockSeparator] 
+[BlockStartLabel] Start of Block: Demographics
+<<TABLE>>
+<</TABLE>>
+first_name First Name
+[TextEntryLine] ________________________________________________________________
+[QuestionSeparator] 
+<<TABLE>>
+<</TABLE>>
+last_name Last Name
+[TextEntryLine] ________________________________________________________________
+[QuestionSeparator] 
+<<TABLE>>
+<</TABLE>>
+ps_id PARTICIPANT ID: Please provide the following information to help us generate a unique identifier for you:
+
+For example, if your mother's name is Jane, your house number is 123, you were born in January, and your postcode is AB1 2CD, your participant ID would be JA101CD.
+[ListParagraph] First two letters of mother's first name  (1) __________________________________________________
+[ListParagraph] First digit of your house number  (2) __________________________________________________
+[ListParagraph] Month you were born  (3) __________________________________________________
+[ListParagraph] Last two letters of your postcode  (4) __________________________________________________
+[QuestionSeparator] 
+<<TABLE>>
+<</TABLE>>
+val_id We also need you to put the validation ID. This ID starts with three letters (i.e, NDC), followed by two or more digits. This ID should have been provided by the research team. If you haven not received it, pleas ask one of our team.
+[ListParagraph] All digits after three letters  (1) __________________________________________________
+[QuestionSeparator] 
+<<TABLE>>
+<</TABLE>>
+Ethnicity What best describes your ethnic origin?
+
+Ethic origin refers to your cultural background or where your family comes from, including your ancestors, country of origin, and cultural traditions you identify with.
+[Dropdown] ▼ Indian (1) ... Prefer not to say (20)
+[QuestionSeparator] 
+<<TABLE>>
+<</TABLE>>
+DoB  Date of Birth (dd/mm/yyyy)
+
+[TextEntryLine] ________________________________________________________________
+[QuestionSeparator] 
+<<TABLE>>
+<</TABLE>>
+Gender Gender
+
+[ListParagraph] Male  (1) 
+[ListParagraph] Female  (2) 
+[ListParagraph] Non-binary / third gender  (3) 
+[ListParagraph] Prefer not to say  (4) 
+[QuestionSeparator] 
+<<TABLE>>
+<</TABLE>>
+Medication Are you currently taking any prescribed medication for a mental health or psychiatric condition? (e.g., antidepressants). This information will only be used to help us describe the sample and It will not be used to decide whether you can take part in the study or shared with anyone else.
+[ListParagraph] Yes  (1) 
+[ListParagraph] No  (2) 
+[QuestionSeparator] 
+<<TABLE>>
+Page Break | 
+<</TABLE>>
+ // 
+[BlockEndLabel] End of Block: Demographics
+[BlockSeparator] 
+[BlockStartLabel] Start of Block: Hair Type
+<<TABLE>>
+<</TABLE>>
+Hair_type Please select below which hair type (number; letter) is most representative of your own hair. Please only select ONE hair type from all options below:
+[Dropdown] ▼ 1a (1) ... 4c (12)
+[BlockEndLabel] End of Block: Hair Type
+[BlockSeparator] 
+[BlockStartLabel] Start of Block: Edinburgh Handedness Inventory - Short Form
+<<TABLE>>
+[IMAGE]
+<</TABLE>>
+Handedness Please indicate your preference in using your left or your right hand in the following tasks. If the preference is so strong you would never use the other hand, unless absolutely forced to please choose strongly preferred.
+<<TABLE>>
+ | Left hand strongly preferred (1) | Left hand preferred (2) | Indifferent (3) | Right hand preferred (4) | Right hand strongly preferred (5)
+Writing (1)  |  |  |  |  | 
+Throwing (3)  |  |  |  |  | 
+Toothbrush (5)  |  |  |  |  | 
+Spoon (7)  |  |  |  |  | 
+<</TABLE>>
+[BlockEndLabel] End of Block: Edinburgh Handedness Inventory - Short Form
+[BlockSeparator] 
+[BlockStartLabel] Start of Block: McArthur Scale
+<<TABLE>>
+<</TABLE>>
+Ladder_ses Imagine that the ladder below pictures how British society is set up.
+[QuestionSeparator] 
+<<TABLE>>
+<</TABLE>>
+Ladder_image   //  // 
+
+At the top of the ladder are the people who are the best off — those who have the most money, the highest amount of schooling, and the jobs that bring the most respect. At the bottom are people who are the worst off — those who have the least money, little or no education, no job, or jobs that no one wants or respects. Now think about your family. Please tell us where you think your family would be on this ladder.
+[QuestionSeparator] 
+<<TABLE>>
+[IMAGE]
+<</TABLE>>
+SES_Family  
+<<TABLE>>
+ | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10
+<</TABLE>>
+<<TABLE>>
+Mark the rung that best represents where your family would be on this ladder. (4) | [IMAGE]
+<</TABLE>>
+[QuestionSeparator] 
+<<TABLE>>
+<</TABLE>>
+ladder_school Imagine that the ladder below pictures how your school or university is set up.
+[QuestionSeparator] 
+<<TABLE>>
+<</TABLE>>
+Ladder_image2  // 
+
+
+At the top of the ladder are the people in your school with the most respect, the highest grades, and the highest standing. At the bottom are the people whom no one respects, whom no one wants to hang around, and who have the worst grades. Where would you place yourself on this ladder?
+[QuestionSeparator] 
+<<TABLE>>
+[IMAGE]
+<</TABLE>>
+SES_Self  
+<<TABLE>>
+ | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10
+<</TABLE>>
+<<TABLE>>
+Mark the rung that best represents where you would be on this ladder. (4) | [IMAGE]
+<</TABLE>>
+[BlockEndLabel] End of Block: McArthur Scale
+[BlockSeparator] 
+[BlockStartLabel] Start of Block: Karolinska
+<<TABLE>>
+[IMAGE]
+<</TABLE>>
+Karolinska On a scale of 1 through 9 indicate how sleepy you are feeling right now:
+
+[ListParagraph] 1 - Extremely alert  (1) 
+[ListParagraph] 2 - Very alert  (2) 
+[ListParagraph] 3 - Alert  (3) 
+[ListParagraph] 4- Fairly alert  (4) 
+[ListParagraph] 5 - Neither alert nor sleepy  (5) 
+[ListParagraph] 6 - Some signs of sleepiness  (6) 
+[ListParagraph] 7 - Sleepy, but not no effort to keep awake  (7) 
+[ListParagraph] 8 - Sleepy, some effort to keep awake  (8) 
+[ListParagraph] 9 - Very sleepy, great effort to keep awake, fighting sleep  (9) 
+[QuestionSeparator] 
+<<TABLE>>
+[IMAGE]
+<</TABLE>>
+Sleep_Importance What feels most important to you for getting a good night's sleep? You can choose up to three.
+[ListParagraph] Being able to fall asleep easily  (1) 
+[ListParagraph] Staying asleep through the night  (2) 
+[ListParagraph] Waking up feeling rested  (3) 
+[ListParagraph] Getting enough hours of sleep  (4) 
+[ListParagraph] Having a regular bedtime or routine  (5) 
+[ListParagraph] Feeling relaxed before bed  (6) 
+[ListParagraph] Not being disturbed by noise or other people  (7) 
+[ListParagraph] Not using my phone or screens too late  (8) 
+[ListParagraph] Having enough time to myself in the evening  (9) 
+[ListParagraph] Not worrying about school, friends or family  (10) 
+[ListParagraph] Other  (11) __________________________________________________
+[QuestionSeparator] 
+<<TABLE>>
+[IMAGE]
+<</TABLE>>
+Sleep_Own If you could find out more about your own sleep, what would you most like to know? You can choose up to three.
+[ListParagraph] How much sleep I get  (1) 
+[ListParagraph] How good my sleep quality is  (2) 
+[ListParagraph] How long it takes me to fall asleep  (3) 
+[ListParagraph] How often I wake up during the night  (4) 
+[ListParagraph] Whether I get enough deep sleep  (5) 
+[ListParagraph] How my sleep affects my mood  (6) 
+[ListParagraph] How my sleep affects my concentration or learning  (7) 
+[ListParagraph] How phone or screen use affects my sleep  (8) 
+[ListParagraph] How stress or worries affect my sleep  (9) 
+[ListParagraph] What I could do to sleep better  (10) 
+[ListParagraph] Other  (11) __________________________________________________
+[ListParagraph] Not sure  (12) 
+[QuestionSeparator] 
+<<TABLE>>
+Page Break | 
+<</TABLE>>
+ // 
+[BlockEndLabel] End of Block: Karolinska
+[BlockSeparator] 
+[BlockStartLabel] Start of Block: Mental Well-Being
+<<TABLE>>
+<</TABLE>>
+Mental well-being Below are some statements about feelings and thoughts. 
+Please tick the box that best describes your experience of each over the last 2 weeks
+<<TABLE>>
+ | None of the time (1) | Rarely (2) | Some of the time (3) | Often (4) | All of the time (5)
+I’ve been feeling optimistic about the future (1)  |  |  |  |  | 
+I’ve been feeling useful (2)  |  |  |  |  | 
+I’ve been feeling relaxed (3)  |  |  |  |  | 
+I’ve been dealing with problems well (4)  |  |  |  |  | 
+I’ve been thinking clearly (5)  |  |  |  |  | 
+I’ve been feeling close to other people (6)  |  |  |  |  | 
+I’ve been able to make up my own mind about things (7)  |  |  |  |  | 
+<</TABLE>>
+[BlockEndLabel] End of Block: Mental Well-Being
+[BlockSeparator] 
+[BlockStartLabel] Start of Block: SDQ 25 Items
+<<TABLE>>
+<</TABLE>>
+Introduction For each item, please mark the box for Not True, Somewhat True or Certainly True. It would help us if you answered all items as
+best you can even if you are not absolutely certain. Please give your answers on the basis of how things have been for you over
+the last six months.
+[QuestionSeparator] 
+<<TABLE>>
+<</TABLE>>
+sdq Please rate the following statements 
+<<TABLE>>
+ | Not True (1) | Somewhat True (2) | Clearly true (3)
+I try to be nice to other people. I care about their feelings (1)  |  |  | 
+I am restless, I cannot stay still for long (2)  |  |  | 
+I get a lot of headaches, stomach-aches or sickness (3)  |  |  | 
+I usually share with others (food, games, pens etc.) (4)  |  |  | 
+I get very angry and often lose my temper (5)  |  |  | 
+I am usually on my own. I generally play alone or keep to myself (6)  |  |  | 
+I usually do as I am told (7)  |  |  | 
+I worry a lot (8)  |  |  | 
+I am helpful if someone is hurt, upset or feeling ill (9)  |  |  | 
+I am constantly fidgeting or squirming (10)  |  |  | 
+I have one good friend or more (11)  |  |  | 
+I fight a lot. I can make other people do what I want (12)  |  |  | 
+I am often unhappy, down-hearted or tearful (13)  |  |  | 
+Other people my age generally like me (14)  |  |  | 
+I am easily distracted, I find it difficult to concentrate (15)  |  |  | 
+I am nervous in new situations. I easily lose confidence (16)  |  |  | 
+I am kind to younger children (17)  |  |  | 
+I am often accused of lying or cheating (18)  |  |  | 
+Other people pick on me or bully me (19)  |  |  | 
+I often offer to help others (family members, friends, colleagues) (20)  |  |  | 
+I think before I do things (21)  |  |  | 
+I take things that are not mine from home, work or elsewhere (22)  |  |  | 
+I get on better with adults than with people my own age (23)  |  |  | 
+I have many fears, I am easily scared (24)  |  |  | 
+I finish the work I'm doing. My attention is good (25)  |  |  | 
+<</TABLE>>
+[BlockEndLabel] End of Block: SDQ 25 Items
+[BlockSeparator] 
+[BlockStartLabel] Start of Block: RCADS-25
+<<TABLE>>
+<</TABLE>>
+rcads The next questions are about your feelings and mental health. Some of these questions may be difficult to answer. Remember, all your answers are completely confidential and if you do not want to answer a question, you can skip it. Please select how often each of these things happen to you.
+<<TABLE>>
+ | Never (1) | Sometimes (2) | Often (3) | Always (4)
+I feel sad or empty. (1)  |  |  |  | 
+I worry when I think I have done poorly at something. (2)  |  |  |  | 
+I would feel afraid of being on my own at home. (3)  |  |  |  | 
+Nothing is much fun anymore. (4)  |  |  |  | 
+I worry that something awful will happen to someone in my family. (5)  |  |  |  | 
+I am afraid of being in crowded places (like shopping centres, the movies, buses, busy playgrounds) (6)  |  |  |  | 
+I worry what other people think of me. (7)  |  |  |  | 
+I have trouble sleeping. (8)  |  |  |  | 
+I feel scared if I have to sleep on my own. (9)  |  |  |  | 
+I have problems with my appetite. (10)  |  |  |  | 
+I suddenly become dizzy or faint when there is no reason for this. (11)  |  |  |  | 
+I have to do some things over and over again (like washing my hands, cleaning or putting things in a certain order). (12)  |  |  |  | 
+I have no energy for things. (13)  |  |  |  | 
+I suddenly start to tremble or shake when there is no reason for this. (14)  |  |  |  | 
+I cannot think clearly. (15)  |  |  |  | 
+I feel worthless. (16)  |  |  |  | 
+I have to think special thoughts (like number or words) to stop bad things happening. (17)  |  |  |  | 
+I think about death. (18)  |  |  |  | 
+I feel like I don’t want to move. (19)  |  |  |  | 
+I worry that I will suddenly get a scared feeling when there is nothing to be afraid of. (20)  |  |  |  | 
+I am tired a lot. (21)  |  |  |  | 
+I feel afraid that I will make a fool of myself in front of people. (22)  |  |  |  | 
+I have to do some things in just the right way to stop bad things from happening. (23)  |  |  |  | 
+I feel restless. (24)  |  |  |  | 
+I worry that something bad will happen to me. (25)  |  |  |  | 
+<</TABLE>>
+[BlockEndLabel] End of Block: RCADS-25
+[BlockSeparator] 
+[BlockStartLabel] Start of Block: Smartphone Ownership
+<<TABLE>>
+<</TABLE>>
+Smartphone_own Do you have your own smartphone?
+[ListParagraph] Yes  (1) 
+[ListParagraph] No  (2) 
+[QuestionSeparator] 
+[QDisplayLogic] Display this question:
+[QDisplayLogic] If Smartphone_own = Yes
+<<TABLE>>
+<</TABLE>>
+Age_smartphone At what age did you you get your first smartphone? please answer in years
+[Dropdown] ▼ Younger than 5 (4) ... I’m not sure / I can’t remember (10)
+[QuestionSeparator] 
+<<TABLE>>
+<</TABLE>>
+SM_Own Do you currently use social media?
+[ListParagraph] Yes  (1) 
+[ListParagraph] No  (2) 
+[QuestionSeparator] 
+[QDisplayLogic] Display this question:
+[QDisplayLogic] If SM_Own = Yes
+<<TABLE>>
+<</TABLE>>
+Age_SM At what age did you start using social media? please answer in years
+
+[Dropdown] ▼ Younger than 5 (13) ... I’m not sure / I can’t remember (9)
+[BlockEndLabel] End of Block: Smartphone Ownership
+[BlockSeparator] 
+[BlockStartLabel] Start of Block: Social media rank and time (adapted from AoW)
+<<TABLE>>
+<</TABLE>>
+SM_Overuse Do you think you spend too much time on social media?
+[ListParagraph] Yes  (1) 
+[ListParagraph] No  (2) 
+[ListParagraph] Unsure  (3) 
+[QuestionSeparator] 
+<<TABLE>>
+<</TABLE>>
+DragDrop_SM Drag and drop the apps into the box that shows whether you have them on your phone.
+
+
+
+Then, in the 'I have these apps on my phone' box, rank the apps based on how much you use them (from most to least). You can ignore the ranking for the other box.
+<<TABLE>>
+I have these apps on my phone | I don't have these apps on my phone
+______ Facebook (1) | ______ Facebook (1)
+______ Snapchat (2) | ______ Snapchat (2)
+______ Instagram (3) | ______ Instagram (3)
+______ TikTok (4) | ______ TikTok (4)
+______ Youtube (5) | ______ Youtube (5)
+______ X (Twitter) (6) | ______ X (Twitter) (6)
+______ Discord (8) | ______ Discord (8)
+______ Twitch (9) | ______ Twitch (9)
+______ Reddit (10) | ______ Reddit (10)
+______ Kick (11) | ______ Kick (11)
+______ Threads (12) | ______ Threads (12)
+<</TABLE>>
+[QuestionSeparator] 
+<<TABLE>>
+<</TABLE>>
+TimeSpent on each  For each app you use, how much time do you usually spend in one go without a break?
+[QDisplayLogic] Display this choice:
+[QDisplayLogic] If DragDrop_SM = Facebook [ I have these apps on my phone ] 
+[QDisplayLogic] Display this choice:
+[QDisplayLogic] If DragDrop_SM = Instagram [ I have these apps on my phone ] 
+[QDisplayLogic] Display this choice:
+[QDisplayLogic] If DragDrop_SM = TikTok [ I have these apps on my phone ] 
+[QDisplayLogic] Display this choice:
+[QDisplayLogic] If DragDrop_SM = Snapchat [ I have these apps on my phone ] 
+[QDisplayLogic] Display this choice:
+[QDisplayLogic] If DragDrop_SM = Youtube [ I have these apps on my phone ] 
+[QDisplayLogic] Display this choice:
+[QDisplayLogic] If DragDrop_SM = Reddit [ I have these apps on my phone ] 
+[QDisplayLogic] Display this choice:
+[QDisplayLogic] If DragDrop_SM = X (Twitter) [ I have these apps on my phone ] 
+[QDisplayLogic] Display this choice:
+[QDisplayLogic] If DragDrop_SM = Discord [ I have these apps on my phone ] 
+[QDisplayLogic] Display this choice:
+[QDisplayLogic] If DragDrop_SM = X (Twitter) [ I have these apps on my phone ] 
+[QDisplayLogic] Display this choice:
+[QDisplayLogic] If DragDrop_SM = Kick [ I have these apps on my phone ] 
+[QDisplayLogic] Display this choice:
+[QDisplayLogic] If DragDrop_SM = Threads [ I have these apps on my phone ] 
+<<TABLE>>
+ | 0 minutes (1) | 1–15 minutes (2) | 15–30 minutes (3) | 30–60 minutes (4) | 1–2 hours (5) | More than 2 hours (6)
+Display this choice: / If DragDrop_SM = Facebook [ I have these apps on my phone ]  / Facebook (1)  |  |  |  |  |  | 
+Display this choice: / If DragDrop_SM = Instagram [ I have these apps on my phone ]  / Instagram (2)  |  |  |  |  |  | 
+Display this choice: / If DragDrop_SM = TikTok [ I have these apps on my phone ]  / TikTok (3)  |  |  |  |  |  | 
+Display this choice: / If DragDrop_SM = Snapchat [ I have these apps on my phone ]  / Snapchat (4)  |  |  |  |  |  | 
+Display this choice: / If DragDrop_SM = Youtube [ I have these apps on my phone ]  / YouTube (5)  |  |  |  |  |  | 
+Display this choice: / If DragDrop_SM = Reddit [ I have these apps on my phone ]  / Reddit (6)  |  |  |  |  |  | 
+Display this choice: / If DragDrop_SM = X (Twitter) [ I have these apps on my phone ]  / X (Twitter) (7)  |  |  |  |  |  | 
+Display this choice: / If DragDrop_SM = Discord [ I have these apps on my phone ]  / Discord (9)  |  |  |  |  |  | 
+Display this choice: / If DragDrop_SM = X (Twitter) [ I have these apps on my phone ]  / Twitch (10)  |  |  |  |  |  | 
+Display this choice: / If DragDrop_SM = Kick [ I have these apps on my phone ]  / kick (11)  |  |  |  |  |  | 
+Display this choice: / If DragDrop_SM = Threads [ I have these apps on my phone ]  / Threads (12)  |  |  |  |  |  | 
+<</TABLE>>
+[QuestionSeparator] 
+<<TABLE>>
+<</TABLE>>
+Acount_privacy On the social media site you use the most, is your account public or private?
+[ListParagraph] Public  (1) 
+[ListParagraph] Private  (2) 
+[ListParagraph] Unsure  (3) 
+[QuestionSeparator] 
+<<TABLE>>
+<</TABLE>>
+SM_active_passive On the social media platform you use most often, would you describe yourself as more of an active or passive user?
+[ListParagraph] Mostly active: I often post, comment, message, or share content  (1) 
+[ListParagraph] Mostly passive: I mostly look, scroll, or watch without posting much  (4) 
+[ListParagraph] Both equally  (5) 
+[QuestionSeparator] 
+<<TABLE>>
+<</TABLE>>
+SM_function Why do you use social media? Select all that apply.
+[ListParagraph] Stay in touch with friends or family  (1) 
+[ListParagraph] Entertainment  (4) 
+[ListParagraph] When I am bored  (5) 
+[ListParagraph] Keep up with news or current events  (6) 
+[ListParagraph] Follow influencers or celebrities  (7) 
+[ListParagraph] Find information or learn new things  (8) 
+[ListParagraph] Share my own content or express myself  (9) 
+[ListParagraph] Feel connected to online communities  (10) 
+[ListParagraph] School or studying  (11) 
+[ListParagraph] Shopping or discovering products  (12) 
+[ListParagraph] Keep up with trends or viral content  (13) 
+[QuestionSeparator] 
+<<TABLE>>
+<</TABLE>>
+SM_night_check On a typical night, how many times do you wake up and check social media?
+[Dropdown] ▼ Never (1) ... More than 5 times (6)
+[QuestionSeparator] 
+<<TABLE>>
+<</TABLE>>
+SM_morning_check  How long after waking do you typically check social media?
+[Dropdown] ▼  (1) ... More than 60 minutes (7)
+[QuestionSeparator] 
+<<TABLE>>
+<</TABLE>>
+SM_weekdays  How much time do you spend using social media on a typical school day (Monday-Friday)?
+[Dropdown] ▼ Less than 30 minutes (1) ... 7 hours or more (11)
+[QuestionSeparator] 
+<<TABLE>>
+<</TABLE>>
+SM_weekend/holiday  How much time do you spend using social media on a typical non-school day (e.g., weekend or school holiday)?
+[Dropdown] ▼ Less than 30 minutes (1) ... 7 hours or more (11)
+[QuestionSeparator] 
+<<TABLE>>
+<</TABLE>>
+SM_lostrack I lose track of how much time I spend on social media
+[ListParagraph] Strongly Agree  (1) 
+[ListParagraph] Agree  (4) 
+[ListParagraph] Neither agree nor disagree  (5) 
+[ListParagraph] Disagree  (6) 
+[ListParagraph] Strongly disagree  (7) 
+[ListParagraph] Don’t know  (8) 
+[QuestionSeparator] 
+<<TABLE>>
+<</TABLE>>
+app_reduce Do you use any features designed to reduce your social media use and/or screentime (e.g., screentime limits, break reminders, sleep hours reminders)?
+[ListParagraph] Yes  (1) 
+[ListParagraph] No  (2) 
+[ListParagraph] Sometimes  (3) 
+[QuestionSeparator] 
+<<TABLE>>
+<</TABLE>>
+Abstaining_SM  Do you use any features designed to reduce your social media use and/or screentime (e.g., screentime limits, break reminders, sleep hours reminders)?
+[ListParagraph] Very negatively  (1) 
+[ListParagraph] Somewhat negatively  (4) 
+[ListParagraph] No effect  (5) 
+[ListParagraph] Somewhat positively  (6) 
+[ListParagraph] Very positively  (7) 
+[QuestionSeparator] 
+<<TABLE>>
+<</TABLE>>
+Abstaining_days How long do you think you could completely abstain from social media, excluding instant messaging apps such as WhatsApp?
+By social media, we mean platforms such as TikTok, Instagram, Facebook, Snapchat, X/Twitter, Reddit, YouTube, and Threads.
+[ListParagraph] Number of days  (1) __________________________________________________
+[QuestionSeparator] 
+<<TABLE>>
+<</TABLE>>
+SM_family_control Does your family manage or control your social media use?
+[ListParagraph] Yes  (1) 
+[ListParagraph] No  (2) 
+[BlockEndLabel] End of Block: Social media rank and time (adapted from AoW)
+[BlockSeparator] 
+[BlockStartLabel] Start of Block: Screen control, social media impact and doomscrolling's 
+<<TABLE>>
+<</TABLE>>
+Screen Control How do you rate the following statements about screen use?
+<<TABLE>>
+ | Strongly agree (1) | Somewhat agree (2) | Neither agree nor disagree (3) | Somewhat disagree (4) | Strongly disagree (5)
+I can control my screen behaviours (1)  |  |  |  |  | 
+I feel dependent on screens in order to function effectively in day-to-day life (2)  |  |  |  |  | 
+I feel addicted to any screen based activities (3)  |  |  |  |  | 
+<</TABLE>>
+[QuestionSeparator] 
+<<TABLE>>
+<</TABLE>>
+Social media impact  How do you rate the following about social media use?
+<<TABLE>>
+ | Strongly agree (1) | Somewhat agree (2) | Neither agree nor disagree (3) | Somewhat disagree (4) | Strongly disagree (5)
+The impacts of social media on my mental welling is mostly positive (4)  |  |  |  |  | 
+The impacts of social media on my wellbeing in mostly negative (5)  |  |  |  |  | 
+Social media is essential for day-to-day life (6)  |  |  |  |  | 
+I avoid some social media (7)  |  |  |  |  | 
+<</TABLE>>
+[QuestionSeparator] 
+<<TABLE>>
+<</TABLE>>
+Doomscrolling  Please indicate your agreement with the following statements.
+<<TABLE>>
+ | Strongly disagree (1) | Disagree (2) | Somewhat disagree (3) | Neutral (4) | Somewhat agree (5) | Agree (6) | Strongly agree (7)
+I feel an urge to seek bad news on social media, more and more often. (1)  |  |  |  |  |  |  | 
+I lose track of time when I read bad news on social media. (2)  |  |  |  |  |  |  | 
+I find myself continuously browsing negative news. (3)  |  |  |  |  |  |  | 
+I feel like I am addicted to negative news. (4)  |  |  |  |  |  |  | 
+<</TABLE>>
+[BlockEndLabel] End of Block: Screen control, social media impact and doomscrolling's 
+[BlockSeparator] 
+[BlockStartLabel] Start of Block: Gaming
+<<TABLE>>
+<</TABLE>>
+weekday_games Roughly how many hours do you play video games in a typical week? For example, if you usually play 1 hour per day during the week (Monday – Friday) and 2 hours per day during the weekend (Saturday and Sunday), this would be 9 hours per week in total.
+[ListParagraph] I do not play video games  (1) 
+[ListParagraph] Less than 5 hours  (4) 
+[ListParagraph] 6-10 hours  (5) 
+[ListParagraph] 11-15 hours  (6) 
+[ListParagraph] 16-20 hours  (7) 
+[ListParagraph] More than 20 hours  (8) 
+[QuestionSeparator] 
+[QDisplayLogic] Display this question:
+[QDisplayLogic] If weekday_games = I do not play video games
+<<TABLE>>
+<</TABLE>>
+other_games  Please list up to five games that you currently spend the most time playing.
+[ListParagraph] Game 1  (1) __________________________________________________
+[ListParagraph] Game 2  (2) __________________________________________________
+[ListParagraph] Game 3  (3) __________________________________________________
+[ListParagraph] Game 4  (4) __________________________________________________
+[ListParagraph] Game 5  (5) __________________________________________________
+[QuestionSeparator] 
+[QDisplayLogic] Display this question:
+[QDisplayLogic] If If Please list up to five games that you currently spend the most time playing. Text Response Is Not Empty 
+<<TABLE>>
+<</TABLE>>
+other_games_time  For the games that you entered, please select roughly how many hours you would play each game in a typical week.
+[QDisplayLogic] Display this choice:
+[QDisplayLogic] If If Please list up to five games that you currently spend the most time playing. Text Response Is Not Empty 
+[QDisplayLogic] Display this choice:
+[QDisplayLogic] If If Please list up to five games that you currently spend the most time playing. Text Response Is Not Empty 
+[QDisplayLogic] Display this choice:
+[QDisplayLogic] If If Please list up to five games that you currently spend the most time playing. Text Response Is Not Empty 
+[QDisplayLogic] Display this choice:
+[QDisplayLogic] If If Please list up to five games that you currently spend the most time playing. Text Response Is Not Empty 
+[QDisplayLogic] Display this choice:
+[QDisplayLogic] If If Please list up to five games that you currently spend the most time playing. Text Response Is Not Empty 
+<<TABLE>>
+ | Less than 5 hours (1) | 6-10 hours (2) | 11-15 hours (3) | 16-20 hours (4) | More than 20 hours (5)
+Display this choice: / If If Please list up to five games that you currently spend the most time playing. Text Response Is Not Empty  / ${other_games /ChoiceTextEntryValue/1} (1)  |  |  |  |  | 
+Display this choice: / If If Please list up to five games that you currently spend the most time playing. Text Response Is Not Empty  / ${other_games /ChoiceTextEntryValue/2} (2)  |  |  |  |  | 
+Display this choice: / If If Please list up to five games that you currently spend the most time playing. Text Response Is Not Empty  / ${other_games /ChoiceTextEntryValue/3} (3)  |  |  |  |  | 
+Display this choice: / If If Please list up to five games that you currently spend the most time playing. Text Response Is Not Empty  / ${other_games /ChoiceTextEntryValue/4} (4)  |  |  |  |  | 
+Display this choice: / If If Please list up to five games that you currently spend the most time playing. Text Response Is Not Empty  / ${other_games /ChoiceTextEntryValue/5} (5)  |  |  |  |  | 
+<</TABLE>>
+[QuestionSeparator] 
+<<TABLE>>
+<</TABLE>>
+game_time_per_wk_pct Roughly how much of the time you spend gaming per week is spent playing with others (e.g., multiplayer, online)? (in percentage)
+<<TABLE>>
+ | 0 | 10 | 20 | 30 | 40 | 50 | 60 | 70 | 80 | 90 | 100
+<</TABLE>>
+<<TABLE>>
+  (1) | [IMAGE]
+<</TABLE>>
+[BlockEndLabel] End of Block: Gaming
+[BlockSeparator] 
+[BlockStartLabel] Start of Block: STAI Short
+<<TABLE>>
+<</TABLE>>
+STAI-S A number of statements which people have used to describe themselves are given below. Read
+each statement and then choose the appropriate statement to indicate
+how you feel right now, that is, at this moment. There are no right or wrong answers. Do not
+spend too much time on any one statement but give the answer which seems to describe your
+present feelings best.
+<<TABLE>>
+ | Not at all (1) | Somewhat (2) | Moderately (3) | Very much (4)
+I feel upset. (1)  |  |  |  | 
+I feel frightened. (2)  |  |  |  | 
+I feel nervous. (3)  |  |  |  | 
+I am jittery. (4)  |  |  |  | 
+I feel confused. (5)  |  |  |  | 
+<</TABLE>>
+[BlockEndLabel] End of Block: STAI Short
+[BlockSeparator] 
+[BlockStartLabel] Start of Block: BIS-BAS
+<<TABLE>>
+[IMAGE]
+<</TABLE>>
+bisbas Each item of this questionnaire is a statement that a person may either agree with or disagree with.  For each item, indicate how much you agree or disagree with what the item says.  Please respond to all the items; do not leave any blank.  Please be as accurate and honest as you can be.  Respond to each item as if it were the only item.  That is, don't worry about being "consistent" in your responses.
+
+<<TABLE>>
+ | Very true for me (1) | Somewhat true for me (2) | Somewhat false for me (3) | Very false for me (4)
+I worry about making mistakes (1)  |  |  |  | 
+Criticism or scolding hurts me quite a bit (2)  |  |  |  | 
+I feel pretty worried or upset when I think or know somebody is angry at me (3)  |  |  |  | 
+I feel worried when I think I have done poorly at something important’ (4)  |  |  |  | 
+When I get something I want, I feel excited and energised (5)  |  |  |  | 
+When I'm doing well at something I love to keep at it (6)  |  |  |  | 
+It would excite me to win a contest (7)  |  |  |  | 
+When I see an opportunity for something I like I get excited right away (8)  |  |  |  | 
+When I want something I usually go all-out to get it (25)  |  |  |  | 
+I go out of my way to get things I want (9)  |  |  |  | 
+If I see a chance to get something I want I move on it right away (26)  |  |  |  | 
+When I go after something I use a no holds barred approach (27)  |  |  |  | 
+<</TABLE>>
+[QuestionSeparator] 
+<<TABLE>>
+<</TABLE>>
+Future Self And one FINAL question (thank you for bearing with us!): Imagine yourself 10 years from now. If you could leave one sentence for that future version of yourself, what would you say?
+[TextEntryLine] ________________________________________________________________
+[TextEntryLine] ________________________________________________________________
+[TextEntryLine] ________________________________________________________________
+[TextEntryLine] ________________________________________________________________
+[TextEntryLine] ________________________________________________________________
+[BlockEndLabel] End of Block: BIS-BAS
+[BlockSeparator] 
