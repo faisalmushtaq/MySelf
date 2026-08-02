@@ -3,7 +3,7 @@
  *
  * Visual language inherited from the BrainPop lab site (editorial restraint,
  * generous whitespace, hairline borders, minimal motion) on a near-white
- * canvas with all-black text, set in a single typeface throughout.
+ * canvas with all-black text, set throughout in Newsreader.
  *
  * Interaction: one question per screen, large readable type, quiet chrome,
  * and controls that look like what they measure (a ladder you tap, hair
@@ -12,16 +12,20 @@
  * Design tokens mirror assets/css/style.css in brainpop-lab-website.
  */
 
-@import "@fontsource/dm-sans/300.css";
-@import "@fontsource/dm-sans/400.css";
-@import "@fontsource/dm-sans/500.css";
-@import "@fontsource/dm-sans/700.css";
+/* Newsreader throughout. Bundled, never fetched from a CDN — the app has to
+   look the same with no network at all. */
+@import "@fontsource/newsreader/300.css";
+@import "@fontsource/newsreader/400.css";
+@import "@fontsource/newsreader/500.css";
+@import "@fontsource/newsreader/600.css";
+@import "@fontsource/newsreader/700.css";
 
 :root {
   --canvas: #fcfcfb;        /* near-white page */
   --off-white: #f4f4f2;     /* subtle alternate fill */
   --paper: #ffffff;         /* cards, inputs */
   --text: #000000;          /* all text is black */
+  --muted: #6b6b68;         /* secondary navigation only, never question text */
   --hairline: rgba(0, 0, 0, 0.14);
   --hairline-strong: rgba(0, 0, 0, 0.34);
   --accent: #067843;        /* state only: selection, progress, saved */
@@ -30,9 +34,9 @@
   --warn: #a33b00;
 
   /*
-   * ONE typeface throughout: question stems, options, prose and numbers all
-   * share it, so nothing on screen changes voice mid-question. Size and
-   * weight carry hierarchy.
+   * ONE typeface throughout — Newsreader: question stems, options, prose and
+   * numbers all share it, so nothing on screen changes voice mid-question.
+   * Size and weight carry hierarchy.
    *
    * Both variables point at the same family deliberately. They are the single
    * switch point for an accessible/dyslexia-friendly face later: set
@@ -40,7 +44,7 @@
    * import) on :root, or scope it to a body class toggled per participant,
    * and every surface follows without touching component code.
    */
-  --font-ui: "DM Sans", system-ui, -apple-system, sans-serif;
+  --font-ui: "Newsreader", Georgia, "Times New Roman", serif;
   --font-display: var(--font-ui);
   --font-body: var(--font-ui);
 
@@ -159,13 +163,14 @@ textarea {
   color: var(--text);
 }
 
+/* Set as written — MyThoughts, MyStory. Upper-casing it broke the internal
+   capital that makes the name read as one word. */
 .subbrand {
-  margin: 0.15rem 0 0;
+  margin: 0.2rem 0 0;
   font-family: var(--font-body);
-  font-size: 0.7rem;
+  font-size: 0.95rem;
   font-weight: 500;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
+  letter-spacing: 0.02em;
   color: var(--accent);
 }
 
@@ -202,11 +207,30 @@ textarea {
   margin: 0;
 }
 
+/* No rule above this: a hairline immediately under the Start button read as
+   a boundary the button was pressed against. Space does the separating. */
 .demo-note {
-  margin-top: 2.5rem;
-  padding-top: 1.25rem;
-  border-top: 1px solid var(--hairline);
+  margin-top: 2.25rem;
   font-size: 0.78rem;
+  color: var(--muted);
+}
+
+/* Who to ask, at the foot of the first screen: quiet, always there, never in
+   the way of starting. */
+.start-footer {
+  /* Plain margin, not margin-top:auto — an auto margin absorbs the free space
+     and overrides the column's centring, dropping everything to the top. */
+  margin-top: 3.5rem;
+  font-family: var(--font-body);
+  font-size: 0.9rem;
+  line-height: 1.6;
+  color: var(--muted);
+  max-width: 46ch;
+}
+
+.start-footer a {
+  color: inherit;
+  text-underline-offset: 2px;
 }
 
 /* ── Survey chrome ─────────────────────────────────────────────────────── */
@@ -217,26 +241,40 @@ textarea {
   padding: 0.35rem 0 1.75rem;
 }
 
+/* Named, not just a chevron. Quiet grey so it never competes with the
+   question, but readable enough that people know they can go back. The 44px
+   height keeps the tap target honest even though the box is invisible. */
 .back {
-  border: 1px solid var(--hairline);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border: none;
   background: transparent;
-  color: var(--text);
-  width: 44px;
-  height: 44px;
+  color: var(--muted);
+  min-height: 44px;
+  padding: 0 0.75rem 0 0.25rem;
   border-radius: 999px;
-  font-size: 1.25rem;
+  font-family: var(--font-ui);
+  font-size: 1rem;
+  font-weight: 500;
   line-height: 1;
   cursor: pointer;
-  transition: background 0.2s ease, border-color 0.2s ease;
+  transition: color 0.2s ease, background 0.2s ease;
+}
+
+.back-arrow {
+  font-size: 1.25rem;
+  line-height: 1;
 }
 
 .back:hover {
-  background: rgba(0, 0, 0, 0.05);
-  border-color: var(--hairline-strong);
+  color: var(--text);
+  background: rgba(0, 0, 0, 0.04);
 }
 
 .back-spacer {
   width: 44px;
+  min-height: 44px;
 }
 
 :focus-visible {
@@ -320,6 +358,85 @@ textarea {
   white-space: pre-wrap;
   margin: 0;
   max-width: 62ch;
+}
+
+/* Framing that belongs with its control rather than on a page of its own.
+   Same family and colour as everything else — a step down in size and weight
+   is all that separates it from the question. */
+.lede {
+  font-family: var(--font-body);
+  font-size: 1.05rem;
+  font-weight: 400;
+  line-height: 1.65;
+  color: var(--text);
+  white-space: pre-wrap;
+  margin: 0.85rem 0 0;
+  max-width: 52ch;
+}
+
+/* An information screen's body is the whole screen — it gets the same reading
+   size as a question stem's supporting text, not a footnote size. Paragraph
+   spacing comes from the source text's blank lines. */
+.lede-body {
+  font-size: 1.15rem;
+  line-height: 1.75;
+  max-width: 60ch;
+  margin-top: 1.25rem;
+}
+
+/* ── Disclosure: detail on request ─────────────────────────────────────── */
+.more-info {
+  margin-top: 1.75rem;
+  width: 100%;
+  max-width: 60ch;
+}
+
+.more-info-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 48px;
+  padding: 0 0.9rem 0 0.6rem;
+  background: none;
+  border: 1px solid var(--hairline);
+  border-radius: 999px;
+  font-family: var(--font-ui);
+  font-size: 1rem;
+  font-weight: 500;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.more-info-toggle:hover {
+  border-color: var(--hairline-strong);
+}
+
+.more-info-caret {
+  font-size: 0.8rem;
+  color: var(--accent);
+}
+
+.more-info-body {
+  margin-top: 0.9rem;
+  padding: 1.25rem 1.4rem;
+  background: var(--off-white);
+  border-radius: var(--radius);
+  font-family: var(--font-body);
+  font-size: 1.05rem;
+  font-weight: 400;
+  line-height: 1.7;
+  color: var(--text);
+  white-space: pre-wrap;
+}
+
+.start-instructions {
+  font-family: var(--font-body);
+  font-size: 1.05rem;
+  font-weight: 400;
+  line-height: 1.65;
+  color: var(--text);
+  margin: 0 0 1.5rem;
+  max-width: 46ch;
 }
 
 /* ── Option cards ──────────────────────────────────────────────────────── */
@@ -663,6 +780,58 @@ input[type="range"] {
   font-weight: 400;
   line-height: 1.25;
   text-align: center;
+}
+
+/* Hair tiles carry a description rather than a classification code, so the
+   label wraps to two lines and needs a readable measure. */
+.tile-label {
+  text-align: center;
+  text-wrap: balance;
+}
+
+/* ── Compact chips ─────────────────────────────────────────────────────── */
+/* Many short labels — months, ages — laid out so all of them are visible and
+   any one is a single tap. This is what a dropdown replaces, badly. */
+.chip-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  width: 100%;
+  max-width: 40rem;
+}
+
+.chip {
+  min-height: 52px;
+  min-width: 72px;
+  padding: 0 1.05rem;
+  background: var(--paper);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+  font-family: var(--font-ui);
+  font-size: 1.1rem;
+  font-weight: 500;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.chip.wide {
+  flex-basis: 100%;
+  text-align: left;
+}
+
+.chip:hover {
+  border-color: var(--hairline-strong);
+}
+
+.chip.selected {
+  border-color: var(--accent);
+  background: var(--accent-wash);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .chip {
+    transition: border-color 0.18s ease, background 0.18s ease;
+  }
 }
 
 /* ── Form fields ───────────────────────────────────────────────────────── */

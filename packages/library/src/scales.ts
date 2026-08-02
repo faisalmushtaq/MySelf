@@ -104,17 +104,37 @@ const hairDescriptions: Record<string, string> = {
 
 export const hairType12: ResponseScale = {
   key: "scale.hair_type_12",
-  version: "1.0.0",
-  name: "Hair type (1a-4c)",
+  version: "2.0.0",
+  name: "Hair type (1a-4c classification; described in plain words)",
   direction: "unordered",
+  scoringNote:
+    "Codes 1-12 run 1a, 1b, 1c, 2a … 4c in order. The classification code is kept in codeLabel for the codebook; participants see the picture and the description only.",
   options: hairLabels.map((label, i) => ({
     code: i + 1,
     legacyCode: i + 1,
-    label,
+    // The participant reads a description, not a classification code.
+    label: hairDescriptions[label] ?? label,
+    codeLabel: label,
     kind: "substantive" as const,
     textEntry: false,
     illustration: `hair:${label}`,
-    description: hairDescriptions[label],
+  })),
+};
+
+/** Calendar months, for the birth-month step of the secret code (D-23). */
+export const month12: ResponseScale = {
+  key: "scale.month_12",
+  version: "1.0.0",
+  name: "Calendar month",
+  direction: "ascending",
+  options: [
+    "January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December",
+  ].map((label, i) => ({
+    code: i + 1,
+    label,
+    kind: "substantive" as const,
+    textEntry: false,
   })),
 };
 
@@ -549,6 +569,7 @@ export const allScales: ResponseScale[] = [
   gender4,
   ethnicityUk20,
   hairType12,
+  month12,
   kss9Canonical,
   kss9AsAdministered,
   ehiSf5Canonical,

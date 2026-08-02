@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { AnswerStore, Walker } from "@myself/engine";
 import { releaseManifest } from "@myself/schema";
-import rawManifest from "../../../releases/ybm_nd2026_standard_r3.1.0.manifest.json";
-import { flattenManifest } from "./lib/flatten.js";
+import rawManifest from "../../../releases/ybm_nd2026_standard_r4.0.0.manifest.json";
+import { flattenManifest, reminderOf } from "./lib/flatten.js";
 import { resolveText } from "./lib/pipes.js";
 
 const manifest = releaseManifest.parse(rawManifest);
@@ -45,24 +45,44 @@ describe("manifest flattening", () => {
     // These rules are what stop implausible identifiers and dates of birth
     // reaching the raw data. If a release ever ships without them the app
     // would silently accept anything, so the manifest is asserted directly.
-    expect(manifest.composition.participantCode?.pattern).toBe("^[A-Za-z]{3}[0-9]{2,}$");
+    const code = manifest.composition.participantCode;
+    expect(code?.pattern).toBe("^[A-Za-z]{3}[0-9]{4}$"); // three letters, four digits
+    expect(code?.variable).toBe("val_id"); // captured once, never re-asked
+    expect(code?.instructions).toMatch(/research team/i);
 
     const find = (key: string) => flattened.units.find((u) => u.item.key === key)?.item;
 
-    const psId = find("ps_id");
-    expect(psId?.responseType).toBe("form_fields");
-    if (psId?.responseType === "form_fields") {
-      // every component of the derived participant ID is format-constrained
-      expect(psId.fields.every((f) => f.pattern !== undefined && f.patternHint !== undefined)).toBe(true);
-      expect(psId.fields.find((f) => f.key === "mother_initials")?.maxChars).toBe(2);
-      expect(psId.fields.find((f) => f.key === "house_digit")?.kind).toBe("numeric");
+    // The secret code is built one component per screen, each constrained.
+    for (const [key, pattern] of [
+      ["ps_mother_initials", "^[A-Za-z]{2}$"],
+      ["ps_house_digit", "^[0-9]$"],
+      ["ps_postcode_letters", "^[A-Za-z]{2}$"],
+    ] as const) {
+      const item = find(key);
+      expect(item?.responseType).toBe("text_short");
+      if (item?.responseType === "text_short") {
+        expect(item.pattern).toBe(pattern);
+        expect(item.patternHint).toBeTruthy();
+        expect(item.required).toBe("hard");
+      }
     }
 
-    const valId = find("val_id");
-    if (valId?.responseType === "form_fields") {
-      expect(valId.fields[0]?.kind).toBe("numeric");
-      expect(valId.fields[0]?.pattern).toBe("^[0-9]{2,}$");
+    // Month is chosen, not typed, so it cannot be mistyped at all.
+    const month = find("ps_birth_month");
+    expect(month?.responseType).toBe("single_choice");
+    if (month?.responseType === "single_choice") {
+      expect(month.presentation).toBe("compact");
+      expect(manifest.scales[month.scale]).toBeDefined();
     }
+
+    // The explainer comes before any of it is collected.
+    const intro = flattened.units.findIndex((u) => u.item.key === "secret_code_intro");
+    const first = flattened.units.findIndex((u) => u.item.key === "ps_mother_initials");
+    expect(intro).toBeGreaterThan(-1);
+    expect(intro).toBeLessThan(first);
+
+    // The in-flow validation-ID question is gone: it is the opening screen now.
+    expect(find("val_id")).toBeUndefined();
 
     const dob = find("dob");
     expect(dob?.responseType).toBe("date");
@@ -70,6 +90,50 @@ describe("manifest flattening", () => {
       expect(dob.minAgeYears).toBe(4); // nobody younger than 4 completes this
       expect(dob.maxAgeYears).toBe(100);
     }
+  });
+
+  it("puts each ladder on one screen with its explanation, and no page of narration first", () => {
+    const ladders = flattened.units.filter((u) => u.item.responseType === "ladder");
+    expect(ladders).toHaveLength(2);
+    for (const l of ladders) {
+      expect(l.item.lede?.text).toMatch(/^This ladder stands for/);
+      expect(l.item.lede?.text).not.toMatch(/below/i);
+      expect(l.item.stem.text).not.toMatch(/below/i);
+    }
+    // the two click-through pages that used to precede each ladder are gone
+    const keys = flattened.units.map((u) => u.item.key);
+    for (const gone of ["society_intro", "society_desc", "school_intro", "school_desc"]) {
+      expect(keys).not.toContain(gone);
+    }
+  });
+
+  it("never tells a participant to read something that is not on the screen", () => {
+    // "below are some statements" was written for a paper form. Here every
+    // statement arrives on its own screen, so the words were simply untrue.
+    for (const u of flattened.units) {
+      const text = `${u.item.stem.text} ${u.item.lede?.text ?? ""}`;
+      expect(text).not.toMatch(/\b(are|is|shown|given|listed|presented)\s+(below|above)\b/i);
+    }
+  });
+
+  it("shortens instrument instructions to the part that still helps mid-battery", () => {
+    // The opening sentence describes what is coming; by the time someone asks
+    // for a reminder it has already come. The last sentence says how to answer.
+    expect(reminderOf("The next few screens each show a statement. For each one, say how much you agree.")).toBe(
+      "For each one, say how much you agree.",
+    );
+    for (const text of flattened.context.values()) {
+      expect(text).not.toMatch(/next few screens/i);
+    }
+  });
+
+  it("offers data-handling detail on the first screen without imposing it", () => {
+    const intro = flattened.units.find((u) => u.item.key === "intro");
+    expect(intro?.item.moreInfo?.label).toBeTruthy();
+    expect(intro?.item.moreInfo?.body.text).toMatch(/WHERE IT IS KEPT/);
+    // A title, then the body — not one undifferentiated block of prose.
+    expect(intro?.item.stem.text).toBe("Yorkshire Brain Map School Workshop");
+    expect(intro?.item.lede?.text).toMatch(/Thank you for taking part/);
   });
 
   it("resolves the consent withdrawal-date pipe from the session start", () => {

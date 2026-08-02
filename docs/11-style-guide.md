@@ -25,7 +25,7 @@ The visual language is inherited from the **BrainPop lab website** (`faisalmusht
 
 ## 2. Typography
 
-- **One typeface throughout (`DM Sans`)** — question stems, options, prose, buttons, ladder numbers and the wordmark all share it (D-21). Nothing on screen changes voice mid-question. Hierarchy comes from **size and weight only**: 400 for prose and controls, 500 for stems and emphasis, 600–700 for the wordmark and headings.
+- **One typeface throughout (`Newsreader`)** — question stems, options, prose, buttons, ladder numbers and the wordmark all share it (D-21). Nothing on screen changes voice mid-question. The serif is the distinctive one and it is the one everything is set in (D-24) — the earlier sans/serif pairing, and the later decision to unify on the sans, are both superseded. Hierarchy comes from **size and weight only**: 400 for prose and controls, 500 for stems and emphasis, 600–700 for the wordmark and headings.
 - **Single switch point for an accessible face.** `--font-ui` in `:root` is the only place the family is named; `--font-display` and `--font-body` both alias it. A dyslexia-friendly font (e.g. Atkinson Hyperlegible or OpenDyslexic via `@fontsource`) becomes a one-line change, or a body-class toggle for a per-participant setting — no component touches needed. Planned, not yet built.
 - Fonts are **bundled via `@fontsource`**, never loaded from a CDN — the app must render identically offline in a school hall.
 - **Base size is large by design**: 20px on phones, 22px from 768px up. Participants include children and low-literacy readers; small type is not an aesthetic choice we get to make.

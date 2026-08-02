@@ -83,7 +83,31 @@ export function SingleChoice({ item, scale, value, onAnswer }: ControlProps) {
     );
   }
 
-  const asPicker = item.presentation === "dropdown" || item.presentation === "wheel" || scale.options.length > 12;
+  // Compact chips: many short labels (months, ages) laid out in a wrapping
+  // grid. Everything is visible at once and answered in a single tap, where a
+  // menu would hide the options behind one.
+  if (item.presentation === "compact") {
+    return (
+      <div className="chip-grid" role="radiogroup" aria-label={item.stem.text}>
+        {scale.options.map((o) => (
+          <button
+            key={o.code}
+            type="button"
+            role="radio"
+            aria-checked={selected === o.code}
+            className={`chip${selected === o.code ? " selected" : ""}${o.kind !== "substantive" ? " wide" : ""}`}
+            onClick={() => onAnswer({ kind: "choice", code: o.code }, auto)}
+          >
+            {o.label}
+          </button>
+        ))}
+      </div>
+    );
+  }
+
+  // Menus are the exception, chosen deliberately in the library — never a
+  // fallback triggered by option count.
+  const asPicker = item.presentation === "dropdown" || item.presentation === "wheel";
 
   if (asPicker) {
     return (
@@ -230,8 +254,19 @@ export function LadderControl({ item, value, onAnswer }: ControlProps) {
     return Math.min(top, Math.max(item.lowestValue, top - Math.min(item.rungs - 1, Math.max(0, idx))));
   };
 
-  const pick = (v: number) => {
-    if (v !== selected) onAnswer({ kind: "number", value: v }, false);
+  // Choosing a rung moves on, the same as tapping an option card. The advance
+  // is held until the finger lifts, so dragging up and down the ladder to find
+  // the right rung never jumps the screen mid-decision; arrow keys adjust
+  // without advancing, and Enter continues.
+  const pick = (v: number, settle: boolean) => {
+    if (v !== selected || settle) onAnswer({ kind: "number", value: v }, settle);
+  };
+  const lastPicked = useRef<number | undefined>(undefined);
+  const release = () => {
+    if (!dragging.current) return;
+    dragging.current = false;
+    const v = lastPicked.current;
+    if (v !== undefined) onAnswer({ kind: "number", value: v }, true);
   };
 
   return (
@@ -252,21 +287,26 @@ export function LadderControl({ item, value, onAnswer }: ControlProps) {
         onPointerDown={(e) => {
           dragging.current = true;
           e.currentTarget.setPointerCapture(e.pointerId);
-          pick(valueFromY(e.clientY, e.currentTarget));
+          const v = valueFromY(e.clientY, e.currentTarget);
+          lastPicked.current = v;
+          pick(v, false);
         }}
         onPointerMove={(e) => {
-          if (dragging.current) pick(valueFromY(e.clientY, e.currentTarget));
+          if (!dragging.current) return;
+          const v = valueFromY(e.clientY, e.currentTarget);
+          lastPicked.current = v;
+          pick(v, false);
         }}
-        onPointerUp={() => (dragging.current = false)}
+        onPointerUp={release}
         onPointerCancel={() => (dragging.current = false)}
         onKeyDown={(e) => {
           const cur = selected ?? item.lowestValue - 1 + Math.ceil(item.rungs / 2);
           if (e.key === "ArrowUp" || e.key === "ArrowRight") {
             e.preventDefault();
-            pick(Math.min(top, cur + 1));
+            pick(Math.min(top, cur + 1), false);
           } else if (e.key === "ArrowDown" || e.key === "ArrowLeft") {
             e.preventDefault();
-            pick(Math.max(item.lowestValue, cur - 1));
+            pick(Math.max(item.lowestValue, cur - 1), false);
           }
         }}
       >

@@ -48,9 +48,12 @@ const est = (a: number, b: number) =>
 
 // ---------------------------------------------------------------------------
 
-const introText = `Yorkshire Brain Map School Workshop - Citizen Neuroscience - NotreDame
+// The title is a title, not the first line of a wall of text. The body keeps
+// the approved wording verbatim; only its arrangement on screen changes.
+const introTitle = "Yorkshire Brain Map School Workshop";
+const introSubtitle = "Citizen Neuroscience — Notre Dame";
 
-Thank you for taking part in this workshop.
+const introText = `Thank you for taking part in this workshop.
 
 In this study, we'll use a special tool called electroencephalography (EEG) to collect information about your brain. We'll put sensors on your head, and they'll record your brain activity. You'll also help collect brain data from another person. This new way helps us gather brain data quickly with help from people who aren't experts. The EEG headset should not feel uncomfortable, so if it does at any point, just let a member of the research team know. EEG is safe, pain free, and non-invasive.
 
@@ -61,6 +64,31 @@ Joining this study is your choice, and you can leave at any time with no problem
 Our study has permission from the School of Psychology Ethics Committee (Ethics Reference: PSCETHS-1449, Date of Approval: 5/6/25).
 
 The questions you're about to answer should take about 10 minutes to answer. Please finish the survey quickly and carefully so we can stay on schedule. Thank you for joining our study! If you have questions or worries, please feel free to ask.`;
+
+/**
+ * Data handling, in the participant's own terms, available from the first
+ * screen without being imposed on anyone who does not want it (D-24). This is
+ * a plain-language restatement of the approved information sheet, not new
+ * permissions — every claim here is one the protocol already makes.
+ */
+const privacyText = `WHAT WE COLLECT
+Your answers to these questions, the EEG recording from the session, and some details about how you used the app — such as how long you spent on each question. We also collect your name and date of birth so the research team can identify your session on the day.
+
+WHERE IT IS KEPT
+Everything is saved on this iPad first, encrypted, so it works even with no internet. It is later transferred to secure University of Leeds storage. Your name and date of birth are stored apart from your answers, so the two are not held together.
+
+WHO CAN SEE IT
+The research team. When we publish or share the data, your name is never attached — only your code and your answers.
+
+YOUR SECRET CODE
+The code you're about to make is how you can ask us to remove your answers later. Keep it somewhere you'll remember. We can't work out who you are from it, which is the point of it.
+
+CHANGING YOUR MIND
+You can stop at any time, and you don't have to give a reason. If you want your answers taken out afterwards, contact the research team within 24 hours of finishing and tell them your code.
+
+QUESTIONS
+Email the research team at m.faizah@leeds.ac.uk. Ethics reference PSCETHS-1449.`;
+
 
 export const ybmIntroConsent: ModuleInput = {
   ...moduleBase,
@@ -78,7 +106,9 @@ export const ybmIntroConsent: ModuleInput = {
           revision: 1,
           variable: "study_intro",
           legacyVariable: "Introduction",
-          stem: { text: introText },
+          stem: { text: introTitle },
+          lede: { text: `${introSubtitle}\n\n${introText}` },
+          moreInfo: { label: "How we look after your information", body: { text: privacyText } },
         },
         {
           responseType: "checkbox_set",
@@ -117,7 +147,7 @@ export const ybmIntroConsent: ModuleInput = {
             {
               key: "information_read",
               text: {
-                text: "I have read and understood the information on the study presented above and have been offered the opportunity to ask the research team questions via email (m.faizah@leeds.ac.uk)",
+                text: "I have read and understood the information about the study shown at the start of this survey and have been offered the opportunity to ask the research team questions via email (m.faizah@leeds.ac.uk)",
               },
             },
             { key: "agree", text: { text: "I agree to take part in this study" } },
@@ -127,8 +157,12 @@ export const ybmIntroConsent: ModuleInput = {
     },
   ],
   timeEstimates: est(120, 90),
-  changelog: "1.0: encoded from QSF. Legacy consent choice codes were 2-7. Withdrawal date piped as session start + 2 days.",
-  researcherNotes: "The intro's 'about 10 minutes' estimate is superseded by computed per-release estimates (A-38).",
+  changelog:
+    "1.0: encoded from QSF. Legacy consent choice codes were 2-7. Withdrawal date piped as session start + 2 days. " +
+    "2.0 (D-23): one consent statement said the study information was 'presented above' — on a paper form it was, but here it is a previous screen, so the statement was literally untrue at the moment of signing. Changed to 'shown at the start of this survey'. Meaning unchanged; ETHICS COMMITTEE MUST BE NOTIFIED before this release is administered.",
+  researcherNotes:
+    "The intro's 'about 10 minutes' estimate is superseded by computed per-release estimates (A-38). " +
+    "OUTSTANDING: the consent wording change in 2.0 is a factual correction, not a substantive one, but approved consent text was altered — confirm with PSCETHS-1449 before fielding.",
 };
 
 // ---------------------------------------------------------------------------
@@ -165,75 +199,73 @@ export const ybmIdentity: ModuleInput = {
           maxChars: 100,
           researcherNote: "Direct identifier — identity-schema routed (D-09).",
         },
+        // The secret code is built one piece at a time. Four short screens beat
+        // one dense form: each piece gets its own instruction and its own
+        // validation, and nobody has to hold four rules in their head at once.
         {
-          responseType: "form_fields",
-          key: "ps_id",
+          responseType: "info",
+          key: "secret_code_intro",
           revision: 1,
-          variable: "ps_id",
-          legacyVariable: "ps_id",
-          required: "hard",
-          stem: {
-            text: "PARTICIPANT ID: Please provide the following information to help us generate a unique identifier for you:\n\nFor example, if your mother's name is Jane, your house number is 123, you were born in January, and your postcode is AB1 2CD, your participant ID would be JA101CD.",
+          variable: "ps_id_intro",
+          required: "optional",
+          stem: { text: "Next, you'll make your secret code" },
+          lede: {
+            text: "The next four questions build a short code that is yours alone. It is made from things you will always remember, so you can tell us your code again later — if you ever want your answers taken out of the study, that code is how we find them.\n\nWe cannot work it out from your code who you are. That is the point of it: your answers stay linked to you without being labelled with your name.",
           },
-          fields: [
-            {
-              key: "mother_initials",
-              label: "First two letters of mother's first name",
-              required: true,
-              maxChars: 2,
-              pattern: "^[A-Za-z]{2}$",
-              patternHint: "Two letters, for example JA",
-            },
-            {
-              key: "house_digit",
-              label: "First digit of your house number",
-              kind: "numeric",
-              required: true,
-              maxChars: 1,
-              pattern: "^[0-9]$",
-              patternHint: "A single number, for example 1",
-            },
-            {
-              key: "birth_month",
-              label: "Month you were born",
-              required: true,
-              maxChars: 12,
-              pattern: "^([A-Za-z]{3,9}|0?[1-9]|1[0-2])$",
-              patternHint: "The month name or its number, for example January or 01",
-            },
-            {
-              key: "postcode_letters",
-              label: "Last two letters of your postcode",
-              required: true,
-              maxChars: 2,
-              pattern: "^[A-Za-z]{2}$",
-              patternHint: "Two letters, for example CD",
-            },
-          ],
-          researcherNote: "Quasi-identifying components — identity-schema routed; derived code used for legacy matching (A-27/D-09).",
+          researcherNote:
+            "Explains the purpose of the ps_id components before collection (D-23). The code is participant-held; the research team cannot reverse it.",
         },
         {
-          responseType: "form_fields",
-          key: "val_id",
+          responseType: "text_short",
+          key: "ps_mother_initials",
           revision: 1,
-          variable: "val_id",
-          legacyVariable: "val_id",
+          variable: "ps_mother_initials",
           required: "hard",
-          stem: {
-            text: "We also need you to put the validation ID. This ID starts with three letters (e.g. NDC), followed by two or more digits. This ID should have been provided by the research team. If you have not received it, please ask one of our team.",
-          },
-          fields: [
-            {
-              key: "digits",
-              label: "All digits after three letters",
-              kind: "numeric",
-              required: true,
-              maxChars: 10,
-              pattern: "^[0-9]{2,}$",
-              patternHint: "At least two numbers, for example 042",
-            },
-          ],
-          researcherNote: "Typos in the administered stem fixed per D-07 ('haven not', 'pleas', 'i.e,').",
+          stem: { text: "The first two letters of your mother's first name" },
+          lede: { text: "For example, if her name is Jane, type JA." },
+          maxChars: 2,
+          pattern: "^[A-Za-z]{2}$",
+          patternHint: "Two letters, for example JA",
+          researcherNote: "Secret-code component 1 of 4 — identity-schema routed (D-09/D-23).",
+        },
+        {
+          responseType: "text_short",
+          key: "ps_house_digit",
+          revision: 1,
+          variable: "ps_house_digit",
+          required: "hard",
+          stem: { text: "The first digit of your house number" },
+          lede: { text: "For example, if you live at number 123, type 1." },
+          maxChars: 1,
+          pattern: "^[0-9]$",
+          patternHint: "One number, for example 1",
+          researcherNote: "Secret-code component 2 of 4 — identity-schema routed (D-09/D-23).",
+        },
+        {
+          responseType: "single_choice",
+          key: "ps_birth_month",
+          revision: 1,
+          variable: "ps_birth_month",
+          required: "hard",
+          stem: { text: "The month you were born" },
+          lede: { text: "Just the month — you'll be asked for the full date in a moment." },
+          scale: "scale.month_12",
+          scaleVersion: "1.0.0",
+          presentation: "compact",
+          researcherNote: "Secret-code component 3 of 4. Chosen from a list rather than typed (D-23).",
+        },
+        {
+          responseType: "text_short",
+          key: "ps_postcode_letters",
+          revision: 1,
+          variable: "ps_postcode_letters",
+          required: "hard",
+          stem: { text: "The last two letters of your postcode" },
+          lede: { text: "For example, if your postcode is AB1 2CD, type CD." },
+          maxChars: 2,
+          pattern: "^[A-Za-z]{2}$",
+          patternHint: "Two letters, for example CD",
+          researcherNote: "Secret-code component 4 of 4 — identity-schema routed (D-09/D-23).",
         },
         {
           responseType: "date",
@@ -255,7 +287,16 @@ export const ybmIdentity: ModuleInput = {
     },
   ],
   timeEstimates: est(150, 120),
-  changelog: "1.0: encoded from QSF; collection preserved per D-09, storage separated at the data layer.",
+  changelog:
+    "1.0: encoded from QSF; collection preserved per D-09, storage separated at the data layer. " +
+    "2.0 (D-23): the validation ID moved to the opening screen, where it is entered once before anything else, " +
+    "so the in-flow val_id item is removed. The ps_id form was split into four single-purpose screens preceded " +
+    "by an explanation of what the code is for; birth month is now chosen from a list. Legacy ps_id is derived " +
+    "from ps_mother_initials + ps_house_digit + ps_birth_month + ps_postcode_letters at export, and val_id from " +
+    "the session's participant code — the crosswalk records both derivations rather than recoding silently.",
+  researcherNotes:
+    "Legacy crosswalk: ps_id = initials + house digit + zero-padded month number + postcode letters (e.g. JA101CD); " +
+    "val_id = the participant code captured at the opening screen. Both are derived, never re-asked.",
 };
 
 // ---------------------------------------------------------------------------
@@ -276,7 +317,11 @@ export const ybmDemographics: ModuleInput = {
           "Ethnicity",
           "What best describes your ethnic origin?\n\nEthnic origin refers to your cultural background or where your family comes from, including your ancestors, country of origin, and cultural traditions you identify with.",
           "scale.ethnicity_uk20",
-          { presentation: "wheel", required: "hard", researcherNote: "'Ethic origin' typo fixed per D-07." },
+          {
+            required: "hard",
+            researcherNote:
+              "'Ethic origin' typo fixed per D-07. Presented as a full tappable list rather than a menu (D-23): the census categories are long enough to need reading, and a menu hides them behind an extra tap.",
+          },
         ),
         single("gender", "gender", "Gender", "Gender", "scale.gender_4", { required: "hard" }),
         single(
@@ -310,13 +355,15 @@ export const ybmEegPractical: ModuleInput = {
           "hair_type",
           "hair_type",
           "Hair_type",
-          "Please select below which hair type (number; letter) is most representative of your own hair. Please only select ONE hair type from all options below:",
+          "Which of these is most like your own hair?",
           "scale.hair_type_12",
           {
             presentation: "grid",
             required: "hard",
+            lede: { text: "Pick the one closest to yours — it helps us fit the EEG cap. Choose just one." },
             researcherNote:
-              "Rendered as a tappable illustrated grid: each option draws its own curl pattern (MySelf-authored artwork, no third-party chart dependency). Replaces the Qualtrics chart image + dropdown.",
+              "Rendered as a tappable illustrated grid: each option draws its own curl pattern (MySelf-authored artwork, no third-party chart dependency). Replaces the Qualtrics chart image + dropdown. " +
+              "The 1a-4c classification codes are no longer shown (D-23) — participants match a picture and a description; the code is kept in the scale's codeLabel for the codebook.",
           },
         ),
       ],
@@ -392,7 +439,7 @@ export const ybmSmartphone: ModuleInput = {
           "At what age did you get your first smartphone? Please answer in years.",
           "scale.age_adoption_smartphone",
           {
-            presentation: "wheel",
+            presentation: "compact",
             displayIf: {
               op: "selected",
               target: { item: { instrument: "ybm_smartphone", item: "own", revision: 1 } },
@@ -408,7 +455,7 @@ export const ybmSmartphone: ModuleInput = {
           "At what age did you start using social media? Please answer in years.",
           "scale.age_adoption_sm",
           {
-            presentation: "wheel",
+            presentation: "compact",
             displayIf: { op: "selected", target: { item: smUseRef }, code: 1 },
           },
         ),
@@ -506,10 +553,10 @@ export const ybmSocialMedia: ModuleInput = {
           scale: "scale.sm_functions_11",
           scaleVersion: "1.0.0",
         },
-        single("night_checks", "sm_night_checks", "SM_night_check", "On a typical night, how many times do you wake up and check social media?", "scale.sm_night_checks_4pt", { presentation: "wheel" }),
-        single("morning_latency", "sm_morning_latency", "SM_morning_check ", "How long after waking do you typically check social media?", "scale.sm_morning_latency_5pt", { presentation: "wheel" }),
-        single("time_school_day", "sm_time_school_day", "SM_weekdays ", "How much time do you spend using social media on a typical school day (Monday-Friday)?", "scale.sm_daily_time_9pt", { presentation: "wheel" }),
-        single("time_nonschool_day", "sm_time_nonschool_day", "SM_weekend/holiday ", "How much time do you spend using social media on a typical non-school day (e.g., weekend or school holiday)?", "scale.sm_daily_time_9pt", { presentation: "wheel", researcherNote: "Legacy tag contains a slash and trailing space (A-31)." }),
+        single("night_checks", "sm_night_checks", "SM_night_check", "On a typical night, how many times do you wake up and check social media?", "scale.sm_night_checks_4pt"),
+        single("morning_latency", "sm_morning_latency", "SM_morning_check ", "How long after waking do you typically check social media?", "scale.sm_morning_latency_5pt"),
+        single("time_school_day", "sm_time_school_day", "SM_weekdays ", "How much time do you spend using social media on a typical school day (Monday-Friday)?", "scale.sm_daily_time_9pt"),
+        single("time_nonschool_day", "sm_time_nonschool_day", "SM_weekend/holiday ", "How much time do you spend using social media on a typical non-school day (e.g., weekend or school holiday)?", "scale.sm_daily_time_9pt", { researcherNote: "Legacy tag contains a slash and trailing space (A-31)." }),
         single("lose_track", "sm_lose_track", "SM_lostrack", "I lose track of how much time I spend on social media", "scale.agree_5pt_dk"),
         single(
           "limit_features",

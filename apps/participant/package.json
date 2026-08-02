@@ -11,7 +11,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@fontsource/dm-sans": "^5.3.0",
+    
     "@fontsource/newsreader": "^5.3.0",
     "@myself/engine": "workspace:*",
     "@myself/schema": "workspace:*",

@@ -27,6 +27,24 @@ const baseItem = {
   /** Legacy source variable (verbatim Qualtrics tag), for the crosswalk. */
   legacyVariable: z.string().optional(),
   stem: displayText,
+  /**
+   * Secondary explanatory text shown under the stem in body size. Lets a long
+   * framing passage sit on the same screen as its response control instead of
+   * becoming a click-through page the participant has already forgotten by the
+   * time the control appears.
+   */
+  lede: displayText.optional(),
+  /**
+   * Detail a participant may want but should not have to wade through — how
+   * their data is handled, who sees it, how long it is kept. Collapsed behind
+   * its own label so it is available without being imposed.
+   */
+  moreInfo: z
+    .object({
+      label: z.string().min(1),
+      body: displayText,
+    })
+    .optional(),
   media: z.array(mediaRef).optional(),
   required: z.enum(["hard", "soft", "optional"]).default("soft"),
   /** Offer an explicit decline control (D-05 / A-44). */
@@ -57,9 +75,13 @@ export const itemDefinition = z.discriminatedUnion("responseType", [
     scaleVersion: semver,
     /**
      * "grid" tiles illustrated options; "spectrum" lays them along a left-to-
-     * right axis so the spatial arrangement carries the meaning (handedness).
+     * right axis so the spatial arrangement carries the meaning (handedness);
+     * "compact" wraps many short labels (ages, months) into tappable chips so a
+     * long list is still answered in one look rather than through a menu.
+     * Menus ("dropdown"/"wheel") hide the options and cost an extra tap — use
+     * them only where the list is genuinely too long to lay out.
      */
-    presentation: z.enum(["cards", "dropdown", "wheel", "grid", "spectrum"]).default("cards"),
+    presentation: z.enum(["cards", "dropdown", "wheel", "grid", "spectrum", "compact"]).default("cards"),
     /** Display the spectrum in reverse option order (presentation only —
      * response codes are never affected). */
     spectrumReverse: z.boolean().default(false),

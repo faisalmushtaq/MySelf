@@ -160,8 +160,10 @@ export async function loadAnswers(sessionId: string): Promise<Map<string, Record
     if (!e.itemKey) continue;
     if (e.type === "response.recorded" || e.type === "response.changed") {
       if (e.payload) {
-        const value = await unseal<AnswerValue>(key, e.payload);
-        answers.set(e.itemKey, { status: "answered", value });
+        // Response events carry { value, timing }: the answer and the paradata
+        // about how it was given travel together in one sealed payload.
+        const sealed = await unseal<{ value: AnswerValue }>(key, e.payload);
+        if (sealed.value) answers.set(e.itemKey, { status: "answered", value: sealed.value });
       }
     } else if (e.type === "item.skipped") {
       answers.set(e.itemKey, { status: "skipped" });
