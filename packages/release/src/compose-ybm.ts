@@ -26,6 +26,9 @@ export const ybmComposition: AssessmentDraftInput = {
   key: "ybm_nd2026_standard",
   study: "ybm",
   title: "Yorkshire Brain Map — NotreDame 2026 standard questionnaire",
+  // r2.0.0 presentation changes (D-17/D-18): hair type is an illustrated
+  // tappable grid, MacArthur ladders are tap/drag ladder graphics with anchor
+  // labels. Item wording, response options and codes are unchanged from r1.
   language: "en-GB",
   readingLevel: "standard",
   ageBand: "14-16",

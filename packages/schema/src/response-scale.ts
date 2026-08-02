@@ -20,6 +20,14 @@ export const scaleOption = z.object({
   kind: z.enum(["substantive", "decline", "dont_know", "not_applicable", "other_specify"]).default("substantive"),
   /** Free-text entry attached to this option (e.g. "Other: ____"). */
   textEntry: z.boolean().default(false),
+  /**
+   * Illustration key for options that are chosen by appearance rather than
+   * by reading (e.g. hair-type patterns). Rendered by the presentation layer;
+   * the label remains authoritative and is always shown alongside.
+   */
+  illustration: z.string().optional(),
+  /** Short plain-language gloss shown under an illustrated option. */
+  description: z.string().optional(),
 });
 
 export const responseScale = z.object({

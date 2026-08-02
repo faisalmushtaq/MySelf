@@ -81,12 +81,41 @@ export const ethnicityUk20: ResponseScale = {
   ],
 };
 
+/**
+ * Hair type (1a-4c). Each option carries an illustration key so participants
+ * choose by looking at the curl pattern rather than decoding a code; the
+ * label stays authoritative and is shown with every tile.
+ */
+const hairLabels = ["1a", "1b", "1c", "2a", "2b", "2c", "3a", "3b", "3c", "4a", "4b", "4c"] as const;
+const hairDescriptions: Record<string, string> = {
+  "1a": "Straight, fine",
+  "1b": "Straight, medium",
+  "1c": "Straight, coarse",
+  "2a": "Loose waves",
+  "2b": "Defined waves",
+  "2c": "Strong waves",
+  "3a": "Loose curls",
+  "3b": "Springy curls",
+  "3c": "Tight curls",
+  "4a": "Soft coils",
+  "4b": "Zig-zag coils",
+  "4c": "Tight coils",
+};
+
 export const hairType12: ResponseScale = {
   key: "scale.hair_type_12",
   version: "1.0.0",
   name: "Hair type (1a-4c)",
   direction: "unordered",
-  options: opts(["1a", "1b", "1c", "2a", "2b", "2c", "3a", "3b", "3c", "4a", "4b", "4c"]),
+  options: hairLabels.map((label, i) => ({
+    code: i + 1,
+    legacyCode: i + 1,
+    label,
+    kind: "substantive" as const,
+    textEntry: false,
+    illustration: `hair:${label}`,
+    description: hairDescriptions[label],
+  })),
 };
 
 /** KSS canonical labels (D-08; A-8 typo corrected, point 4 "Rather alert"). */

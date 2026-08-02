@@ -197,3 +197,21 @@ decisions:
       which is binding for the participant app, MySelf Studio and all future
       surfaces. Fonts are bundled locally (@fontsource) rather than loaded from
       a CDN so the interface renders identically offline.
+
+  - id: D-18
+    topic: Presentation of hair type and the MacArthur ladders; public preview content
+    decision: intuitive-controls-and-unredacted-preview
+    detail: >
+      Researcher direction 2026-08-02. (a) Hair type is presented as a grid of
+      tappable tiles, each drawing its own curl pattern as MySelf-authored SVG
+      artwork — this removes the dependency on the third-party Qualtrics chart
+      image entirely (closing the A-42 hair-chart licence question by not using
+      the asset). (b) The MacArthur ladders are drawn ladders the participant
+      taps or drags directly, with anchor labels at each end, replacing the
+      abstract slider; the SPARQ background image is likewise no longer needed.
+      (c) The researcher confirmed the instrument licences are held (extracted
+      for the existing Qualtrics survey), so the public preview build no longer
+      redacts validated-instrument wording. Item wording, options and response
+      codes are unchanged; these are presentation changes, released as r2.0.0
+      because anything participant-visible requires a new immutable release
+      (r1.0.0 remains in the repository untouched).

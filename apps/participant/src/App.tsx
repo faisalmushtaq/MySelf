@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { AnswerStore, Walker, type AnswerValue, type PresentableUnit } from "@myself/engine";
 import { releaseManifest, responseScale, type ReleaseManifest, type ResponseScale } from "@myself/schema";
-import rawManifest from "@release-manifest";
+import rawManifest from "../../../releases/ybm_nd2026_standard_r2.0.0.manifest.json";
 import { flattenManifest } from "./lib/flatten.js";
 import {
   appendEvent,
@@ -16,7 +16,7 @@ import { SurveyScreen } from "./components/SurveyScreen.js";
 
 /**
  * MySelf Go — participant application (preview build).
- * Renders the frozen YBM r1.0.0 release entirely from its manifest, saves
+ * Renders the frozen YBM r2.0.0 release entirely from its manifest, saves
  * every response to encrypted IndexedDB before advancing, works offline via
  * the service worker, and returns to a neutral start screen on handover.
  */

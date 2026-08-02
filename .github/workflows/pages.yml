@@ -27,10 +27,7 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: node scripts/gen-preview-manifest.mjs
       - run: pnpm -r build
-        env:
-          MYSELF_REDACTED: "1"
       - uses: actions/upload-pages-artifact@v3
         with:
           path: apps/participant/dist
