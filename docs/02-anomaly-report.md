@@ -1,5 +1,7 @@
 # Anomaly Report — Yorkshire Brain Map (NotreDame2026) Qualtrics Export
 
+> **Updated 2026-08-02 after receipt of the QSF.** See [10-qsf-findings.md](10-qsf-findings.md) for machine-level resolutions. Status changes: **A-2, A-3 CONFIRMED** as live errors; **A-4 WITHDRAWN** (Word-export artefact — QSF logic is correct); **A-11, A-14, A-37(part), A-39, A-40, A-41, A-42 RESOLVED**; new anomalies **A-43** (age dropdowns missing option "5") and **A-44** (RCADS instructions promise skipping but the question is force-response) added below.
+
 Each anomaly is classified as:
 
 - **C1 — Clearly safe to correct** (presentation/metadata only; zero effect on data meaning)
@@ -18,17 +20,17 @@ Migration disposition codes (from the migration strategy): `EXACT` (exact reprod
 | **A-1** | **C2** | `Abstaining_SM` question text is wrong | Its text duplicates `app_reduce` ("Do you use any features designed to reduce your social media use…?") but its options are an effect scale (Very negatively … Very positively). The intended question (presumably "What effect do you think abstaining from social media would have on you?") is missing. Historical data for this variable are of doubtful meaning. **Decision needed:** correct wording in MySelf (APPROVED-FIX, new item version) and flag legacy data; or retire the item. |
 | **A-2** | **C2** | Wrong display condition on Twitch row of `TimeSpent on each` | The Twitch row displays if **X (Twitter)** is in "I have these apps"; the correct condition (Twitch) appears nowhere. Consequence: Twitch time was asked of the wrong participants and never of some right ones. **Decision:** fix in MySelf (APPROVED-FIX); mark legacy Twitch-time data unreliable in the crosswalk. |
 | **A-3** | **C2** | Inverted display logic on `other_games` | Shown **if `weekday_games` = "I do not play video games"** — i.e., only non-gamers are asked to list the games they play. Almost certainly should be *Is Not Selected*. If data were collected this way, gamers' top-5 games were never captured. **Decision:** confirm intent; fix in MySelf (APPROVED-FIX); annotate legacy data. |
-| **A-4** | **C2** | `other_games_time` choice-level conditions are five identical question-level tests | Each row should display only if its corresponding game text entry is non-empty; as exported, all five rows show if any entry is non-empty, producing rows with blank piped labels. Fix per-row in MySelf (APPROVED-FIX). |
+| **A-4** | ~~C2~~ **WITHDRAWN** | ~~`other_games_time` choice-level conditions are five identical question-level tests~~ | QSF shows per-row conditions are correct (row *N* ← game *N* NotEmpty); the Word export rendered them misleadingly. Residual minor note: the *question-level* condition tests only game 1, so filling only slots 2–5 skips the matrix — reviewed under A-3's decision. |
 | **A-5** | **C2** | No non-consent pathway | Consent block has no "I do not consent" option and no screen-out branch visible. If a participant will not tick all boxes, behaviour is undefined (or forced). MySelf requires an explicit decline path with a respectful exit screen. **Decision:** confirm forced-consent behaviour in Qualtrics and approve the MySelf consent flow. |
 | **A-6** | **C4** | SDQ response anchor "Clearly true" contradicts canonical "Certainly True" (and the survey's own instructions) | Canonical label must be restored **only with youthinmind authorisation** (their terms prohibit modification and unauthorised electronic versions). Preserve the administered variant as its own labelled form for comparability. |
 | **A-7** | **C4** | SDQ item wording appears to mix the 11–17 and 18+ self-report forms | E.g. item 20 "(family members, friends, colleagues)" and item 22 "home, work or elsewhere" match the adult form; other items match the youth form. Requires verification against canonical youthinmind forms and a decision about which edition future waves should use. Administered form must be preserved verbatim as `sdq25 v1.0-ybm-asadmin`. |
 | **A-8** | **C4** | KSS label deviations | Point 7 "Sleepy, but **not no** effort to keep awake" (typo, semantics inverted vs canonical "no effort"); point 4 "4- Fairly alert" vs canonical "Rather alert". Correcting the typo changes a validated anchor → psychometric review; preserve administered form as its own version. |
 | **A-9** | **C2** | `weekday_games` name/content mismatch and band gap | Name implies weekdays; question asks weekly total. Bands skip 5–6 hours ("Less than 5" → "6-10"). Canonical variable rename is safe (`gaming_hours_week`); the band gap is a substantive instrument change → decision for future waves; C3 for the regression fixture. |
 | **A-10** | **C2** | `other_games_time` has no "0 hours" column and bands mismatch `weekday_games` | A listed game cannot be reported at <"Less than 5 hours"— fine — but bands are inconsistent with the parent question's bands. Decision for future waves; preserve as administered for comparability. |
-| **A-11** | **C2** | Branch nesting unconfirmed | Word export cannot show whether blocks 14–17 (Screen control…, Gaming, STAI, BIS-BAS) are inside the `SM_Own = Yes` branch. Content suggests only block 13 (and plausibly 14) belongs inside. **Needs QSF or researcher confirmation before the release manifest is frozen.** UNRESOLVED until then. |
+| **A-11** | **RESOLVED** | Branch nesting confirmed via QSF | The `SM_Own = Yes` branch contains **both** "Social media rank and time" and "Screen control, social media impact and doomscrolling's". Gaming, STAI and BIS-BAS are asked of everyone. |
 | **A-12** | **C2** | Duplicate question text within `app_reduce`/`Abstaining_SM` pair | Same as A-1 viewed from the duplication side; also both sit adjacent, so participants saw the same question twice with different answer sets. Confirm which data are interpretable. |
 | **A-13** | **C1** | Piped text `${other_games /ChoiceTextEntryValue/N}` contains a stray space | May render literally or fail depending on Qualtrics parsing. MySelf's piping references will be validated identifiers; the crosswalk records the original string. |
-| **A-14** | **C2** | `SM_morning_check` first dropdown option has a blank label (code 1) | Likely "Immediately/Within 5 minutes" was intended. Unrecoverable from Word export; needs QSF or researcher memory. UNRESOLVED until confirmed. |
+| **A-14** | **RESOLVED** | `SM_morning_check` first option label | QSF shows it is "**<5 minutes**" (code 1) — the Word export swallowed the `<` as HTML. |
 
 ## Response-coding anomalies (all C3 by default — preserve codes, crosswalk to clean canonical codes)
 
@@ -36,7 +38,7 @@ Migration disposition codes (from the migration strategy): `EXACT` (exact reprod
 |----|----|----|
 | **A-15** | C3 | Non-sequential choice codes throughout: Consent (2–7), `SM_active_passive` (1,4,5), `SM_function` (1,4–13), `SM_lostrack` (1,4–8), `Abstaining_SM` (1,4–7), `weekday_games` (1,4–8), `Social media impact` rows (4–7), `bisbas` rows (1–8,25,9,26,27), `DragDrop_SM` (skips 7), `TimeSpent` rows (skip 8), EHI rows (1,3,5,7). Standard Qualtrics editing artefacts. **Never silently recode**: MySelf assigns clean canonical codes and ships a tested crosswalk; legacy view exports original codes. |
 | **A-16** | C3/C4 | SDQ administered 1–3 vs canonical scoring 0–2; RCADS administered 1–4 vs canonical 0–3. Published norms and cutoffs assume canonical coding. Scoring definitions must transform administered codes; both codings preserved in exports. C4 because scoring/norms are affected. |
-| **A-17** | C2 | `Age_SM` dropdown codes non-monotonic (`Younger than 5` = 13 … `not sure` = 9); `Age_smartphone` starts at 4. Full code maps needed from QSF before any age-of-adoption analysis crosswalk can be certified. |
+| **A-17** | C3 (was C2) | `Age_SM`/`Age_smartphone` code maps now fully recovered from QSF (see 10-qsf-findings §3): display order is sensible (Younger than 5, 6, 7 … 25, not sure) but codes are scrambled (e.g. age 7 = code 27, age 9 = code 11). Crosswalk certified from QSF; codes preserved in legacy view, clean ordinal codes canonical. |
 | **A-18** | C3 | Scale-direction reversals between adjacent instruments: `Screen Control`/`Social media impact`/`SM_lostrack` are agree-first (1 = agree); `Doomscrolling` is disagree-first (1 = disagree). Not an error per se (Doomscrolling follows its source scale) but a data-analysis hazard; document prominently in the codebook. Direction metadata is mandatory on every scale in MySelf. |
 
 ## Validated-measure deviations (all C4)
@@ -74,18 +76,25 @@ Migration disposition codes (from the migration strategy): `EXACT` (exact reprod
 | **A-37** | C1 | `DoB` free-text with no format validation; MySelf uses a proper date control (presentation-only modernisation) — subject to A-26 decision on collecting DoB at all. |
 | **A-38** | C2 | "About 10 minutes" completion estimate in the intro is asserted without provenance; MySelf will compute estimates per age band and update from empirical data. Decide the initial estimate to display. |
 
-## Reconstruction gaps (cannot be recovered from the Word export)
+## Reconstruction gaps — all resolved by the QSF (details in 10-qsf-findings.md)
 
-| ID | Class | Gap |
+| ID | Class | Status |
 |----|----|----|
-| **A-39** | UNRESOLVED | Full choice lists + codes for all 8 elided dropdowns (Ethnicity, Hair_type [reconstructable], Age_smartphone, Age_SM, SM_night_check, SM_morning_check, SM_weekdays, SM_weekend/holiday). **Need QSF or screenshots.** |
-| **A-40** | UNRESOLVED | Required/optional status per question; max-selection enforcement ("choose up to three"); numeric validation on `Abstaining_days`; consent forced-response settings. **Need QSF.** |
-| **A-41** | UNRESOLVED | Branch nesting (A-11); any embedded-data fields; end-of-survey behaviour/redirects; scoring set up inside Qualtrics; any custom JavaScript. **Need QSF.** |
-| **A-42** | UNRESOLVED | Stimulus images (MacArthur ladders ×2, hair-type chart): not in export. **Need original assets + licence check** (commercial hair-typology charts are frequently copyrighted). |
+| **A-39** | RESOLVED | All dropdown lists + codes recovered (QSF §3). |
+| **A-40** | RESOLVED | Full validation map recovered (QSF §4): 15 hard-forced questions, 5 soft-prompted, choice-range on sleep items, DoB has date validation, `Abstaining_days` has **no** numeric validation, consent requires all 6 boxes. |
+| **A-41** | RESOLVED | No embedded data, no randomisation, no scoring, no redirects; the only custom JavaScript is the ladder background image on the two SES sliders (QSF §6) — migrates as a native ladder control, `PRESENT` disposition. Trash block found (STAI-T, Fasting removed pre-launch — to confirm against first dataset). Back button is **enabled** survey-wide. |
+| **A-42** | RESOLVED (licence check outstanding) | Ladder image = Leeds Qualtrics library `IM_9QR5ycr6HarV5Iy` + SPARQ toolkit PNG (sparqtools.org); hair chart = `IM_0VW7lNCmjc75IGi` (700×301). Download via account access; hair-chart original source/licence still to identify. |
+
+## New anomalies from the QSF
+
+| ID | Class | Anomaly |
+|----|----|----|
+| **A-43** | **C2** | Both age-of-adoption dropdowns (`Age_smartphone`, `Age_SM`) jump from "Younger than 5" to "6" — **age 5 cannot be reported**. Decision: add "5" in MySelf (APPROVED-FIX, new item version) or preserve the gap for comparability. |
+| **A-44** | **C4** | RCADS-25 instructions tell participants *"you can skip it"* but the question is **ForceResponse ON** — skipping is impossible. SDQ is also hard-forced. Contradiction between participant-facing promise and behaviour; affects ethics accuracy and missing-data assumptions. Decide r1 behaviour (recommended: honour the instruction — make items soft-required with an explicit decline option, and document the departure from the Qualtrics configuration as APPROVED-FIX/DEPART). |
 
 ---
 
-### Summary counts
-- C1 (safe fix): 7 · C2 (researcher decision): 15 · C3 (preserve): 3 · C4 (psychometric/ethical/licensing review): 10 · UNRESOLVED pending QSF/assets: 4 clusters.
+### Summary counts (post-QSF)
+- C1 (safe fix): 7 · C2 (researcher decision): 13 · C3 (preserve): 4 · C4 (review): 11 · Withdrawn: 1 (A-4) · Resolved: 8 (A-11, A-14, A-37-part, A-39, A-40, A-41, A-42, A-17-codes).
 
-**Blocking items before a faithful YBM release can be frozen:** A-11 (branch nesting), A-39/A-40 (dropdown lists + validation), A-42 (images), A-25 (SDQ licence), A-24 (SWEMWBS licence), A-1/A-2/A-3 decisions (fix vs preserve), A-26/A-27 (identifier design approval).
+**Remaining blockers before a faithful YBM release can be frozen:** A-25 (SDQ licence), A-24 (SWEMWBS registration), A-1/A-2/A-3/A-43/A-44 decisions, A-26/A-27 (identifier design approval), hair-chart image licence, image downloads from the Qualtrics library.

@@ -2,7 +2,7 @@
 
 **Source artefact:** `Yorkshire_Brain_Map_-_NotreDame2026.docx` (Qualtrics Word export)
 **Analysed:** 2026-08-02
-**Status of this inventory:** Reconstructed from the Word export only. The Word export omits several machine-level details (full dropdown choice lists, validation settings, flow nesting, randomisation, embedded data). Items that cannot be confirmed from this export are marked **[UNCONFIRMED — needs QSF]** throughout. A Qualtrics `.qsf` export has been requested to close these gaps.
+**Status of this inventory:** Originally reconstructed from the Word export only; items marked **[UNCONFIRMED — needs QSF]** below are historical. **The QSF has since been received and every such gap is resolved — see [10-qsf-findings.md](10-qsf-findings.md)**, and the machine-readable per-question extraction at `source-materials/qsf_questions.json`. Where this document and the QSF findings differ, the QSF findings govern (notably: branch nesting includes *both* social-media blocks; the `other_games_time` per-row logic is correct; `SM_morning_check` option 1 is "<5 minutes"; back-navigation is enabled survey-wide).
 
 ---
 

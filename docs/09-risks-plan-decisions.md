@@ -52,13 +52,14 @@ One iPad, one researcher, one afternoon: publish `ybm-nd2026-standard r1.0.0-rc`
 
 ## 4. Decisions that genuinely require your input before coding
 
-1. **Supply the micro-narrative codebase** (ZIP into this repo — Dropbox is unreachable from this environment). Blocks Phase 5 design decisions and the retain/refactor audit.
-2. **Supply the QSF export** (+ MacArthur ladder images and hair-type chart with their sources/rights). Blocks A-11, A-39–A-42 and a trustworthy crosswalk.
-3. **Anomaly decisions:** A-1 (Abstaining_SM wording), A-2 (Twitch condition), A-3/A-4 (gaming logic), A-5 (consent decline path), A-34 (bespoke typo fixes) — fix-in-r1 vs preserve.
-4. **Identifier redesign approval** (A-26/A-27): drop names/DoB from the participant flow in favour of team-issued codes + identity-service capture? (Recommended.)
-5. **Licensing:** confirm/initiate youthinmind authorisation (SDQ — blocking), Warwick SWEMWBS registration, STAI-5 position, doomscrolling-items source; who owns these conversations?
-6. **Comparability stance for r1:** administer the as-administered forms verbatim (typos included) for continuity with the current wave, or adopt corrected canonical forms now and accept a documented break? (Recommended: verbatim `-ybm-asadmin` forms in r1 alongside canonical forms in the library, switch by explicit decision at the next natural wave boundary.)
-7. **Deployment target & IdP:** university VM vs cloud; which OIDC provider (Leeds Azure Entra?); NHS-adjacent requirements now or later?
-8. **Safeguarding routes:** named reviewers, review cadence, escalation wording for RCADS-18 and narrative flags (needs ethics alignment; PSCETHS-1449 scope check).
-9. **Managed-iPad posture:** are collection iPads MDM-managed with passcodes (assumed yes — required for the at-rest security story)?
-10. **LLM provider + data-processing terms** for the first narrative study (provider, region, retention, training-use opt-out) consistent with consent and ethics.
+*(Updated 2026-08-02: the codebase ZIP and QSF have been received and audited — the two supply blockers are cleared. Phase 0 now consists purely of the decisions below.)*
+
+1. **Anomaly decisions:** A-1 (Abstaining_SM wording), A-2 (Twitch condition — confirmed live error), A-3 (inverted gaming logic — confirmed live error), A-5 (consent decline path), A-34 (bespoke typo fixes), **A-43** (age dropdowns missing "5"), **A-44** (RCADS/SDQ forced-response contradicts "you can skip it" — recommended: soft-required + explicit decline in r1, documented as an approved departure) — fix-in-r1 vs preserve, each recorded in `migration/decisions.yaml`.
+2. **Identifier redesign approval** (A-26/A-27): drop names/DoB from the participant flow in favour of team-issued codes + identity-service capture? (Recommended.)
+3. **Licensing:** confirm/initiate youthinmind authorisation (SDQ — blocking), Warwick SWEMWBS registration, STAI-5 position, doomscrolling-items source, hair-type chart image rights; **plus** contact the micro-narratives authors (petr.slovak@kcl.ac.uk) to confirm the reimplementation-with-citation plan for the narrative module (academic/non-commercial licence with community commitments — see docs/08 §8). Who owns these conversations?
+4. **Comparability stance for r1:** administer the as-administered forms verbatim (typos included) for continuity with the current wave, or adopt corrected canonical forms now and accept a documented break? (Recommended: verbatim `-ybm-asadmin` forms in r1 alongside canonical forms in the library, switch by explicit decision at the next natural wave boundary.)
+5. **Deployment target & IdP:** university VM vs cloud; which OIDC provider (Leeds Azure Entra?); NHS-adjacent requirements now or later?
+6. **Safeguarding routes:** named reviewers, review cadence, escalation wording for RCADS-18 and narrative flags (needs ethics alignment; PSCETHS-1449 scope check).
+7. **Managed-iPad posture:** are collection iPads MDM-managed with passcodes (assumed yes — required for the at-rest security story)?
+8. **LLM provider + data-processing terms** for the first narrative study (provider, region, retention, training-use opt-out) consistent with consent and ethics. Note: the existing app is OpenAI-only; MySelf's gateway is provider-independent, so this is a study-level choice, not an architectural one.
+9. **Second seed protocol scope:** should the MVP include the full `np.micro_narrative` protocol (collect→extract→three personas→select→rate→adapt, ported from the CHI 2025 app) alongside `np.future_self`, or is `np.future_self` alone sufficient for the vertical slice? (Recommended: specify both, implement `np.future_self` first, port the full protocol in Phase 5 as its acceptance test.)

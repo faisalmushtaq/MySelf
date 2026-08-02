@@ -1,7 +1,7 @@
 # MySelf — Design Package (v0.1, pre-implementation)
 
-Produced 2026-08-02 from the Qualtrics Word export `Yorkshire_Brain_Map_-_NotreDame2026.docx`.
-**Status: awaiting feedback + two blocked inputs (micro-narrative codebase ZIP; QSF export) before implementation begins.**
+Produced 2026-08-02 from the Qualtrics Word export, then updated the same day after receipt of the **QSF export** and the **micro-narrative codebase** (KCL Micro-narratives app, CHI 2025). All three source artefacts are audited; copies live in `source-materials/`.
+**Status: source audits complete — awaiting researcher feedback and the Phase 0 decisions (docs/09 §4) before implementation begins.**
 
 | Doc | Contents (maps to brief items) |
 |---|---|
@@ -12,5 +12,6 @@ Produced 2026-08-02 from the Qualtrics Word export `Yorkshire_Brain_Map_-_NotreD
 | [05-architecture.md](05-architecture.md) | Stack, definition layer, offline-first iPad architecture, session state machine, sync protocol, encryption/keys, LLM gateway, security/governance, testing (items 9, 15-partial; offline-annex items 1–10) |
 | [06-data-model-identifiers-versioning.md](06-data-model-identifiers-versioning.md) | Data model, identifier system, variable naming, adapted semver, paradata, missingness taxonomy, export bundle (items 10–11) |
 | [07-migration-strategy.md](07-migration-strategy.md) | Qualtrics→MySelf pipeline, dispositions, crosswalk, safer identifier/linkage design, regression fixture (item 12) |
-| [08-micro-narrative-module.md](08-micro-narrative-module.md) | Narrative module design; **code audit pending ZIP** (items 2, 14 blocked) |
+| [08-micro-narrative-module.md](08-micro-narrative-module.md) | Narrative module design + **full audit of the KCL Micro-narratives codebase** with retain/refactor recommendation (items 2, 14) |
 | [09-risks-plan-decisions.md](09-risks-plan-decisions.md) | Risks & mitigations, staged plan with acceptance criteria, smallest useful prototype, decisions required (items 15–18) |
+| [10-qsf-findings.md](10-qsf-findings.md) | QSF machine-level resolution: flow nesting, all dropdown code maps, validation settings, custom JS, image assets, Trash block, new anomalies A-43/A-44 |
