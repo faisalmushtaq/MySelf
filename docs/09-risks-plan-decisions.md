@@ -52,7 +52,9 @@ One iPad, one researcher, one afternoon: publish `ybm-nd2026-standard r1.0.0-rc`
 
 ## 4. Decisions that genuinely require your input before coding
 
-*(Updated 2026-08-02: the codebase ZIP and QSF have been received and audited — the two supply blockers are cleared. Phase 0 now consists purely of the decisions below.)*
+> **✅ RESOLVED 2026-08-02.** All decisions were answered by the principal researcher and are recorded with dispositions in [`migration/decisions.yaml`](../migration/decisions.yaml) (D-01…D-15). Headlines: all five confirmed content/logic errors fixed in r1; RCADS/SDQ become soft-required honouring "you can skip it"; consent stays forced (off-platform decline handling); **canonical validated forms adopted in r1** (documented break; SDQ still licence-gated); identifier collection unchanged in-flow but stored via the separated identity schema; cloud hosting; **non-MDM team-controlled iPads** (app-layer encryption promoted to primary control); OpenAI adapter first behind the provider-independent gateway; **the full micro-narrative protocol is the MVP's narrative module** (no separate future_self protocol). Outstanding inputs (non-blocking for Phase 1): safeguarding protocol document, cloud account/IdP details, licence outcomes.
+>
+> The original question list is preserved below for provenance.
 
 1. **Anomaly decisions:** A-1 (Abstaining_SM wording), A-2 (Twitch condition — confirmed live error), A-3 (inverted gaming logic — confirmed live error), A-5 (consent decline path), A-34 (bespoke typo fixes), **A-43** (age dropdowns missing "5"), **A-44** (RCADS/SDQ forced-response contradicts "you can skip it" — recommended: soft-required + explicit decline in r1, documented as an approved departure) — fix-in-r1 vs preserve, each recorded in `migration/decisions.yaml`.
 2. **Identifier redesign approval** (A-26/A-27): drop names/DoB from the participant flow in favour of team-issued codes + identity-service capture? (Recommended.)
