@@ -24,6 +24,7 @@ const stubItem = (key: string, variable: string): ItemDefinition => ({
   scale: "scale.yes_no",
   scaleVersion: "1.0.0",
   presentation: "cards",
+  spectrumReverse: false,
   autoAdvance: true,
 });
 

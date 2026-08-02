@@ -10,7 +10,7 @@ import { responseScale } from "../response-scale.js";
  * Legacy Qualtrics codes were 1..9 identical to canonical (QSF RecodeValues).
  */
 
-export const kssScaleCanonical: z.infer<typeof responseScale> = {
+export const kssScaleCanonical: z.input<typeof responseScale> = {
   key: "scale.kss_9pt",
   version: "1.0.0",
   name: "KSS 9-point sleepiness scale (canonical labels)",
@@ -35,7 +35,7 @@ export const kssScaleCanonical: z.infer<typeof responseScale> = {
   scoringNote: "Single-item state measure; score = selected code (1-9).",
 };
 
-export const kssScaleAsAdministered: z.infer<typeof responseScale> = {
+export const kssScaleAsAdministered: z.input<typeof responseScale> = {
   ...kssScaleCanonical,
   key: "scale.kss_9pt_ybm",
   name: "KSS 9-point scale as administered in YBM 2026 (deviating labels preserved)",
@@ -46,7 +46,7 @@ export const kssScaleAsAdministered: z.infer<typeof responseScale> = {
   }),
 };
 
-export const kssInstrument: z.infer<typeof instrumentVersion> = {
+export const kssInstrument: z.input<typeof instrumentVersion> = {
   instrument: "kss",
   version: "1.0",
   name: "Karolinska Sleepiness Scale",
