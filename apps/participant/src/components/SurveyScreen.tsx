@@ -45,34 +45,26 @@ export function SurveyScreen(props: SurveyScreenProps) {
   }, [index]);
 
   /**
-   * Keyboard parity with the on-screen affordances: a letter selects the
-   * option showing that key; Enter continues. Ignored while typing in a
-   * field, so text answers are never hijacked.
+   * Enter continues, for anyone using a keyboard. Ignored while typing in a
+   * field so text answers are never hijacked. Option selection is by tap,
+   * click, Tab+Space or arrow keys — there are no shortcut letters to learn.
    */
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Enter" || e.metaKey || e.ctrlKey || e.altKey) return;
       const target = e.target as HTMLElement | null;
-      const typing =
+      if (
         target instanceof HTMLInputElement ||
         target instanceof HTMLTextAreaElement ||
-        target instanceof HTMLSelectElement;
-      if (e.metaKey || e.ctrlKey || e.altKey) return;
-
-      if (e.key === "Enter" && !typing) {
-        const next = document.querySelector<HTMLButtonElement>("button.next:not(:disabled)");
-        if (next) {
-          e.preventDefault();
-          next.click();
-        }
+        target instanceof HTMLSelectElement ||
+        target instanceof HTMLButtonElement
+      ) {
         return;
       }
-      if (typing || e.key.length !== 1) return;
-      const letter = e.key.toUpperCase();
-      if (letter < "A" || letter > "Z") return;
-      const option = document.querySelector<HTMLButtonElement>(`[data-option-key="${letter}"]`);
-      if (option) {
+      const next = document.querySelector<HTMLButtonElement>("button.next:not(:disabled)");
+      if (next) {
         e.preventDefault();
-        option.click();
+        next.click();
       }
     };
     addEventListener("keydown", onKey);
@@ -190,9 +182,6 @@ export function SurveyScreen(props: SurveyScreenProps) {
         )}
         <button type="button" className="next" disabled={!canAdvance && item.required === "hard"} onClick={handleNext}>
           {item.responseType === "info" ? "Continue" : answered ? "Next" : item.required === "hard" ? "Next" : softPrompted ? "Skip" : "Next"}
-          <span className="key-hint" aria-hidden="true">
-            ↵
-          </span>
         </button>
       </footer>
     </div>

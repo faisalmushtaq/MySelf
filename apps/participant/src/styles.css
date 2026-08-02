@@ -2,12 +2,12 @@
  * MySelf — participant interface
  *
  * Visual language inherited from the BrainPop lab site (editorial aesthetic):
- *   cream canvas, Newsreader display serif, DM Sans body, green accent,
- *   generous whitespace, hairline borders, restrained motion.
+ *   Newsreader display serif, DM Sans body, generous whitespace, hairline
+ *   borders, restrained motion — on a near-white canvas with all-black text.
  *
- * Interaction patterns from best-in-class conversational survey products
- * (Typeform lineage): one question per screen, lettered option keys with
- * keyboard parity, oversized readable type, quiet persistent chrome.
+ * Interaction: one question per screen, large readable type, quiet chrome,
+ * and controls that look like what they measure (a ladder you tap, hair
+ * patterns you recognise) rather than abstract widgets.
  *
  * Design tokens mirror assets/css/style.css in brainpop-lab-website.
  */
@@ -19,17 +19,15 @@
 @import "@fontsource/dm-sans/500.css";
 
 :root {
-  --cream: #faf6f0;
-  --off-white: #f0ebe3;
-  --paper: #ffffff;
-  --dark-bg: #0d0d0d;
-  --text: #111110;
-  --text-muted: rgba(17, 17, 16, 0.55);
-  --hairline: rgba(17, 17, 16, 0.12);
-  --hairline-strong: rgba(17, 17, 16, 0.28);
-  --accent: #067843;
+  --canvas: #fcfcfb;        /* near-white page */
+  --off-white: #f4f4f2;     /* subtle alternate fill */
+  --paper: #ffffff;         /* cards, inputs */
+  --text: #000000;          /* all text is black */
+  --hairline: rgba(0, 0, 0, 0.14);
+  --hairline-strong: rgba(0, 0, 0, 0.34);
+  --accent: #067843;        /* state only: selection, progress, saved */
   --accent-hover: #055c34;
-  --accent-wash: rgba(6, 120, 67, 0.08);
+  --accent-wash: rgba(6, 120, 67, 0.07);
   --warn: #a33b00;
 
   --font-display: "Newsreader", Georgia, "Times New Roman", serif;
@@ -54,10 +52,10 @@ body,
 
 body {
   font-family: var(--font-body);
-  font-size: 17px;
-  line-height: 1.65;
+  font-size: 20px;
+  line-height: 1.6;
   color: var(--text);
-  background-color: var(--cream);
+  background-color: var(--canvas);
   -webkit-font-smoothing: antialiased;
   -webkit-tap-highlight-color: transparent;
 }
@@ -95,11 +93,11 @@ textarea {
   align-items: center;
   gap: 0.55rem;
   padding: calc(env(safe-area-inset-top, 0px) + 0.85rem) 1.75rem 0.5rem;
-  font-size: 0.72rem;
-  font-weight: 400;
+  font-size: 0.78rem;
+  font-weight: 500;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--text-muted);
+  color: var(--text);
 }
 
 .dot {
@@ -162,10 +160,10 @@ textarea {
 
 .study-title {
   font-family: var(--font-body);
-  font-weight: 300;
-  font-size: 1rem;
-  line-height: 1.7;
-  color: var(--text-muted);
+  font-weight: 400;
+  font-size: 1.1rem;
+  line-height: 1.65;
+  color: var(--text);
   margin: 0.75rem 0 1.5rem;
   max-width: 34ch;
 }
@@ -177,7 +175,7 @@ textarea {
 
 .screen.finish p {
   font-weight: 300;
-  color: var(--text-muted);
+  color: var(--text);
   max-width: 42ch;
   margin: 0 0 0.5rem;
 }
@@ -222,7 +220,7 @@ textarea {
 }
 
 .back:hover {
-  background: rgba(17, 17, 16, 0.05);
+  background: rgba(0, 0, 0, 0.05);
   border-color: var(--hairline-strong);
 }
 
@@ -278,7 +276,7 @@ textarea {
 
 .stem {
   font-family: var(--font-display);
-  font-size: clamp(1.6rem, 4.4vw, 2.15rem);
+  font-size: clamp(1.75rem, 5vw, 2.4rem);
   font-weight: 400;
   line-height: 1.2;
   letter-spacing: -0.01em;
@@ -291,7 +289,7 @@ textarea {
    measure, so a long stem reads as a paragraph rather than a wall of display
    serif. The type scale stays the same family and rhythm. */
 .stem-long {
-  font-size: clamp(1.25rem, 3vw, 1.55rem);
+  font-size: clamp(1.4rem, 3.4vw, 1.75rem);
   line-height: 1.35;
   max-width: 46ch;
 }
@@ -303,16 +301,16 @@ textarea {
 
 .info-text {
   font-family: var(--font-body);
-  font-size: 1rem;
-  font-weight: 300;
-  line-height: 1.78;
-  color: var(--text-muted);
+  font-size: 1.05rem;
+  font-weight: 400;
+  line-height: 1.7;
+  color: var(--text);
   white-space: pre-wrap;
   margin: 0;
   max-width: 62ch;
 }
 
-/* ── Option cards (lettered, keyboard-parity) ──────────────────────────── */
+/* ── Option cards ──────────────────────────────────────────────────────── */
 .cards {
   display: flex;
   flex-direction: column;
@@ -332,7 +330,7 @@ textarea {
   border: 1px solid var(--hairline);
   border-radius: var(--radius);
   font-family: var(--font-body);
-  font-size: 1rem;
+  font-size: 1.08rem;
   font-weight: 400;
   color: var(--text);
   cursor: pointer;
@@ -358,29 +356,8 @@ textarea {
 
 .card.quiet {
   background: transparent;
-  color: var(--text-muted);
+  color: var(--text);
   border-style: dashed;
-}
-
-/* Letter key — the Typeform affordance, styled editorially */
-.key {
-  flex: none;
-  width: 26px;
-  height: 26px;
-  border: 1px solid var(--hairline-strong);
-  border-radius: 4px;
-  display: grid;
-  place-items: center;
-  font-size: 0.72rem;
-  font-weight: 500;
-  color: var(--text-muted);
-  background: transparent;
-}
-
-.card.selected .key {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: #fff;
 }
 
 .card-label {
@@ -396,9 +373,9 @@ textarea {
 
 .hint {
   font-family: var(--font-body);
-  font-size: 0.82rem;
-  font-weight: 300;
-  color: var(--text-muted);
+  font-size: 0.95rem;
+  font-weight: 400;
+  color: var(--text);
   margin: 0;
 }
 
@@ -420,7 +397,7 @@ textarea {
 }
 
 .text-input::placeholder {
-  color: rgba(17, 17, 16, 0.3);
+  color: rgba(0, 0, 0, 0.32);
 }
 
 .text-input:focus {
@@ -486,7 +463,7 @@ textarea {
   font-family: var(--font-body);
   font-size: 0.95rem;
   font-weight: 300;
-  color: var(--text-muted);
+  color: var(--text);
 }
 
 .error {
@@ -515,7 +492,7 @@ textarea {
   justify-content: space-between;
   font-size: 0.82rem;
   font-weight: 300;
-  color: var(--text-muted);
+  color: var(--text);
 }
 
 input[type="range"] {
@@ -533,35 +510,144 @@ input[type="range"] {
   line-height: 1;
 }
 
-/* ── Ladder ────────────────────────────────────────────────────────────── */
-.ladder {
+/* ── Ladder (MacArthur): the picture is the control ────────────────────── */
+.ladder-wrap {
   display: flex;
   flex-direction: column;
-  gap: 4px;
   align-items: center;
-  max-width: 16rem;
-}
-
-.rung {
+  gap: 0.5rem;
   width: 100%;
-  min-height: 42px;
-  border: 1px solid var(--hairline);
-  border-radius: 4px;
-  background: var(--paper);
-  font-family: var(--font-display);
-  font-size: 1.1rem;
-  cursor: pointer;
-  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
 }
 
-.rung:hover {
+.ladder-anchor {
+  margin: 0;
+  max-width: 30ch;
+  text-align: center;
+  font-size: 0.98rem;
+  font-weight: 500;
+  line-height: 1.35;
+}
+
+.ladder-svg {
+  touch-action: none; /* dragging up and down the ladder must not scroll */
+  cursor: pointer;
+  user-select: none;
+}
+
+/* Pointer interaction should not leave a focus box; keyboard focus still does. */
+.ladder-svg:focus {
+  outline: none;
+}
+
+.ladder-svg:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 4px;
+  border-radius: 8px;
+}
+
+.ladder-rail {
+  stroke: var(--text);
+  stroke-width: 3;
+  stroke-linecap: round;
+}
+
+.ladder-step {
+  stroke: var(--text);
+  stroke-width: 2.5;
+  stroke-linecap: round;
+}
+
+.ladder-number {
+  font-family: var(--font-display);
+  font-size: 19px;
+  fill: var(--text);
+  paint-order: stroke;
+  stroke: var(--paper);
+  stroke-width: 5px;
+  stroke-linejoin: round;
+}
+
+.ladder-highlight {
+  fill: var(--accent);
+}
+
+.ladder-rung.selected .ladder-step {
+  stroke: #fff;
+}
+
+.ladder-rung.selected .ladder-number {
+  fill: #fff;
+  stroke: var(--accent);
+}
+
+.ladder-status {
+  margin: 0.25rem 0 0;
+  font-size: 1rem;
+  font-weight: 500;
+}
+
+/* ── Illustrated tile grid (e.g. hair type) ────────────────────────────── */
+.tile-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(104px, 1fr));
+  gap: 0.7rem;
+  width: 100%;
+  max-width: 44rem;
+}
+
+.tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.8rem 0.5rem 0.9rem;
+  background: var(--paper);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+  cursor: pointer;
+  color: var(--text);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .tile {
+    transition: border-color 0.18s ease, background 0.18s ease, transform 0.18s ease;
+  }
+  .tile:hover {
+    transform: translateY(-1px);
+  }
+}
+
+.tile:hover {
   border-color: var(--hairline-strong);
 }
 
-.rung.selected {
-  background: var(--accent);
+.tile.selected {
   border-color: var(--accent);
-  color: #fff;
+  background: var(--accent-wash);
+}
+
+.tile-art {
+  display: block;
+  width: 62px;
+  height: 62px;
+  color: var(--text);
+}
+
+.tile.selected .tile-art {
+  color: var(--accent);
+}
+
+.tile-label {
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  line-height: 1;
+}
+
+.tile-desc {
+  font-size: 0.8rem;
+  font-weight: 400;
+  line-height: 1.25;
+  text-align: center;
 }
 
 /* ── Form fields ───────────────────────────────────────────────────────── */
@@ -585,7 +671,7 @@ input[type="range"] {
   font-weight: 500;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: var(--text-muted);
+  color: var(--text);
 }
 
 .field .text-input {
@@ -678,7 +764,7 @@ input[type="range"] {
 }
 
 .rank-buttons button:hover {
-  background: rgba(17, 17, 16, 0.05);
+  background: rgba(0, 0, 0, 0.05);
 }
 
 /* ── Consent ───────────────────────────────────────────────────────────── */
@@ -698,10 +784,10 @@ input[type="range"] {
   border-radius: var(--radius);
   padding: 0.9rem 1.1rem;
   cursor: pointer;
-  font-size: 0.92rem;
-  font-weight: 300;
-  line-height: 1.6;
-  color: var(--text-muted);
+  font-size: 1rem;
+  font-weight: 400;
+  line-height: 1.55;
+  color: var(--text);
   transition: border-color 0.18s ease, background 0.18s ease;
 }
 
@@ -738,7 +824,7 @@ input[type="range"] {
   background: var(--text);
   color: #fff;
   font-family: var(--font-body);
-  font-size: 0.92rem;
+  font-size: 1rem;
   font-weight: 500;
   letter-spacing: 0.01em;
   border: none;
@@ -752,22 +838,10 @@ input[type="range"] {
 }
 
 .next:disabled {
-  background: rgba(17, 17, 16, 0.18);
+  background: rgba(0, 0, 0, 0.22);
   cursor: default;
 }
 
-/* Keyboard affordance on the primary action; hidden on touch-only devices
-   where no physical keyboard implies it. */
-.key-hint {
-  font-size: 0.85rem;
-  opacity: 0.65;
-}
-
-@media (hover: none) and (pointer: coarse) {
-  .key-hint {
-    display: none;
-  }
-}
 
 .next.big {
   margin: 0;
@@ -786,7 +860,7 @@ input[type="range"] {
   background: none;
   border: none;
   border-bottom: 1px solid var(--hairline-strong);
-  color: var(--text-muted);
+  color: var(--text);
   font-size: 0.88rem;
   font-weight: 300;
   cursor: pointer;
@@ -809,7 +883,7 @@ input[type="range"] {
 /* ── Larger screens ────────────────────────────────────────────────────── */
 @media (min-width: 768px) {
   body {
-    font-size: 18px;
+    font-size: 22px;
   }
   .screen {
     padding-left: 3rem;

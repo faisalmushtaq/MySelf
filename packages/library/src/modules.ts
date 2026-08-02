@@ -270,10 +270,10 @@ export const ybmEegPractical: ModuleInput = {
           "Please select below which hair type (number; letter) is most representative of your own hair. Please only select ONE hair type from all options below:",
           "scale.hair_type_12",
           {
-            presentation: "wheel",
+            presentation: "grid",
             required: "hard",
-            media: [{ assetKey: "hair_type_chart", alt: "Chart of twelve hair types from 1a (straight) to 4c (coily)", kind: "image" }],
-            researcherNote: "Chart image = Qualtrics library IM_0VW7lNCmjc75IGi; original source/licence to identify (A-42 residue).",
+            researcherNote:
+              "Rendered as a tappable illustrated grid: each option draws its own curl pattern (MySelf-authored artwork, no third-party chart dependency). Replaces the Qualtrics chart image + dropdown.",
           },
         ),
       ],

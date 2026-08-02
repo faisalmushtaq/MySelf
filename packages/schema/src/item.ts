@@ -47,7 +47,8 @@ export const itemDefinition = z.discriminatedUnion("responseType", [
     responseType: z.literal("single_choice"),
     scale: dottedKey, // response-scale key
     scaleVersion: semver,
-    presentation: z.enum(["cards", "dropdown", "wheel"]).default("cards"),
+    /** "grid" tiles illustrated options (see scaleOption.illustration). */
+    presentation: z.enum(["cards", "dropdown", "wheel", "grid"]).default("cards"),
     autoAdvance: z.boolean().default(true),
   }),
   z.object({
@@ -74,6 +75,10 @@ export const itemDefinition = z.discriminatedUnion("responseType", [
     rungs: z.number().int().min(2),
     lowestValue: z.number().int().default(1),
     image: mediaRef.optional(),
+    /** Anchors shown at the ends of the ladder so the metaphor needs no
+     * explanation (e.g. "The people who are best off" / "…worst off"). */
+    topLabel: z.string().optional(),
+    bottomLabel: z.string().optional(),
   }),
   z.object({
     ...baseItem,

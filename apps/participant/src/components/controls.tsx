@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { Illustration } from "./illustrations.js";
 import type { AnswerValue } from "@myself/engine";
 import type { ItemDefinition, ResponseScale } from "@myself/schema";
 
@@ -19,17 +20,35 @@ export interface ControlProps {
 const prefersReducedMotion = () =>
   typeof matchMedia !== "undefined" && matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-/** Letter key for an option position (A, B, C…): the affordance participants
- * can also type. Beyond 26 options we fall back to no key rather than
- * inventing confusing labels. */
-export const optionKey = (index: number): string | null =>
-  index < 26 ? String.fromCharCode(65 + index) : null;
-
 export function SingleChoice({ item, scale, value, onAnswer }: ControlProps) {
   if (item.responseType !== "single_choice" || !scale) return null;
   const selected = value?.kind === "choice" ? value.code : undefined;
   const auto = item.autoAdvance && !prefersReducedMotion();
-  const asPicker = item.presentation !== "cards" || scale.options.length > 12;
+
+  // Illustrated grid: participants choose by looking, not by reading a code.
+  if (item.presentation === "grid") {
+    return (
+      <div className="tile-grid" role="radiogroup" aria-label={item.stem.text}>
+        {scale.options.map((o) => (
+          <button
+            key={o.code}
+            type="button"
+            role="radio"
+            aria-checked={selected === o.code}
+            aria-label={o.description ? `${o.label} — ${o.description}` : o.label}
+            className={`tile${selected === o.code ? " selected" : ""}`}
+            onClick={() => onAnswer({ kind: "choice", code: o.code }, auto)}
+          >
+            <span className="tile-art">{o.illustration && <Illustration token={o.illustration} />}</span>
+            <span className="tile-label">{o.label}</span>
+            {o.description && <span className="tile-desc">{o.description}</span>}
+          </button>
+        ))}
+      </div>
+    );
+  }
+
+  const asPicker = item.presentation === "dropdown" || item.presentation === "wheel" || scale.options.length > 12;
 
   if (asPicker) {
     return (
@@ -56,32 +75,23 @@ export function SingleChoice({ item, scale, value, onAnswer }: ControlProps) {
 
   return (
     <div className="cards" role="radiogroup" aria-label={item.stem.text}>
-      {scale.options.map((o, i) => {
-        const letter = optionKey(i);
-        return (
-          <button
-            key={o.code}
-            type="button"
-            role="radio"
-            aria-checked={selected === o.code}
-            data-option-key={letter ?? undefined}
-            className={`card${selected === o.code ? " selected" : ""}${o.kind !== "substantive" ? " quiet" : ""}`}
-            onClick={() => onAnswer({ kind: "choice", code: o.code }, auto)}
-          >
-            {letter && (
-              <span className="key" aria-hidden="true">
-                {letter}
-              </span>
-            )}
-            <span className="card-label">{o.label}</span>
-            {selected === o.code && (
-              <span className="tick" aria-hidden="true">
-                ✓
-              </span>
-            )}
-          </button>
-        );
-      })}
+      {scale.options.map((o) => (
+        <button
+          key={o.code}
+          type="button"
+          role="radio"
+          aria-checked={selected === o.code}
+          className={`card${selected === o.code ? " selected" : ""}${o.kind !== "substantive" ? " quiet" : ""}`}
+          onClick={() => onAnswer({ kind: "choice", code: o.code }, auto)}
+        >
+          <span className="card-label">{o.label}</span>
+          {selected === o.code && (
+            <span className="tick" aria-hidden="true">
+              ✓
+            </span>
+          )}
+        </button>
+      ))}
     </div>
   );
 }
@@ -104,8 +114,7 @@ export function MultiChoice({ item, scale, value, onAnswer }: ControlProps) {
           Choose up to {max} — {selected.length} selected
         </p>
       )}
-      {scale.options.map((o, i) => {
-        const letter = optionKey(i);
+      {scale.options.map((o) => {
         const on = selected.includes(o.code);
         return (
           <button
@@ -113,15 +122,9 @@ export function MultiChoice({ item, scale, value, onAnswer }: ControlProps) {
             type="button"
             role="checkbox"
             aria-checked={on}
-            data-option-key={letter ?? undefined}
             className={`card${on ? " selected" : ""}`}
             onClick={() => toggle(o.code)}
           >
-            {letter && (
-              <span className="key" aria-hidden="true">
-                {letter}
-              </span>
-            )}
             <span className="card-label">{o.label}</span>
             {on && (
               <span className="tick" aria-hidden="true">
@@ -165,25 +168,103 @@ export function SliderControl({ item, value, onAnswer }: ControlProps) {
   );
 }
 
+/**
+ * MacArthur ladder: an actual drawn ladder the participant taps — or drags a
+ * finger up and down — rather than an abstract slider. The metaphor is the
+ * instrument, so the picture is the control. Anchor labels sit at each end so
+ * no explanation is needed, and arrow keys move a rung at a time.
+ */
 export function LadderControl({ item, value, onAnswer }: ControlProps) {
+  const dragging = useRef(false);
   if (item.responseType !== "ladder") return null;
+
+  const top = item.lowestValue + item.rungs - 1;
   const selected = value?.kind === "number" ? value.value : undefined;
-  const rungs = Array.from({ length: item.rungs }, (_, i) => item.lowestValue + item.rungs - 1 - i);
+  const rungs = Array.from({ length: item.rungs }, (_, i) => top - i); // top-down
+
+  const RUNG_H = 44;
+  const PAD = 14;
+  const W = 260;
+  const H = item.rungs * RUNG_H + PAD * 2;
+  const railInset = 34;
+
+  const valueFromY = (clientY: number, el: SVGSVGElement): number => {
+    const box = el.getBoundingClientRect();
+    const y = ((clientY - box.top) / box.height) * H;
+    const idx = Math.floor((y - PAD) / RUNG_H);
+    return Math.min(top, Math.max(item.lowestValue, top - Math.min(item.rungs - 1, Math.max(0, idx))));
+  };
+
+  const pick = (v: number) => {
+    if (v !== selected) onAnswer({ kind: "number", value: v }, false);
+  };
+
   return (
-    <div className="ladder" role="radiogroup" aria-label={item.stem.text}>
-      {rungs.map((r) => (
-        <button
-          key={r}
-          type="button"
-          role="radio"
-          aria-checked={selected === r}
-          aria-label={`Rung ${r} of ${item.lowestValue + item.rungs - 1}`}
-          className={`rung${selected === r ? " selected" : ""}`}
-          onClick={() => onAnswer({ kind: "number", value: r }, false)}
-        >
-          {r}
-        </button>
-      ))}
+    <div className="ladder-wrap">
+      {item.topLabel && <p className="ladder-anchor top">{item.topLabel}</p>}
+      <svg
+        className="ladder-svg"
+        viewBox={`0 0 ${W} ${H}`}
+        width="100%"
+        style={{ maxWidth: W }}
+        role="slider"
+        tabIndex={0}
+        aria-label={item.stem.text}
+        aria-valuemin={item.lowestValue}
+        aria-valuemax={top}
+        aria-valuenow={selected ?? undefined}
+        aria-valuetext={selected === undefined ? "No rung chosen yet" : `Rung ${selected} of ${top}`}
+        onPointerDown={(e) => {
+          dragging.current = true;
+          e.currentTarget.setPointerCapture(e.pointerId);
+          pick(valueFromY(e.clientY, e.currentTarget));
+        }}
+        onPointerMove={(e) => {
+          if (dragging.current) pick(valueFromY(e.clientY, e.currentTarget));
+        }}
+        onPointerUp={() => (dragging.current = false)}
+        onPointerCancel={() => (dragging.current = false)}
+        onKeyDown={(e) => {
+          const cur = selected ?? item.lowestValue - 1 + Math.ceil(item.rungs / 2);
+          if (e.key === "ArrowUp" || e.key === "ArrowRight") {
+            e.preventDefault();
+            pick(Math.min(top, cur + 1));
+          } else if (e.key === "ArrowDown" || e.key === "ArrowLeft") {
+            e.preventDefault();
+            pick(Math.max(item.lowestValue, cur - 1));
+          }
+        }}
+      >
+        {/* rails */}
+        <line x1={railInset} y1={PAD} x2={railInset} y2={H - PAD} className="ladder-rail" />
+        <line x1={W - railInset} y1={PAD} x2={W - railInset} y2={H - PAD} className="ladder-rail" />
+        {rungs.map((r, i) => {
+          const cy = PAD + i * RUNG_H + RUNG_H / 2;
+          const on = selected === r;
+          return (
+            <g key={r} className={`ladder-rung${on ? " selected" : ""}`}>
+              {on && (
+                <rect
+                  x={railInset - 12}
+                  y={cy - RUNG_H / 2 + 3}
+                  width={W - railInset * 2 + 24}
+                  height={RUNG_H - 6}
+                  rx={6}
+                  className="ladder-highlight"
+                />
+              )}
+              <line x1={railInset} y1={cy} x2={W - railInset} y2={cy} className="ladder-step" />
+              <text x={W / 2} y={cy} className="ladder-number" textAnchor="middle" dominantBaseline="central">
+                {r}
+              </text>
+            </g>
+          );
+        })}
+      </svg>
+      {item.bottomLabel && <p className="ladder-anchor bottom">{item.bottomLabel}</p>}
+      <p className="ladder-status" aria-live="polite">
+        {selected === undefined ? "Tap a rung on the ladder" : `You chose rung ${selected}`}
+      </p>
     </div>
   );
 }
