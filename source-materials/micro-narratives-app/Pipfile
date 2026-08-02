@@ -1,0 +1,30 @@
+[[source]]
+url = "https://pypi.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[packages]
+streamlit = ">=1.43.0"
+streamlit-feedback = "==0.1.4"
+langchain = ">=0.3.30"
+langchain-community = ">=0.3.27"
+langchain-openai = ">=0.3.7"
+langchain-core = ">=1.2.22"
+langsmith = ">=0.8.18"
+pydantic-settings = ">=2.14.2"
+boto3 = "==1.37.8"
+langchain-text-splitters = ">=0.3.9"
+aiohttp = ">=3.13.3"
+orjson = ">=3.11.6"
+tornado = ">=6.5.5"
+pillow = ">=12.2.0"
+protobuf = ">=5.29.6"
+urllib3 = ">=2.6.0"
+h11 = ">=0.16.0"
+gitpython = ">=3.1.47"
+
+[dev-packages]
+ruff = "*"
+
+[requires]
+python_version = "3.12"

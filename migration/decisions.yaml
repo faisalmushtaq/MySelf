@@ -1,0 +1,185 @@
+# MySelf — Phase 0 decision register
+# Recorded 2026-08-02 from the principal researcher's in-session answers.
+# Dispositions: EXACT | PRESENT | SAFE-FIX | APPROVED-FIX | DEPART | UNRESOLVED
+# This file is part of release provenance: releases reference the decision IDs they implement.
+
+decisions:
+  - id: D-01
+    anomaly: A-1
+    topic: Abstaining_SM question text is wrong (duplicates app_reduce)
+    decision: fix-in-r1
+    disposition: APPROVED-FIX
+    detail: >
+      Restore the intended wording ("What effect do you think abstaining from
+      social media would have on you?") as a new item version of
+      sm_abstain_effect. Exact final wording to be confirmed at library review.
+      Legacy Qualtrics variable flagged unreliable in the crosswalk.
+
+  - id: D-02
+    anomaly: A-2
+    topic: Twitch row of TimeSpent matrix tests the X (Twitter) condition
+    decision: fix-in-r1
+    disposition: APPROVED-FIX
+    detail: >
+      Twitch row displays when Twitch is in "I have these apps on my phone".
+      Legacy Twitch-time data annotated unreliable in the crosswalk.
+
+  - id: D-03
+    anomaly: A-3
+    topic: other_games display logic inverted (shown only to non-gamers)
+    decision: fix-in-r1
+    disposition: APPROVED-FIX
+    detail: >
+      Games list and follow-up time matrix shown when "I do not play video
+      games" is NOT selected. Includes the A-4 residual fix: the time matrix
+      displays when ANY game slot is non-empty (not only slot 1).
+      Legacy data annotated accordingly.
+
+  - id: D-04
+    anomaly: A-43
+    topic: Age-of-adoption dropdowns missing option "5"
+    decision: fix-in-r1
+    disposition: APPROVED-FIX
+    detail: >
+      Insert age "5" into smartphone_age and sm_age with clean canonical codes;
+      crosswalk documents that legacy data cannot contain this value.
+
+  - id: D-05
+    anomaly: A-44
+    topic: RCADS/SDQ forced response contradicts "you can skip it" instruction
+    decision: soft-required-with-decline
+    disposition: APPROVED-FIX
+    detail: >
+      RCADS-25 and SDQ items are soft-required in r1 (single prompt, then
+      skippable/declinable), honouring the participant-facing instruction.
+      Departure from Qualtrics ForceResponse configuration is documented.
+
+  - id: D-06
+    anomaly: A-5
+    topic: Consent has no decline pathway
+    decision: keep-forced-consent
+    disposition: EXACT
+    detail: >
+      All six consent statements remain required with no in-app decline path;
+      non-consent is handled off-platform by the research team, as now.
+
+  - id: D-07
+    anomaly: A-34 (and A-28, A-33)
+    topic: Typos in bespoke item wording and instructions
+    decision: fix-in-r1
+    disposition: APPROVED-FIX
+    detail: >
+      Bespoke item typos ("mental welling", "wellbeing in mostly negative",
+      "did you you get", "Ethic origin", "haven not / pleas") corrected as new
+      item versions; originals preserved in migration metadata.
+
+  - id: D-08
+    anomaly: A-6, A-7, A-8, A-19, A-20 (validated-form deviations)
+    topic: Comparability stance for validated instruments in r1
+    decision: adopt-canonical-now
+    disposition: DEPART
+    detail: >
+      Release 1 administers corrected canonical forms (SDQ canonical anchors and
+      single-edition wording, KSS canonical labels, EHI-SF canonical anchors,
+      MacArthur discrete 10-rung ladder), accepting a documented comparability
+      break with the Qualtrics wave. As-administered -ybm-asadmin forms are
+      still encoded in the library for legacy-data interpretation.
+    constraints:
+      - SDQ canonical inclusion remains gated on youthinmind authorisation (A-25).
+      - Canonical wording must be verified against publisher/author sources
+        before encoding; verification status recorded per instrument.
+
+  - id: D-09
+    anomaly: A-26, A-27
+    topic: Identifier collection
+    decision: keep-current-collection
+    disposition: EXACT (collection) / DEPART (storage)
+    detail: >
+      The participant flow continues to collect first name, last name, DoB,
+      ps_id components and val_id. Architectural separation is retained:
+      identity fields are routed to the separated identity schema, role-gated,
+      excluded from default exports, and never stored beside response data.
+
+  - id: D-10
+    anomaly: A-24, A-25, A-21, A-23, A-42
+    topic: Licensing conversations (SDQ, SWEMWBS, STAI-5, doomscrolling, hair chart, micro-narratives citation/courtesy)
+    decision: research-team-handles
+    detail: >
+      The research team runs all licensor conversations. The platform tracks
+      licence status per instrument; the publish gate continues to block
+      permission_required/blocked instruments.
+      Updated 2026-08-02: the researcher confirmed in-session that licences and
+      ethics approvals are held. Instrument records move to permission_held on
+      this attestation; `verified` stays false until the licence documents are
+      filed in the register (paperwork task, not a publish blocker).
+    status: researcher-attested-held
+
+  - id: D-11
+    anomaly: A-29
+    topic: Safeguarding configuration
+    decision: defer-rules-build-mechanism
+    detail: >
+      Updated 2026-08-02: no existing safeguarding protocol document exists yet;
+      the researcher will develop one later. The platform builds the full flag
+      mechanism (tiers, review queue, permission gating, audit) but ships with
+      no active rules. The publish gate requires an explicit safeguarding
+      declaration per narrative protocol — "no automated rules; researcher
+      review only" is a valid, deliberate declaration for early releases, and
+      participant-facing wording must not imply any monitoring.
+    status: deferred-by-researcher
+
+  - id: D-12
+    topic: Hosting and researcher identity provider
+    decision: cloud-when-provisioned
+    detail: >
+      Updated 2026-08-02: no cloud account exists yet. The MVP runs on Docker
+      Compose (Postgres + API + apps) so it works locally and moves unchanged
+      to any provider once an account is set up. Recommendation prepared for
+      that moment: AWS eu-west-2 or Azure UK South (UK data residency),
+      managed Postgres, object storage for assets/exports; researcher sign-in
+      via Keycloak initially, swappable for the university IdP (OIDC) later.
+    status: deferred-until-account-exists
+
+  - id: D-13
+    topic: Collection-device posture
+    decision: team-controlled-no-mdm
+    detail: >
+      iPads are physically controlled by the research team but not MDM-managed.
+      Consequences applied: app-layer encryption treated as the primary at-rest
+      control; device-passcode presence checked and surfaced on the readiness
+      screen; provisioning runbook requires passcode + Home-Screen install;
+      residual risk recorded in the risk register.
+
+  - id: D-14
+    topic: LLM provider for the first narrative study
+    decision: openai-first-provider-flexible
+    detail: >
+      OpenAI adapter implemented first (existing API usage carries over);
+      the provider-independent gateway and deterministic mock are retained, and
+      provider/model/params are pinned per published release so other providers
+      can be adopted per study without code changes.
+
+  - id: D-15
+    topic: MVP narrative scope
+    decision: full-protocol-only
+    detail: >
+      The MVP's narrative module is the full micro-narrative protocol
+      (guided collect -> extraction -> persona scenarios -> select -> rate ->
+      adapt -> confirm), generalised from the CHI 2025 app. np.future_self is
+      not built as a protocol; the Future Self question remains a plain
+      open-text item in the YBM questionnaire.
+
+  - id: D-16
+    topic: Product naming — separating surveys from LLM narratives
+    decision: mythoughts-and-mystory
+    detail: >
+      Researcher decision 2026-08-02: within the MySelf platform, the two
+      participant-facing experiences are named and visually separated —
+      "MyThoughts" for conventional questionnaire/survey modules and
+      "MyStory" for LLM-supported micro-narrative protocols. MySelf remains
+      the platform and umbrella brand; the composer tags each assessment
+      component as a MyThoughts or MyStory experience; participant screens
+      show the sub-brand of the active experience so participants always know
+      whether they are answering questions or telling a story (this also
+      reinforces the design rule that model-mediated interaction must be
+      distinguishable from the canonical survey engine).

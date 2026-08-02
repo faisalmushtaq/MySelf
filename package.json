@@ -1,0 +1,20 @@
+{
+  "name": "myself",
+  "version": "0.1.0",
+  "private": true,
+  "description": "MySelf — research platform for self-report surveys and LLM-supported micro-narrative research",
+  "engines": {
+    "node": ">=22",
+    "pnpm": ">=10"
+  },
+  "scripts": {
+    "build": "pnpm -r build",
+    "test": "pnpm -r test",
+    "typecheck": "pnpm -r typecheck",
+    "lint": "pnpm -r lint"
+  },
+  "devDependencies": {
+    "playwright-core": "^1.62.1",
+    "typescript": "^5.6.0"
+  }
+}
