@@ -17,11 +17,11 @@ The visual language is inherited from the **BrainPop lab website** (`faisalmusht
 | `--hairline` | `rgba(0,0,0,0.14)` | Default borders |
 | `--hairline-strong` | `rgba(0,0,0,0.34)` | Hover borders, input underlines |
 | `--accent` | `#067843` | Selection, progress, affirmative state, MyStory/MyThoughts marks |
-| `--accent-wash` | `rgba(6,120,67,0.08)` | Selected card fill |
+| `--accent-wash` | `rgba(6,120,67,0.07)` | Selected card fill |
 | `--warn` | `#A33B00` | Errors, offline state (never red-on-green semantics alone) |
 | `--radius` | `6px` | Cards and inputs. Pills (`999px`) only for buttons and chips. |
 
-**Colour is never the sole carrier of meaning**: selection also shows a tick and a filled letter key; offline also states "Offline" in words.
+**Colour is never the sole carrier of meaning**: selection also shows a tick or a filled highlight; offline also states "Offline" in words.
 
 ## 2. Typography
 
@@ -53,7 +53,7 @@ The visual language is inherited from the **BrainPop lab website** (`faisalmusht
 
 ## 5. Accessibility (non-negotiable)
 
-44 px minimum touch targets · visible `2px` accent focus ring with offset (pointer interaction never leaves a focus box) · full keyboard path · every control labelled from the definition layer, not visual order · WCAG 2.2 AA contrast (accent `#067843` on cream passes for text ≥16 px and for UI borders) · `prefers-reduced-motion` honoured · text scales to 200 % without loss · no colour-only meaning.
+44 px minimum touch targets · visible `2px` accent focus ring with offset (pointer interaction never leaves a focus box) · full keyboard path · every control labelled from the definition layer, not visual order · WCAG 2.2 AA contrast (accent `#067843` on the canvas passes for text ≥16 px and for UI borders) · `prefers-reduced-motion` honoured · text scales to 200 % without loss · no colour-only meaning.
 
 ## 6. Applying this to new surfaces
 
