@@ -44,6 +44,41 @@ export function SurveyScreen(props: SurveyScreenProps) {
     };
   }, [index]);
 
+  /**
+   * Keyboard parity with the on-screen affordances: a letter selects the
+   * option showing that key; Enter continues. Ignored while typing in a
+   * field, so text answers are never hijacked.
+   */
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      const typing =
+        target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement ||
+        target instanceof HTMLSelectElement;
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+
+      if (e.key === "Enter" && !typing) {
+        const next = document.querySelector<HTMLButtonElement>("button.next:not(:disabled)");
+        if (next) {
+          e.preventDefault();
+          next.click();
+        }
+        return;
+      }
+      if (typing || e.key.length !== 1) return;
+      const letter = e.key.toUpperCase();
+      if (letter < "A" || letter > "Z") return;
+      const option = document.querySelector<HTMLButtonElement>(`[data-option-key="${letter}"]`);
+      if (option) {
+        e.preventDefault();
+        option.click();
+      }
+    };
+    addEventListener("keydown", onKey);
+    return () => removeEventListener("keydown", onKey);
+  }, [index]);
+
   if (!unit) return null;
   const item = unit.item;
   const scale = "scale" in item ? scales.get(item.scale) : undefined;
@@ -93,6 +128,12 @@ export function SurveyScreen(props: SurveyScreenProps) {
   };
 
   const controlProps = { item: resolvedItem, scale, value: record?.value, onAnswer: handleAnswer };
+  /**
+   * Identity of the question on screen. Used as a React key so every control
+   * remounts between questions: without it React reuses the control instance
+   * and its internal draft state (e.g. typed text) bleeds into the next item.
+   */
+  const unitKey = `${unit.instrument}.${item.key}#${item.revision}`;
 
   return (
     <div className="screen survey">
@@ -112,19 +153,27 @@ export function SurveyScreen(props: SurveyScreenProps) {
       </header>
 
       <main className="survey-body">
-        <h1 ref={headingRef} tabIndex={-1} className={item.responseType === "info" ? "info-text" : "stem"}>
+        <h1
+          ref={headingRef}
+          tabIndex={-1}
+          className={
+            item.responseType === "info"
+              ? "info-text"
+              : `stem${stemText.length > 110 ? " stem-long" : ""}`
+          }
+        >
           {stemText}
         </h1>
-        <SingleChoice {...controlProps} />
-        <MultiChoice {...controlProps} />
-        <SliderControl {...controlProps} />
-        <LadderControl {...controlProps} />
-        <NumericControl {...controlProps} />
-        <DateControl {...controlProps} />
-        <TextControl {...controlProps} />
-        <FormFieldsControl {...controlProps} />
-        <RankGroupControl {...controlProps} />
-        <CheckboxSetControl {...controlProps} />
+        <SingleChoice key={`sc-${unitKey}`} {...controlProps} />
+        <MultiChoice key={`mc-${unitKey}`} {...controlProps} />
+        <SliderControl key={`sl-${unitKey}`} {...controlProps} />
+        <LadderControl key={`ld-${unitKey}`} {...controlProps} />
+        <NumericControl key={`nu-${unitKey}`} {...controlProps} />
+        <DateControl key={`dt-${unitKey}`} {...controlProps} />
+        <TextControl key={`tx-${unitKey}`} {...controlProps} />
+        <FormFieldsControl key={`ff-${unitKey}`} {...controlProps} />
+        <RankGroupControl key={`rg-${unitKey}`} {...controlProps} />
+        <CheckboxSetControl key={`cb-${unitKey}`} {...controlProps} />
 
         {softPrompted && !answered && (
           <p className="soft-prompt" role="status">
@@ -141,6 +190,9 @@ export function SurveyScreen(props: SurveyScreenProps) {
         )}
         <button type="button" className="next" disabled={!canAdvance && item.required === "hard"} onClick={handleNext}>
           {item.responseType === "info" ? "Continue" : answered ? "Next" : item.required === "hard" ? "Next" : softPrompted ? "Skip" : "Next"}
+          <span className="key-hint" aria-hidden="true">
+            ↵
+          </span>
         </button>
       </footer>
     </div>

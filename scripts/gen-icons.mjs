@@ -33,11 +33,11 @@ function png(size, rgb) {
     raw[rowStart] = 0; // filter none
     for (let x = 0; x < size; x++) {
       const i = rowStart + 1 + x * 3;
-      // simple centred rounded-square accent on a soft background
+      // Centred disc in the BrainPop accent green on the cream canvas.
       const cx = x / size - 0.5;
       const cy = y / size - 0.5;
-      const inside = Math.max(Math.abs(cx), Math.abs(cy)) < 0.34;
-      const [r, g, b] = inside ? rgb : [247, 247, 251];
+      const inside = Math.sqrt(cx * cx + cy * cy) < 0.33;
+      const [r, g, b] = inside ? rgb : [250, 246, 240];
       raw[i] = r;
       raw[i + 1] = g;
       raw[i + 2] = b;
@@ -52,7 +52,7 @@ function png(size, rgb) {
 }
 
 mkdirSync("apps/participant/public", { recursive: true });
-const accent = [59, 59, 109];
+const accent = [6, 120, 67]; // BrainPop --accent #067843
 writeFileSync("apps/participant/public/icon-192.png", png(192, accent));
 writeFileSync("apps/participant/public/icon-512.png", png(512, accent));
 writeFileSync("apps/participant/public/apple-touch-icon.png", png(180, accent));
