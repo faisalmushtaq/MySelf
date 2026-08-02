@@ -23,6 +23,8 @@ export interface ControlProps {
    * leaving the last valid value stored while the screen showed something else.
    */
   onValidity?: ((state: { ok: boolean; complete: boolean }) => void) | undefined;
+  /** Enter on a typed answer moves on, matching how choices auto-advance. */
+  onSubmit?: (() => void) | undefined;
 }
 
 const prefersReducedMotion = () =>
@@ -302,7 +304,7 @@ export function LadderControl({ item, value, onAnswer }: ControlProps) {
   );
 }
 
-export function NumericControl({ item, value, onAnswer, onValidity }: ControlProps) {
+export function NumericControl({ item, value, onAnswer, onValidity, onSubmit }: ControlProps) {
   if (item.responseType !== "numeric") return null;
   const current = value?.kind === "number" ? String(value.value) : "";
   const [text, setText] = useState(current);
@@ -338,6 +340,12 @@ export function NumericControl({ item, value, onAnswer, onValidity }: ControlPro
         aria-label={item.stem.text}
         aria-invalid={error !== null}
         onChange={(e) => commit(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key !== "Enter") return;
+          e.preventDefault();
+          commit(text);
+          onSubmit?.();
+        }}
       />
       {item.unitLabel && <span className="unit">{item.unitLabel}</span>}
       {error && (
@@ -349,7 +357,7 @@ export function NumericControl({ item, value, onAnswer, onValidity }: ControlPro
   );
 }
 
-export function DateControl({ item, value, onAnswer, onValidity }: ControlProps) {
+export function DateControl({ item, value, onAnswer, onValidity, onSubmit }: ControlProps) {
   const [error, setError] = useState<string | null>(null);
   if (item.responseType !== "date") return null;
   const current = value?.kind === "date" ? value.iso : "";
@@ -391,6 +399,12 @@ export function DateControl({ item, value, onAnswer, onValidity }: ControlProps)
           onValidity?.({ ok: problem === null, complete: problem === null });
           if (!problem) onAnswer({ kind: "date", iso }, false);
         }}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            onSubmit?.();
+          }
+        }}
       />
       {error && (
         <p className="error" role="alert">
@@ -401,7 +415,7 @@ export function DateControl({ item, value, onAnswer, onValidity }: ControlProps)
   );
 }
 
-export function TextControl({ item, value, onAnswer, onValidity }: ControlProps) {
+export function TextControl({ item, value, onAnswer, onValidity, onSubmit }: ControlProps) {
   if (item.responseType !== "text_short" && item.responseType !== "text_long") return null;
   const current = value?.kind === "text" ? value.value : "";
   const [text, setText] = useState(current);
@@ -430,6 +444,14 @@ export function TextControl({ item, value, onAnswer, onValidity }: ControlProps)
       pending.current = null;
       if (raw.trim().length > 0) onAnswer({ kind: "text", value: raw }, false);
     }, 400); // debounce keystrokes; every commit is still an autosaved event
+  };
+
+  /** Record the current text now, without waiting for the debounce. */
+  const flush = () => {
+    if (timer.current) clearTimeout(timer.current);
+    const raw = pending.current;
+    pending.current = null;
+    if (raw !== null && raw.trim().length > 0) onAnswer({ kind: "text", value: raw }, false);
   };
 
   // Flush on unmount so advancing before the debounce elapses never drops the
@@ -463,6 +485,12 @@ export function TextControl({ item, value, onAnswer, onValidity }: ControlProps)
           maxLength={item.maxChars}
           aria-label={item.stem.text}
           onChange={(e) => commit(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key !== "Enter") return;
+            e.preventDefault();
+            flush();
+            onSubmit?.();
+          }}
         />
       )}
       {error && (
@@ -479,7 +507,7 @@ export function TextControl({ item, value, onAnswer, onValidity }: ControlProps)
   );
 }
 
-export function FormFieldsControl({ item, value, onAnswer, onValidity }: ControlProps) {
+export function FormFieldsControl({ item, value, onAnswer, onValidity, onSubmit }: ControlProps) {
   if (item.responseType !== "form_fields") return null;
   const current = value?.kind === "fields" ? value.values : {};
   const [values, setValues] = useState<Record<string, string>>(current);
@@ -545,6 +573,27 @@ export function FormFieldsControl({ item, value, onAnswer, onValidity }: Control
             value={values[f.key] ?? ""}
             aria-invalid={errors[f.key] !== undefined}
             onChange={(e) => commit(f.key, e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key !== "Enter") return;
+              e.preventDefault();
+              // Enter walks down the form, then moves on from the last field.
+              const inputs = Array.from(
+                e.currentTarget.closest(".fields")?.querySelectorAll("input") ?? [],
+              ) as HTMLInputElement[];
+              const at = inputs.indexOf(e.currentTarget);
+              const next = inputs[at + 1];
+              if (next) {
+                next.focus();
+                return;
+              }
+              if (timer.current) clearTimeout(timer.current);
+              const draft = pending.current;
+              pending.current = null;
+              if (draft && Object.values(draft).some((x) => x.trim().length > 0)) {
+                onAnswer({ kind: "fields", values: draft }, false);
+              }
+              onSubmit?.();
+            }}
           />
           {errors[f.key] && (
             <span className="error" role="alert">
