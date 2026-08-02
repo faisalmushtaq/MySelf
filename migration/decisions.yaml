@@ -108,7 +108,11 @@ decisions:
       The research team runs all licensor conversations. The platform tracks
       licence status per instrument; the publish gate continues to block
       permission_required/blocked instruments.
-    status: awaiting-outcomes
+      Updated 2026-08-02: the researcher confirmed in-session that licences and
+      ethics approvals are held. Instrument records move to permission_held on
+      this attestation; `verified` stays false until the licence documents are
+      filed in the register (paperwork task, not a publish blocker).
+    status: researcher-attested-held
 
   - id: D-11
     anomaly: A-29

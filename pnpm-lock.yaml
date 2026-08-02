@@ -28,6 +28,22 @@ importers:
         specifier: ^2.1.0
         version: 2.1.9
 
+  packages/library:
+    dependencies:
+      '@myself/schema':
+        specifier: workspace:*
+        version: link:../schema
+      zod:
+        specifier: ^3.23.8
+        version: 3.25.76
+    devDependencies:
+      typescript:
+        specifier: ^5.6.0
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.0
+        version: 2.1.9
+
   packages/schema:
     dependencies:
       zod:

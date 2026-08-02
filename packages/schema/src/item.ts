@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { dottedKey, semver, slug, variableName } from "./identifiers.js";
-import { pipeRef } from "./logic.js";
+import { logicExpr, pipeRef } from "./logic.js";
 
 /**
  * Items are versioned as integer revisions within their instrument. Any change
@@ -31,6 +31,8 @@ const baseItem = {
   required: z.enum(["hard", "soft", "optional"]).default("soft"),
   /** Offer an explicit decline control (D-05 / A-44). */
   allowDecline: z.boolean().default(false),
+  /** Intra-module display condition (e.g. Age_smartphone if smartphone owned). */
+  displayIf: logicExpr.optional(),
   a11yNote: z.string().optional(),
   researcherNote: z.string().optional(),
 };
