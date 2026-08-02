@@ -1,9 +1,16 @@
+import { resolve } from "node:path";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 import { VitePWA } from "vite-plugin-pwa";
 
 // Base path: GitHub Pages serves the app at /<repo-name>/.
 const base = process.env["MYSELF_BASE"] ?? "/MySelf/";
+
+// Public-preview builds (MYSELF_REDACTED=1) bundle the redacted manifest so
+// licensed instrument wording is never served from a public URL.
+const manifestFile = process.env["MYSELF_REDACTED"]
+  ? "../../releases/preview.manifest.json"
+  : "../../releases/ybm_nd2026_standard_r1.0.0.manifest.json";
 
 export default defineConfig({
   base,
@@ -34,6 +41,7 @@ export default defineConfig({
       },
     }),
   ],
+  resolve: { alias: { "@release-manifest": resolve(__dirname, manifestFile) } },
   server: { fs: { allow: [".."] } },
   test: { environment: "node", include: ["src/**/*.test.ts"] },
 } as Parameters<typeof defineConfig>[0]);

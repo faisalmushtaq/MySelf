@@ -4,3 +4,4 @@ dist/
 .env
 .env.*
 coverage/
+releases/preview.manifest.json
