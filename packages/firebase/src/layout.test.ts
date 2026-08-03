@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest";
 import type { DeviceSession, DeviceEvent } from "@myself/store";
-import { EVENTS_PER_CHUNK, MAX_DOCUMENT_BYTES, conflictWith, joinSession, paths, splitSession } from "./layout.js";
+import {
+  EVENTS_PER_CHUNK,
+  MAX_DOCUMENT_BYTES,
+  chunksComplete,
+  conflictWith,
+  joinSession,
+  paths,
+  splitSession,
+} from "./layout.js";
 
 /**
  * A bug here loses a whole sitting at the moment it is handed over, so the
@@ -144,5 +152,44 @@ describe("paths", () => {
     expect(paths.session("ybm", "s1")).toBe("studies/ybm/sessions/s1");
     expect(paths.participant("ybm", "JA101CD")).toBe("studies/ybm/participants/JA101CD");
     expect(paths.sessionChunk("ybm", "s1", 3)).toBe("studies/ybm/sessions/s1/chunks/0003");
+  });
+});
+
+describe("a torn write", () => {
+  /**
+   * The only way a spilled sitting could lose events without anybody noticing:
+   * the session document says four chunks, three arrive, and the log comes back
+   * short but plausible. It has to fail loudly instead — the device still holds
+   * its copy, so a loud failure is recoverable and a quiet one is not.
+   */
+  const huge = Array.from({ length: 400 }, (_, i) => event(i, "x".repeat(3000)));
+  const split = () => splitSession(session(huge), "dev_a", "ybm");
+
+  it("is refused rather than returning a short log", () => {
+    const { doc, chunks } = split();
+    expect(() => joinSession(doc, chunks.slice(0, -1))).toThrow(/incomplete/);
+    expect(() => joinSession(doc, [])).toThrow(/incomplete/);
+  });
+
+  it("is refused when a chunk in the middle is missing, not just the last", () => {
+    const { doc, chunks } = split();
+    expect(() => joinSession(doc, [chunks[0]!, ...chunks.slice(2)])).toThrow(/incomplete/);
+  });
+
+  it("names the sitting, so the one to re-sync is obvious", () => {
+    const { doc, chunks } = split();
+    expect(() => joinSession(doc, chunks.slice(1))).toThrow(/ses_1/);
+  });
+
+  it("passes a whole one, in any order", () => {
+    const { doc, chunks } = split();
+    expect(chunksComplete(doc, chunks)).toBe(true);
+    expect(() => joinSession(doc, [...chunks].reverse())).not.toThrow();
+  });
+
+  it("does not object to a normal sitting, which has no chunks at all", () => {
+    const { doc } = splitSession(session([event(0), event(1)]), "dev_a", "ybm");
+    expect(chunksComplete(doc, [])).toBe(true);
+    expect(joinSession(doc).events).toHaveLength(2);
   });
 });

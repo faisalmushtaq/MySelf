@@ -166,8 +166,36 @@ export function splitSession(session: DeviceSession, deviceId: string, study: st
   return { doc: { ...base, events: [], chunkCount: chunks.length }, chunks };
 }
 
-/** Put a sitting back together from its document and any chunks. */
+/**
+ * Whether every chunk a sitting claims is actually present.
+ *
+ * The one way a spilled sitting could lose data quietly is a torn write: the
+ * session document lands saying it has four chunks, and only three of them
+ * make it. The log would then be short by a few hundred events and nothing
+ * would look wrong. So the count is checked rather than trusted.
+ */
+export function chunksComplete(doc: SessionDoc, chunks: ChunkDoc[]): boolean {
+  if (doc.chunkCount === 0) return true;
+  const indexes = new Set(chunks.map((c) => c.index));
+  if (indexes.size !== doc.chunkCount) return false;
+  for (let i = 0; i < doc.chunkCount; i += 1) if (!indexes.has(i)) return false;
+  return true;
+}
+
+/**
+ * Put a sitting back together from its document and any chunks.
+ *
+ * Throws rather than returning a short log. A truncated sitting that enters
+ * the dataset looking complete is the worst outcome available here — it would
+ * be analysed, and nothing downstream could tell. A loud failure is recoverable:
+ * the device still holds its copy, and the sitting can be re-synced.
+ */
 export function joinSession(doc: SessionDoc, chunks: ChunkDoc[] = []): DeviceSession {
+  if (!chunksComplete(doc, chunks)) {
+    throw new Error(
+      `sitting ${doc.sessionId} is incomplete: it claims ${doc.chunkCount} chunks and ${chunks.length} arrived — do not use this log`,
+    );
+  }
   const events =
     doc.chunkCount === 0
       ? doc.events

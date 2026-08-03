@@ -33,7 +33,19 @@ export async function buildStudyDataset(study: string): Promise<{ dataset: Datas
       data.chunkCount > 0
         ? (await db.collection(paths.sessionChunks(study, data.sessionId)).get()).docs.map((c) => c.data() as ChunkDoc)
         : [];
-    sessions.push(joinSession(data, chunks));
+    try {
+      sessions.push(joinSession(data, chunks));
+    } catch (error) {
+      // A sitting whose chunks are incomplete is left out and shouted about
+      // rather than exported short. The device still holds its copy, so this
+      // is recoverable — quietly exporting a truncated log would not be.
+      logger.error("incomplete sitting left out of the export", {
+        sessionId: data.sessionId,
+        expectedChunks: data.chunkCount,
+        found: chunks.length,
+        error: String(error),
+      });
+    }
   }
 
   const corrections = await db.collection(paths.corrections(study)).get();
