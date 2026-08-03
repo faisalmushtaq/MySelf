@@ -52,6 +52,24 @@ export interface CodeCorrection {
   withdrawnAt: string | null;
 }
 
+/** A sitting assigned to a specific participant — how twins are split. */
+export interface Assignment {
+  sessionId: string;
+  participantCode: string;
+  reason: string;
+  madeAt: string;
+}
+
+/** Parent and child, or twin and twin. Held with the names, not the answers. */
+export interface Relationship {
+  id: string;
+  participantCode: string;
+  relatedCode: string;
+  kind: "parent_of" | "child_of" | "sibling_of" | "twin_of";
+  note: string;
+  recordedAt: string;
+}
+
 export interface AccessRecord {
   id: string;
   at: string;
@@ -64,6 +82,8 @@ class ResearcherDb extends Dexie {
   sessions!: EntityTable<StoredSession, "sessionId">;
   people!: EntityTable<PersonRecord, "participantCode">;
   corrections!: EntityTable<CodeCorrection, "id">;
+  assignments!: EntityTable<Assignment, "sessionId">;
+  relationships!: EntityTable<Relationship, "id">;
   identityAccess!: EntityTable<AccessRecord, "id">;
 
   constructor() {
@@ -75,6 +95,14 @@ class ResearcherDb extends Dexie {
       sessions: "sessionId, startedAt, studyCode, importedAt",
       people: "participantCode, study, familyName, upn",
       corrections: "id, wrongCode, withdrawnAt",
+      identityAccess: "id, at",
+    });
+    this.version(3).stores({
+      sessions: "sessionId, startedAt, studyCode, importedAt",
+      people: "participantCode, study, familyName, upn",
+      corrections: "id, wrongCode, withdrawnAt",
+      assignments: "sessionId, participantCode",
+      relationships: "id, participantCode, relatedCode",
       identityAccess: "id, at",
     });
   }
@@ -279,4 +307,70 @@ export async function aliases(): Promise<Record<string, string>> {
 
 export async function accessLog(): Promise<AccessRecord[]> {
   return (await db.identityAccess.orderBy("at").reverse().limit(200).toArray());
+}
+
+// ── Twins, and who belongs to whom ────────────────────────────────────────
+
+/**
+ * Assign a sitting to a participant, overriding the code it derived to.
+ *
+ * This is how twins are separated. Their secret codes are identical — same
+ * mother, same house, same birth month, same postcode — so nothing but a name
+ * distinguishes them, and the split has to be stated by somebody who can see
+ * those names.
+ */
+export async function assignSession(sessionId: string, participantCode: string, reason: string): Promise<void> {
+  await db.assignments.put({ sessionId, participantCode, reason, madeAt: new Date().toISOString() });
+  await noteAccess("assign_sitting", participantCode, reason);
+}
+
+export async function clearAssignment(sessionId: string): Promise<void> {
+  await db.assignments.delete(sessionId);
+}
+
+export async function assignments(): Promise<Record<string, string>> {
+  const rows = await db.assignments.toArray();
+  return Object.fromEntries(rows.map((r) => [r.sessionId, r.participantCode]));
+}
+
+export async function assignmentList(): Promise<Assignment[]> {
+  return (await db.assignments.toArray()).sort((a, b) => b.madeAt.localeCompare(a.madeAt));
+}
+
+export async function recordRelationship(
+  participantCode: string,
+  relatedCode: string,
+  kind: Relationship["kind"],
+  note: string,
+): Promise<{ ok: boolean; error?: string }> {
+  if (participantCode === relatedCode) return { ok: false, error: "a person cannot be related to themselves" };
+  const at = new Date().toISOString();
+  await db.relationships.put({ id: id(), participantCode, relatedCode, kind, note, recordedAt: at });
+  // Both directions are stored, so looking up either end finds the other. A
+  // relationship recorded once and readable one way only is a relationship
+  // somebody will miss.
+  const inverse: Record<Relationship["kind"], Relationship["kind"]> = {
+    parent_of: "child_of",
+    child_of: "parent_of",
+    sibling_of: "sibling_of",
+    twin_of: "twin_of",
+  };
+  await db.relationships.put({
+    id: id(),
+    participantCode: relatedCode,
+    relatedCode: participantCode,
+    kind: inverse[kind],
+    note,
+    recordedAt: at,
+  });
+  await noteAccess("record_relationship", `${participantCode} ${kind} ${relatedCode}`, note);
+  return { ok: true };
+}
+
+export async function relationshipsFor(participantCode: string): Promise<Relationship[]> {
+  return db.relationships.where("participantCode").equals(participantCode).toArray();
+}
+
+export async function allRelationships(): Promise<Relationship[]> {
+  return (await db.relationships.toArray()).sort((a, b) => a.participantCode.localeCompare(b.participantCode));
 }

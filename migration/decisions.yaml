@@ -807,3 +807,42 @@ decisions:
       month and two postcode letters straight off it. Deliberate trade for a
       code a participant can reproduce years later (D-23); the reason the code
       is treated as pseudonymous rather than anonymous data.
+
+  - id: D-38
+    topic: Twins, parent respondents, and the identifiers used for record linkage
+    decision: detect-collisions-assign-per-sitting-validate-check-digits
+    detail: >
+      Researcher direction 2026-08-03, correcting an earlier assumption of
+      mine: Connected Bradford holds education and health records already
+      linked, so a UPN is a sufficient key into NHS data for this study — the
+      linkage is performed there, not by the research team — and NHS numbers
+      will sometimes be collected directly in the survey under explicit
+      in-survey approval.
+      TWINS. The participant code is mother's initials + house digit + birth
+      month + postcode letters. Twins share every one of them, so they derive
+      an identical code and their answers merge into a single person silently.
+      This is the exact failure the platform is built to prevent and the design
+      walked straight into it. Nothing but their names distinguishes them, and
+      names live in the identity partition, so the resolution has to be made by
+      a human who can see them.
+      Implemented: ingest reports a COLLISION when one code carries two
+      different first names, and accepts per-sitting `assignments` (session id
+      -> participant code) that override the derived code. An assignment
+      outranks a correction, being the more specific statement. The rows are
+      still ingested so nothing is lost, but the researcher view raises a
+      blocking banner saying plainly that any analysis of the dataset is wrong
+      until it is resolved, with a one-click separation.
+      PARENTS. `informant` is carried on every sitting, taken from the form the
+      release administered rather than from anything the respondent typed. A
+      parent answering about a child is filed under the child's code with
+      informant "parent" — the same person seen from a second point of view,
+      which is how self and parent SDQ reports have always been paired. Where a
+      parent is a subject in their own right they get their own code, and a
+      relationship row in the identity partition links them. Relationships are
+      stored in both directions, because one recorded to be readable only one
+      way is one somebody will miss.
+      CHECK DIGITS. NHS numbers (Modulus 11) and UPNs (check letter, alphabet
+      omitting I, O and S) are validated structurally at the point of entry. A
+      well-formed wrong identifier is the dangerous case: it either drops a
+      child out of the linked cohort or attaches them to somebody else, and
+      neither is visible afterwards.

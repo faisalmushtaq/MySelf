@@ -8,6 +8,8 @@ import { buildDataset } from "./lib/build.js";
 import {
   addSessions,
   aliases,
+  assignSession,
+  assignments,
   clearAll,
   importExportFile,
   storeIdentity,
@@ -40,10 +42,11 @@ type Tab = "overview" | "table" | "linkage" | "data";
 
 export default function App() {
   const [dataset, setDataset] = useState<Dataset | null>(null);
-  const [issues, setIssues] = useState<{ rejected: { sessionId: string; reason: string }[]; warnings: string[] }>({
-    rejected: [],
-    warnings: [],
-  });
+  const [issues, setIssues] = useState<{
+    rejected: { sessionId: string; reason: string }[];
+    collisions: { participantId: string; names: string[]; sessions: string[] }[];
+    warnings: string[];
+  }>({ rejected: [], collisions: [], warnings: [] });
   const [tab, setTab] = useState<Tab>("overview");
   const [visible, setVisible] = useState<string[] | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
@@ -55,13 +58,13 @@ export default function App() {
     const sessions = await storedSessions();
     // Corrections are applied here, at derivation, so a repaired code joins a
     // participant's waves without anything being rewritten (D-37).
-    const built = buildDataset(sessions, STUDY, await aliases());
+    const built = buildDataset(sessions, STUDY, await aliases(), await assignments());
     setDataset(built.dataset);
     // Names go to their own table, never into the dataset the rest of this
     // app reads. They are needed to repair a code and to link a UPN, and the
     // Linkage tab is the only place they surface.
     await storeIdentity(built.identity);
-    setIssues({ rejected: built.rejected, warnings: built.warnings });
+    setIssues({ rejected: built.rejected, collisions: built.collisions, warnings: built.warnings });
     setBusy(false);
   }, []);
 
@@ -154,6 +157,50 @@ export default function App() {
             {issues.rejected.slice(0, 5).map((r) => (
               <li key={r.sessionId}>
                 {r.sessionId}: {r.reason}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {issues.collisions.length > 0 && (
+        <div className="alert">
+          <strong>
+            {issues.collisions.length} code{issues.collisions.length === 1 ? " is" : "s are"} being shared by more
+            than one person — almost certainly twins.
+          </strong>{" "}
+          The secret code is built from the mother&apos;s initials, a house digit, a birth month and postcode
+          letters, and siblings born on the same day share every one of them. Until this is resolved, their answers
+          are counted as one person and <strong>any analysis of this dataset is wrong</strong>.
+          <ul>
+            {issues.collisions.map((c) => (
+              <li key={c.participantId}>
+                <strong>{c.participantId}</strong> — {c.names.join(" and ")} ({c.sessions.length} sittings).{" "}
+                <button
+                  type="button"
+                  className="link"
+                  onClick={() => {
+                    void (async () => {
+                      // Give every sitting after the first its own code, so
+                      // each twin becomes a participant in their own right.
+                      // Which sitting belongs to which name is then checked on
+                      // the Linkage tab, where the names are visible.
+                      const [, ...rest] = c.sessions;
+                      let suffix = 2;
+                      for (const sessionId of rest) {
+                        await assignSession(
+                          sessionId,
+                          `${c.participantId}-${suffix}`,
+                          `twin split: ${c.names.join(" / ")} share the code ${c.participantId}`,
+                        );
+                        suffix += 1;
+                      }
+                      await reload();
+                      setTab("linkage");
+                    })();
+                  }}
+                >
+                  Separate them
+                </button>
               </li>
             ))}
           </ul>

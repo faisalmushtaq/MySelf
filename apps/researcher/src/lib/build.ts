@@ -15,6 +15,8 @@ export interface BuildResult {
   /** Names and code components, kept apart from the dataset (D-37). */
   identity: IdentityRow[];
   rejected: { sessionId: string; reason: string }[];
+  /** One code carrying two different names — twins, until resolved (D-38). */
+  collisions: { participantId: string; names: string[]; sessions: string[] }[];
   warnings: string[];
 }
 
@@ -22,8 +24,11 @@ export function buildDataset(
   sessions: DeviceSession[],
   study: string,
   aliases: Record<string, string> = {},
+  assignments: Record<string, string> = {},
 ): BuildResult {
-  if (sessions.length === 0) return { dataset: emptyDataset(), identity: [], rejected: [], warnings: [] };
+  if (sessions.length === 0) {
+    return { dataset: emptyDataset(), identity: [], rejected: [], collisions: [], warnings: [] };
+  }
 
   const groups = new Map<string, DeviceSession[]>();
   for (const s of sessions) {
@@ -41,6 +46,7 @@ export function buildDataset(
 
   let dataset = emptyDataset();
   const identity: IdentityRow[] = [];
+  const collisions: BuildResult["collisions"] = [];
   const rejected: BuildResult["rejected"] = [];
   const warnings: string[] = [];
 
@@ -61,12 +67,19 @@ export function buildDataset(
       );
     }
     const sortedGroup = [...group].sort((a, b) => a.startedAt.localeCompare(b.startedAt));
-    const result = ingest(sortedGroup, { manifest: release.manifest, study, existing: dataset, aliases });
+    const result = ingest(sortedGroup, {
+      manifest: release.manifest,
+      study,
+      existing: dataset,
+      aliases,
+      assignments,
+    });
     dataset = result.dataset;
     identity.push(...result.identity);
+    collisions.push(...result.collisions);
     rejected.push(...result.rejected);
     warnings.push(...result.warnings);
   }
 
-  return { dataset, identity, rejected, warnings };
+  return { dataset, identity, rejected, collisions, warnings };
 }

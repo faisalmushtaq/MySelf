@@ -54,6 +54,21 @@ export interface IngestOptions {
    * fact about it. Re-deriving with the mapping removed puts everything back.
    */
   aliases?: Record<string, string>;
+  /**
+   * Per-sitting overrides: session id -> the participant it really belongs to.
+   *
+   * The case this exists for is twins. The secret code is built from the
+   * mother's initials, a house digit, a birth month and postcode letters —
+   * every one of which two siblings born on the same day share. Their code is
+   * therefore identical, and without an override their answers would merge
+   * into one person silently, which is the single worst thing this platform
+   * could do. The only thing that tells them apart is their names, which live
+   * in the identity partition, so the split is made by a human who can see
+   * those and recorded here.
+   *
+   * An assignment wins over an alias: it is the more specific statement.
+   */
+  assignments?: Record<string, string>;
 }
 
 export interface IngestResult {
@@ -68,6 +83,19 @@ export interface IngestResult {
   identity: IdentityRow[];
   /** Sessions that could not be attached to a participant, and why. */
   rejected: { sessionId: string; reason: string }[];
+  /**
+   * One code, more than one person — almost always twins.
+   *
+   * Reported rather than resolved: the rows are still here so nothing is lost
+   * and a human can look, but any analysis of a dataset with an unresolved
+   * collision in it is wrong, and saying so loudly is the only useful
+   * behaviour. Resolve by assigning one of them a distinct code.
+   */
+  collisions: {
+    participantId: string;
+    names: string[];
+    sessions: string[];
+  }[];
   warnings: string[];
 }
 
@@ -95,9 +123,11 @@ const site = (studyCode: string): string | undefined => {
 function indexManifest(manifest: ReleaseManifest) {
   const items = new Map<string, { variable: string; scaleKey?: string; identifying: boolean }>();
   const instrumentOf = new Map<string, string>();
+  const informants = new Set<string>();
   for (const def of Object.values(manifest.instruments)) {
-    const inst = def as { instrument: string; forms: { items: Record<string, unknown>[] }[] };
+    const inst = def as { instrument: string; forms: { informant?: string; items: Record<string, unknown>[] }[] };
     for (const form of inst.forms) {
+      if (form.informant) informants.add(form.informant);
       for (const raw of form.items) {
         const it = raw as { key: string; variable: string; scale?: string; identifying?: boolean };
         items.set(`${inst.instrument}.${it.key}`, {
@@ -115,7 +145,10 @@ function indexManifest(manifest: ReleaseManifest) {
   const scoring = new Map<string, ScoringDefinition>(
     Object.entries(manifest.scoring).map(([k, v]) => [k, v as ScoringDefinition]),
   );
-  return { items, scales, scoring };
+  // A release is normally answered by one kind of respondent throughout. If it
+  // mixes them, say so rather than picking one and being quietly wrong.
+  const informant = informants.size === 1 ? [...informants][0]! : informants.size > 1 ? "mixed" : undefined;
+  return { items, scales, scoring, informant };
 }
 
 /** Reduce one session's events to per-item state plus session-level counts. */
@@ -271,12 +304,15 @@ function present(value: unknown, scale: ResponseScale | undefined) {
 
 export function ingest(sessions: DeviceSession[], options: IngestOptions): IngestResult {
   const { manifest, study } = options;
-  const { items: itemIndex, scales, scoring } = indexManifest(manifest);
+  const { items: itemIndex, scales, scoring, informant } = indexManifest(manifest);
   const rejected: IngestResult["rejected"] = [];
   const warnings: string[] = [];
 
   const existing = options.existing;
   const identityRows: IdentityRow[] = [];
+  // First names seen under each code, and the sittings they came from. Two
+  // different names under one code is the twin signature.
+  const namesByParticipant = new Map<string, Map<string, Set<string>>>();
   const sessionRows: SessionRow[] = existing ? [...existing.sessions] : [];
   const responseRows: ResponseRow[] = existing ? [...existing.responses] : [];
   const scoreRows: ScoreRow[] = existing ? [...existing.scores] : [];
@@ -292,9 +328,13 @@ export function ingest(sessions: DeviceSession[], options: IngestOptions): Inges
 
     const { items, reviewEdits, durationMs, foregroundMs } = replay(session);
     const derived = deriveParticipantCode(secretParts(items));
+    // An assignment is a statement about this exact sitting and outranks a
+    // correction, which is a statement about a code.
+    const assigned = options.assignments?.[session.sessionId];
     // A correction resolves through as many hops as it takes, so fixing A->B
     // and later B->C does not leave A pointing at a code nobody uses.
-    const participantId = derived === null ? null : resolveAlias(derived, options.aliases);
+    const participantId =
+      assigned ?? (derived === null ? null : resolveAlias(derived, options.aliases));
     if (!participantId) {
       // Without a complete code there is no key to file this under, and
       // guessing one would join it to the wrong person. Held back, not dropped.
@@ -335,6 +375,14 @@ export function ingest(sessions: DeviceSession[], options: IngestOptions): Inges
           // The age is the part of a date of birth that the research actually
           // needs. Derived here, at a known reference date, so analysts are not
           // tempted to ask for the date itself later.
+          if (meta.variable === "first_name") {
+            const seen = namesByParticipant.get(participantId) ?? new Map<string, Set<string>>();
+            const key = rendered.trim().toLowerCase();
+            const sessions = seen.get(key) ?? new Set<string>();
+            sessions.add(session.sessionId);
+            seen.set(key, sessions);
+            namesByParticipant.set(participantId, seen);
+          }
           if (meta.variable === "dob") {
             const age = ageAt(rendered, session.startedAt);
             if (age !== null) {
@@ -394,6 +442,7 @@ export function ingest(sessions: DeviceSession[], options: IngestOptions): Inges
       studyCode: session.studyCode,
       ...(site(session.studyCode) ? { site: site(session.studyCode)! } : {}),
       releaseKey: session.releaseKey,
+      ...(informant ? { informant } : {}),
       releaseHash: session.releaseHash,
       startedAt: session.startedAt,
       ...(session.completedAt ? { completedAt: session.completedAt } : {}),
@@ -422,6 +471,13 @@ export function ingest(sessions: DeviceSession[], options: IngestOptions): Inges
     },
     identity: identityRows,
     rejected,
+    collisions: [...namesByParticipant.entries()]
+      .filter(([, names]) => names.size > 1)
+      .map(([participantId, names]) => ({
+        participantId,
+        names: [...names.keys()].sort(),
+        sessions: [...new Set([...names.values()].flatMap((s) => [...s]))].sort(),
+      })),
     warnings,
   };
 }

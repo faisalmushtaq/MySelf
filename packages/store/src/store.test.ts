@@ -633,3 +633,80 @@ describe("correcting a mistyped code", () => {
     expect(resolveAlias("A", undefined)).toBe("A");
   });
 });
+
+describe("twins", () => {
+  /**
+   * The code is mother's initials + house digit + birth month + postcode
+   * letters. Twins share every one of them, so they derive the same code and
+   * their answers merge into one person — silently, and unrecoverably once an
+   * analysis has been run on it. Nothing but their names tells them apart.
+   */
+  const shared = { initials: "JA", digit: "1", month: 1, postcode: "CD" };
+
+  const twin = (id: string, firstName: string, startedAt: string): DeviceSession =>
+    session(id, shared, {
+      startedAt,
+      extra: [
+        ev("response.recorded", "ybm_identity.first_name", { value: { kind: "text", value: firstName } }),
+        ev("response.recorded", "ybm_identity.last_name", { value: { kind: "text", value: "Hussain" } }),
+      ],
+    });
+
+  it("says so loudly when one code carries two different names", () => {
+    const { collisions, dataset } = ingest(
+      [twin("t1", "Amara", "2026-03-01T09:00:00.000Z"), twin("t2", "Zayn", "2026-03-01T10:00:00.000Z")],
+      { manifest, study: "ybm" },
+    );
+    expect(collisions).toHaveLength(1);
+    expect(collisions[0]!.participantId).toBe("JA101CD");
+    expect(collisions[0]!.names).toEqual(["amara", "zayn"]);
+    expect(collisions[0]!.sessions).toEqual(["t1", "t2"]);
+    // The rows are still here — nothing is lost — but the dataset currently
+    // says these two children are one person, which is why it must be shouted.
+    expect(dataset.participants).toHaveLength(1);
+  });
+
+  it("splits them once a sitting is assigned to its own code", () => {
+    const { dataset, collisions } = ingest(
+      [twin("t1", "Amara", "2026-03-01T09:00:00.000Z"), twin("t2", "Zayn", "2026-03-01T10:00:00.000Z")],
+      { manifest, study: "ybm", assignments: { t2: "JA101CD2" } },
+    );
+    expect(collisions).toEqual([]);
+    expect(dataset.participants.map((p) => p.participantId).sort()).toEqual(["JA101CD", "JA101CD2"]);
+    for (const p of dataset.participants) expect(p.sessionCount).toBe(1);
+  });
+
+  it("keeps each twin's later waves with the right one of them", () => {
+    const { dataset } = ingest(
+      [
+        twin("t1", "Amara", "2026-03-01T09:00:00.000Z"),
+        twin("t2", "Zayn", "2026-03-01T10:00:00.000Z"),
+        twin("t3", "Amara", "2026-09-01T09:00:00.000Z"),
+        twin("t4", "Zayn", "2026-09-01T10:00:00.000Z"),
+      ],
+      { manifest, study: "ybm", assignments: { t2: "JA101CD2", t4: "JA101CD2" } },
+    );
+    expect(dataset.participants).toHaveLength(2);
+    for (const p of dataset.participants) expect(p.sessionCount).toBe(2);
+    const zayn = dataset.sessions.filter((s) => s.participantId === "JA101CD2");
+    expect(zayn.map((s) => s.wave)).toEqual([1, 2]);
+  });
+
+  it("an assignment outranks a correction, because it is the more specific statement", () => {
+    const { dataset } = ingest([twin("t1", "Amara", "2026-03-01T09:00:00.000Z")], {
+      manifest,
+      study: "ybm",
+      aliases: { JA101CD: "ZZ999ZZ" },
+      assignments: { t1: "JA101CD2" },
+    });
+    expect(dataset.participants[0]!.participantId).toBe("JA101CD2");
+  });
+
+  it("does not cry twins over one person answering at two waves", () => {
+    const { collisions } = ingest(
+      [twin("t1", "Amara", "2026-03-01T09:00:00.000Z"), twin("t2", "Amara", "2026-09-01T09:00:00.000Z")],
+      { manifest, study: "ybm" },
+    );
+    expect(collisions).toEqual([]);
+  });
+});

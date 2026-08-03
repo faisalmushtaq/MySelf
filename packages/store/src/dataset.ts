@@ -55,7 +55,16 @@ export const sessionRow = z.object({
   /** Site derived from the study code's letters, where it has them. */
   site: z.string().optional(),
   releaseKey: z.string().min(1),
-  /** Content hash of the release, so answers are always interpretable. */
+  /**
+   * Who answered: the young person, or a parent or teacher about them.
+   *
+   * Taken from the form the release administered, not from anything the
+   * respondent typed. A parent's answers about a child are filed under the
+   * child's code with `informant: "parent"` — the same person, described from
+   * a second point of view — which is how SDQ self and parent reports have
+   * always been paired.
+   */
+  informant: z.string().optional(),
   releaseHash: z.string().min(1),
   startedAt: z.string().datetime(),
   completedAt: z.string().datetime().optional(),
@@ -129,6 +138,24 @@ export const identityRow = z.object({
   recordedAt: z.string().datetime(),
 });
 
+/**
+ * A stated relationship between two participants.
+ *
+ * Parents and children, and twins with each other. Kept in the identity
+ * partition rather than the dataset because knowing that two codes are a
+ * parent and child is, in a school-sized sample, close to naming them.
+ */
+export const relationshipRow = z.object({
+  study: z.string().min(1),
+  /** The participant the relationship is stated from. */
+  participantId: z.string().min(1),
+  relatedId: z.string().min(1),
+  kind: z.enum(["parent_of", "child_of", "sibling_of", "twin_of"]),
+  recordedBy: z.string().min(1),
+  recordedAt: z.string().datetime(),
+  note: z.string().optional(),
+});
+
 export const dataset = z.object({
   /** Provenance for the whole dataset, carried into every export. */
   generatedAt: z.string().datetime(),
@@ -146,6 +173,7 @@ export type SessionRow = z.infer<typeof sessionRow>;
 export type ResponseRow = z.infer<typeof responseRow>;
 export type ScoreRow = z.infer<typeof scoreRow>;
 export type IdentityRow = z.infer<typeof identityRow>;
+export type RelationshipRow = z.infer<typeof relationshipRow>;
 export type Dataset = z.infer<typeof dataset>;
 
 export const emptyDataset = (): Dataset => ({
