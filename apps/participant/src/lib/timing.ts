@@ -28,6 +28,61 @@ export interface ItemTimingState {
   enteredAt: number | null;
   /** Monotonic ms when the item was first presented, across all visits. */
   firstSeenAt: number;
+  /** Milliseconds below which an answer was not read — scaled to this item. */
+  tooFastMs: number;
+}
+
+/** How the too-fast threshold is derived. See the schema for the reasoning. */
+export interface PacePolicy {
+  /** Floor, in seconds, for items with almost nothing to read. */
+  tooFastSeconds: number;
+  /** Reading speed the threshold is scaled by — set well above real speed. */
+  tooFastWordsPerSecond: number;
+  /** Upper bound, so a very long screen cannot demand an absurd minimum. */
+  tooFastMaxSeconds: number;
+}
+
+/** Words a participant would have to read before this item could be answered. */
+export function wordCount(...texts: (string | undefined)[]): number {
+  return texts
+    .filter((t): t is string => typeof t === "string")
+    .reduce((n, t) => n + t.trim().split(/\s+/).filter(Boolean).length, 0);
+}
+
+/**
+ * The threshold for one item: long enough to read what it says, floored so a
+ * two-word question is not held to an unreachable standard and capped so a
+ * page of consent text is not either.
+ */
+export function tooFastThresholdMs(words: number, policy: PacePolicy): number {
+  const fromReading = words / policy.tooFastWordsPerSecond;
+  const seconds = Math.min(policy.tooFastMaxSeconds, Math.max(policy.tooFastSeconds, fromReading));
+  return Math.round(seconds * 1000);
+}
+
+/** How the dwell-help wait is derived. See the schema for the reasoning. */
+export interface DwellPolicy {
+  dwellHintSeconds: number;
+  dwellWordsPerSecond: number;
+  dwellReadingMultiple: number;
+  dwellMaxSeconds: number;
+}
+
+/**
+ * How long to wait before quietly offering help, for one item.
+ *
+ * Someone is stuck, not thinking, once they have had time to read the screen
+ * several times over. A flat wait gets this wrong at both ends: on "Writing"
+ * it is an age, and on a page of consent statements it interrupts a careful
+ * reader halfway through their first pass.
+ */
+export function dwellHintMs(words: number, policy: DwellPolicy): number {
+  const readingSeconds = words / policy.dwellWordsPerSecond;
+  const seconds = Math.min(
+    policy.dwellMaxSeconds,
+    Math.max(policy.dwellHintSeconds, readingSeconds * policy.dwellReadingMultiple),
+  );
+  return Math.round(seconds * 1000);
 }
 
 export interface LeftPayload extends Record<string, unknown> {
@@ -47,7 +102,7 @@ export class SessionTiming {
   private hiddenMs = 0;
   private hiddenSince: number | null = null;
 
-  constructor(private readonly tooFastSeconds: number) {}
+  constructor(private readonly pace: PacePolicy) {}
 
   /** Elapsed wall time for the session, in milliseconds. */
   elapsedMs(): number {
@@ -83,15 +138,19 @@ export class SessionTiming {
     return { awayMs: away };
   }
 
-  /** Item shown. Returns the visit number (1 on first sight). */
-  enter(itemKey: string): { visit: number; returning: boolean } {
+  /**
+   * Item shown. `words` is how much is on screen to read, which sets this
+   * item's too-fast threshold. Returns the visit number (1 on first sight).
+   */
+  enter(itemKey: string, words = 0): { visit: number; returning: boolean; tooFastMs: number } {
     this.current = itemKey;
     const existing = this.items.get(itemKey);
     if (existing) {
       existing.visits += 1;
       existing.enteredAt = now();
-      return { visit: existing.visits, returning: true };
+      return { visit: existing.visits, returning: true, tooFastMs: existing.tooFastMs };
     }
+    const tooFastMs = tooFastThresholdMs(words, this.pace);
     this.items.set(itemKey, {
       itemKey,
       visits: 1,
@@ -100,8 +159,9 @@ export class SessionTiming {
       tooFast: false,
       enteredAt: now(),
       firstSeenAt: now(),
+      tooFastMs,
     });
-    return { visit: 1, returning: false };
+    return { visit: 1, returning: false, tooFastMs };
   }
 
   /** Item left. Returns the payload for the `item.left` event. */
@@ -128,10 +188,16 @@ export class SessionTiming {
   recordResponse(
     itemKey: string,
     isChange: boolean,
-  ): { sinceShownMs: number; tooFast: boolean; timeToFirstResponseMs?: number; changes: number } {
+  ): {
+    sinceShownMs: number;
+    tooFast: boolean;
+    thresholdMs: number;
+    timeToFirstResponseMs?: number;
+    changes: number;
+  } {
     const state = this.items.get(itemKey);
     const sinceShown = state?.enteredAt == null ? 0 : Math.round(now() - state.enteredAt);
-    if (!state) return { sinceShownMs: sinceShown, tooFast: false, changes: 0 };
+    if (!state) return { sinceShownMs: sinceShown, tooFast: false, thresholdMs: 0, changes: 0 };
     if (isChange) state.changes += 1;
     if (state.timeToFirstResponseMs === undefined) {
       state.timeToFirstResponseMs = Math.round(now() - state.firstSeenAt);
@@ -139,11 +205,12 @@ export class SessionTiming {
     // Only the first sight of an item can be "too fast": coming back to change
     // an answer you have already read is a different act, and flagging it would
     // punish exactly the care we want people to take.
-    const tooFast = state.visits === 1 && !isChange && sinceShown < this.tooFastSeconds * 1000;
+    const tooFast = state.visits === 1 && !isChange && sinceShown < state.tooFastMs;
     if (tooFast) state.tooFast = true;
     return {
       sinceShownMs: sinceShown,
       tooFast,
+      thresholdMs: state.tooFastMs,
       changes: state.changes,
       ...(state.timeToFirstResponseMs !== undefined
         ? { timeToFirstResponseMs: state.timeToFirstResponseMs }

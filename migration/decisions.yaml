@@ -404,3 +404,96 @@ decisions:
       the foot of the opening screen. The hairline under the Start button is
       removed — it read as a boundary the button was pressed against.
       Released as r4.0.0.
+
+  - id: D-25
+    topic: Answers that depend on earlier answers
+    decision: order-cross-check-and-limit
+    detail: >
+      Researcher direction 2026-08-02.
+      (a) ORDER: date of birth is asked immediately after the name, before
+      anything that depends on it. The publish gate now refuses any release
+      where a display condition, cross-check or option limit points at a
+      question asked later — such a condition can never fire, so the item
+      silently vanishes from every session and nobody notices until the data
+      comes back short.
+      (b) CROSS-CHECK: the secret code's birth-month component is checked
+      against the recorded date of birth. A contradiction is still recorded —
+      it is what the participant said, and the raw log is never edited — but
+      the screen says so and holds there, because at that moment they can tell
+      us which of the two is right and afterwards nobody can. Implemented as a
+      small named vocabulary (`crossChecks`) evaluated in the engine, so a
+      release can never carry a rule nothing knows how to apply.
+      (c) OPTION LIMITS: the age-of-first-smartphone and age-of-first-social-
+      media questions offer no age above the participant's own, derived from
+      the date of birth. Every substantive option now carries the quantity it
+      denotes (`value`) so the rule has something to compare. Escapes ("I'm not
+      sure") are never filtered — they claim no quantity.
+      Both rules fail OPEN: if the earlier answer is missing or unusable,
+      nothing is blocked and nothing is hidden. A rule that cannot be evaluated
+      must never become an obstacle or quietly narrow what someone can say.
+      (d) TOO-FAST THRESHOLD: the flat two seconds flagged legitimate quick
+      answers to short battery items and buried the real cases in noise. The
+      threshold now scales with how much the screen actually asks people to
+      read — words divided by a deliberately generous reading speed, floored at
+      0.8s and capped at 6s — and the run before the pace prompt is 5.
+      Released as r5.0.0.
+
+  - id: D-26
+    topic: Conditional flow, the name carried through, and scaled dwell help
+    decision: confirm-branch-personalise
+    detail: >
+      Researcher direction 2026-08-02.
+      (a) SOCIAL-MEDIA CONFIRMATION: "no" to social media is often a
+      misunderstanding rather than an answer — people say it when they only
+      watch, or when they don't count YouTube or WhatsApp. A single follow-up
+      screen lists the platforms and asks once more. The original answer is
+      never overwritten: the confirmation is its own variable, and the section
+      shows if either says yes. A considered "no" is honoured — no app
+      questions follow at all.
+      (b) DEPENDENCY AUDIT: every branch, cross-check and option limit in a
+      release is checked against the administered order at publish time (see
+      D-25a). This is the structural guarantee behind conditional questions.
+      (c) THE NAME: the first name given at the start is piped into the closing
+      screen, and will feed the MyStory module so nobody is asked twice. Pipes
+      now carry a fallback, so an unresolved one reads naturally instead of
+      showing a raw placeholder.
+      (d) DWELL HELP: the offer of help now waits until someone has had time to
+      read the screen three times over, floored at 20s and capped at 90s. A
+      flat 30s was far too long on a two-word question and interrupted a
+      careful reader partway through a long one.
+      Released as r5.0.0.
+
+  - id: D-27
+    topic: Response bands that overlap or leave gaps
+    decision: disjoint-and-exhaustive
+    detail: >
+      Researcher direction 2026-08-02, from the fielded screens.
+      The administered scales had boundaries a participant could not resolve.
+      Social-media time: "1–15 minutes" and "15–30 minutes" both claimed 15;
+      "30 minutes–1 hour" and "1–2 hours" both claimed an hour (A-36). Gaming:
+      "Less than 5 hours" then "6-10 hours" left 5-6 hours in no band at all
+      (A-9). Two people with identical use could land in different bands, and
+      some people had no honest box.
+      All quantity bands are now disjoint and exhaustive. Codes and legacy
+      codes are untouched — this is a labelling fix, not a recoding, and the
+      crosswalk is unaffected. A test reads each banded scale as a set and
+      fails on any overlap, or any gap wider than the unit the band is stated
+      in, so this cannot drift back.
+      Also: the per-platform time question offered "0 minutes" while only being
+      asked about platforms the participant had just said they use. Zero was a
+      contradiction; the option now reads "I have it but barely use it", which
+      is what it was presumably there to capture.
+      Released as r5.0.0.
+
+  - id: D-28
+    topic: Typeface, again
+    decision: inter
+    detail: >
+      Researcher direction 2026-08-02, with reference screenshots of Typeform.
+      The interface is set in Inter — the neo-grotesque that Typeform's own
+      interface uses, and the closest freely licensable equivalent. Question
+      stems sit at 600 with tighter tracking, which is what makes a question
+      read as a statement rather than a form label.
+      This supersedes D-21 (DM Sans) and D-24a (Newsreader). The point of the
+      single `--font-ui` switch point is that this was a two-line change; it
+      remains the one place to swap in a dyslexia-friendly face.

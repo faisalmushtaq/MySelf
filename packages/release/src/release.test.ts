@@ -15,7 +15,7 @@ const registries: Registries = {
 };
 
 const meta = {
-  version: "4.0.0",
+  version: "5.0.0",
   publishedAt: "2026-08-02T12:00:00.000Z",
   publishedBy: "faisalmushtaq",
   engineVersion: "0.1.0",
@@ -32,12 +32,12 @@ describe("canonical JSON", () => {
   });
 });
 
-describe("YBM release r4.0.0", () => {
+describe("YBM release r5.0.0", () => {
   it("passes the publish gate and produces a verifiable manifest", () => {
     const manifest = buildRelease(ybmComposition, registries, meta);
     expect(manifest.hash).toMatch(/^sha256:[0-9a-f]{64}$/);
     expect(verifyManifestHash(manifest)).toBe(true);
-    expect(manifest.release.key).toBe("ybm_nd2026_standard_r4_0_0");
+    expect(manifest.release.key).toBe("ybm_nd2026_standard_r5_0_0");
   });
 
   it("is deterministic: identical inputs give an identical hash", () => {
@@ -61,7 +61,7 @@ describe("YBM release r4.0.0", () => {
     // The frozen file is what devices actually run. If someone edits an item,
     // a scale or the composition without republishing, this fails: the release
     // on disk would no longer be the release the sources describe.
-    const path = fileURLToPath(new URL("../../../releases/ybm_nd2026_standard_r4.0.0.manifest.json", import.meta.url));
+    const path = fileURLToPath(new URL("../../../releases/ybm_nd2026_standard_r5.0.0.manifest.json", import.meta.url));
     const committed = JSON.parse(readFileSync(path, "utf8")) as {
       hash: string;
       release: { version: string; publishedAt: string; publishedBy: string; engineVersion: string; decisionRefs: string[] };
@@ -126,6 +126,44 @@ describe("publish gate", () => {
     const bad = structuredClone(ybmComposition);
     bad.sections[8]!.components.push({ kind: "narrative", protocol: "np.micro_narrative", protocolVersion: "1.0.0" });
     expect(() => buildRelease(bad, registries, meta)).toThrow(/narrative components not yet supported/);
+  });
+
+  it("rejects a question that branches on an answer given later", () => {
+    // The condition would be evaluated against an empty answer, so the item
+    // would vanish from every session and nobody would notice until the data
+    // came back short. That is a broken release, not a runtime problem.
+    const bad = structuredClone(registries);
+    const identity = bad.modules.find((m) => m.instrument === "ybm_identity")!;
+    identity.forms[0]!.items[0]!.displayIf = {
+      op: "selected",
+      target: { item: { instrument: "ybm_smartphone", item: "sm_use", revision: 1 } },
+      code: 1,
+    };
+    expect(() => buildRelease(ybmComposition, bad, meta)).toThrow(/asked later/);
+  });
+
+  it("rejects a cross-check against a question that does not exist", () => {
+    const bad = structuredClone(registries);
+    const identity = bad.modules.find((m) => m.instrument === "ybm_identity")!;
+    const month = identity.forms[0]!.items.find((i) => i.key === "ps_birth_month")!;
+    month.crossChecks = [
+      {
+        kind: "matches_month_of_date",
+        against: { instrument: "ybm_identity", item: "nonexistent", revision: 1 },
+        message: "…",
+      },
+    ];
+    expect(() => buildRelease(ybmComposition, bad, meta)).toThrow(/not in this release/);
+  });
+
+  it("rejects an option limit derived from a date collected afterwards", () => {
+    const bad = structuredClone(registries);
+    const identity = bad.modules.find((m) => m.instrument === "ybm_identity")!;
+    // Move date of birth to the end of the module, after the month it feeds
+    const items = identity.forms[0]!.items;
+    const dob = items.splice(items.findIndex((i) => i.key === "dob"), 1)[0]!;
+    items.push(dob);
+    expect(() => buildRelease(ybmComposition, bad, meta)).toThrow(/asked later/);
   });
 
   it("rejects an undeclared pipe placeholder", () => {

@@ -1,6 +1,42 @@
 import { z } from "zod";
-import { dottedKey, semver, slug, variableName } from "./identifiers.js";
+import { dottedKey, itemRef, semver, slug, variableName } from "./identifiers.js";
 import { logicExpr, pipeRef } from "./logic.js";
+
+/**
+ * Consistency between answers, declared rather than coded. A questionnaire
+ * that asks the same fact twice should notice when the two disagree — and say
+ * so at the point of entry, where the participant can still tell us which one
+ * is right. Checking afterwards means a dataset full of contradictions and
+ * nobody left to ask.
+ *
+ * The vocabulary is deliberately small and named: each kind is implemented
+ * once in the engine and covered by tests, so a release can never carry a
+ * rule that nothing knows how to evaluate.
+ */
+export const crossCheck = z.object({
+  kind: z.enum([
+    /** This choice's `value` must equal the calendar month of a date answer. */
+    "matches_month_of_date",
+  ]),
+  /** The earlier item this answer is checked against. */
+  against: itemRef,
+  /** What the participant is told when the two disagree. */
+  message: z.string().min(1),
+});
+
+/**
+ * Options that cannot apply to this participant are not shown. Nobody should
+ * have to scroll past "23" to say they got their first phone at 11, and an
+ * age older than they are is not an answer we want to be able to record.
+ */
+export const optionLimit = z.object({
+  kind: z.enum([
+    /** Hide options whose `value` exceeds the participant's age today. */
+    "at_most_age_now",
+  ]),
+  /** The date-of-birth item the age is computed from. */
+  from: itemRef,
+});
 
 /**
  * Items are versioned as integer revisions within their instrument. Any change
@@ -59,6 +95,8 @@ const baseItem = {
    * become extra reading for people who are managing fine.
    */
   hint: z.string().optional(),
+  /** Consistency rules against earlier answers, checked at the point of entry. */
+  crossChecks: z.array(crossCheck).optional(),
   a11yNote: z.string().optional(),
   researcherNote: z.string().optional(),
 };
@@ -85,6 +123,8 @@ export const itemDefinition = z.discriminatedUnion("responseType", [
     /** Display the spectrum in reverse option order (presentation only —
      * response codes are never affected). */
     spectrumReverse: z.boolean().default(false),
+    /** Restrict the offered options to those this participant could give. */
+    limitOptions: optionLimit.optional(),
     autoAdvance: z.boolean().default(true),
   }),
   z.object({
@@ -191,3 +231,5 @@ export const itemDefinition = z.discriminatedUnion("responseType", [
 ]);
 
 export type ItemDefinition = z.infer<typeof itemDefinition>;
+export type CrossCheck = z.infer<typeof crossCheck>;
+export type OptionLimit = z.infer<typeof optionLimit>;

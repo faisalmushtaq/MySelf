@@ -16,29 +16,34 @@ export function resolveText(
   return text.replace(/\{([a-z][a-z0-9_]*)\}/g, (whole, name: string) => {
     const pipe = pipes[name];
     if (!pipe) return whole;
+    // An unresolved pipe falls back to its declared text rather than leaving
+    // the participant looking at "{first_name}".
+    const unresolved = pipe.fallback ?? whole;
     switch (pipe.kind) {
       case "date_offset": {
         const d = new Date(sessionStart.getTime() + (pipe.offsetDays ?? 0) * 86_400_000);
         return d.toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
       }
       case "item_text_entry": {
-        if (!pipe.item) return whole;
+        if (!pipe.item) return unresolved;
         const rec = store.get(pipe.item);
         if (rec?.status === "answered" && rec.value?.kind === "fields" && pipe.part !== undefined) {
-          return rec.value.values[String(pipe.part)] ?? whole;
+          return rec.value.values[String(pipe.part)]?.trim() || unresolved;
         }
-        if (rec?.status === "answered" && rec.value?.kind === "text") return rec.value.value;
-        return whole;
+        if (rec?.status === "answered" && rec.value?.kind === "text") {
+          return rec.value.value.trim() || unresolved;
+        }
+        return unresolved;
       }
       case "item_answer": {
-        if (!pipe.item) return whole;
+        if (!pipe.item) return unresolved;
         const rec = store.get(pipe.item);
         if (rec?.status === "answered" && rec.value?.kind === "choice") return String(rec.value.code);
         if (rec?.status === "answered" && rec.value?.kind === "number") return String(rec.value.value);
-        return whole;
+        return unresolved;
       }
       case "session_field":
-        return whole; // populated when session metadata pipes are configured
+        return unresolved; // populated when session metadata pipes are configured
     }
   });
 }

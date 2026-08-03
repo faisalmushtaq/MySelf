@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { AnswerStore, Walker, type AnswerValue, type PresentableUnit } from "@myself/engine";
 import { releaseManifest, responseScale, type ReleaseManifest, type ResponseScale } from "@myself/schema";
-import rawManifest from "../../../releases/ybm_nd2026_standard_r4.0.0.manifest.json";
+import rawManifest from "../../../releases/ybm_nd2026_standard_r5.0.0.manifest.json";
 import { flattenManifest } from "./lib/flatten.js";
+import { resolveText } from "./lib/pipes.js";
 import {
   appendEvent,
   completeSession,
@@ -12,12 +13,12 @@ import {
   loadAnswers,
   type SessionRow,
 } from "./lib/db.js";
-import { SessionTiming } from "./lib/timing.js";
+import { SessionTiming, wordCount } from "./lib/timing.js";
 import { SurveyScreen } from "./components/SurveyScreen.js";
 
 /**
  * MySelf Go — participant application (preview build).
- * Renders the frozen YBM r4.0.0 release entirely from its manifest, saves
+ * Renders the frozen YBM r5.0.0 release entirely from its manifest, saves
  * every response to encrypted IndexedDB before advancing, works offline via
  * the service worker, and returns to a neutral start screen on handover.
  */
@@ -40,9 +41,22 @@ const unitKeyOf = (i: number) => {
   return u ? `${u.instrument}.${u.item.key}` : "";
 };
 
+/**
+ * How much reading a screen actually puts in front of someone — stem, lede,
+ * and any consent statements. The too-fast threshold scales with it, so a
+ * four-word battery item is not held to the same clock as a paragraph.
+ */
+const wordsAt = (i: number): number => {
+  const item = flattened.units[i]?.item;
+  if (!item) return 0;
+  const statements = item.responseType === "checkbox_set" ? item.statements.map((st) => st.text.text) : [];
+  return wordCount(item.stem.text, item.lede?.text, ...statements);
+};
+
 const effort = manifest.composition.effort;
 const codeRule = manifest.composition.participantCode;
 const contact = manifest.composition.contact;
+const finishScreen = manifest.composition.screens["finish"];
 
 export default function App() {
   const [phase, setPhase] = useState<Phase>({ kind: "start" });
@@ -57,7 +71,7 @@ export default function App() {
   const skipRun = useRef<{ count: number; firstIndex: number | null }>({ count: 0, firstIndex: null });
   // Timing paradata for the live session, and the run of answers given faster
   // than the question could have been read.
-  const timing = useRef(new SessionTiming(effort.tooFastSeconds));
+  const timing = useRef(new SessionTiming(effort));
   const fastRun = useRef(0);
   // The AnswerStore is a mutable engine structure; bump re-renders explicitly
   // whenever it changes so controls reflect the recorded answer.
@@ -124,7 +138,7 @@ export default function App() {
       storeRef.current = store;
       skipRun.current = { count: 0, firstIndex: null };
       fastRun.current = 0;
-      timing.current = new SessionTiming(effort.tooFastSeconds);
+      timing.current = new SessionTiming(effort);
       const w = new Walker(flattened.units, store, manifest.composition.allowBackNavigation);
       const index = existing ? Math.min(session.currentIndex, flattened.units.length - 1) : (w.first() ?? 0);
       if (existing) {
@@ -132,8 +146,8 @@ export default function App() {
       }
       const firstKey = unitKeyOf(index);
       if (firstKey) {
-        const { visit, returning } = timing.current.enter(firstKey);
-        void appendEvent(session, "item.presented", firstKey, { visit, returning }, index, tMono());
+        const { visit, returning, tooFastMs } = timing.current.enter(firstKey, wordsAt(index));
+        void appendEvent(session, "item.presented", firstKey, { visit, returning, tooFastMs }, index, tMono());
       }
       setPhase({ kind: "running", session, index });
     } finally {
@@ -168,7 +182,7 @@ export default function App() {
           phase.session,
           "response.too_fast",
           itemKey,
-          { sinceShownMs: t.sinceShownMs, thresholdMs: effort.tooFastSeconds * 1000, run: fastRun.current },
+          { sinceShownMs: t.sinceShownMs, thresholdMs: t.thresholdMs, run: fastRun.current },
           phase.index,
           tMono(),
         );
@@ -203,8 +217,8 @@ export default function App() {
       if (phase.kind === "start" || phase.kind === "finished") return;
       const key = unitKeyOf(index);
       if (!key) return;
-      const { visit, returning } = timing.current.enter(key);
-      void appendEvent(phase.session, "item.presented", key, { visit, returning }, index, tMono());
+      const { visit, returning, tooFastMs } = timing.current.enter(key, wordsAt(index));
+      void appendEvent(phase.session, "item.presented", key, { visit, returning, tooFastMs }, index, tMono());
     },
     [phase],
   );
@@ -326,7 +340,7 @@ export default function App() {
 
   const handover = useCallback(() => {
     storeRef.current = new AnswerStore();
-    timing.current = new SessionTiming(effort.tooFastSeconds);
+    timing.current = new SessionTiming(effort);
     fastRun.current = 0;
     setCode("");
     setSavedAt(null);
@@ -471,8 +485,20 @@ export default function App() {
 
       {phase.kind === "finished" && (
         <div className="screen finish">
-          <h1>Thank you! 🎉</h1>
-          <p>{manifest.composition.screens["finish"]?.body ?? "You've finished — thank you."}</p>
+          {/* The name given at the very start, used at the very end. Both the
+              title and the body are piped like any other participant text, so
+              this is a release decision rather than something coded here. */}
+          <h1>
+            {finishScreen?.title
+              ? resolveText(finishScreen.title.text, finishScreen.title.pipes, storeRef.current, new Date(phase.session.startedAt))
+              : "Thank you!"}{" "}
+            🎉
+          </h1>
+          <p>
+            {finishScreen
+              ? resolveText(finishScreen.body.text, finishScreen.body.pipes, storeRef.current, new Date(phase.session.startedAt))
+              : "You've finished — thank you."}
+          </p>
           <p className="hint">Your answers are saved safely on this device.</p>
           <button type="button" className="next big" onClick={handover}>
             Hand back to the researcher

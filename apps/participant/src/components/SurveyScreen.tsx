@@ -1,7 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { AnswerStore, Walker, type AnswerValue, type PresentableUnit } from "@myself/engine";
+import {
+  AnswerStore,
+  Walker,
+  checkConsistency,
+  visibleOptions,
+  type AnswerValue,
+  type PresentableUnit,
+} from "@myself/engine";
 import type { ItemDefinition, ResponseScale } from "@myself/schema";
 import { resolveText } from "../lib/pipes.js";
+import { dwellHintMs, wordCount, type DwellPolicy } from "../lib/timing.js";
 import { Illustration } from "./illustrations.js";
 import {
   CheckboxSetControl,
@@ -16,11 +24,12 @@ import {
   TextControl,
 } from "./controls.js";
 
-export interface EffortPolicy {
+export interface EffortPolicy extends DwellPolicy {
   confirmSkip: boolean;
   skipRunCheckIn: number;
-  dwellHintSeconds: number;
   tooFastSeconds: number;
+  tooFastWordsPerSecond: number;
+  tooFastMaxSeconds: number;
   tooFastRunPrompt: number;
 }
 
@@ -50,6 +59,8 @@ export function SurveyScreen(props: SurveyScreenProps) {
   const [draft, setDraft] = useState<{ ok: boolean; complete: boolean } | null>(null);
   const [helpOpen, setHelpOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
+  /** Message when this answer contradicts an earlier one (D-25). */
+  const [inconsistency, setInconsistency] = useState<string | null>(null);
   const [dwelling, setDwelling] = useState(false);
   const advanceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const headingRef = useRef<HTMLHeadingElement | null>(null);
@@ -59,6 +70,7 @@ export function SurveyScreen(props: SurveyScreenProps) {
     setDraft(null);
     setHelpOpen(false);
     setMoreOpen(false);
+    setInconsistency(null);
     setDwelling(false);
     headingRef.current?.focus();
     return () => {
@@ -73,12 +85,15 @@ export function SurveyScreen(props: SurveyScreenProps) {
    */
   useEffect(() => {
     if (unit?.item.responseType === "info") return;
+    const item = unit?.item;
+    const statements = item?.responseType === "checkbox_set" ? item.statements.map((st) => st.text.text) : [];
+    const waitMs = dwellHintMs(wordCount(item?.stem.text, item?.lede?.text, ...statements), effort);
     const t = setTimeout(() => {
       setDwelling(true);
-      props.onEvent("hint.shown", { reason: "dwell", seconds: effort.dwellHintSeconds });
-    }, effort.dwellHintSeconds * 1000);
+      props.onEvent("hint.shown", { reason: "dwell", afterMs: waitMs });
+    }, waitMs);
     return () => clearTimeout(t);
-  }, [index, effort.dwellHintSeconds]);
+  }, [index, effort]);
 
   /**
    * Enter continues, for anyone using a keyboard. Ignored while typing in a
@@ -109,7 +124,13 @@ export function SurveyScreen(props: SurveyScreenProps) {
 
   if (!unit) return null;
   const item = unit.item;
-  const scale = "scale" in item ? scales.get(item.scale) : undefined;
+  const baseScale = "scale" in item ? scales.get(item.scale) : undefined;
+  // Options this participant could not truthfully choose are not offered —
+  // an age older than they are is not an answer we want to be able to record.
+  const scale =
+    baseScale && item.responseType === "single_choice" && item.limitOptions
+      ? { ...baseScale, options: visibleOptions(item.limitOptions, baseScale.options, store, new Date()) }
+      : baseScale;
   const record = store.get({ instrument: unit.instrument, item: item.key, revision: item.revision });
   const answered = record?.status === "answered";
   const progress = walker.sectionProgress(index);
@@ -135,7 +156,7 @@ export function SurveyScreen(props: SurveyScreenProps) {
   // A visible format error blocks advancing whatever the requirement level:
   // nobody should be able to move past a field the screen is calling wrong,
   // and no earlier valid value should be carried forward behind an error.
-  const draftBlocked = draft !== null && !draft.ok;
+  const draftBlocked = (draft !== null && !draft.ok) || inconsistency !== null;
   // Once a control reports on itself, what is on screen is the truth — not what
   // happens to be in the store. So a complete draft counts as answered before
   // the autosave debounce fires (nobody waits on a disabled button after typing
@@ -147,7 +168,20 @@ export function SurveyScreen(props: SurveyScreenProps) {
     (!draftBlocked && (item.required === "hard" ? satisfied : true));
 
   const handleAnswer = (value: AnswerValue, autoAdvance: boolean) => {
+    // An answer that contradicts an earlier one is still recorded — it is what
+    // the participant said, and the raw log is never edited. But the screen
+    // says so and holds here, because right now they can tell us which of the
+    // two is right; after the session, nobody can.
+    const conflict = checkConsistency(item, value, scale, store);
+    setInconsistency(conflict);
     props.onRecord(unit, value);
+    if (conflict) {
+      props.onEvent("response.inconsistent", {
+        with: item.crossChecks?.[0]?.against,
+        kind: item.crossChecks?.[0]?.kind,
+      });
+      return; // never auto-advance past a contradiction
+    }
     if (autoAdvance) {
       if (advanceTimer.current) clearTimeout(advanceTimer.current);
       advanceTimer.current = setTimeout(() => props.onAdvance(index, "next"), 300);
@@ -280,6 +314,12 @@ export function SurveyScreen(props: SurveyScreenProps) {
         <FormFieldsControl key={`ff-${unitKey}`} {...controlProps} />
         <RankGroupControl key={`rg-${unitKey}`} {...controlProps} />
         <CheckboxSetControl key={`cb-${unitKey}`} {...controlProps} />
+
+        {inconsistency && (
+          <p className="error inconsistency" role="alert">
+            {inconsistency}
+          </p>
+        )}
 
         {/* Context and help: opened by the participant, or offered after a long
             pause. Rendered inside the body so nothing below it moves. */}

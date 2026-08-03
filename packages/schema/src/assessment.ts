@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { dottedKey, instrumentRef, semver, sha256, slug, ulid, variableName } from "./identifiers.js";
 import { logicExpr } from "./logic.js";
+import { displayText } from "./item.js";
 
 /**
  * Draft assessment composition -> immutable release manifest.
@@ -106,27 +107,58 @@ export const assessmentDraft = z.object({
       confirmSkip: z.boolean().default(true),
       /** Consecutive skips after which a check-in screen is shown. */
       skipRunCheckIn: z.number().int().min(2).default(3),
-      /** Seconds on one item before help is quietly offered. */
-      dwellHintSeconds: z.number().int().min(5).default(30),
       /**
-       * Below this many seconds on screen, an answer is faster than the item
-       * could plausibly have been read. The response is still recorded — it is
-       * the participant's answer and the raw data is never edited — but it is
-       * flagged in the paradata so data quality can be judged afterwards.
+       * Floor, in seconds, before help is quietly offered on an item. The
+       * actual wait scales with how much the screen asks people to read and
+       * weigh, so a two-word question does not sit there for the same time as
+       * a page of consent statements.
        */
-      tooFastSeconds: z.number().min(0).default(2),
+      dwellHintSeconds: z.number().int().min(5).default(20),
+      /**
+       * Reading speed used to scale the dwell wait. Set near real silent
+       * reading speed for this age group (~3 words a second), then multiplied
+       * by the allowance below — someone is only "stuck" once they have had
+       * time to read the thing several times over.
+       */
+      dwellWordsPerSecond: z.number().positive().default(3),
+      /** How many times over the reading time counts as stuck rather than thinking. */
+      dwellReadingMultiple: z.number().positive().default(3),
+      /** Upper bound, so a long screen never waits absurdly long to offer help. */
+      dwellMaxSeconds: z.number().int().positive().default(90),
+      /**
+       * Floor for the too-fast threshold, in seconds. Applies to the shortest
+       * items, where there is barely anything to read: a one-word question
+       * genuinely can be answered in a moment, and flagging that is noise.
+       */
+      tooFastSeconds: z.number().min(0).default(0.8),
+      /**
+       * Reading speed used to scale the threshold to how much the item
+       * actually says. Deliberately far above real reading speed (~3-4 words
+       * a second for this age group): the flag is for speeds that are not
+       * reading at all, not for people who read briskly. A fifty-word consent
+       * statement answered in under six seconds was not read; a four-word
+       * battery item answered in one second may well have been.
+       */
+      tooFastWordsPerSecond: z.number().positive().default(8),
+      /** Upper bound, so a very long screen cannot demand an absurd minimum. */
+      tooFastMaxSeconds: z.number().positive().default(6),
       /**
        * Consecutive too-fast answers after which the participant is asked, once
        * and without accusation, whether they want to slow down. 0 disables.
        */
-      tooFastRunPrompt: z.number().int().min(0).default(3),
+      tooFastRunPrompt: z.number().int().min(0).default(5),
     })
     .default({
       confirmSkip: true,
       skipRunCheckIn: 3,
-      dwellHintSeconds: 30,
-      tooFastSeconds: 2,
-      tooFastRunPrompt: 3,
+      dwellHintSeconds: 20,
+      dwellWordsPerSecond: 3,
+      dwellReadingMultiple: 3,
+      dwellMaxSeconds: 90,
+      tooFastSeconds: 0.8,
+      tooFastWordsPerSecond: 8,
+      tooFastMaxSeconds: 6,
+      tooFastRunPrompt: 5,
     }),
   offline: z.object({
     surveyOfflineCapable: z.literal(true), // conventional content MUST work offline
@@ -137,7 +169,13 @@ export const assessmentDraft = z.object({
     slug,
     z.object({
       kind: z.enum(["consent", "assent", "information", "transition", "finish"]),
-      body: z.string().min(1),
+      /** Heading, where the screen has one distinct from its body. */
+      title: displayText.optional(),
+      /**
+       * Piped like any other participant-facing text, so a name given at the
+       * start can be used at the end without being asked for again.
+       */
+      body: displayText,
     }),
   ),
   notes: z.string().optional(),
@@ -218,6 +256,9 @@ export const responseEvent = z.object({
     // without any of it being derived at capture time.
     "item.left",
     "response.too_fast",
+    /** Answer contradicted an earlier one; recorded, flagged, and reconciled
+     *  on screen rather than left for the analyst to find (D-25). */
+    "response.inconsistent",
     "effort.pace_prompt_shown",
     "session.suspended",
     "session.resumed",
