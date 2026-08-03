@@ -1,4 +1,4 @@
-import type { ResponseScale } from "@myself/schema";
+import type { ResponseScale, ScaleOption } from "@myself/schema";
 import { opt, opts } from "./util.js";
 
 /**
@@ -133,6 +133,8 @@ export const month12: ResponseScale = {
   ].map((label, i) => ({
     code: i + 1,
     label,
+    // The month number, so the choice can be checked against a date of birth.
+    value: i + 1,
     kind: "substantive" as const,
     textEntry: false,
   })),
@@ -333,16 +335,37 @@ export const smPlatforms: ResponseScale = {
   ],
 };
 
-/** Per-sitting time bands (TimeSpent columns; boundary overlaps preserved — A-36/C2 pending future wave). */
+/**
+ * Per-sitting time bands.
+ *
+ * The administered labels overlapped at every boundary — "1–15 minutes" and
+ * "15–30 minutes" both claimed 15, "30–60 minutes" and "1–2 hours" both
+ * claimed an hour — so a participant at a boundary had no way to know which
+ * box was theirs, and two people with identical use could land in different
+ * bands (A-36, resolved in D-27). Bands are now disjoint and exhaustive.
+ * Codes and legacy codes are untouched: only the labels are clearer.
+ *
+ * "0 minutes" is also gone. This question is only asked about platforms the
+ * participant has already said they use, so zero was a contradiction; the
+ * option now says what it was presumably there to capture.
+ */
 export const smSittingTime6: ResponseScale = {
   key: "scale.sm_sitting_time_6pt",
-  version: "1.0.0",
-  name: "Time per sitting (6 bands, as administered)",
+  version: "2.0.0",
+  name: "Time per sitting on a platform (6 bands, disjoint)",
   direction: "ascending",
-  options: opts(["0 minutes", "1–15 minutes", "15–30 minutes", "30–60 minutes", "1–2 hours", "More than 2 hours"]),
+  scoringNote:
+    "Bands are disjoint and exhaustive (D-27). Code 1 is 'have it but barely use it' rather than a literal zero — it was administered as '0 minutes' on a question only asked of users of the platform.",
+  options: [
+    opt(1, "I have it but barely use it", 1),
+    opt(2, "Up to 15 minutes", 2),
+    opt(3, "16 to 30 minutes", 3),
+    opt(4, "31 to 60 minutes", 4),
+    opt(5, "More than 1 hour, up to 2 hours", 5),
+    opt(6, "More than 2 hours", 6),
+  ],
 };
 
-/** Reasons for social-media use; legacy 1,4-13 (A-15). */
 export const smFunctions11: ResponseScale = {
   key: "scale.sm_functions_11",
   version: "1.0.0",
@@ -389,7 +412,7 @@ export const nightChecks4: ResponseScale = {
   version: "1.0.0",
   name: "Night-time social-media checks",
   direction: "ascending",
-  options: [opt(1, "Never", 1), opt(2, "1-2 times", 4), opt(3, "3-5 times", 5), opt(4, "More than 5 times", 6)],
+  options: [opt(1, "Never", 1), opt(2, "1 or 2 times", 4), opt(3, "3 to 5 times", 5), opt(4, "More than 5 times", 6)],
 };
 
 /** Morning check latency; legacy 1,4,5,6,7 (first label "<5 minutes" — A-14 resolved). */
@@ -400,28 +423,34 @@ export const morningLatency5: ResponseScale = {
   direction: "ascending",
   options: [
     opt(1, "<5 minutes", 1),
-    opt(2, "5-10 minutes", 4),
-    opt(3, "11-30 minutes", 5),
-    opt(4, "31-60 minutes", 6),
+    opt(2, "5 to 10 minutes", 4),
+    opt(3, "11 to 30 minutes", 5),
+    opt(4, "31 to 60 minutes", 6),
     opt(5, "More than 60 minutes", 7),
   ],
 };
 
-/** Daily social-media time; legacy 1,4-11 (shared by school-day and non-school-day items). */
+/**
+ * Daily social-media time. The administered bands shared every boundary
+ * ("30 minutes–1 hour" and "1–2 hours" both claimed an hour), so each upper
+ * bound is now explicitly exclusive (A-36 / D-27). Legacy codes 1, 4-11 are
+ * preserved exactly — this is a labelling fix, not a recoding.
+ */
 export const smDailyTime9: ResponseScale = {
   key: "scale.sm_daily_time_9pt",
-  version: "1.0.0",
-  name: "Daily social-media time (9 bands)",
+  version: "2.0.0",
+  name: "Daily social-media time (9 bands, disjoint)",
   direction: "ascending",
+  scoringNote: "Bands are disjoint and exhaustive (D-27); code and legacyCode pairs are unchanged from 1.0.0.",
   options: [
     opt(1, "Less than 30 minutes", 1),
-    opt(2, "30 minutes–1 hour", 4),
-    opt(3, "1–2 hours", 5),
-    opt(4, "2–3 hours", 6),
-    opt(5, "3–4 hours", 7),
-    opt(6, "4–5 hours", 8),
-    opt(7, "5–6 hours", 9),
-    opt(8, "6–7 hours", 10),
+    opt(2, "30 minutes to just under 1 hour", 4),
+    opt(3, "1 hour to just under 2 hours", 5),
+    opt(4, "2 hours to just under 3 hours", 6),
+    opt(5, "3 hours to just under 4 hours", 7),
+    opt(6, "4 hours to just under 5 hours", 8),
+    opt(7, "5 hours to just under 6 hours", 9),
+    opt(8, "6 hours to just under 7 hours", 10),
     opt(9, "7 hours or more", 11),
   ],
 };
@@ -429,26 +458,32 @@ export const smDailyTime9: ResponseScale = {
 /** Weekly gaming hours; legacy 1,4-8; band gap 5-6 preserved (A-9, C3). */
 export const gamingHours6: ResponseScale = {
   key: "scale.gaming_hours_6pt",
-  version: "1.0.0",
-  name: "Weekly gaming hours (6 bands, as administered)",
+  version: "2.0.0",
+  name: "Weekly gaming hours (6 bands, contiguous)",
   direction: "ascending",
+  scoringNote:
+    "The administered bands left 5-6 hours in no band at all (A-9): 'Less than 5' then '6-10'. Someone playing five and a half hours had nowhere to put themselves. Bands are now contiguous (D-27); codes and legacy codes are unchanged.",
   options: [
     opt(1, "I do not play video games", 1),
     opt(2, "Less than 5 hours", 4),
-    opt(3, "6-10 hours", 5),
-    opt(4, "11-15 hours", 6),
-    opt(5, "16-20 hours", 7),
+    opt(3, "5 to 10 hours", 5),
+    opt(4, "11 to 15 hours", 6),
+    opt(5, "16 to 20 hours", 7),
     opt(6, "More than 20 hours", 8),
   ],
 };
 
-/** Per-game weekly hours (no zero band by design — a listed game is played). */
+/**
+ * Per-game weekly hours (no zero band by design — a listed game is played).
+ * Same gap closed as the weekly total above (A-9 / D-27).
+ */
 export const gameHours5: ResponseScale = {
   key: "scale.game_hours_5pt",
-  version: "1.0.0",
-  name: "Per-game weekly hours (5 bands)",
+  version: "2.0.0",
+  name: "Per-game weekly hours (5 bands, contiguous)",
   direction: "ascending",
-  options: opts(["Less than 5 hours", "6-10 hours", "11-15 hours", "16-20 hours", "More than 20 hours"]),
+  scoringNote: "Bands are contiguous (D-27); codes are unchanged from 1.0.0.",
+  options: opts(["Less than 5 hours", "5 to 10 hours", "11 to 15 hours", "16 to 20 hours", "More than 20 hours"]),
 };
 
 /**
@@ -489,24 +524,39 @@ const smLegacy: (number | undefined)[] = [
   13, undefined, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33,
 ];
 
+/**
+ * The age each option denotes, so an option older than the participant can be
+ * withheld (D-25). "Younger than 5" denotes 4 — the oldest age it covers, so
+ * it survives the filter for anyone it could apply to. The "not sure" escape
+ * denotes nothing and is never filtered.
+ */
+const ageValue = (label: string): number => (label === "Younger than 5" ? 4 : Number(label));
+
+const ageOptions = (legacy: (number | undefined)[]): ScaleOption[] =>
+  ageLabels.map((label, i) => ({ ...opt(i + 1, label, legacy[i]), value: ageValue(label) }));
+
 export const ageAdoptionSmartphone: ResponseScale = {
   key: "scale.age_adoption_smartphone",
-  version: "1.0.0",
+  version: "2.0.0",
   name: "Age of first smartphone (canonical ordinal; legacy Qualtrics codes preserved)",
   direction: "ascending",
+  scoringNote:
+    "Each option carries the age it denotes in `value`; presentation may withhold ages above the participant's own (D-25). Codes and legacy codes are unaffected by that filtering.",
   options: [
-    ...ageLabels.map((label, i) => opt(i + 1, label, smartphoneLegacy[i])),
+    ...ageOptions(smartphoneLegacy),
     opt(99, "I’m not sure / I can’t remember", 10, "dont_know"),
   ],
 };
 
 export const ageAdoptionSocialMedia: ResponseScale = {
   key: "scale.age_adoption_sm",
-  version: "1.0.0",
+  version: "2.0.0",
   name: "Age of first social-media use (canonical ordinal; legacy Qualtrics codes preserved)",
   direction: "ascending",
+  scoringNote:
+    "Each option carries the age it denotes in `value`; presentation may withhold ages above the participant's own (D-25). Codes and legacy codes are unaffected by that filtering.",
   options: [
-    ...ageLabels.map((label, i) => opt(i + 1, label, smLegacy[i])),
+    ...ageOptions(smLegacy),
     opt(99, "I’m not sure / I can’t remember", 9, "dont_know"),
   ],
 };

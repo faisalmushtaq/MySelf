@@ -63,6 +63,13 @@ export const pipeRef = z.object({
   /** e.g. session start date + N days (YBM consent withdrawal deadline). */
   offsetDays: z.number().int().optional(),
   field: z.enum(["session_start_date", "participant_code", "study_name"]).optional(),
+  /**
+   * Text to use when the pipe cannot be resolved — the answer was skipped,
+   * lost, or not reached. Without one, a participant sees the raw placeholder,
+   * which is worse than saying nothing. Write the surrounding sentence so it
+   * reads naturally with the fallback in place.
+   */
+  fallback: z.string().optional(),
 });
 
 export type PipeRef = z.infer<typeof pipeRef>;

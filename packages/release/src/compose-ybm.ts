@@ -16,10 +16,21 @@ import type { assessmentDraft } from "@myself/schema";
 export type AssessmentDraftInput = z.input<typeof assessmentDraft>;
 
 const en = { language: "en-GB", informant: "self", readingLevel: "standard" } as const;
-const smUseYes = {
+/**
+ * Everything about social media hangs off this one answer, so it is worth
+ * getting right. "No" to `sm_use` triggers a confirmation with examples
+ * (D-26); the section shows if *either* answer is yes, and a considered "no"
+ * means no app questions at all.
+ */
+const yesTo = (item: string) => ({
   op: "selected" as const,
-  target: { item: { instrument: "ybm_smartphone", item: "sm_use", revision: 1 } },
+  target: { item: { instrument: "ybm_smartphone", item, revision: 1 } },
   code: 1,
+});
+
+const usesSocialMedia = {
+  op: "any" as const,
+  args: [yesTo("sm_use"), yesTo("sm_use_confirm")],
 };
 
 export const ybmComposition: AssessmentDraftInput = {
@@ -53,15 +64,41 @@ export const ybmComposition: AssessmentDraftInput = {
   effort: {
     confirmSkip: true,
     skipRunCheckIn: 3,
-    dwellHintSeconds: 30,
-    tooFastSeconds: 2,
-    tooFastRunPrompt: 3,
+    // Help is offered once someone has had time to read the screen three times
+    // over, floored and capped (D-26) — a flat wait is far too long on a
+    // two-word question and interrupts a careful reader on a long one.
+    dwellHintSeconds: 20,
+    dwellWordsPerSecond: 3,
+    dwellReadingMultiple: 3,
+    dwellMaxSeconds: 90,
+    // The too-fast threshold scales with how much each screen asks people to
+    // read, floored and capped (D-25). A flat two seconds flagged legitimate
+    // quick answers to short battery items and buried the real cases.
+    tooFastSeconds: 0.8,
+    tooFastWordsPerSecond: 8,
+    tooFastMaxSeconds: 6,
+    tooFastRunPrompt: 5,
   },
   offline: { surveyOfflineCapable: true },
   screens: {
+    // The name given at the very start comes back at the very end, so the
+    // last thing a participant reads is addressed to them (D-26). The pipe
+    // carries a fallback, so a lost or skipped name reads naturally too.
     finish: {
       kind: "finish",
-      body: "That's everything — thank you for taking part in the Yorkshire Brain Map study! Please hand the iPad back to the researcher.",
+      title: {
+        text: "Thank you, {first_name}!",
+        pipes: {
+          first_name: {
+            kind: "item_text_entry",
+            item: { instrument: "ybm_identity", item: "first_name", revision: 1 },
+            fallback: "and well done",
+          },
+        },
+      },
+      body: {
+        text: "That's everything — thanks for taking part in the Yorkshire Brain Map study. Please hand the iPad back to the researcher.",
+      },
     },
   },
   sections: [
@@ -117,7 +154,7 @@ export const ybmComposition: AssessmentDraftInput = {
     {
       key: "social_media",
       title: "Your social media",
-      displayIf: smUseYes,
+      displayIf: usesSocialMedia,
       components: [
         { kind: "module", ref: { instrument: "ybm_social_media", version: "1.0", ...en } },
         { kind: "module", ref: { instrument: "ybm_screen_attitudes", version: "1.0", ...en } },

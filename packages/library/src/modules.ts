@@ -25,7 +25,9 @@ const single = (
     key,
     revision: 1,
     variable,
-    legacyVariable,
+    // Items with no Qualtrics ancestor carry no legacy tag at all, rather than
+    // an empty one that would look like a crosswalk entry.
+    ...(legacyVariable ? { legacyVariable } : {}),
     stem: { text },
     scale,
     scaleVersion: "1.0.0",
@@ -199,6 +201,24 @@ export const ybmIdentity: ModuleInput = {
           maxChars: 100,
           researcherNote: "Direct identifier — identity-schema routed (D-09).",
         },
+        {
+          responseType: "date",
+          key: "dob",
+          revision: 1,
+          variable: "dob",
+          legacyVariable: "DoB ",
+          required: "hard",
+          stem: { text: "Date of Birth (dd/mm/yyyy)" },
+          minYear: 1990,
+          maxYear: 2026,
+          // Plausibility only — a mistyped year is caught, an unusual but real
+          // date is not blocked (D-19).
+          minAgeYears: 4,
+          maxAgeYears: 100,
+          researcherNote:
+            "Direct identifier — identity-schema routed (D-09). Legacy tag carries a trailing space. " +
+            "Asked immediately after the name and before the secret code (D-25): the code's month component is cross-checked against it, and the age derived from it limits the age-of-first-device options later.",
+        },
         // The secret code is built one piece at a time. Four short screens beat
         // one dense form: each piece gets its own instruction and its own
         // validation, and nobody has to hold four rules in their head at once.
@@ -248,11 +268,21 @@ export const ybmIdentity: ModuleInput = {
           variable: "ps_birth_month",
           required: "hard",
           stem: { text: "The month you were born" },
-          lede: { text: "Just the month — you'll be asked for the full date in a moment." },
+          lede: { text: "This is part of your code, so it needs to match the date of birth you gave a moment ago." },
           scale: "scale.month_12",
           scaleVersion: "1.0.0",
           presentation: "compact",
-          researcherNote: "Secret-code component 3 of 4. Chosen from a list rather than typed (D-23).",
+          // Asked twice, so it must agree with itself. Caught here, while the
+          // participant can still say which one is right (D-25).
+          crossChecks: [
+            {
+              kind: "matches_month_of_date",
+              against: { instrument: "ybm_identity", item: "dob", revision: 1 },
+              message: "That's not the month in the date of birth you gave. Check which one is right — you can use Back to change the date.",
+            },
+          ],
+          researcherNote:
+            "Secret-code component 3 of 4. Chosen from a list rather than typed, and cross-checked against dob so the derived ps_id cannot disagree with the recorded date of birth (D-23/D-25).",
         },
         {
           responseType: "text_short",
@@ -266,22 +296,6 @@ export const ybmIdentity: ModuleInput = {
           pattern: "^[A-Za-z]{2}$",
           patternHint: "Two letters, for example CD",
           researcherNote: "Secret-code component 4 of 4 — identity-schema routed (D-09/D-23).",
-        },
-        {
-          responseType: "date",
-          key: "dob",
-          revision: 1,
-          variable: "dob",
-          legacyVariable: "DoB ",
-          required: "hard",
-          stem: { text: "Date of Birth (dd/mm/yyyy)" },
-          minYear: 1990,
-          maxYear: 2026,
-          // Plausibility only — a mistyped year is caught, an unusual but real
-          // date is not blocked (D-19).
-          minAgeYears: 4,
-          maxAgeYears: 100,
-          researcherNote: "Direct identifier — identity-schema routed (D-09). Legacy tag carries a trailing space.",
         },
       ],
     },
@@ -440,6 +454,9 @@ export const ybmSmartphone: ModuleInput = {
           "scale.age_adoption_smartphone",
           {
             presentation: "compact",
+            // Nobody can have got their first phone at an age they have not
+            // reached: ages above the participant's own are not offered (D-25).
+            limitOptions: { kind: "at_most_age_now", from: { instrument: "ybm_identity", item: "dob", revision: 1 } },
             displayIf: {
               op: "selected",
               target: { item: { instrument: "ybm_smartphone", item: "own", revision: 1 } },
@@ -447,7 +464,34 @@ export const ybmSmartphone: ModuleInput = {
             },
           },
         ),
-        single("sm_use", "sm_use", "SM_Own", "Do you currently use social media?", "scale.yes_no"),
+        single("sm_use", "sm_use", "SM_Own", "Do you currently use social media?", "scale.yes_no", {
+          lede: {
+            text: "We mean apps where you can see or share things other people have posted — even if you mostly just watch.",
+          },
+        }),
+        // "No" is often a misunderstanding rather than an answer: people say it
+        // when they only watch, or when they don't think YouTube or WhatsApp
+        // count. Ask once more with examples, then take the answer as given —
+        // and honour it, because the whole section hangs off it (D-26).
+        single(
+          "sm_use_confirm",
+          "sm_use_confirm",
+          "",
+          "Just to check — do you use any of these?",
+          "scale.yes_no",
+          {
+            lede: {
+              text: "TikTok · Instagram · Snapchat · YouTube · WhatsApp · Discord · Reddit · X (Twitter) · Twitch · BeReal · Facebook · Pinterest\n\nWatching or reading without posting still counts. Messaging apps you use to keep up with friends count too.",
+            },
+            displayIf: {
+              op: "selected",
+              target: { item: { instrument: "ybm_smartphone", item: "sm_use", revision: 1 } },
+              code: 2,
+            },
+            researcherNote:
+              "Confirmation step for a 'No' to sm_use (D-26). Recorded separately from sm_use — the original answer is never overwritten — and the social-media section shows if EITHER says yes. A 'No' here is taken at face value and no app questions follow.",
+          },
+        ),
         single(
           "age_sm",
           "sm_age",
@@ -456,7 +500,20 @@ export const ybmSmartphone: ModuleInput = {
           "scale.age_adoption_sm",
           {
             presentation: "compact",
-            displayIf: { op: "selected", target: { item: smUseRef }, code: 1 },
+            limitOptions: { kind: "at_most_age_now", from: { instrument: "ybm_identity", item: "dob", revision: 1 } },
+            // Either route into social media qualifies: someone who said no
+            // and then recognised the apps still gets asked when they started.
+            displayIf: {
+              op: "any",
+              args: [
+                { op: "selected", target: { item: smUseRef }, code: 1 },
+                {
+                  op: "selected",
+                  target: { item: { instrument: "ybm_smartphone", item: "sm_use_confirm", revision: 1 } },
+                  code: 1,
+                },
+              ],
+            },
           },
         ),
       ],

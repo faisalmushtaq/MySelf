@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { AnswerStore, Walker } from "@myself/engine";
 import { releaseManifest } from "@myself/schema";
-import rawManifest from "../../../releases/ybm_nd2026_standard_r4.0.0.manifest.json";
+import rawManifest from "../../../releases/ybm_nd2026_standard_r5.0.0.manifest.json";
 import { flattenManifest, reminderOf } from "./lib/flatten.js";
 import { resolveText } from "./lib/pipes.js";
 
@@ -92,6 +92,55 @@ describe("manifest flattening", () => {
     }
   });
 
+  it("asks for the date of birth before anything that depends on it", () => {
+    const at = (key: string) => flattened.units.findIndex((u) => u.item.key === key);
+    // Name, then date of birth, then the code that is checked against it.
+    expect(at("last_name")).toBeLessThan(at("dob"));
+    expect(at("dob")).toBeLessThan(at("secret_code_intro"));
+    expect(at("dob")).toBeLessThan(at("ps_birth_month"));
+    // and before the age-limited questions much later in the survey
+    expect(at("dob")).toBeLessThan(at("age_smartphone"));
+    expect(at("dob")).toBeLessThan(at("age_sm"));
+  });
+
+  it("cross-checks the code's month against the recorded date of birth", () => {
+    const month = flattened.units.find((u) => u.item.key === "ps_birth_month")?.item;
+    const check = month?.crossChecks?.[0];
+    expect(check?.kind).toBe("matches_month_of_date");
+    expect(check?.against).toEqual({ instrument: "ybm_identity", item: "dob", revision: 1 });
+    expect(check?.message).toBeTruthy();
+    // the check is only meaningful if the options carry the month number
+    const scale = manifest.scales["scale.month_12"] as { options: { value?: number }[] };
+    expect(scale.options.map((o) => o.value)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
+  });
+
+  it("limits the age-of-first-device options to ages the participant has reached", () => {
+    for (const key of ["age_smartphone", "age_sm"]) {
+      const item = flattened.units.find((u) => u.item.key === key)?.item;
+      expect(item?.responseType).toBe("single_choice");
+      if (item?.responseType !== "single_choice") continue;
+      expect(item.limitOptions).toEqual({
+        kind: "at_most_age_now",
+        from: { instrument: "ybm_identity", item: "dob", revision: 1 },
+      });
+      // every substantive option must declare the age it denotes, or the rule
+      // would silently keep options it cannot evaluate
+      const scale = manifest.scales[item.scale] as {
+        options: { label: string; value?: number; kind: string }[];
+      };
+      for (const o of scale.options) {
+        if (o.kind === "substantive") expect(o.value, `${item.scale} / ${o.label}`).toBeTypeOf("number");
+      }
+    }
+  });
+
+  it("scales the too-fast threshold instead of holding every screen to one clock", () => {
+    const e = manifest.composition.effort;
+    expect(e.tooFastSeconds).toBeLessThan(2); // a short item is not given two seconds
+    expect(e.tooFastWordsPerSecond).toBeGreaterThan(4); // well above real reading speed
+    expect(e.tooFastMaxSeconds).toBeGreaterThan(e.tooFastSeconds);
+  });
+
   it("puts each ladder on one screen with its explanation, and no page of narration first", () => {
     const ladders = flattened.units.filter((u) => u.item.responseType === "ladder");
     expect(ladders).toHaveLength(2);
@@ -134,6 +183,76 @@ describe("manifest flattening", () => {
     // A title, then the body — not one undifferentiated block of prose.
     expect(intro?.item.stem.text).toBe("Yorkshire Brain Map School Workshop");
     expect(intro?.item.lede?.text).toMatch(/Thank you for taking part/);
+  });
+
+
+  it("confirms a 'no' to social media before dropping the whole section", () => {
+    const at = (key: string) => flattened.units.findIndex((u) => u.item.key === key);
+    // "No" is often a misunderstanding — people say it when they only watch,
+    // or when they don't think YouTube or WhatsApp count.
+    const confirm = flattened.units.find((u) => u.item.key === "sm_use_confirm");
+    expect(confirm).toBeDefined();
+    expect(confirm!.item.lede?.text).toMatch(/TikTok/);
+    expect(at("sm_use")).toBeLessThan(at("sm_use_confirm"));
+    // and it is only asked of people who said no
+    expect(confirm!.item.displayIf).toMatchObject({ op: "selected", code: 2 });
+  });
+
+  it("asks nothing about apps when someone means their 'no'", () => {
+    const store = new AnswerStore();
+    const no = { status: "answered" as const, value: { kind: "choice" as const, code: 2 } };
+    store.set({ instrument: "ybm_smartphone", item: "sm_use", revision: 1 }, no);
+    store.set({ instrument: "ybm_smartphone", item: "sm_use_confirm", revision: 1 }, no);
+    store.set({ instrument: "ybm_smartphone", item: "own", revision: 1 }, no);
+    const visible = new Walker(flattened.units, store, true)
+      .visibleUnits()
+      .map((i) => flattened.units[i]!.instrument);
+    expect(visible).not.toContain("ybm_social_media");
+    expect(visible).not.toContain("ybm_screen_attitudes");
+    expect(visible).not.toContain("doomscroll4");
+  });
+
+  it("asks about apps when the confirmation changes the answer", () => {
+    const store = new AnswerStore();
+    store.set(
+      { instrument: "ybm_smartphone", item: "sm_use", revision: 1 },
+      { status: "answered", value: { kind: "choice", code: 2 } }, // "no"
+    );
+    store.set(
+      { instrument: "ybm_smartphone", item: "sm_use_confirm", revision: 1 },
+      { status: "answered", value: { kind: "choice", code: 1 } }, // "…oh, those count"
+    );
+    const visible = new Walker(flattened.units, store, true)
+      .visibleUnits()
+      .map((i) => flattened.units[i]!.instrument);
+    expect(visible).toContain("ybm_social_media");
+    expect(visible).toContain("doomscroll4");
+  });
+
+  it("greets the participant by the name they gave at the start", () => {
+    const finish = manifest.composition.screens["finish"];
+    expect(finish?.title?.text).toContain("{first_name}");
+    const pipe = finish?.title?.pipes?.["first_name"];
+    expect(pipe?.item).toEqual({ instrument: "ybm_identity", item: "first_name", revision: 1 });
+    // and reads naturally when there is no name to use
+    expect(pipe?.fallback).toBeTruthy();
+
+    const store = new AnswerStore();
+    store.set(
+      { instrument: "ybm_identity", item: "first_name", revision: 1 },
+      { status: "answered", value: { kind: "text", value: "Faisal" } },
+    );
+    expect(resolveText(finish!.title!.text, finish!.title!.pipes, store, new Date())).toBe("Thank you, Faisal!");
+    expect(resolveText(finish!.title!.text, finish!.title!.pipes, new AnswerStore(), new Date())).toBe(
+      "Thank you, and well done!",
+    );
+  });
+
+  it("waits longer before offering help on a longer question", () => {
+    const e = manifest.composition.effort;
+    expect(e.dwellWordsPerSecond).toBeGreaterThan(0);
+    expect(e.dwellReadingMultiple).toBeGreaterThanOrEqual(2);
+    expect(e.dwellMaxSeconds).toBeGreaterThan(e.dwellHintSeconds);
   });
 
   it("resolves the consent withdrawal-date pipe from the session start", () => {

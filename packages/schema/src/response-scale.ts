@@ -34,6 +34,14 @@ export const scaleOption = z.object({
    * choose by looking at the picture, not by decoding a classification.
    */
   codeLabel: z.string().optional(),
+  /**
+   * The quantity the option denotes, where it denotes one — the age for "13",
+   * 4 for "Younger than 5". Distinct from `code`, which is an arbitrary
+   * identifier: two scales can code the same age differently, but the age is
+   * the age. Options that denote no quantity ("I'm not sure") leave it unset
+   * and are never filtered by a quantity rule.
+   */
+  value: z.number().optional(),
 });
 
 export const responseScale = z.object({

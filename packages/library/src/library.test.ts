@@ -79,6 +79,84 @@ describe("scales", () => {
     expect(platforms.options.find((o) => o.label === "Twitch")!.legacyCode).toBe(9);
   });
 
+  /**
+   * Boundaries. Someone at "exactly 2 hours" must have one box — not two, and
+   * not none. The administered scales had both faults: the social-media time
+   * bands overlapped at every boundary, and the gaming bands left a hole
+   * between 5 and 6 hours. Neither is visible unless you read the options as
+   * a set, which is what this does (A-9 / A-36, resolved in D-27).
+   */
+  describe("quantity bands are unambiguous", () => {
+    /**
+     * [lower, upper] in minutes, or null when the label states no quantity.
+     * The unit is taken from the label as a whole when a part omits it, so
+     * "5 to 10 hours" is 300-600 minutes rather than 5-600.
+     */
+    const parseBand = (label: string): [number, number] | null => {
+      if (!/\d/.test(label)) return null;
+      const labelUnit = /hour/i.test(label) ? 60 : 1;
+      const num = (part: string): number | null => {
+        const m = part.match(/(\d+(?:\.\d+)?)/);
+        if (!m) return null;
+        return Number(m[1]) * (/hour/i.test(part) ? 60 : /minute/i.test(part) ? 1 : labelUnit);
+      };
+      const parts = label.split(/\bto\b|\bor\b|,|–|—|-/).filter((x) => /\d/.test(x));
+      const values = parts.map(num).filter((n): n is number => n !== null);
+      if (values.length === 0) return null;
+
+      const openEnded = /(or more|more than|^over)/i.test(label);
+      const openStart = /^(less than|under|fewer than|up to|<)/i.test(label);
+      // "More than 1 hour, up to 2 hours" states both ends despite opening
+      // with "more than", so a second number wins over the open-ended form.
+      if (values.length >= 2) return [values[0]!, values[values.length - 1]!];
+      if (openStart) return [0, values[0]!];
+      if (openEnded) return [values[0]!, Infinity];
+      return [values[0]!, values[0]!];
+    };
+
+    const banded = [
+      "scale.sm_sitting_time_6pt",
+      "scale.sm_daily_time_9pt",
+      "scale.sm_morning_latency_5pt",
+      "scale.sm_night_checks_4pt",
+      "scale.gaming_hours_6pt",
+      "scale.game_hours_5pt",
+    ];
+
+    it.each(banded)("%s: no value falls in two bands, and none falls between them", (key) => {
+      const scale = parsedScales.find((s) => s.key === key)!;
+      const bands = scale.options
+        .filter((o) => o.kind === "substantive")
+        .map((o) => ({ label: o.label, band: parseBand(o.label) }))
+        .filter((b): b is { label: string; band: [number, number] } => b.band !== null);
+      expect(bands.length, `${key} has no parseable bands`).toBeGreaterThan(1);
+
+      for (let i = 1; i < bands.length; i++) {
+        const prev = bands[i - 1]!;
+        const cur = bands[i]!;
+        expect(
+          prev.band[1] <= cur.band[0],
+          `'${prev.label}' and '${cur.label}' both claim values around ${cur.band[0]} minutes`,
+        ).toBe(true);
+        // Bands may only be as coarse as the unit they are stated in: whole
+        // hours may leave whole-hour steps, minutes may leave minute steps.
+        // Anything wider is a range of answers with no box at all.
+        const step = /hour/i.test(cur.label) ? 60 : 1;
+        expect(
+          cur.band[0] - prev.band[1],
+          `nothing covers the range between '${prev.label}' and '${cur.label}'`,
+        ).toBeLessThanOrEqual(step);
+      }
+    });
+
+    it("offers no zero band on a question only asked of people who do the thing", () => {
+      // "0 minutes" for a platform the participant has just said they use is a
+      // contradiction, and tells us nothing we did not already know.
+      const sitting = parsedScales.find((s) => s.key === "scale.sm_sitting_time_6pt")!;
+      expect(sitting.options.map((o) => o.label)).not.toContain("0 minutes");
+    });
+  });
+
   it("direction metadata is present and deliberate on the reversed pair (A-18)", () => {
     expect(parsedScales.find((s) => s.key === "scale.agree_5pt_desc")!.direction).toBe("descending");
     expect(parsedScales.find((s) => s.key === "scale.doomscroll_7pt")!.direction).toBe("ascending");

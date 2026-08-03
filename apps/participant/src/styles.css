@@ -3,7 +3,7 @@
  *
  * Visual language inherited from the BrainPop lab site (editorial restraint,
  * generous whitespace, hairline borders, minimal motion) on a near-white
- * canvas with all-black text, set throughout in Newsreader.
+ * canvas with all-black text, set throughout in Inter.
  *
  * Interaction: one question per screen, large readable type, quiet chrome,
  * and controls that look like what they measure (a ladder you tap, hair
@@ -12,13 +12,14 @@
  * Design tokens mirror assets/css/style.css in brainpop-lab-website.
  */
 
-/* Newsreader throughout. Bundled, never fetched from a CDN — the app has to
-   look the same with no network at all. */
-@import "@fontsource/newsreader/300.css";
-@import "@fontsource/newsreader/400.css";
-@import "@fontsource/newsreader/500.css";
-@import "@fontsource/newsreader/600.css";
-@import "@fontsource/newsreader/700.css";
+/* Inter throughout — the neo-grotesque Typeform's interface is set in.
+   Bundled, never fetched from a CDN: the app has to look the same with no
+   network at all, in a school hall. */
+@import "@fontsource/inter/300.css";
+@import "@fontsource/inter/400.css";
+@import "@fontsource/inter/500.css";
+@import "@fontsource/inter/600.css";
+@import "@fontsource/inter/700.css";
 
 :root {
   --canvas: #fcfcfb;        /* near-white page */
@@ -34,9 +35,10 @@
   --warn: #a33b00;
 
   /*
-   * ONE typeface throughout — Newsreader: question stems, options, prose and
+   * ONE typeface throughout — Inter: question stems, options, prose and
    * numbers all share it, so nothing on screen changes voice mid-question.
-   * Size and weight carry hierarchy.
+   * Size and weight carry hierarchy. Question stems sit at 600 with slightly
+   * negative tracking, which is what gives the Typeform look its confidence.
    *
    * Both variables point at the same family deliberately. They are the single
    * switch point for an accessible/dyslexia-friendly face later: set
@@ -44,7 +46,7 @@
    * import) on :root, or scope it to a body class toggled per participant,
    * and every surface follows without touching component code.
    */
-  --font-ui: "Newsreader", Georgia, "Times New Roman", serif;
+  --font-ui: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-display: var(--font-ui);
   --font-body: var(--font-ui);
 
@@ -326,9 +328,11 @@ textarea {
 .stem {
   font-family: var(--font-ui);
   font-size: clamp(1.6rem, 4.4vw, 2.1rem);
-  font-weight: 500;
+  /* 600 with tight tracking: the weight is what makes a Typeform question
+     read as a statement rather than a form label. */
+  font-weight: 600;
   line-height: 1.25;
-  letter-spacing: -0.015em;
+  letter-spacing: -0.021em;
   margin: 0;
   max-width: var(--measure);
   color: var(--text);
@@ -339,8 +343,8 @@ textarea {
    serif. The type scale stays the same family and rhythm. */
 .stem-long {
   font-size: clamp(1.25rem, 3vw, 1.5rem);
-  font-weight: 500;
-  line-height: 1.45;
+  font-weight: 600;
+  line-height: 1.4;
   max-width: 46ch;
 }
 
@@ -600,6 +604,18 @@ textarea {
   font-size: 0.88rem;
   margin: 0.4rem 0 0;
   width: 100%;
+}
+
+/* A contradiction with an earlier answer needs more room than a format hint:
+   it asks the participant to go and reconcile two things, not retype one. */
+.inconsistency {
+  margin-top: 1.25rem;
+  padding: 0.9rem 1.1rem;
+  border-left: 3px solid var(--warn);
+  background: rgba(163, 59, 0, 0.05);
+  font-size: 1rem;
+  line-height: 1.55;
+  max-width: 46ch;
 }
 
 .text-wrap {

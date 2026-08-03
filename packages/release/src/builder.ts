@@ -41,6 +41,104 @@ export class PublishGateError extends Error {
 
 const BLOCKED_LICENCES = new Set(["permission_required", "blocked"]);
 
+/** Every item reference a logic expression depends on. */
+function logicTargets(expr: unknown, out: string[] = []): string[] {
+  if (!expr || typeof expr !== "object") return out;
+  const e = expr as Record<string, unknown>;
+  if (Array.isArray(e["args"])) for (const a of e["args"]) logicTargets(a, out);
+  if (e["arg"]) logicTargets(e["arg"], out);
+  const target = e["target"] as { item?: { instrument: string; item: string } } | undefined;
+  if (target?.item) out.push(`${target.item.instrument}.${target.item.item}`);
+  return out;
+}
+
+/**
+ * Dependency audit.
+ *
+ * A question that branches on an answer given later can never fire — the
+ * condition is evaluated against an empty answer, so the item silently
+ * disappears from every session and nobody notices until the data comes back
+ * short. The same goes for a cross-check against a question asked afterwards,
+ * or an age limit derived from a date of birth collected later.
+ *
+ * All of these are structural mistakes in the composition, not runtime
+ * problems, so they belong here: a release that contains one cannot be
+ * published at all.
+ */
+function auditDependencies(
+  draft: z.infer<typeof assessmentDraft>,
+  instruments: Registries["instruments"],
+  modules: Registries["modules"],
+): string[] {
+  const failures: string[] = [];
+  /** Item key -> position in the administered order. */
+  const position = new Map<string, number>();
+  /** Every dependency, with where it was declared and what it needs. */
+  const deps: { at: number; owner: string; needs: string; why: string }[] = [];
+  let n = 0;
+
+  for (const section of draft.sections) {
+    for (const component of section.components) {
+      if (component.kind === "narrative" || component.kind === "screen") continue;
+      const defs = component.kind === "instrument" ? instruments : modules;
+      const def = defs.find((d) => d.instrument === component.ref.instrument && d.version === component.ref.version);
+      const form = def?.forms.find(
+        (f) =>
+          f.language === component.ref.language &&
+          (f.variant ?? undefined) === (component.ref.variant ?? undefined) &&
+          f.readingLevel === component.ref.readingLevel &&
+          f.informant === component.ref.informant,
+      );
+      if (!form) continue; // already reported by the resolution checks above
+
+      for (const item of form.items) {
+        const key = `${component.ref.instrument}.${item.key}`;
+        position.set(key, n);
+        // A section- or component-level condition binds at the position of the
+        // first item it governs, which is where it is first evaluated.
+        for (const target of logicTargets(section.displayIf)) {
+          deps.push({ at: n, owner: key, needs: target, why: `section '${section.key}' condition` });
+        }
+        for (const target of logicTargets(component.displayIf)) {
+          deps.push({ at: n, owner: key, needs: target, why: "component condition" });
+        }
+        for (const target of logicTargets(item.displayIf)) {
+          deps.push({ at: n, owner: key, needs: target, why: "display condition" });
+        }
+        for (const check of item.crossChecks ?? []) {
+          deps.push({
+            at: n,
+            owner: key,
+            needs: `${check.against.instrument}.${check.against.item}`,
+            why: `cross-check '${check.kind}'`,
+          });
+        }
+        if (item.responseType === "single_choice" && item.limitOptions) {
+          deps.push({
+            at: n,
+            owner: key,
+            needs: `${item.limitOptions.from.instrument}.${item.limitOptions.from.item}`,
+            why: `option limit '${item.limitOptions.kind}'`,
+          });
+        }
+        n += 1;
+      }
+    }
+  }
+
+  for (const dep of deps) {
+    const target = position.get(dep.needs);
+    if (target === undefined) {
+      failures.push(`${dep.owner}: ${dep.why} refers to '${dep.needs}', which is not in this release`);
+    } else if (target >= dep.at) {
+      failures.push(
+        `${dep.owner}: ${dep.why} depends on '${dep.needs}', which is asked later (position ${target} vs ${dep.at})`,
+      );
+    }
+  }
+  return failures;
+}
+
 export function buildRelease(
   draftInput: z.input<typeof assessmentDraft>,
   registries: Registries,
@@ -136,6 +234,8 @@ export function buildRelease(
 
   const sectionKeys = draft.sections.map((s) => s.key);
   if (new Set(sectionKeys).size !== sectionKeys.length) failures.push("duplicate section keys");
+
+  failures.push(...auditDependencies(draft, instruments, modules));
 
   if (failures.length > 0) throw new PublishGateError(failures);
 
