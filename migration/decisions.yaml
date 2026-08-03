@@ -607,3 +607,62 @@ decisions:
       the append-only log.
       Released as r6.0.0. r5.0.0 stays in releases/ untouched — a published
       release is never edited or deleted, even when superseded within the day.
+
+  - id: D-32
+    topic: Handedness — the question, the midpoint, and where the drawing sits
+    decision: ask-outright-label-the-middle-centre-the-icon
+    detail: >
+      Researcher direction 2026-08-02. Consent is received, the BIS/BAS and
+      Doomscrolling subsets are confirmed as intended, and the EHI-SF canonical
+      anchor wording is confirmed — the "VERIFY before approval" flags on the
+      instrument and the scale are cleared. (The LQ cutoffs are still to be
+      checked when the scoring package computes them.)
+      (a) THE QUESTION IS ASKED. Stems were the bare task names the paper form
+      uses — "Writing", "Throwing" — which name the topic without asking
+      anything. Each now asks outright: "Which hand do you write with?".
+      Response options and codes are unchanged, so this is wording, not a
+      different measurement.
+      (b) THE MIDPOINT IS LABELLED. On narrow screens only the two ends were
+      named, leaving "Both equally" as an unlabelled dot between two labelled
+      extremes — which is exactly the answer least likely to be chosen by
+      someone who cannot see what it means. The middle anchor is now shown
+      alongside the ends. On wide screens all five labels were always visible.
+      (c) THE DRAWING IS CENTRED. The object illustration sat left-aligned,
+      directly above the leftmost option, on a question about which hand you
+      use. Whether or not it measurably biased anything, a picture sitting over
+      one end of a left-right scale is a nudge nobody intended, and centring it
+      costs nothing.
+      (d) THE HELP TEXT FOLLOWS. The hint used to be the question the stem now
+      asks, so it said nothing new. It now says what a participant actually
+      needs: think about what you would do without stopping to think, and using
+      either hand is a real answer rather than a failure to choose.
+
+  - id: D-33
+    topic: Telling participants something back
+    decision: score-pipes-and-handedness-feedback
+    detail: >
+      Researcher direction 2026-08-02: give something back as the survey goes
+      along, starting with handedness, to keep people engaged early.
+      Built as a general capability rather than a one-off. A new `score` pipe
+      resolves any scoring output for the current session — the value or its
+      band label — from the scoring definitions frozen into the release. The
+      same definitions the server recomputes from, so a screen and an export
+      can never disagree. Nothing is stored differently and no raw response is
+      touched: this is a read of answers already given, computed for display.
+      The EHI scoring definition gains a `classify` step turning the laterality
+      quotient into a band. Veale (2014) cutoffs are unchanged (left ≤ -60,
+      right ≥ +60); the mixed range is split further for participant-facing
+      wording only, and `lq` remains the analysed variable.
+      A feedback screen follows all four handedness items — never between them,
+      so it cannot influence any answer it is computed from. Both pipes carry
+      fallbacks, so a partial or missing answer set reads as "—" and
+      "mixed-handed" rather than showing a confident-looking number that isn't
+      one, or a raw placeholder.
+      Where this goes next: the same mechanism will serve sleep, wellbeing and
+      the rest. Those need more care than handedness — a wellbeing score read
+      back mid-survey could plausibly change later answers, and some of these
+      instruments are screening measures whose scores should not be presented
+      to a young person without a safeguarding path. Handedness is the one that
+      is genuinely safe to hand back immediately, which is why it is first and
+      alone for now.
+      Released as r6.0.0.

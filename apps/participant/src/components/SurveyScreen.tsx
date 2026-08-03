@@ -300,7 +300,13 @@ export function SurveyScreen(props: SurveyScreenProps) {
           </div>
         )}
         {item.illustration && (
-          <span className="stem-object">
+          <span
+            // On a left-to-right spectrum the drawing is centred over the
+            // axis. Left-aligned it sat directly above the leftmost option,
+            // which is a nudge towards "left" on a question about which hand
+            // you use (D-32).
+            className={`stem-object${item.responseType === "single_choice" && item.presentation === "spectrum" ? " centred" : ""}`}
+          >
             <Illustration token={item.illustration} />
           </span>
         )}

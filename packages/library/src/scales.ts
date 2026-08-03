@@ -195,7 +195,7 @@ export const ehiSf5Canonical: ResponseScale = {
   direction: "ascending",
   options: opts(["Always right", "Usually right", "Both equally", "Usually left", "Always left"]),
   scoringNote:
-    "Veale (2014) laterality quotient scoring; anchor wording to be verified against the published form before approval.",
+    "Veale (2014) laterality quotient scoring. Anchor wording confirmed by the researcher 2026-08-02 (D-32); the midpoint 'Both equally' is shown on every screen size.",
 };
 
 /** Administered YBM anchors (left-anchored, 5-point) — A-19. */

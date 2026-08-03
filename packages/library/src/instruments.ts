@@ -90,13 +90,29 @@ export const kss: InstrumentInput = {
 // Edinburgh Handedness Inventory - Short Form
 // ---------------------------------------------------------------------------
 
-/** [key, item text, legacy variable, object illustration, plain-language hint] */
-const ehiTasks: [string, string, string, string, string][] = [
-  ["writing", "Writing", "Handedness_1", "object:pen", "Which hand do you write with?"],
-  ["throwing", "Throwing", "Handedness_3", "object:ball", "Which hand do you throw a ball with?"],
-  ["toothbrush", "Toothbrush", "Handedness_5", "object:toothbrush", "Which hand do you hold your toothbrush in?"],
-  ["spoon", "Spoon", "Handedness_7", "object:spoon", "Which hand do you hold a spoon in?"],
+/**
+ * [key, question, legacy variable, object illustration]
+ *
+ * The stems were the bare task names the paper form uses — "Writing",
+ * "Throwing" — which say what the item is about without actually asking
+ * anything. Each now asks the question outright (D-32); the response options
+ * are unchanged, so this is wording, not a different measurement.
+ */
+const ehiTasks: [string, string, string, string][] = [
+  ["writing", "Which hand do you write with?", "Handedness_1", "object:pen"],
+  ["throwing", "Which hand do you throw a ball with?", "Handedness_3", "object:ball"],
+  ["toothbrush", "Which hand do you hold your toothbrush in?", "Handedness_5", "object:toothbrush"],
+  ["spoon", "Which hand do you hold a spoon in?", "Handedness_7", "object:spoon"],
 ];
+
+/**
+ * The help text now that the question is no longer vague. It says the thing a
+ * participant actually needs: this is about what you do, not what you were
+ * taught, and using either hand is a real answer rather than a failure to
+ * choose.
+ */
+const ehiHint =
+  "Think about what you'd do without stopping to think about it. If you really would use either hand, choose \"Both equally\".";
 
 /**
  * Handedness is answered spatially: the response options run left-to-right so
@@ -116,14 +132,43 @@ const ehiForm = (
   ...(variant ? { variant } : {}),
   label,
   instructions,
-  items: ehiTasks.map(([key, text, legacy, illustration, hint]) =>
-    row(key, `ehi_${key}`, legacy, text, scale, {
-      presentation: "spectrum",
-      spectrumReverse: reverse,
-      illustration,
-      hint,
-    }),
-  ),
+  items: [
+    ...ehiTasks.map(([key, text, legacy, illustration]): ItemInput =>
+      row(key, `ehi_${key}`, legacy, text, scale, {
+        presentation: "spectrum",
+        spectrumReverse: reverse,
+        illustration,
+        hint: ehiHint,
+      }),
+    ),
+    // Something back, straight away (D-33). Handedness is the one measure here
+    // that can be scored the instant it is answered and told back plainly, so
+    // it is where the survey stops being a one-way extraction for a moment.
+    // Purely presentational: the score shown is computed from answers already
+    // given, nothing is stored differently, and the raw responses are
+    // untouched.
+    {
+      responseType: "info",
+      key: "lq_feedback",
+      revision: 1,
+      variable: "ehi_lq_feedback",
+      required: "optional",
+      stem: {
+        text: "Your handedness score is {lq}",
+        pipes: {
+          lq: { kind: "score", scoringKey: "score.ehi_sf", output: "lq", decimals: 1, fallback: "—" },
+        },
+      },
+      lede: {
+        text: "That puts you in the {band} range.\n\nThe scale runs from -100 (uses the left hand for everything) to +100 (uses the right hand for everything). Most people are somewhere near one end; being in the middle is genuinely uncommon, not a mistake.",
+        pipes: {
+          band: { kind: "score", scoringKey: "score.ehi_sf", output: "lq_band", fallback: "mixed-handed" },
+        },
+      },
+      researcherNote:
+        "Participant-facing feedback on the EHI laterality quotient (D-33). Presentational only — computed from the answers just given, stored nowhere, and shown after all four items so it cannot influence any of them.",
+    } as ItemInput,
+  ] as ItemInput[],
 });
 
 export const ehiSf: InstrumentInput = {
@@ -139,7 +184,7 @@ export const ehiSf: InstrumentInput = {
   forms: [
     ehiForm(
       undefined,
-      "EHI-SF canonical (Veale 2014 anchors — VERIFY wording before approval)",
+      "EHI-SF canonical (Veale 2014 anchors, confirmed by the researcher 2026-08-02)",
       "scale.ehi_sf_5pt",
       "Please indicate your preferences in the use of hands in the following activities.",
       true,
@@ -156,9 +201,11 @@ export const ehiSf: InstrumentInput = {
   scoringKey: "score.ehi_sf",
   timeEstimates: est([60, 45]),
   changelog:
-    "1.0: encoded from QSF. Canonical form uses Veale (2014) right-anchored responses per D-08; administered left-anchored form preserved as ybm-asadmin. Legacy matrix rows were coded 1,3,5,7. Presented as a left-to-right spatial spectrum with object illustrations (D-19, presentation only).",
+    "1.0: encoded from QSF. Canonical form uses Veale (2014) right-anchored responses per D-08; administered left-anchored form preserved as ybm-asadmin. Legacy matrix rows were coded 1,3,5,7. Presented as a left-to-right spatial spectrum with object illustrations (D-19, presentation only). " +
+    "2.0 (D-32): stems ask the question outright ('Which hand do you write with?') rather than naming the task ('Writing'); the object drawing is centred over the axis rather than sitting at the left, where it may have pulled answers towards the left-hand end; the midpoint is labelled on narrow screens. Response options and codes unchanged.",
   owner: "ybm",
-  researcherNotes: "Canonical anchor wording and LQ cutoffs must be verified against Veale (2014) before approval.",
+  researcherNotes:
+    "Canonical anchor wording confirmed by the researcher 2026-08-02 (D-32). LQ cutoffs still to be checked against Veale (2014) when the scoring package computes them.",
 };
 
 // ---------------------------------------------------------------------------

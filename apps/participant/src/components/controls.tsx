@@ -65,6 +65,7 @@ export function SingleChoice({ item, scale, value, onAnswer }: ControlProps) {
     const chosen = ordered.find((o) => o.code === selected);
     const first = ordered[0];
     const last = ordered[ordered.length - 1];
+    const middle = ordered.length % 2 === 1 ? ordered[(ordered.length - 1) / 2] : undefined;
     return (
       <div className="spectrum" role="radiogroup" aria-label={item.stem.text}>
         <div className="spectrum-row">
@@ -87,11 +88,15 @@ export function SingleChoice({ item, scale, value, onAnswer }: ControlProps) {
           ))}
         </div>
         {/* Narrow screens keep the left-to-right axis — that arrangement IS the
-            question — and drop to end anchors plus a readout of the choice,
-            because five labels cannot sit side by side on a phone. Both are
-            hidden by CSS once there is room for the full labels. */}
+            question — and drop to anchors plus a readout of the choice,
+            because five labels cannot sit side by side on a phone. The MIDDLE
+            anchor is named as well as the two ends (D-32): without it, "both
+            equally" is an unlabelled dot between two labelled extremes, which
+            is exactly the answer least likely to be picked by someone who
+            cannot see what it means. Hidden by CSS once the full labels fit. */}
         <div className="spectrum-ends" aria-hidden="true">
           <span>{first?.label}</span>
+          {middle && middle !== first && middle !== last && <span>{middle.label}</span>}
           <span>{last?.label}</span>
         </div>
         <p className="spectrum-status" aria-live="polite">

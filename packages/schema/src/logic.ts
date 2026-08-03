@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { itemRef } from "./identifiers.js";
+import { dottedKey, itemRef, slug } from "./identifiers.js";
 
 /**
  * Branching / display logic as a small, total, side-effect-free expression AST.
@@ -57,7 +57,19 @@ export const logicExpr: z.ZodType<LogicExpr> = z.lazy(() =>
 
 /** Piped-text reference: only validated identifiers, never raw strings. */
 export const pipeRef = z.object({
-  kind: z.enum(["item_answer", "item_text_entry", "session_field", "date_offset"]),
+  /**
+   * `score` resolves a scoring output for the current session — the value or
+   * its band label — so a participant can be told something about what they
+   * just answered. The scorer runs over the answers already given; nothing is
+   * stored differently and the raw responses are untouched (D-33).
+   */
+  kind: z.enum(["item_answer", "item_text_entry", "session_field", "date_offset", "score"]),
+  /** For `score`: the scoring definition, e.g. "score.ehi_sf". */
+  scoringKey: dottedKey.optional(),
+  /** For `score`: which output of it, e.g. "lq" or "lq_band". */
+  output: slug.optional(),
+  /** For a numeric score output: decimal places to show. */
+  decimals: z.number().int().min(0).max(3).optional(),
   item: itemRef.optional(),
   part: z.union([z.number().int(), z.string()]).optional(),
   /** e.g. session start date + N days (YBM consent withdrawal deadline). */
