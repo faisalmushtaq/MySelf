@@ -666,3 +666,27 @@ decisions:
       is genuinely safe to hand back immediately, which is why it is first and
       alone for now.
       Released as r6.0.0.
+
+  - id: D-34
+    topic: What the handedness feedback says
+    decision: report-the-person-not-the-scale
+    detail: >
+      Researcher direction 2026-08-02. The first draft of the feedback led with
+      the number and then added "Most people are somewhere near one end; being
+      in the middle is genuinely uncommon, not a mistake." That is a judgement
+      nobody asked for: it tells a participant their own result needs excusing,
+      and it ranks one answer against everyone else's on a screen that exists
+      to give something back.
+      The feedback now reports what the answers say about that person and
+      stops. The result leads — "Your answers suggest you're very
+      right-handed" — and the number supports it underneath, with the scale
+      stated plainly and no commentary on how common the result is.
+      Band labels were rewritten to complete that sentence: very left-handed,
+      left-handed, mostly left-handed, equally comfortable with either hand,
+      mostly right-handed, right-handed, very right-handed. Veale (2014)
+      cutoffs are still unchanged and `lq` is still the analysed variable —
+      this is the wording read back to a participant, not the classification
+      used for analysis.
+      Two tests hold the line: every band must complete the sentence it is
+      dropped into, and no instrument text may say a result is normal,
+      unusual, uncommon or a mistake.

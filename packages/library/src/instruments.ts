@@ -153,16 +153,25 @@ const ehiForm = (
       revision: 1,
       variable: "ehi_lq_feedback",
       required: "optional",
+      // Report what the answers say about this person, and stop. An earlier
+      // draft added "being in the middle is genuinely uncommon, not a mistake"
+      // — which tells someone their result needs excusing, and is a judgement
+      // nobody asked for (D-34).
       stem: {
-        text: "Your handedness score is {lq}",
+        text: "Your answers suggest you're {band}",
         pipes: {
-          lq: { kind: "score", scoringKey: "score.ehi_sf", output: "lq", decimals: 1, fallback: "—" },
+          band: {
+            kind: "score",
+            scoringKey: "score.ehi_sf",
+            output: "lq_band",
+            fallback: "somewhere in the middle",
+          },
         },
       },
       lede: {
-        text: "That puts you in the {band} range.\n\nThe scale runs from -100 (uses the left hand for everything) to +100 (uses the right hand for everything). Most people are somewhere near one end; being in the middle is genuinely uncommon, not a mistake.",
+        text: "Your handedness score is {lq}, on a scale from -100 (always the left hand) to +100 (always the right hand).",
         pipes: {
-          band: { kind: "score", scoringKey: "score.ehi_sf", output: "lq_band", fallback: "mixed-handed" },
+          lq: { kind: "score", scoringKey: "score.ehi_sf", output: "lq", decimals: 1, fallback: "not complete" },
         },
       },
       researcherNote:

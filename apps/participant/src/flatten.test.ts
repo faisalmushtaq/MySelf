@@ -321,12 +321,14 @@ describe("manifest flattening", () => {
     for (const key of ["writing", "throwing", "toothbrush", "spoon"]) {
       expect(at(key)).toBeLessThan(at("lq_feedback"));
     }
-    const lq = fb?.item.stem.pipes?.["lq"];
-    expect(lq?.kind).toBe("score");
-    expect(lq?.scoringKey).toBe("score.ehi_sf");
-    expect(lq?.output).toBe("lq");
-    expect(lq?.fallback).toBeTruthy(); // never shows a raw placeholder
-    expect(fb?.item.lede?.pipes?.["band"]?.output).toBe("lq_band");
+    // The result leads; the number supports it.
+    expect(fb?.item.stem.text).toBe("Your answers suggest you're {band}");
+    const band = fb?.item.stem.pipes?.["band"];
+    expect(band?.kind).toBe("score");
+    expect(band?.scoringKey).toBe("score.ehi_sf");
+    expect(band?.output).toBe("lq_band");
+    expect(band?.fallback).toBeTruthy(); // never shows a raw placeholder
+    expect(fb?.item.lede?.pipes?.["lq"]?.output).toBe("lq");
     // and the release actually carries the scoring it refers to
     expect(manifest.scoring["score.ehi_sf"]).toBeDefined();
   });
