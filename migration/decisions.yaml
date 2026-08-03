@@ -690,3 +690,46 @@ decisions:
       Two tests hold the line: every band must complete the sentence it is
       dropped into, and no instrument text may say a result is normal,
       unusual, uncommon or a mistake.
+
+  - id: D-35
+    topic: Where the answers go — the dataset, the researcher view and BIDS
+    decision: raw-logs-are-the-record-everything-else-is-derived
+    detail: >
+      Researcher direction 2026-08-03: one database reachable quickly through
+      the web, summary global measures, a filter on every column, and the same
+      data also written into a traditional BIDS-style folder structure, with
+      longitudinal capture treated as the point of the exercise rather than a
+      later addition.
+      The shape adopted is a projection, not a store. The record is the
+      device's append-only event log, kept exactly as it arrived; the dataset
+      (participants, sessions, responses, scores) is derived from those logs on
+      every load and never persisted. A scoring correction or a fix in the
+      reader is therefore a new build, applied to the whole study at once, with
+      no migration and no possibility of two versions of the truth sitting in
+      one file. It costs a second at start-up.
+      Three rules the types enforce rather than merely document: raw is raw —
+      skips and declines are first-class statuses, and nothing derived is ever
+      written back into a response row; derived is separate and regenerable,
+      recording which scoring definition produced it; identifiers live apart —
+      names and dates of birth are not in the dataset shape at all, and what
+      links a person across waves is the derived participant code.
+      Longitudinal linkage is the highest-risk code in the platform, because a
+      wrong join silently merges two children's data and nobody ever sees it.
+      A sitting whose secret code is incomplete is HELD BACK, never guessed at:
+      it is stored, reported on screen, and left out of every count until a
+      human resolves it. Sittings are read back through the release they were
+      collected under, matched by content hash, so wave 1 under r5 and wave 3
+      under r7 are not silently treated as the same instrument.
+      Wave-by-wave comparisons in the researcher view use the returning sample
+      only. Comparing a later wave against everyone who ever did a first one
+      mixes change with attrition, and the two are not separable afterwards.
+      The BIDS export is BIDS-style, deliberately: a survey-only dataset is not
+      a valid BIDS dataset on its own, but following the layout means the EEG
+      drops into the per-subject session directories beside it later without
+      anything moving. `n/a` for missing, never a blank; a sidecar dictionary
+      for every data file; the release hash in the dataset description.
+      Until sync exists the route off an iPad is a file, written from a
+      handover panel behind a deliberate gesture on the build line, and the
+      researcher view is a laptop tool holding real answers — hence storage per
+      browser profile, demonstration data filed under sites beginning "DEMO",
+      and clearing everything one click away.

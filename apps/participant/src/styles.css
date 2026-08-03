@@ -1552,3 +1552,53 @@ input[type="range"] {
   border-bottom-color: var(--accent);
   color: var(--accent);
 }
+
+/* ── Handover panel ────────────────────────────────────────────────────── */
+/* Researcher-only, reached by five taps on the build line. Deliberately plain:
+   it is a piece of fieldwork equipment, not part of what a participant sees. */
+.handover {
+  width: 100%;
+  max-width: 42rem;
+  margin-top: 1.5rem;
+  padding: 1rem 1.25rem 1.25rem;
+  border: 1px solid var(--hairline);
+  border-radius: 10px;
+  background: var(--off-white);
+}
+
+.handover h2 {
+  font-family: var(--font-ui);
+  font-size: 1.05rem;
+  font-weight: 600;
+  margin: 0 0 0.5rem;
+}
+
+.handover-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin: 0.9rem 0 0.5rem;
+}
+
+.handover-actions .secondary {
+  min-height: 44px;
+  padding: 0 1rem;
+  border: 1px solid var(--hairline-strong);
+  border-radius: 8px;
+  background: var(--paper);
+  font-family: var(--font-ui);
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.handover-actions .secondary:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.handover-actions .secondary:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}

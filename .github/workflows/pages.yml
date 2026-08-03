@@ -28,6 +28,11 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm -r build
+      # Both apps ship from one artifact: the participant app at the root, the
+      # researcher view one level down. Separate paths keep the participant
+      # app's service worker out of the researcher view's scope — a shared
+      # scope would have the survey's cache serving the wrong build.
+      - run: cp -R apps/researcher/dist apps/participant/dist/researcher
       - uses: actions/upload-pages-artifact@v3
         with:
           path: apps/participant/dist

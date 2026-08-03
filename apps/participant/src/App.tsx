@@ -13,6 +13,7 @@ import {
   loadAnswers,
   type SessionRow,
 } from "./lib/db.js";
+import { buildDeviceExport, downloadExport } from "./lib/export.js";
 import { SessionTiming, wordCount } from "./lib/timing.js";
 import { ReviewScreen } from "./components/ReviewScreen.js";
 import { SurveyScreen } from "./components/SurveyScreen.js";
@@ -79,6 +80,12 @@ export default function App() {
   const [counts, setCounts] = useState({ inProgress: 0, completed: 0 });
   const [busy, setBusy] = useState(false);
   const [codeError, setCodeError] = useState<string | null>(null);
+  // Handover is a researcher action on a device that spends its day in
+  // participants' hands, so it sits behind a deliberate gesture on the build
+  // line rather than a button anyone can find by wandering.
+  const handoverTaps = useRef(0);
+  const [handoverOpen, setHandoverOpen] = useState(false);
+  const [handoverNote, setHandoverNote] = useState<string | null>(null);
   // Consecutive skips, and where the run began, so a check-in can offer to
   // take the participant back to the first one they left blank.
   const skipRun = useRef<{ count: number; firstIndex: number | null }>({ count: 0, firstIndex: null });
@@ -419,11 +426,61 @@ export default function App() {
           <button type="button" className="next big" disabled={code.trim().length < 2 || busy} onClick={() => void start()}>
             Start
           </button>
-          <p className="hint demo-note">
+          <p
+            className="hint demo-note"
+            onClick={() => {
+              handoverTaps.current += 1;
+              if (handoverTaps.current >= 5) {
+                handoverTaps.current = 0;
+                setHandoverOpen((v) => !v);
+              }
+            }}
+          >
             Preview build · release {manifest.release.version} · {manifest.hash?.slice(7, 19)} ·{" "}
             {counts.completed} completed session{counts.completed === 1 ? "" : "s"} stored on this device · build{" "}
             {__BUILD_STAMP__}
           </p>
+          {handoverOpen && (
+            <div className="handover">
+              <h2>Handover</h2>
+              <p className="hint">
+                {counts.completed} completed and {counts.inProgress} unfinished session
+                {counts.inProgress === 1 ? "" : "s"} on this device. The file contains real answers: put it
+                straight into approved storage, and only delete anything here once it has landed.
+              </p>
+              <div className="handover-actions">
+                <button
+                  type="button"
+                  className="secondary"
+                  disabled={counts.completed === 0}
+                  onClick={() => {
+                    void (async () => {
+                      const data = await buildDeviceExport();
+                      downloadExport(data);
+                      setHandoverNote(`${data.sessions.length} session${data.sessions.length === 1 ? "" : "s"} written`);
+                    })();
+                  }}
+                >
+                  Export completed sessions
+                </button>
+                <button
+                  type="button"
+                  className="secondary"
+                  disabled={counts.completed + counts.inProgress === 0}
+                  onClick={() => {
+                    void (async () => {
+                      const data = await buildDeviceExport({ includeInProgress: true });
+                      downloadExport(data, "device-all");
+                      setHandoverNote(`${data.sessions.length} session${data.sessions.length === 1 ? "" : "s"} written, unfinished included`);
+                    })();
+                  }}
+                >
+                  Include unfinished
+                </button>
+              </div>
+              {handoverNote && <p className="hint">{handoverNote}</p>}
+            </div>
+          )}
           {contact && (
             <p className="start-footer">
               {contact.ethicsReference && <>Ethics reference {contact.ethicsReference}. </>}
