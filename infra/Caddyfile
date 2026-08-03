@@ -1,0 +1,33 @@
+# TLS, obtained and renewed automatically from Let's Encrypt. Point an A record
+# at the box, set DOMAIN in .env, and there is nothing else to do — no
+# certificate to remember to renew in eleven months.
+
+{$DOMAIN} {
+	encode gzip
+
+	# Sign-in lives under /auth. Keycloak's admin console is where people are
+	# added, given a role, or removed — that is the whole of user administration.
+	handle_path /auth/* {
+		reverse_proxy keycloak:8080
+	}
+
+	handle /api/* {
+		uri strip_prefix /api
+		reverse_proxy api:8080
+	}
+
+	# Anything else is the researcher view, served as static files if you choose
+	# to host it here rather than on Pages.
+	handle {
+		root * /srv/researcher
+		try_files {path} /index.html
+		file_server
+	}
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "no-referrer"
+		-Server
+	}
+}

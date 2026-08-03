@@ -733,3 +733,34 @@ decisions:
       researcher view is a laptop tool holding real answers — hence storage per
       browser profile, demonstration data filed under sites beginning "DEMO",
       and clearing everything one click away.
+
+  - id: D-36
+    topic: Where the server runs, and who controls the accounts
+    decision: self-hosted-provider-independent-with-own-idp
+    detail: >
+      Researcher direction 2026-08-03, superseding the hosting half of D-12:
+      the platform must run completely independently of University of Leeds
+      infrastructure, and the researcher must be able to control who has admin
+      rights directly, without asking anyone.
+      Adopted: a single rented Linux host (Hetzner CX32 in the EU recommended,
+      DigitalOcean London equivalent) running four containers — Postgres 16,
+      Keycloak, the API, and Caddy for automatic TLS. Nothing in the core path
+      depends on a service only one provider sells, so the study can move host
+      without a rebuild.
+      Sign-in is OIDC against the stack's own Keycloak. Three realm roles —
+      owner, researcher, analyst — carry a fixed capability set, and adding or
+      removing a person is done in the Keycloak console alone: the API keeps no
+      user list of its own, so there is nothing to drift out of step. Enrolling
+      an iPad and reading an identifier are owner-only. A signed-in person with
+      no role is told so plainly rather than shown an empty study, because
+      silence looks like a bug and invites a workaround.
+      iPads authenticate with an enrolment token issued once by an owner and
+      stored only as a SHA-256 hash; a lost device is revoked and refused at
+      the next sync. Participants never authenticate at all.
+      Consequences recorded honestly in docs/12: hosting it yourself changes
+      who operates the server, not who is responsible for the data. Leeds
+      remains the data controller for Leeds-sponsored research, the hosting
+      provider becomes a processor to name in the DPIA, and PSCETHS-1449
+      describes a data flow that ends on the iPads — syncing to a server needs
+      an amendment. Until that is approved the file-based handover route stays
+      the one used for real fieldwork; the server runs on synthetic data.

@@ -1,0 +1,23 @@
+# Build the whole workspace, ship only what the API needs to run.
+FROM node:22-alpine AS build
+WORKDIR /repo
+RUN corepack enable
+COPY pnpm-workspace.yaml pnpm-lock.yaml package.json ./
+COPY packages ./packages
+COPY apps/api ./apps/api
+COPY releases ./releases
+RUN pnpm install --frozen-lockfile --filter @myself/api...
+RUN pnpm --filter @myself/api... build
+RUN pnpm deploy --filter @myself/api --prod /app
+
+FROM node:22-alpine
+WORKDIR /app
+ENV NODE_ENV=production
+COPY --from=build /app /app
+# Run unprivileged: a process that never needs to write to its own image
+# should not be able to.
+USER node
+EXPOSE 8080
+# Migrations run at start-up and are recorded by name, so two containers
+# starting together cannot apply the same migration twice.
+CMD ["node", "dist/index.js"]
