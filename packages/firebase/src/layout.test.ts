@@ -193,3 +193,29 @@ describe("a torn write", () => {
     expect(joinSession(doc).events).toHaveLength(2);
   });
 });
+
+describe("the quarantined flag", () => {
+  /**
+   * Found by asking what happens when many devices sync at once, which is how
+   * most silent data loss is found: not by the thing you were looking for.
+   *
+   * Firestore's `!=` operator excludes documents that lack the field entirely.
+   * A query for "sittings that are not quarantined" against an optional field
+   * therefore returns only the ones explicitly marked false — none, when the
+   * writer never set it — and an empty export looks like an empty study rather
+   * than a bug. The flag is written on every sitting so that cannot happen.
+   */
+  it("is always written, so a query for it can never miss a sitting", () => {
+    const { doc } = splitSession(session([event(0)]), "dev_a", "ybm");
+    expect(doc.quarantined).toBe(false);
+    expect(Object.keys(doc)).toContain("quarantined");
+    // Present in the JSON that actually reaches Firestore, not just the type.
+    expect(JSON.parse(JSON.stringify(doc))).toHaveProperty("quarantined", false);
+  });
+
+  it("is written on a spilled sitting too", () => {
+    const huge = Array.from({ length: 400 }, (_, i) => event(i, "x".repeat(3000)));
+    const { doc } = splitSession(session(huge), "dev_a", "ybm");
+    expect(doc.quarantined).toBe(false);
+  });
+});

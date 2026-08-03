@@ -77,8 +77,16 @@ export interface SessionDoc {
   chunkCount: number;
   eventCount: number;
   receivedAt: string;
-  /** Set when the same sitting arrives from a second device. */
-  quarantined?: boolean;
+  /**
+   * Set when the same sitting arrives from a second device.
+   *
+   * ALWAYS WRITTEN, never left absent — and required, so the type will not let
+   * it be forgotten. Firestore's `!=` operator silently excludes documents that
+   * lack the field, so a query for "not quarantined" against optional data
+   * returns almost nothing and looks like an empty study rather than an error.
+   * A field that is always present cannot be walked into that way.
+   */
+  quarantined: boolean;
 }
 
 export interface ChunkDoc {
@@ -133,6 +141,7 @@ export function splitSession(session: DeviceSession, deviceId: string, study: st
     complete: session.complete,
     eventCount: ordered.length,
     receivedAt: now.toISOString(),
+    quarantined: false,
   };
 
   if (byteLength({ ...base, events: ordered }) <= MAX_DOCUMENT_BYTES) {
