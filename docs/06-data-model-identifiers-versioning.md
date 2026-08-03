@@ -108,3 +108,51 @@ Long exports carry `status` beside `value`; wide exports emit NA plus a companio
 ## 5. Export bundle
 
 Every export is a zip: data (CSV/Parquet, long + wide + optional legacy view) + `codebook.html/csv` + `data_dictionary.json` + instrument/item metadata + scoring definitions and generated R/Python scoring syntax + `release-manifest.json` (+hash) + `migration-crosswalk.json` (where legacy view included) + audit slip (who exported, when, filters, PII flag) + LLM provenance file (model_calls subset) where narrative data included. Sufficient to reconstruct exactly what each participant saw and how every value was coded — depositable in a repository alongside the data.
+
+## 6. Implemented data layer (`@myself/store`, researcher view) — 2026-08-03
+
+The abstract model above is now built for the survey side. What exists:
+
+**The record is the event log.** Each iPad writes a handover file: its
+append-only log, decrypted, unedited, in the order the events happened. The
+dataset — `participants`, `sessions`, `responses`, `scores` — is *derived* from
+those logs by `ingest()` and is never persisted anywhere. That is what makes a
+rescoring or a fix in the reader a new build rather than a migration.
+
+| Table | Grain | Notes |
+|---|---|---|
+| `participants` | one person | derived code, first/last seen, sitting count, sites |
+| `sessions` | one sitting | wave, site, release hash, durations, answered/skipped/too-fast/revisited counts, review edits |
+| `responses` | one variable per sitting | status, value, text, label, dwell, visits, `tooFast`, `changed` |
+| `scores` | one derived output per sitting | scoring key + version, valid count, warnings |
+
+**Longitudinal linkage.** `deriveParticipantCode()` builds the code from the
+four components (mother's initials, house digit, birth month, postcode
+letters). A sitting whose code is incomplete is **held back**, never guessed
+at, and shown as such in the researcher view: a wrong join merges two
+children's data invisibly. Waves are numbered per participant in the order the
+sittings actually happened, continuing across imports and across releases.
+
+**Releases.** Sittings are grouped by release hash and read back through the
+manifest they were collected under. Reading a 2026 session through a 2028
+manifest is how a renamed option code becomes a silently wrong answer.
+
+**Researcher view** (`apps/researcher`, published at `/researcher/`): summary
+global measures, a wide table with one row per sitting and a filter on **every**
+column (range for numbers, value list for categories, substring for text —
+derived from the column's kind, so new variables are filterable without code),
+a per-participant drawer showing every wave and the change between them, and
+CSV of exactly what is on screen. Wave-by-wave means use the returning sample
+only.
+
+**BIDS-style export** (`buildBidsExport` + `buildZip`, no dependencies):
+`dataset_description.json` carrying the release hash, `participants.tsv/json`,
+`phenotype/<instrument>.tsv/json` with a `<var>_status` column beside every
+variable, `phenotype/scores.tsv/json` kept out of the raw files, and
+`sub-<LABEL>/sessions.tsv`. `n/a` for missing, never a blank; a sidecar for
+every data file. Survey-only data is not a valid BIDS dataset on its own —
+following the layout is what lets the EEG drop in beside it later.
+
+Not yet built: sync, server storage, access control, the audit slip and the
+codebook/crosswalk generators described in §5. Until those exist the researcher
+view is a laptop tool holding real answers, and is treated as such.
