@@ -1,4 +1,6 @@
+import { useState } from "react";
 import type { Dataset, WideTable } from "@myself/store";
+import { lookupByCode, type PersonRecord } from "../lib/db.js";
 import { participantWaves } from "../lib/longitudinal.js";
 
 /**
@@ -32,6 +34,13 @@ export interface ParticipantPanelProps {
 }
 
 export function ParticipantPanel({ participantId, table, data, onClose }: ParticipantPanelProps) {
+  // Who this code belongs to is available here, because sometimes it has to
+  // be — checking a sitting against a register, chasing a follow-up. It is
+  // asked for rather than shown, and the asking is recorded, so the screen a
+  // researcher has open all day does not have a child's name on it.
+  const [asking, setAsking] = useState(false);
+  const [why, setWhy] = useState("");
+  const [named, setNamed] = useState<PersonRecord | null>(null);
   const waves = participantWaves(table.rows, participantId);
   const person = data.participants.find((p) => p.participantId === participantId);
   const scoreKeys = [...new Set(data.scores.map((s) => `${s.instrument}_${s.output}`))]
@@ -43,6 +52,45 @@ export function ParticipantPanel({ participantId, table, data, onClose }: Partic
       <div className="drawer-head">
         <div>
           <h2>{participantId}</h2>
+          {named ? (
+            <p className="note revealed">
+              <strong>
+                {named.givenName} {named.familyName}
+              </strong>
+              {named.dateOfBirth ? ` · born ${named.dateOfBirth}` : ""}
+              {named.upn ? ` · UPN ${named.upn}` : ""}
+              {named.nhsNumber ? ` · NHS ${named.nhsNumber}` : ""}
+            </p>
+          ) : asking ? (
+            <div className="row reveal-ask">
+              <input
+                className="search"
+                autoFocus
+                value={why}
+                placeholder="Why do you need to know who this is?"
+                onChange={(e) => setWhy(e.target.value)}
+              />
+              <button
+                type="button"
+                className="secondary"
+                disabled={why.trim().length < 12}
+                onClick={() => {
+                  void (async () => {
+                    const found = await lookupByCode(participantId, why.trim());
+                    setNamed(found ?? null);
+                    setAsking(false);
+                    if (!found) setWhy("");
+                  })();
+                }}
+              >
+                Show
+              </button>
+            </div>
+          ) : (
+            <button type="button" className="link" onClick={() => setAsking(true)}>
+              Who is this?
+            </button>
+          )}
           <p className="note">
             {person ? `${person.sessionCount} sitting${person.sessionCount === 1 ? "" : "s"}` : "no sittings"}
             {person && person.sites.length > 0 ? ` · ${person.sites.join(", ")}` : ""}
