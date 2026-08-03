@@ -15,7 +15,7 @@ const registries: Registries = {
 };
 
 const meta = {
-  version: "5.0.0",
+  version: "6.0.0",
   publishedAt: "2026-08-02T12:00:00.000Z",
   publishedBy: "faisalmushtaq",
   engineVersion: "0.1.0",
@@ -32,12 +32,12 @@ describe("canonical JSON", () => {
   });
 });
 
-describe("YBM release r5.0.0", () => {
+describe("YBM release r6.0.0", () => {
   it("passes the publish gate and produces a verifiable manifest", () => {
     const manifest = buildRelease(ybmComposition, registries, meta);
     expect(manifest.hash).toMatch(/^sha256:[0-9a-f]{64}$/);
     expect(verifyManifestHash(manifest)).toBe(true);
-    expect(manifest.release.key).toBe("ybm_nd2026_standard_r5_0_0");
+    expect(manifest.release.key).toBe("ybm_nd2026_standard_r6_0_0");
   });
 
   it("is deterministic: identical inputs give an identical hash", () => {
@@ -46,9 +46,12 @@ describe("YBM release r5.0.0", () => {
     expect(a.hash).toBe(b.hash);
   });
 
-  it("freezes all nine instruments, ten modules and their scales/scoring", () => {
+  it("freezes every component of the composition and its scales/scoring", () => {
     const manifest = buildRelease(ybmComposition, registries, meta);
-    expect(Object.keys(manifest.instruments)).toHaveLength(19);
+    // 18 from r6.0.0: the two sleep-priority questions were dropped from this
+    // fielding (D-31), so their module is no longer a component.
+    expect(Object.keys(manifest.instruments)).toHaveLength(18);
+    expect(Object.keys(manifest.instruments).some((k) => k.includes("sleep_priorities"))).toBe(false);
     // canonical (variant-less) forms only (D-08)
     for (const key of Object.keys(manifest.instruments)) expect(key).not.toContain("+ybm-asadmin");
     expect(Object.keys(manifest.scoring)).toEqual(
@@ -61,7 +64,7 @@ describe("YBM release r5.0.0", () => {
     // The frozen file is what devices actually run. If someone edits an item,
     // a scale or the composition without republishing, this fails: the release
     // on disk would no longer be the release the sources describe.
-    const path = fileURLToPath(new URL("../../../releases/ybm_nd2026_standard_r5.0.0.manifest.json", import.meta.url));
+    const path = fileURLToPath(new URL("../../../releases/ybm_nd2026_standard_r6.0.0.manifest.json", import.meta.url));
     const committed = JSON.parse(readFileSync(path, "utf8")) as {
       hash: string;
       release: { version: string; publishedAt: string; publishedBy: string; engineVersion: string; decisionRefs: string[] };

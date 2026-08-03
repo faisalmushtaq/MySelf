@@ -3,13 +3,15 @@ import type { ResponseScale } from "@myself/schema";
 import { resolveText } from "../lib/pipes.js";
 
 /**
- * A last look before finishing.
+ * The list of everything answered, reached from the finish screen.
  *
  * People notice a wrong answer when they see it written down, not while they
  * are giving it — so the whole session is laid out in order, grouped by
- * section, with every question tappable. Only questions this participant
- * actually saw appear: a branch they never entered is not something they can
- * have got wrong.
+ * section, with every question tappable. It is *offered* rather than imposed
+ * (D-31): most people are done when they are done, and a wall of everything
+ * they just answered is a poor reward for finishing. Only questions this
+ * participant actually saw appear: a branch they never entered is not
+ * something they can have got wrong.
  *
  * Blanks are shown as blanks rather than hidden. "You left this one blank" is
  * information a participant may want to act on, and hiding it would quietly
@@ -137,7 +139,7 @@ export function ReviewScreen(props: ReviewScreenProps) {
 
       <div className="review-actions">
         <button type="button" className="next big" onClick={props.onFinish}>
-          All done — finish
+          Done — back to the end
         </button>
       </div>
     </div>

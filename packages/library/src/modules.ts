@@ -423,6 +423,9 @@ export const ybmSleepPriorities: ModuleInput = {
   instrument: "ybm_sleep_priorities",
   name: "YBM sleep priorities",
   construct: "Sleep priorities and interests (bespoke; not part of the KSS)",
+  // NOT in the ybm_nd2026_standard composition from r6.0.0 (D-31, researcher
+  // direction). Kept encoded and versioned so returning it is a composition
+  // edit, not a re-encoding.
   forms: [
     {
       language: "en-GB",

@@ -1499,3 +1499,38 @@ input[type="range"] {
 .date-amend:hover {
   color: var(--text);
 }
+
+/* Offered on the finish screen, not imposed on the way to it: a quiet panel
+   below the thank-you for the minority who know they got something wrong. */
+.finish-amend {
+  margin: 2rem 0 2.25rem;
+  padding: 1.1rem 1.3rem;
+  background: var(--off-white);
+  border-radius: var(--radius);
+  max-width: 34rem;
+}
+
+.finish-amend-q {
+  margin: 0 0 0.6rem;
+  font-size: 1rem;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.finish-amend-go {
+  min-height: 44px;
+  padding: 0 0.1rem;
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--hairline-strong);
+  font-family: var(--font-ui);
+  font-size: 1rem;
+  font-weight: 500;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.finish-amend-go:hover {
+  border-bottom-color: var(--accent);
+  color: var(--accent);
+}

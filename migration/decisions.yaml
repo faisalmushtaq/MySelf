@@ -580,3 +580,30 @@ decisions:
       made from it are recorded (review.opened / review.edited), so a
       corrected answer is distinguishable from a first one in the paradata.
       Released as r5.0.0.
+
+  - id: D-31
+    topic: Two questions dropped, and the review moved behind the finish screen
+    decision: drop-sleep-priorities-and-offer-the-review
+    detail: >
+      Researcher direction 2026-08-02.
+      (a) DROPPED: the two sleep-priority questions — "What feels most
+      important to you for getting a good night's sleep?" and "If you could
+      find out more about your own sleep, what would you most like to know?" —
+      are removed from the fielded questionnaire. They were the whole of
+      ybm_sleep_priorities, so the module leaves the composition; the sleep
+      section keeps the KSS. The module stays in the library, encoded and
+      versioned, so returning it is a composition edit rather than a
+      re-encoding, and its two scales stay with it.
+      (b) THE REVIEW IS OFFERED, NOT IMPOSED. In D-30 the last question led to
+      a list of everything answered, and only then to the thank-you. That is a
+      poor reward for finishing: most people are done when they are done, and
+      a wall of their own answers reads as more work. The last question now
+      goes straight to "Thank you" with a quiet panel below it — "Need to
+      change anything? / Go back to my answers" — and only that opens the
+      list. Editing from the list returns to the list; leaving the list returns
+      to the thank-you, where the hand-back button waits. The session is
+      completed on reaching the finish screen and completed again on returning
+      from an edit, so the completion event always follows the last change in
+      the append-only log.
+      Released as r6.0.0. r5.0.0 stays in releases/ untouched — a published
+      release is never edited or deleted, even when superseded within the day.
