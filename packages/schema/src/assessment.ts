@@ -262,6 +262,10 @@ export const responseEvent = z.object({
     "effort.pace_prompt_shown",
     "session.suspended",
     "session.resumed",
+    /** Last look over the answers before finishing, and any edit made from
+     *  it — so a corrected answer is distinguishable from a first one (D-30). */
+    "review.opened",
+    "review.edited",
   ]),
   itemRef: z
     .object({ instrument: slug, item: slug, revision: z.number().int().positive() })

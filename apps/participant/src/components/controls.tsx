@@ -441,6 +441,7 @@ export function NumericControl({ item, value, onAnswer, onValidity, onSubmit }: 
 
 export function DateControl({ item, value, onAnswer, onValidity, onSubmit }: ControlProps) {
   const [error, setError] = useState<string | null>(null);
+  const inputRef = useRef<HTMLInputElement | null>(null);
   if (item.responseType !== "date") return null;
   const current = value?.kind === "date" ? value.iso : "";
 
@@ -481,9 +482,22 @@ export function DateControl({ item, value, onAnswer, onValidity, onSubmit }: Con
     return null;
   };
 
+  /** Whole years from a date, for reading the age back to the participant. */
+  const ageOf = (iso: string): number | null => {
+    const d = new Date(`${iso}T00:00:00`);
+    if (Number.isNaN(d.getTime())) return null;
+    const now = new Date();
+    let age = now.getFullYear() - d.getFullYear();
+    const before =
+      now.getMonth() < d.getMonth() || (now.getMonth() === d.getMonth() && now.getDate() < d.getDate());
+    return before ? age - 1 : age;
+  };
+  const shownAge = current && error === null ? ageOf(current) : null;
+
   return (
     <div className="date-wrap">
       <input
+        ref={inputRef}
         type="date"
         className="text-input"
         value={current}
@@ -510,6 +524,29 @@ export function DateControl({ item, value, onAnswer, onValidity, onSubmit }: Con
         <p className="error" role="alert">
           {error}
         </p>
+      )}
+      {/* Read the date back as an age. A date typed a digit wrong usually
+          still looks like a date, but "that makes you 51" does not look like
+          you — so the mistake is obvious at the moment it can be fixed. */}
+      {shownAge !== null && (
+        <div className="date-confirm" role="status">
+          <p className="date-age">
+            Great — that makes you {shownAge} year{shownAge === 1 ? "" : "s"} old.
+          </p>
+          <button
+            type="button"
+            className="date-amend"
+            onClick={() => {
+              const el = inputRef.current;
+              if (!el) return;
+              el.focus();
+              // showPicker is not in every engine; focus alone is the fallback.
+              (el as HTMLInputElement & { showPicker?: () => void }).showPicker?.();
+            }}
+          >
+            That&apos;s not right — change it
+          </button>
+        </div>
       )}
     </div>
   );

@@ -546,3 +546,37 @@ decisions:
       and gender are hard-required with a "Prefer not to say" OPTION, which is
       an answer rather than a refusal to give one.
       Released as r5.0.0.
+
+  - id: D-30
+    topic: Why answers matter, the age read back, and a last look before finishing
+    decision: purpose-confirmation-and-review
+    detail: >
+      Researcher direction 2026-08-02.
+      (a) WHY IT MATTERS: a short screen after consent and before the first
+      question — the last thing read before answering starts. There are no
+      right answers, only true ones; the research is about how sleep, screens
+      and feelings fit together for people this age and what actually helps;
+      a rushed or invented answer does not lose one number, it makes the whole
+      picture slightly less true for everyone the work is meant to help.
+      Deliberately short: a wall of exhortation gets skipped, and the point is
+      one idea. It carries no agreement and is not a consent statement.
+      (b) AGE READ BACK: entering a date of birth now answers "Great — that
+      makes you 15 years old", with a control to change it. A date typed a
+      digit wrong still looks like a date, so the error is invisible; an age
+      does not look like you, so the mistake is obvious at the one moment it
+      can still be fixed. The "(dd/mm/yyyy)" hint is dropped from the stem —
+      the native picker decides the order shown, so promising a format was a
+      claim the app does not control.
+      (c) REVIEW BEFORE FINISHING: reaching the end no longer ends the session.
+      Every question the participant actually saw is listed in order, grouped
+      by section, with the answer in the words they chose — tap any row to
+      change it, and editing returns straight to the list rather than walking
+      the rest of the survey again. The session is completed only when they
+      say they are done. Blanks are shown as blanks rather than hidden: "you
+      left this one blank" is information someone may want to act on, and
+      hiding it would quietly turn a skip into a decision nobody revisits.
+      Branches never entered do not appear — a question you were never asked
+      is not one you can have got wrong. Opening the review and every edit
+      made from it are recorded (review.opened / review.edited), so a
+      corrected answer is distinguishable from a first one in the paradata.
+      Released as r5.0.0.

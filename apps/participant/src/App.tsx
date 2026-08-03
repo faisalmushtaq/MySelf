@@ -14,6 +14,7 @@ import {
   type SessionRow,
 } from "./lib/db.js";
 import { SessionTiming, wordCount } from "./lib/timing.js";
+import { ReviewScreen } from "./components/ReviewScreen.js";
 import { SurveyScreen } from "./components/SurveyScreen.js";
 
 /**
@@ -31,9 +32,13 @@ const scaleMap = new Map<string, ResponseScale>(
 
 type Phase =
   | { kind: "start" }
-  | { kind: "running"; session: SessionRow; index: number }
+  /** `fromReview` means this screen was opened to correct an answer, so
+   *  finishing it goes back to the review rather than onward. */
+  | { kind: "running"; session: SessionRow; index: number; fromReview?: boolean }
   | { kind: "checkin"; session: SessionRow; index: number; firstSkipped: number }
   | { kind: "pace"; session: SessionRow; index: number }
+  /** Last look over everything before finishing (D-30). */
+  | { kind: "review"; session: SessionRow }
   | { kind: "finished"; session: SessionRow };
 
 const unitKeyOf = (i: number) => {
@@ -57,6 +62,7 @@ const effort = manifest.composition.effort;
 const codeRule = manifest.composition.participantCode;
 const contact = manifest.composition.contact;
 const finishScreen = manifest.composition.screens["finish"];
+const reviewScreen = manifest.composition.screens["review"];
 
 export default function App() {
   const [phase, setPhase] = useState<Phase>({ kind: "start" });
@@ -265,6 +271,14 @@ export default function App() {
       // for that visit and the running total across visits.
       await leaveItem(from, kind !== "skip" && kind !== "decline");
 
+      // Opened from the review to correct one answer: go straight back to the
+      // list rather than walking the rest of the survey again.
+      if (phase.fromReview) {
+        await appendEvent(phase.session, "review.edited", unitKeyOf(from), undefined, from, tMono());
+        setPhase({ kind: "review", session: phase.session });
+        return;
+      }
+
       const w = new Walker(flattened.units, storeRef.current, manifest.composition.allowBackNavigation);
       const next = w.next(from);
 
@@ -290,6 +304,14 @@ export default function App() {
       }
 
       if (next === null) {
+        // Straight past the last question used to end the session. Now it
+        // offers a look back first — the session is only completed once the
+        // participant says they are done (D-30).
+        if (reviewScreen) {
+          await appendEvent(phase.session, "review.opened", undefined, timing.current.summary(), from, tMono());
+          setPhase({ kind: "review", session: phase.session });
+          return;
+        }
         await appendEvent(phase.session, "session.completed", undefined, timing.current.summary(), from, tMono());
         await completeSession(phase.session);
         setPhase({ kind: "finished", session: phase.session });
@@ -481,6 +503,32 @@ export default function App() {
             </button>
           </div>
         </div>
+      )}
+
+      {phase.kind === "review" && reviewScreen && (
+        <ReviewScreen
+          units={flattened.units}
+          scales={scaleMap}
+          store={storeRef.current}
+          allowBack={manifest.composition.allowBackNavigation}
+          sectionTitles={flattened.sectionTitles}
+          sessionStart={new Date(phase.session.startedAt)}
+          title={reviewScreen.title ? resolveText(reviewScreen.title.text, reviewScreen.title.pipes, storeRef.current, new Date(phase.session.startedAt)) : "Before you finish"}
+          body={resolveText(reviewScreen.body.text, reviewScreen.body.pipes, storeRef.current, new Date(phase.session.startedAt))}
+          onEdit={(index) => {
+            void appendEvent(phase.session, "review.opened", unitKeyOf(index), { editing: true }, index, tMono());
+            const key = unitKeyOf(index);
+            if (key) timing.current.enter(key, wordsAt(index));
+            setPhase({ kind: "running", session: phase.session, index, fromReview: true });
+          }}
+          onFinish={() => {
+            void (async () => {
+              await appendEvent(phase.session, "session.completed", undefined, timing.current.summary(), 0, tMono());
+              await completeSession(phase.session);
+              setPhase({ kind: "finished", session: phase.session });
+            })();
+          }}
+        />
       )}
 
       {phase.kind === "finished" && (
