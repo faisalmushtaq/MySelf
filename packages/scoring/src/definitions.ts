@@ -110,9 +110,26 @@ export const scoreEhiSf: ScoringInput = {
       map: { "1": 100, "2": 50, "3": 0, "4": -50, "5": -100 },
     },
     { op: "mean", items: ["writing", "throwing", "toothbrush", "spoon"], output: "lq", minValid: 4 },
+    {
+      // Veale (2014) reports left-handed ≤ -60, right-handed ≥ +60, mixed in
+      // between. The wording here is what a participant reads back, so it is
+      // plain rather than clinical (D-33).
+      op: "classify",
+      input: "lq",
+      bands: [
+        { label: "strongly left-handed", min: -100, max: -90 },
+        { label: "left-handed", min: -89.999, max: -60 },
+        { label: "mixed-handed, leaning left", min: -59.999, max: -20 },
+        { label: "mixed-handed", min: -19.999, max: 19.999 },
+        { label: "mixed-handed, leaning right", min: 20, max: 59.999 },
+        { label: "right-handed", min: 60, max: 89.999 },
+        { label: "strongly right-handed", min: 90, max: 100 },
+      ],
+      output: "lq_band",
+    },
   ],
   provenance:
-    "EHI-SF laterality quotient as the mean of items scored 100..-100 (canonical right-first anchors; positive = right-handed). Veale (2014) classification cutoffs (left/mixed/right) to be added as a classify step after verification.",
+    "EHI-SF laterality quotient as the mean of items scored 100..-100 (canonical right-first anchors; positive = right-handed). Band labels follow Veale (2014) cutoffs (left ≤ -60, right ≥ +60) with the mixed range split for participant-facing wording only — the cutoffs themselves are unchanged and lq is the analysed variable (D-33).",
   verified: false,
 };
 

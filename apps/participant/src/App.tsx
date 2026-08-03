@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { AnswerStore, Walker, type AnswerValue, type PresentableUnit } from "@myself/engine";
-import { releaseManifest, responseScale, type ReleaseManifest, type ResponseScale } from "@myself/schema";
+import { releaseManifest, responseScale, scoringDefinition, type ReleaseManifest, type ResponseScale } from "@myself/schema";
 import rawManifest from "../../../releases/ybm_nd2026_standard_r6.0.0.manifest.json";
 import { flattenManifest } from "./lib/flatten.js";
-import { resolveText } from "./lib/pipes.js";
+import { resolveText, useScoringDefinitions } from "./lib/pipes.js";
 import {
   appendEvent,
   completeSession,
@@ -28,6 +28,13 @@ const manifest: ReleaseManifest = releaseManifest.parse(rawManifest);
 const flattened = flattenManifest(manifest);
 const scaleMap = new Map<string, ResponseScale>(
   Object.entries(manifest.scales).map(([k, v]) => [k, responseScale.parse(v)]),
+);
+
+// Scoring frozen into this release, so a `score` pipe can tell a participant
+// something about what they just answered (D-33). Same definitions the server
+// will recompute from, so a screen and an export can never disagree.
+useScoringDefinitions(
+  new Map(Object.entries(manifest.scoring).map(([k, v]) => [k, scoringDefinition.parse(v)])),
 );
 
 type Phase =

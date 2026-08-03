@@ -1086,6 +1086,13 @@ input[type="range"] {
   color: var(--text);
 }
 
+/* Centred over the axis it belongs to, not parked at the left-hand end. */
+.stem-object.centred {
+  display: block;
+  align-self: center;
+  margin-bottom: 0.25rem;
+}
+
 /* End anchors and the readout only exist for narrow screens, where the five
    labels cannot sit along the axis. Hidden wherever they do fit. */
 .spectrum-ends,
@@ -1131,14 +1138,25 @@ input[type="range"] {
     clip-path: inset(50%);
     white-space: nowrap;
   }
+  /* Three anchors on one row: left, middle, right, aligned with the dots
+     they sit under. The middle one matters most — it is the answer nobody
+     picks if they cannot see what the unlabelled centre dot means. */
   .spectrum-ends {
     display: flex;
     justify-content: space-between;
-    gap: 1rem;
+    gap: 0.5rem;
     margin-top: 0.15rem;
-    font-size: 0.95rem;
+    font-size: 0.9rem;
     font-weight: 500;
+    line-height: 1.25;
     color: var(--text);
+  }
+  .spectrum-ends span {
+    flex: 1 1 0;
+    text-align: center;
+  }
+  .spectrum-ends span:first-child {
+    text-align: left;
   }
   .spectrum-ends span:last-child {
     text-align: right;

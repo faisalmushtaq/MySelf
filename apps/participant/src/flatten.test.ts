@@ -298,6 +298,39 @@ describe("manifest flattening", () => {
     expect(manifest.composition.screens["finish"]?.body.text).not.toMatch(/hand the iPad back/i);
   });
 
+
+  it("asks the handedness questions outright and centres nothing at the left", () => {
+    const ehi = flattened.units.filter((u) => u.instrument === "ehi_sf" && u.item.responseType === "single_choice");
+    expect(ehi).toHaveLength(4);
+    for (const u of ehi) {
+      // "Writing" named the task without asking anything; each now asks.
+      expect(u.item.stem.text).toMatch(/^Which hand do you .+\?$/);
+      expect(u.item.hint).toMatch(/Both equally/);
+      if (u.item.responseType === "single_choice") expect(u.item.presentation).toBe("spectrum");
+    }
+    // the midpoint the participant needs to be able to see
+    const scale = manifest.scales["scale.ehi_sf_5pt"] as { options: { label: string }[] };
+    expect(scale.options.map((o) => o.label)).toContain("Both equally");
+  });
+
+  it("tells the participant their handedness score after all four items", () => {
+    const at = (key: string) => flattened.units.findIndex((u) => u.item.key === key);
+    const fb = flattened.units.find((u) => u.item.key === "lq_feedback");
+    expect(fb?.item.responseType).toBe("info");
+    // after every item it is computed from — feedback must not influence them
+    for (const key of ["writing", "throwing", "toothbrush", "spoon"]) {
+      expect(at(key)).toBeLessThan(at("lq_feedback"));
+    }
+    const lq = fb?.item.stem.pipes?.["lq"];
+    expect(lq?.kind).toBe("score");
+    expect(lq?.scoringKey).toBe("score.ehi_sf");
+    expect(lq?.output).toBe("lq");
+    expect(lq?.fallback).toBeTruthy(); // never shows a raw placeholder
+    expect(fb?.item.lede?.pipes?.["band"]?.output).toBe("lq_band");
+    // and the release actually carries the scoring it refers to
+    expect(manifest.scoring["score.ehi_sf"]).toBeDefined();
+  });
+
   it("resolves the consent withdrawal-date pipe from the session start", () => {
     const store = new AnswerStore();
     const text = resolveText(

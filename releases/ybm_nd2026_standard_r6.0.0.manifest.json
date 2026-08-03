@@ -876,7 +876,7 @@
           "language": "en-GB",
           "readingLevel": "standard",
           "informant": "self",
-          "label": "EHI-SF canonical (Veale 2014 anchors — VERIFY wording before approval)",
+          "label": "EHI-SF canonical (Veale 2014 anchors, confirmed by the researcher 2026-08-02)",
           "instructions": "Please indicate your preferences in the use of hands in the following activities.",
           "items": [
             {
@@ -885,12 +885,12 @@
               "variable": "ehi_writing",
               "legacyVariable": "Handedness_1",
               "stem": {
-                "text": "Writing"
+                "text": "Which hand do you write with?"
               },
               "required": "soft",
               "allowDecline": false,
               "illustration": "object:pen",
-              "hint": "Which hand do you write with?",
+              "hint": "Think about what you'd do without stopping to think about it. If you really would use either hand, choose \"Both equally\".",
               "responseType": "single_choice",
               "scale": "scale.ehi_sf_5pt",
               "scaleVersion": "1.0.0",
@@ -904,12 +904,12 @@
               "variable": "ehi_throwing",
               "legacyVariable": "Handedness_3",
               "stem": {
-                "text": "Throwing"
+                "text": "Which hand do you throw a ball with?"
               },
               "required": "soft",
               "allowDecline": false,
               "illustration": "object:ball",
-              "hint": "Which hand do you throw a ball with?",
+              "hint": "Think about what you'd do without stopping to think about it. If you really would use either hand, choose \"Both equally\".",
               "responseType": "single_choice",
               "scale": "scale.ehi_sf_5pt",
               "scaleVersion": "1.0.0",
@@ -923,12 +923,12 @@
               "variable": "ehi_toothbrush",
               "legacyVariable": "Handedness_5",
               "stem": {
-                "text": "Toothbrush"
+                "text": "Which hand do you hold your toothbrush in?"
               },
               "required": "soft",
               "allowDecline": false,
               "illustration": "object:toothbrush",
-              "hint": "Which hand do you hold your toothbrush in?",
+              "hint": "Think about what you'd do without stopping to think about it. If you really would use either hand, choose \"Both equally\".",
               "responseType": "single_choice",
               "scale": "scale.ehi_sf_5pt",
               "scaleVersion": "1.0.0",
@@ -942,18 +942,50 @@
               "variable": "ehi_spoon",
               "legacyVariable": "Handedness_7",
               "stem": {
-                "text": "Spoon"
+                "text": "Which hand do you hold a spoon in?"
               },
               "required": "soft",
               "allowDecline": false,
               "illustration": "object:spoon",
-              "hint": "Which hand do you hold a spoon in?",
+              "hint": "Think about what you'd do without stopping to think about it. If you really would use either hand, choose \"Both equally\".",
               "responseType": "single_choice",
               "scale": "scale.ehi_sf_5pt",
               "scaleVersion": "1.0.0",
               "presentation": "spectrum",
               "spectrumReverse": true,
               "autoAdvance": true
+            },
+            {
+              "key": "lq_feedback",
+              "revision": 1,
+              "variable": "ehi_lq_feedback",
+              "stem": {
+                "text": "Your handedness score is {lq}",
+                "pipes": {
+                  "lq": {
+                    "kind": "score",
+                    "scoringKey": "score.ehi_sf",
+                    "output": "lq",
+                    "decimals": 1,
+                    "fallback": "—"
+                  }
+                }
+              },
+              "lede": {
+                "text": "That puts you in the {band} range.\n\nThe scale runs from -100 (uses the left hand for everything) to +100 (uses the right hand for everything). Most people are somewhere near one end; being in the middle is genuinely uncommon, not a mistake.",
+                "pipes": {
+                  "band": {
+                    "kind": "score",
+                    "scoringKey": "score.ehi_sf",
+                    "output": "lq_band",
+                    "fallback": "mixed-handed"
+                  }
+                }
+              },
+              "required": "optional",
+              "allowDecline": false,
+              "researcherNote": "Participant-facing feedback on the EHI laterality quotient (D-33). Presentational only — computed from the answers just given, stored nowhere, and shown after all four items so it cannot influence any of them.",
+              "responseType": "info"
             }
           ],
           "presentationFidelity": "stepped_allowed"
@@ -984,10 +1016,10 @@
           "provenance": "estimated-heuristic"
         }
       ],
-      "changelog": "1.0: encoded from QSF. Canonical form uses Veale (2014) right-anchored responses per D-08; administered left-anchored form preserved as ybm-asadmin. Legacy matrix rows were coded 1,3,5,7. Presented as a left-to-right spatial spectrum with object illustrations (D-19, presentation only).",
+      "changelog": "1.0: encoded from QSF. Canonical form uses Veale (2014) right-anchored responses per D-08; administered left-anchored form preserved as ybm-asadmin. Legacy matrix rows were coded 1,3,5,7. Presented as a left-to-right spatial spectrum with object illustrations (D-19, presentation only). 2.0 (D-32): stems ask the question outright ('Which hand do you write with?') rather than naming the task ('Writing'); the object drawing is centred over the axis rather than sitting at the left, where it may have pulled answers towards the left-hand end; the midpoint is labelled on narrow screens. Response options and codes unchanged.",
       "approvalStatus": "draft",
       "owner": "ybm",
-      "researcherNotes": "Canonical anchor wording and LQ cutoffs must be verified against Veale (2014) before approval."
+      "researcherNotes": "Canonical anchor wording confirmed by the researcher 2026-08-02 (D-32). LQ cutoffs still to be checked against Veale (2014) when the scoring package computes them."
     },
     "macarthur_ssy@1.0/en-GB/self/standard": {
       "instrument": "macarthur_ssy",
@@ -4714,7 +4746,7 @@
         }
       ],
       "direction": "ascending",
-      "scoringNote": "Veale (2014) laterality quotient scoring; anchor wording to be verified against the published form before approval."
+      "scoringNote": "Veale (2014) laterality quotient scoring. Anchor wording confirmed by the researcher 2026-08-02 (D-32); the midpoint 'Both equally' is shown on every screen size."
     },
     "scale.kss_9pt": {
       "key": "scale.kss_9pt",
@@ -6173,9 +6205,51 @@
           ],
           "output": "lq",
           "minValid": 4
+        },
+        {
+          "op": "classify",
+          "input": "lq",
+          "bands": [
+            {
+              "label": "strongly left-handed",
+              "min": -100,
+              "max": -90
+            },
+            {
+              "label": "left-handed",
+              "min": -89.999,
+              "max": -60
+            },
+            {
+              "label": "mixed-handed, leaning left",
+              "min": -59.999,
+              "max": -20
+            },
+            {
+              "label": "mixed-handed",
+              "min": -19.999,
+              "max": 19.999
+            },
+            {
+              "label": "mixed-handed, leaning right",
+              "min": 20,
+              "max": 59.999
+            },
+            {
+              "label": "right-handed",
+              "min": 60,
+              "max": 89.999
+            },
+            {
+              "label": "strongly right-handed",
+              "min": 90,
+              "max": 100
+            }
+          ],
+          "output": "lq_band"
         }
       ],
-      "provenance": "EHI-SF laterality quotient as the mean of items scored 100..-100 (canonical right-first anchors; positive = right-handed). Veale (2014) classification cutoffs (left/mixed/right) to be added as a classify step after verification.",
+      "provenance": "EHI-SF laterality quotient as the mean of items scored 100..-100 (canonical right-first anchors; positive = right-handed). Band labels follow Veale (2014) cutoffs (left ≤ -60, right ≥ +60) with the mixed range split for participant-facing wording only — the cutoffs themselves are unchanged and lq is the analysed variable (D-33).",
       "verified": false
     },
     "score.swemwbs": {
@@ -6436,5 +6510,5 @@
   "prompts": {},
   "modelConfigs": {},
   "assets": {},
-  "hash": "sha256:ec0085d2e2243495b04c91826f0d46744bd472a1da61c2b817be93a18bd220ad"
+  "hash": "sha256:78235480c26f3bd82b45c087c1d52fdb88b50ac184721972b67f50a968806422"
 }

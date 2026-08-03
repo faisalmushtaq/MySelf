@@ -1,10 +1,49 @@
 import type { AnswerStore } from "@myself/engine";
-import type { PipeRef } from "@myself/schema";
+import type { PipeRef, ScoringDefinition } from "@myself/schema";
+import { executeScoring } from "@myself/scoring";
 
 /**
  * Resolve piped placeholders in participant-facing text. Only structured pipe
  * references are supported (no arbitrary interpolation — docs/05 §2).
  */
+
+/**
+ * Scoring definitions frozen into the running release, so a `score` pipe can
+ * tell a participant something about what they have just answered. Set once at
+ * start-up from the manifest; without it, score pipes fall back rather than
+ * inventing a number.
+ */
+let scoringByKey = new Map<string, ScoringDefinition>();
+export function useScoringDefinitions(defs: Map<string, ScoringDefinition>): void {
+  scoringByKey = defs;
+}
+
+/**
+ * Run a scoring definition over the answers given so far and return one of its
+ * outputs. Nothing is stored: this is a read of the current answers, computed
+ * for display, exactly as the server will recompute it later from the same raw
+ * data (D-33).
+ */
+function resolveScore(pipe: PipeRef, store: AnswerStore): string | null {
+  if (!pipe.scoringKey || !pipe.output) return null;
+  const def = scoringByKey.get(pipe.scoringKey);
+  if (!def) return null;
+  const values: Record<string, number | null> = {};
+  for (const step of def.steps) {
+    const items = "items" in step ? step.items : [];
+    for (const key of items) {
+      if (key in values) continue;
+      const rec = store.get({ instrument: def.instrument, item: key, revision: 1 });
+      values[key] = rec?.status === "answered" && rec.value?.kind === "choice" ? rec.value.code : null;
+    }
+  }
+  const out = executeScoring(def, values).outputs[pipe.output];
+  if (out === null || out === undefined) return null;
+  if (typeof out === "number") {
+    return pipe.decimals === undefined ? String(out) : out.toFixed(pipe.decimals);
+  }
+  return out;
+}
 
 export function resolveText(
   text: string,
@@ -42,6 +81,8 @@ export function resolveText(
         if (rec?.status === "answered" && rec.value?.kind === "number") return String(rec.value.value);
         return unresolved;
       }
+      case "score":
+        return resolveScore(pipe, store) ?? unresolved;
       case "session_field":
         return unresolved; // populated when session metadata pipes are configured
     }
