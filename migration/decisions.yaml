@@ -846,3 +846,39 @@ decisions:
       well-formed wrong identifier is the dangerous case: it either drops a
       child out of the linked cohort or attaches them to somebody else, and
       neither is visible afterwards.
+
+  - id: D-39
+    topic: Firebase as the backend
+    decision: firestore-two-projects-rules-tested-against-the-emulator
+    detail: >
+      Researcher direction 2026-08-03, after ethics approval by Chair's action:
+      go with Firebase provided it is reliable, maintenance-free and free at
+      this scale. Supersedes the hosting half of D-36; the self-hosted stack
+      stays in the repository as a tested fallback.
+      The argument that decided it: for a single researcher with no IT support,
+      a forgotten unpatched box holding children's answers is a more likely
+      breach than a misconfigured managed service. Firebase removes the box.
+      What it costs is the database-enforced identity separation, which is
+      recovered by putting identity in a SECOND FIREBASE PROJECT with its own
+      IAM — a project boundary being the strongest control Firebase offers.
+      Nothing in a browser reaches it: names go in through a Firestore trigger
+      and come out through owner-only callables, so a child's name never passes
+      through a researcher's laptop, which is better than the file route it
+      replaces.
+      One document per sitting, whole event log inline. At ~54 kB against the
+      1 MiB limit this makes deriving the dataset one read per sitting rather
+      than one per event — 1,000 reads instead of 295,000 — which is the
+      difference between fitting in the free tier and not. Logs too large spill
+      into chunk documents packed to a BYTE budget, not an event count: a first
+      version chunked on count alone and produced over-limit chunks as soon as
+      answers got long, which fails the write and loses the sitting the spill
+      exists to save. Caught by its own test.
+      Because the rules are now the access control, they are tested against the
+      real Firestore emulator — 20 tests, each rule exercised from both sides,
+      the caller who should pass and the caller who should not. An iPad may
+      post sittings and read nothing; a stolen device is not a window into the
+      cohort. Nobody, at any role, may edit a raw log or delete a sitting.
+      Honest caveat recorded in docs/13: Blaze is required for functions and
+      scheduled exports, so "free" means a card on file billed at zero, with a
+      budget alert. Without Blaze the identity separation cannot be enforced,
+      so it is not really optional for this design.

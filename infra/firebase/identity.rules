@@ -1,0 +1,65 @@
+rules_version = '2';
+
+/**
+ * MySelf — identity project rules.
+ *
+ * A different Firebase project from the research data, with its own IAM. This
+ * is the strongest separation Firebase offers and it is the whole reason the
+ * study can hold names at all: a credential that reaches the answers does not
+ * reach this project, and the reverse.
+ *
+ * What lives here: names, dates of birth, the secret-code components, UPNs,
+ * NHS numbers, parent-child relationships, and a log of every time somebody
+ * looked at any of it.
+ *
+ * The rules are deliberately narrower than the research project's:
+ *
+ *   - only owners, never researchers or analysts, and never devices
+ *   - reads happen through a Cloud Function that writes the access log first,
+ *     so a lookup that found nothing is still recorded; direct client reads of
+ *     participant records are closed
+ *   - the access log cannot be written from a client at all, so nobody can
+ *     manufacture a justification for a lookup they did not make
+ */
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isOwner() {
+      return request.auth != null
+        && request.auth.token.get('device', false) == false
+        && request.auth.token.get('role', '') == 'owner';
+    }
+
+    match /studies/{study} {
+
+      // Written by the ingest function from the identity partition, and read
+      // through the linkage function. No client read path: a console session
+      // with an owner's credentials should not be able to page through
+      // children's names, and this is what stops it.
+      match /participants/{code} {
+        allow read, write: if false;
+      }
+
+      // Every code a person has typed, wave by wave. The evidence a twin split
+      // or a mistyped-code correction is based on.
+      match /claims/{sessionId} {
+        allow read, write: if false;
+      }
+
+      match /relationships/{id} {
+        allow read, write: if false;
+      }
+
+      // Readable by an owner reviewing who looked at what — which is the point
+      // of it — and writable by nothing outside the admin SDK.
+      match /accessLog/{entry} {
+        allow read: if isOwner();
+        allow write: if false;
+      }
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

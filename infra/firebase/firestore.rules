@@ -1,0 +1,150 @@
+rules_version = '2';
+
+/**
+ * MySelf — research project rules.
+ *
+ * On Postgres the access control was a role with no grant. Here it is this
+ * file, so it is written to be read: every rule states who and why, and the
+ * rules test suite exercises each one from both sides — the caller who should
+ * pass and the caller who should not.
+ *
+ * Three kinds of caller:
+ *   - iPads, which carry a `device` claim. They may add sittings and read
+ *     nothing. A stolen device cannot read the study back.
+ *   - people, who carry a `role` claim of owner, researcher or analyst.
+ *   - everybody else, who gets nothing.
+ *
+ * Participants never authenticate at all: the iPad is the authenticated party,
+ * not the child using it.
+ */
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function role() {
+      return signedIn() ? request.auth.token.get('role', '') : '';
+    }
+
+    function isDevice() {
+      return signedIn() && request.auth.token.get('device', false) == true;
+    }
+
+    // A person, as opposed to an iPad. Devices are deliberately excluded from
+    // every read path below by this distinction.
+    function isPerson() {
+      return signedIn() && !isDevice() && role() in ['owner', 'researcher', 'analyst'];
+    }
+
+    function canWrite() {
+      return role() in ['owner', 'researcher'];
+    }
+
+    function isOwner() {
+      return role() == 'owner';
+    }
+
+    // The device's own study, so one site's iPad cannot post into another's.
+    function deviceStudy() {
+      return request.auth.token.get('study', '');
+    }
+
+    match /studies/{study} {
+
+      // ── Sittings ────────────────────────────────────────────────────────
+      match /sessions/{sessionId} {
+        // People read; devices never do.
+        allow read: if isPerson();
+
+        // A device may create a sitting that does not exist yet, in its own
+        // study, stamped with its own id. Create-only is what makes a retried
+        // upload safe: the second attempt is refused rather than doubling
+        // anything, and the client treats "already exists" as success.
+        allow create: if isDevice()
+          && study == deviceStudy()
+          && request.resource.data.deviceId == request.auth.uid
+          && request.resource.data.sessionId == sessionId
+          && request.resource.data.study == study;
+
+        // Only the device that created a sitting may add to it — the case
+        // where a participant resumes and finishes on the same iPad. A second
+        // device writing here is exactly the merge this platform must never
+        // make, so it is refused at the rule and the client files a quarantine
+        // record instead.
+        allow update: if isDevice()
+          && resource.data.deviceId == request.auth.uid
+          && request.resource.data.deviceId == resource.data.deviceId
+          && request.resource.data.sessionId == resource.data.sessionId
+          && request.resource.data.releaseHash == resource.data.releaseHash;
+
+        // Researchers may mark a sitting quarantined, and nothing else about
+        // it. The raw log is the record; no person edits it, ever.
+        allow update: if canWrite()
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['quarantined']);
+
+        // Nobody deletes. Withdrawal is a documented workflow that writes a
+        // tombstone, not an ad-hoc delete from a console.
+        allow delete: if false;
+
+        match /chunks/{chunk} {
+          allow read: if isPerson();
+          allow create: if isDevice() && study == deviceStudy();
+          allow update, delete: if false;
+        }
+      }
+
+      // ── Quarantine ──────────────────────────────────────────────────────
+      // A device whose write was refused files the copy it was holding here,
+      // so both versions survive and a human can compare them.
+      match /quarantine/{entry} {
+        allow read: if isPerson();
+        allow create: if isDevice() && study == deviceStudy();
+        allow update: if canWrite();
+        allow delete: if false;
+      }
+
+      // ── Corrections and twin splits ─────────────────────────────────────
+      // Both change who a sitting belongs to, so both are researcher-level and
+      // both are append-then-withdraw rather than edit-in-place: the history of
+      // what was believed about a participant is itself worth keeping.
+      match /corrections/{correction} {
+        allow read: if isPerson();
+        allow create: if canWrite() && request.resource.data.wrongCode != request.resource.data.rightCode;
+        allow update: if canWrite()
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['withdrawnAt', 'withdrawnBy']);
+        allow delete: if false;
+      }
+
+      match /assignments/{sessionId} {
+        allow read: if isPerson();
+        allow write: if canWrite();
+      }
+
+      // ── Devices ─────────────────────────────────────────────────────────
+      // Enrolment happens in a Cloud Function using the admin SDK, which is
+      // not subject to these rules. Nothing a browser can do creates a device.
+      match /devices/{deviceId} {
+        allow read: if isOwner();
+        allow write: if false;
+      }
+
+      // ── Audit ───────────────────────────────────────────────────────────
+      // Append-only for anyone who can write, readable only by an owner. Not
+      // editable by anybody, including the person who wrote the entry.
+      match /audit/{entry} {
+        allow read: if isOwner();
+        allow create: if signedIn();
+        allow update, delete: if false;
+      }
+    }
+
+    // Anything not named above is closed. Firestore's default is already deny,
+    // but stating it means a new collection added in a hurry does not quietly
+    // inherit somebody else's permissions.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

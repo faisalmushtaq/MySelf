@@ -21,3 +21,22 @@ jobs:
       - run: pnpm -r build
       - run: pnpm -r typecheck
       - run: pnpm -r test
+
+  # Security rules are the access control on Firebase, so an untested rules
+  # change is an untested security change. This runs them against the real
+  # Firestore emulator, from both sides of every rule.
+  rules:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - run: npm install
+        working-directory: infra/firebase/test
+      - run: npm test
+        working-directory: infra/firebase/test
