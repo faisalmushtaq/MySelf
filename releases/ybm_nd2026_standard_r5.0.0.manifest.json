@@ -411,7 +411,7 @@
               "variable": "consent",
               "legacyVariable": "Consent",
               "stem": {
-                "text": "Please click to indicate you understand and agree to these statements and consent to take part."
+                "text": "Please tap each statement to indicate you understand and agree to them, and that you consent to take part."
               },
               "required": "hard",
               "allowDecline": false,
@@ -705,7 +705,10 @@
               "variable": "ethnicity",
               "legacyVariable": "Ethnicity",
               "stem": {
-                "text": "What best describes your ethnic origin?\n\nEthnic origin refers to your cultural background or where your family comes from, including your ancestors, country of origin, and cultural traditions you identify with."
+                "text": "What best describes your ethnic origin?"
+              },
+              "lede": {
+                "text": "Ethnic origin refers to your cultural background or where your family comes from, including your ancestors, country of origin, and cultural traditions you identify with."
               },
               "required": "hard",
               "allowDecline": false,
@@ -740,11 +743,14 @@
               "variable": "mh_medication",
               "legacyVariable": "Medication",
               "stem": {
-                "text": "Are you currently taking any prescribed medication for a mental health or psychiatric condition? (e.g., antidepressants). This information will only be used to help us describe the sample and it will not be used to decide whether you can take part in the study or shared with anyone else."
+                "text": "Are you currently taking any prescribed medication for a mental health or psychiatric condition?"
+              },
+              "lede": {
+                "text": "For example, antidepressants. We only use this to describe who took part — it never affects whether you can take part, and it is not shared with anyone else."
               },
               "required": "hard",
               "allowDecline": false,
-              "researcherNote": "Special-category health data (A-30). Mid-sentence 'It' fixed per D-07.",
+              "researcherNote": "Special-category health data (A-30). Mid-sentence 'It' fixed per D-07. Question and reassurance split into stem and lede (D-29).",
               "responseType": "single_choice",
               "scale": "scale.yes_no",
               "scaleVersion": "1.0.0",
@@ -1088,7 +1094,7 @@
               "variable": "kss_q1",
               "legacyVariable": "Karolinska",
               "stem": {
-                "text": "On a scale of 1 through 9 indicate how sleepy you are feeling right now:"
+                "text": "How sleepy are you feeling right now?"
               },
               "required": "soft",
               "allowDecline": false,
@@ -2649,7 +2655,7 @@
               "variable": "sm_apps_owned",
               "legacyVariable": "DragDrop_SM",
               "stem": {
-                "text": "Drag and drop the apps into the box that shows whether you have them on your phone.\n\nThen, in the 'I have these apps on my phone' box, rank the apps based on how much you use them (from most to least). You can ignore the ranking for the other box."
+                "text": "Which of these apps do you have on your phone?"
               },
               "required": "soft",
               "allowDecline": false,
@@ -3165,7 +3171,10 @@
               "variable": "sm_abstain_days",
               "legacyVariable": "Abstaining_days_1",
               "stem": {
-                "text": "How long do you think you could completely abstain from social media, excluding instant messaging apps such as WhatsApp?\nBy social media, we mean platforms such as TikTok, Instagram, Facebook, Snapchat, X/Twitter, Reddit, YouTube, and Threads."
+                "text": "How long do you think you could go without social media?"
+              },
+              "lede": {
+                "text": "We mean platforms like TikTok, Instagram, Facebook, Snapchat, X (Twitter), Reddit, YouTube and Threads — not messaging apps such as WhatsApp."
               },
               "required": "soft",
               "allowDecline": false,
@@ -3515,11 +3524,14 @@
               "variable": "gaming_hours_week",
               "legacyVariable": "weekday_games",
               "stem": {
-                "text": "Roughly how many hours do you play video games in a typical week? For example, if you usually play 1 hour per day during the week (Monday – Friday) and 2 hours per day during the weekend (Saturday and Sunday), this would be 9 hours per week in total."
+                "text": "Roughly how many hours do you play video games in a typical week?"
+              },
+              "lede": {
+                "text": "For example, an hour a day Monday to Friday plus two hours a day at the weekend comes to 9 hours."
               },
               "required": "soft",
               "allowDecline": false,
-              "researcherNote": "Legacy tag 'weekday_games' mismatched content (A-9); canonical name corrected, alias kept. Band gap 5-6h preserved (C3).",
+              "researcherNote": "Legacy tag 'weekday_games' mismatched content (A-9); canonical name corrected, alias kept. Band gap closed in D-27. Worked example moved to the lede (D-29).",
               "responseType": "single_choice",
               "scale": "scale.gaming_hours_6pt",
               "scaleVersion": "1.0.0",
@@ -4767,75 +4779,84 @@
     },
     "scale.kss_9pt": {
       "key": "scale.kss_9pt",
-      "version": "1.0.0",
-      "name": "KSS 9-point sleepiness scale (canonical labels)",
+      "version": "2.0.0",
+      "name": "KSS 9-point sleepiness scale (canonical labels, words only)",
       "options": [
         {
           "code": 1,
-          "label": "1 - Extremely alert",
+          "label": "Extremely alert",
           "legacyCode": 1,
           "kind": "substantive",
-          "textEntry": false
+          "textEntry": false,
+          "codeLabel": "1"
         },
         {
           "code": 2,
-          "label": "2 - Very alert",
+          "label": "Very alert",
           "legacyCode": 2,
           "kind": "substantive",
-          "textEntry": false
+          "textEntry": false,
+          "codeLabel": "2"
         },
         {
           "code": 3,
-          "label": "3 - Alert",
+          "label": "Alert",
           "legacyCode": 3,
           "kind": "substantive",
-          "textEntry": false
+          "textEntry": false,
+          "codeLabel": "3"
         },
         {
           "code": 4,
-          "label": "4 - Rather alert",
+          "label": "Rather alert",
           "legacyCode": 4,
           "kind": "substantive",
-          "textEntry": false
+          "textEntry": false,
+          "codeLabel": "4"
         },
         {
           "code": 5,
-          "label": "5 - Neither alert nor sleepy",
+          "label": "Neither alert nor sleepy",
           "legacyCode": 5,
           "kind": "substantive",
-          "textEntry": false
+          "textEntry": false,
+          "codeLabel": "5"
         },
         {
           "code": 6,
-          "label": "6 - Some signs of sleepiness",
+          "label": "Some signs of sleepiness",
           "legacyCode": 6,
           "kind": "substantive",
-          "textEntry": false
+          "textEntry": false,
+          "codeLabel": "6"
         },
         {
           "code": 7,
-          "label": "7 - Sleepy, but no effort to keep awake",
+          "label": "Sleepy, but no effort to keep awake",
           "legacyCode": 7,
           "kind": "substantive",
-          "textEntry": false
+          "textEntry": false,
+          "codeLabel": "7"
         },
         {
           "code": 8,
-          "label": "8 - Sleepy, some effort to keep awake",
+          "label": "Sleepy, some effort to keep awake",
           "legacyCode": 8,
           "kind": "substantive",
-          "textEntry": false
+          "textEntry": false,
+          "codeLabel": "8"
         },
         {
           "code": 9,
-          "label": "9 - Very sleepy, great effort to keep awake, fighting sleep",
+          "label": "Very sleepy, great effort to keep awake, fighting sleep",
           "legacyCode": 9,
           "kind": "substantive",
-          "textEntry": false
+          "textEntry": false,
+          "codeLabel": "9"
         }
       ],
       "direction": "ascending",
-      "scoringNote": "Single-item state measure; score = selected code (1-9)."
+      "scoringNote": "Single-item state measure; score = selected code (1-9). The scale point is in codeLabel; participants see the verbal anchor only (D-29)."
     },
     "scale.sleep_importance_11": {
       "key": "scale.sleep_importance_11",
@@ -6653,5 +6674,5 @@
   "prompts": {},
   "modelConfigs": {},
   "assets": {},
-  "hash": "sha256:065f2b8a0553d2709b6d968a8c32a441bddd8959dcf5bc358bc0a5456d3ff17e"
+  "hash": "sha256:214d32e4708ec82624afa7d4acb8ae17b3234cc99caed7442f2854d3ec75518b"
 }

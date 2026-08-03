@@ -119,7 +119,9 @@ export const ybmIntroConsent: ModuleInput = {
           variable: "consent",
           legacyVariable: "Consent",
           required: "hard", // D-06: all statements required, no in-app decline path
-          stem: { text: "Please click to indicate you understand and agree to these statements and consent to take part." },
+          // "click" was a desktop-Qualtrics word; this is a tablet. Interaction
+          // verbs must describe the interaction that exists (D-29).
+          stem: { text: "Please tap each statement to indicate you understand and agree to them, and that you consent to take part." },
           statements: [
             {
               key: "dissemination",
@@ -329,10 +331,13 @@ export const ybmDemographics: ModuleInput = {
           "ethnicity",
           "ethnicity",
           "Ethnicity",
-          "What best describes your ethnic origin?\n\nEthnic origin refers to your cultural background or where your family comes from, including your ancestors, country of origin, and cultural traditions you identify with.",
+          "What best describes your ethnic origin?",
           "scale.ethnicity_uk20",
           {
             required: "hard",
+            lede: {
+              text: "Ethnic origin refers to your cultural background or where your family comes from, including your ancestors, country of origin, and cultural traditions you identify with.",
+            },
             researcherNote:
               "'Ethic origin' typo fixed per D-07. Presented as a full tappable list rather than a menu (D-23): the census categories are long enough to need reading, and a menu hides them behind an extra tap.",
           },
@@ -342,9 +347,15 @@ export const ybmDemographics: ModuleInput = {
           "medication",
           "mh_medication",
           "Medication",
-          "Are you currently taking any prescribed medication for a mental health or psychiatric condition? (e.g., antidepressants). This information will only be used to help us describe the sample and it will not be used to decide whether you can take part in the study or shared with anyone else.",
+          "Are you currently taking any prescribed medication for a mental health or psychiatric condition?",
           "scale.yes_no",
-          { required: "hard", researcherNote: "Special-category health data (A-30). Mid-sentence 'It' fixed per D-07." },
+          {
+            required: "hard",
+            lede: {
+              text: "For example, antidepressants. We only use this to describe who took part — it never affects whether you can take part, and it is not shared with anyone else.",
+            },
+            researcherNote: "Special-category health data (A-30). Mid-sentence 'It' fixed per D-07. Question and reassurance split into stem and lede (D-29).",
+          },
         ),
       ],
     },
@@ -563,7 +574,10 @@ export const ybmSocialMedia: ModuleInput = {
           variable: "sm_apps_owned",
           legacyVariable: "DragDrop_SM",
           stem: {
-            text: "Drag and drop the apps into the box that shows whether you have them on your phone.\n\nThen, in the 'I have these apps on my phone' box, rank the apps based on how much you use them (from most to least). You can ignore the ranking for the other box.",
+            // Was "Drag and drop the apps into the box…", describing a
+            // Qualtrics interaction that does not exist here: the control is
+            // two tap steps, and it prints its own step labels (D-29).
+            text: "Which of these apps do you have on your phone?",
           },
           scale: "scale.sm_platforms",
           scaleVersion: "1.0.0",
@@ -640,7 +654,10 @@ export const ybmSocialMedia: ModuleInput = {
           variable: "sm_abstain_days",
           legacyVariable: "Abstaining_days_1",
           stem: {
-            text: "How long do you think you could completely abstain from social media, excluding instant messaging apps such as WhatsApp?\nBy social media, we mean platforms such as TikTok, Instagram, Facebook, Snapchat, X/Twitter, Reddit, YouTube, and Threads.",
+            text: "How long do you think you could go without social media?",
+          },
+          lede: {
+            text: "We mean platforms like TikTok, Instagram, Facebook, Snapchat, X (Twitter), Reddit, YouTube and Threads — not messaging apps such as WhatsApp.",
           },
           min: 0,
           max: 3650,
@@ -730,9 +747,14 @@ export const ybmGaming: ModuleInput = {
           "hours_week",
           "gaming_hours_week",
           "weekday_games",
-          "Roughly how many hours do you play video games in a typical week? For example, if you usually play 1 hour per day during the week (Monday – Friday) and 2 hours per day during the weekend (Saturday and Sunday), this would be 9 hours per week in total.",
+          "Roughly how many hours do you play video games in a typical week?",
           "scale.gaming_hours_6pt",
-          { researcherNote: "Legacy tag 'weekday_games' mismatched content (A-9); canonical name corrected, alias kept. Band gap 5-6h preserved (C3)." },
+          {
+            lede: {
+              text: "For example, an hour a day Monday to Friday plus two hours a day at the weekend comes to 9 hours.",
+            },
+            researcherNote: "Legacy tag 'weekday_games' mismatched content (A-9); canonical name corrected, alias kept. Band gap closed in D-27. Worked example moved to the lede (D-29).",
+          },
         ),
         {
           responseType: "form_fields",

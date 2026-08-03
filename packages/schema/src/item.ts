@@ -3,6 +3,15 @@ import { dottedKey, itemRef, semver, slug, variableName } from "./identifiers.js
 import { logicExpr, pipeRef } from "./logic.js";
 
 /**
+ * The oldest age any participant may ever be recorded as, in any study, in any
+ * release. Researchers narrow the range per study; nothing widens past this.
+ * It exists so an implausible date of birth cannot enter the data through a
+ * mis-set configuration — the publish gate refuses a release above it, and the
+ * control clamps to it regardless of what a release says.
+ */
+export const ABSOLUTE_MAX_AGE_YEARS = 120;
+
+/**
  * Consistency between answers, declared rather than coded. A questionnaire
  * that asks the same fact twice should notice when the two disagree — and say
  * so at the point of entry, where the participant can still tell us which one
@@ -169,9 +178,14 @@ export const itemDefinition = z.discriminatedUnion("responseType", [
     responseType: z.literal("date"),
     minYear: z.number().int().optional(),
     maxYear: z.number().int().optional(),
-    /** Plausibility bounds for dates of birth, checked against session date. */
-    minAgeYears: z.number().int().min(0).optional(),
-    maxAgeYears: z.number().int().min(0).optional(),
+    /**
+     * Plausibility bounds for dates of birth, checked against the session
+     * date. The researcher sets these per study — a school cohort might use
+     * 10 to 19 — but no release may exceed the absolute ceiling below, and
+     * the control clamps to it whatever a release says.
+     */
+    minAgeYears: z.number().int().min(0).max(ABSOLUTE_MAX_AGE_YEARS).optional(),
+    maxAgeYears: z.number().int().min(0).max(ABSOLUTE_MAX_AGE_YEARS).optional(),
   }),
   z.object({
     ...baseItem,

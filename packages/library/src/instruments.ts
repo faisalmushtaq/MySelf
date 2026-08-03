@@ -69,7 +69,7 @@ export const kss: InstrumentInput = {
       language: "en-GB",
       label: "KSS canonical (en-GB)",
       items: [
-        row("q1", "kss_q1", "Karolinska", "On a scale of 1 through 9 indicate how sleepy you are feeling right now:", "scale.kss_9pt"),
+        row("q1", "kss_q1", "Karolinska", "How sleepy are you feeling right now?", "scale.kss_9pt"),
       ],
     },
     {
@@ -77,7 +77,7 @@ export const kss: InstrumentInput = {
       variant: "ybm-asadmin",
       label: "KSS as administered, YBM 2026 (A-8 label deviations preserved)",
       items: [
-        row("q1", "kss_q1", "Karolinska", "On a scale of 1 through 9 indicate how sleepy you are feeling right now:", "scale.kss_9pt_ybm"),
+        row("q1", "kss_q1", "Karolinska", "How sleepy are you feeling right now?", "scale.kss_9pt_ybm"),
       ],
     },
   ],
