@@ -497,3 +497,52 @@ decisions:
       This supersedes D-21 (DM Sans) and D-24a (Newsreader). The point of the
       single `--font-ui` switch point is that this was a two-line change; it
       remains the one place to swap in a dyslexia-friendly face.
+
+  - id: D-29
+    topic: Systematic QA sweep — layout, interaction wording, and age bounds
+    decision: qa-pass-and-permanent-guards
+    detail: >
+      Researcher direction 2026-08-02: a systematic examination of the whole
+      survey. Every screen type was walked at phone (390px) and iPad (1024px)
+      width with automated checks for horizontal overflow, clipped content and
+      tap targets under 44px, and every canonical item was read for wording
+      that describes something that is not there.
+      (a) HANDEDNESS ON A PHONE — the worst finding. Below 560px the spectrum
+      collapsed into a vertical list, which threw away the left-to-right
+      arrangement that IS the question (D-19), and rendered as a ragged
+      left-aligned staircase because the flex basis was never reset for the
+      column direction. Narrow screens now keep the axis horizontal: the dots
+      stay on the line at 34px, the labels drop out visually but remain as the
+      accessible names, the two ends are named underneath, and the chosen
+      answer is read back in words.
+      (b) INTERACTION WORDING — "Drag and drop the apps into the box" described
+      a Qualtrics control that does not exist here; the app question is two tap
+      steps that print their own labels, so the stem is now just the question.
+      Consent said "Please click"; this is a tablet. Tests now fail on
+      clicking, dragging, paper-form ticking, above/below references and "on a
+      scale of", across every canonical form.
+      (c) NUMBERS OFF THE SCALE POINTS — the KSS read "1 - Extremely alert …
+      9 - Very sleepy". The digit is a paper artefact for counting by hand and
+      asks a participant to hold a number and a phrase at once when the phrase
+      is the measurement. Participants now see the words only; codes 1-9 are
+      unchanged and the digit lives in `codeLabel` for the codebook. The stem
+      "On a scale of 1 through 9 indicate how sleepy you are feeling right now"
+      is now "How sleepy are you feeling right now?".
+      (d) QUESTION AND EXPLANATION SEPARATED — four items (ethnicity,
+      medication, social-media abstention, weekly gaming hours) carried a
+      question and its explanation in one stem, set at question size. Each is
+      now a stem plus a lede, as everywhere else.
+      (e) TAP TARGETS — the consent tick was 20px, the smallest and most
+      consequential control on screen; now 26px inside a full-row label. The
+      help toggle had a 25px target; now 44px.
+      (f) AGE BOUNDS — researchers set the plausible age range per study, but
+      no release may exceed an absolute ceiling of 120 years, enforced in the
+      schema (a release above it cannot be published) and again in the date
+      control (it clamps regardless of what a release says). Belt and braces
+      because a mis-set configuration must not be able to admit an implausible
+      date of birth into the data.
+      Not faults, checked and left alone: the sleep-priority, sleep-knowledge
+      and social-media-function scales are genuinely unordered lists; ethnicity
+      and gender are hard-required with a "Prefer not to say" OPTION, which is
+      an answer rather than a refusal to give one.
+      Released as r5.0.0.

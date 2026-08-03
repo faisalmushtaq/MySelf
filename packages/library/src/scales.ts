@@ -140,34 +140,49 @@ export const month12: ResponseScale = {
   })),
 };
 
-/** KSS canonical labels (D-08; A-8 typo corrected, point 4 "Rather alert"). */
+/**
+ * KSS canonical labels (D-08; A-8 typo corrected, point 4 "Rather alert").
+ *
+ * The digits are gone from what participants read (D-29). "1 - Extremely
+ * alert" asks someone to hold a number and a phrase at once when the phrase
+ * alone is the thing being measured; the number was a paper-form artefact for
+ * counting by hand. Codes 1-9 are unchanged and the digit is kept in
+ * `codeLabel` for the codebook, so scoring and the crosswalk see exactly what
+ * they saw before.
+ */
+const kssLabels = [
+  "Extremely alert",
+  "Very alert",
+  "Alert",
+  "Rather alert",
+  "Neither alert nor sleepy",
+  "Some signs of sleepiness",
+  "Sleepy, but no effort to keep awake",
+  "Sleepy, some effort to keep awake",
+  "Very sleepy, great effort to keep awake, fighting sleep",
+];
+
 export const kss9Canonical: ResponseScale = {
   key: "scale.kss_9pt",
-  version: "1.0.0",
-  name: "KSS 9-point sleepiness scale (canonical labels)",
+  version: "2.0.0",
+  name: "KSS 9-point sleepiness scale (canonical labels, words only)",
   direction: "ascending",
-  options: [
-    opt(1, "1 - Extremely alert", 1),
-    opt(2, "2 - Very alert", 2),
-    opt(3, "3 - Alert", 3),
-    opt(4, "4 - Rather alert", 4),
-    opt(5, "5 - Neither alert nor sleepy", 5),
-    opt(6, "6 - Some signs of sleepiness", 6),
-    opt(7, "7 - Sleepy, but no effort to keep awake", 7),
-    opt(8, "8 - Sleepy, some effort to keep awake", 8),
-    opt(9, "9 - Very sleepy, great effort to keep awake, fighting sleep", 9),
-  ],
-  scoringNote: "Single-item state measure; score = selected code (1-9).",
+  options: kssLabels.map((label, i) => ({
+    ...opt(i + 1, label, i + 1),
+    codeLabel: String(i + 1),
+  })),
+  scoringNote:
+    "Single-item state measure; score = selected code (1-9). The scale point is in codeLabel; participants see the verbal anchor only (D-29).",
 };
 
 /** Exact administered YBM labels preserved (A-8). */
 export const kss9AsAdministered: ResponseScale = {
   ...kss9Canonical,
   key: "scale.kss_9pt_ybm",
-  name: "KSS 9-point scale as administered in YBM 2026",
+  name: "KSS 9-point scale as administered in YBM 2026 (words only)",
   options: kss9Canonical.options.map((o) => {
-    if (o.code === 4) return { ...o, label: "4- Fairly alert" };
-    if (o.code === 7) return { ...o, label: "7 - Sleepy, but not no effort to keep awake" };
+    if (o.code === 4) return { ...o, label: "Fairly alert" };
+    if (o.code === 7) return { ...o, label: "Sleepy, but not no effort to keep awake" };
     return o;
   }),
 };

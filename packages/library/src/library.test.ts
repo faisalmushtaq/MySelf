@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { instrumentVersion, moduleDefinition, responseScale } from "@myself/schema";
+import { ABSOLUTE_MAX_AGE_YEARS, instrumentVersion, itemDefinition, moduleDefinition, responseScale } from "@myself/schema";
 import { allInstruments } from "./instruments.js";
 import { allModules } from "./modules.js";
 import { allScales } from "./scales.js";
@@ -160,6 +160,94 @@ describe("scales", () => {
   it("direction metadata is present and deliberate on the reversed pair (A-18)", () => {
     expect(parsedScales.find((s) => s.key === "scale.agree_5pt_desc")!.direction).toBe("descending");
     expect(parsedScales.find((s) => s.key === "scale.doomscroll_7pt")!.direction).toBe("ascending");
+  });
+});
+
+/**
+ * Wording that describes a control we do not have, or a page layout that does
+ * not exist. These crept in from the Qualtrics original — "drag and drop the
+ * apps", "please click", "below are some statements" — and each one is a
+ * participant being told to do something impossible (D-29).
+ *
+ * Canonical forms only: as-administered variants preserve the original
+ * wording verbatim on purpose, so they are exempt.
+ */
+describe("nothing describes an interaction or a layout that is not there", () => {
+  const canonicalItems = everything.flatMap((inst) =>
+    inst.forms.filter((f) => !f.variant).flatMap((f) => f.items.map((item) => ({ inst: inst.instrument, item }))),
+  );
+
+  it.each([
+    ["clicking, on a tablet", /\bclick\b/i],
+    ["dragging, when the control is tapped", /\bdrag\b/i],
+    ["something above or below, when one question fills the screen", /\b(are|is|shown|given|listed|presented)\s+(above|below)\b/i],
+    ["ticking or circling a box on paper", /tick the box|check the box|circle (the|one)/i],
+    ["a numeric scale the participant does not need to see", /on a scale of/i],
+  ])("no stem mentions %s", (_what, pattern) => {
+    const offenders = canonicalItems
+      .filter(({ item }) => pattern.test(`${item.stem.text} ${item.lede?.text ?? ""}`))
+      .map(({ inst, item }) => `${inst}/${item.key}`);
+    expect(offenders).toEqual([]);
+  });
+
+  it("no two questions ask exactly the same thing", () => {
+    const seen = new Map<string, string>();
+    const dupes: string[] = [];
+    for (const { inst, item } of canonicalItems) {
+      if (item.responseType === "info") continue;
+      const at = `${inst}/${item.key}`;
+      const prev = seen.get(item.stem.text);
+      if (prev) dupes.push(`${at} duplicates ${prev}`);
+      else seen.set(item.stem.text, at);
+    }
+    expect(dupes).toEqual([]);
+  });
+
+  it("a hard-required item never also offers a decline control", () => {
+    // "You must answer" and "you may refuse" cannot both be true. A decline
+    // *option* inside a scale ("Prefer not to say") is different and fine:
+    // that is an answer, not a refusal to give one.
+    const bad = canonicalItems
+      .filter(({ item }) => item.required === "hard" && item.allowDecline)
+      .map(({ inst, item }) => `${inst}/${item.key}`);
+    expect(bad).toEqual([]);
+  });
+});
+
+describe("date of birth bounds", () => {
+  /**
+   * Researchers narrow the plausible age range per study. Nothing widens past
+   * the absolute ceiling — a mis-set configuration must not be able to admit
+   * an implausible date of birth into the data (D-29).
+   */
+  it("no item may declare an age above the absolute ceiling", () => {
+    expect(ABSOLUTE_MAX_AGE_YEARS).toBe(120);
+    for (const inst of everything) {
+      for (const form of inst.forms) {
+        for (const item of form.items) {
+          if (item.responseType !== "date") continue;
+          if (item.maxAgeYears !== undefined) {
+            expect(item.maxAgeYears, `${inst.instrument}/${item.key}`).toBeLessThanOrEqual(ABSOLUTE_MAX_AGE_YEARS);
+          }
+          if (item.minAgeYears !== undefined && item.maxAgeYears !== undefined) {
+            expect(item.minAgeYears, `${inst.instrument}/${item.key}`).toBeLessThan(item.maxAgeYears);
+          }
+        }
+      }
+    }
+  });
+
+  it("the schema itself refuses a release that tries to exceed it", () => {
+    const tooOld = {
+      responseType: "date",
+      key: "dob",
+      revision: 1,
+      variable: "dob",
+      stem: { text: "Date of birth" },
+      maxAgeYears: ABSOLUTE_MAX_AGE_YEARS + 1,
+    };
+    expect(() => itemDefinition.parse(tooOld)).toThrow();
+    expect(() => itemDefinition.parse({ ...tooOld, maxAgeYears: ABSOLUTE_MAX_AGE_YEARS })).not.toThrow();
   });
 });
 

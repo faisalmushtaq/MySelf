@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Illustration } from "./illustrations.js";
 import type { AnswerValue } from "@myself/engine";
-import type { ItemDefinition, ResponseScale } from "@myself/schema";
+import { ABSOLUTE_MAX_AGE_YEARS, type ItemDefinition, type ResponseScale } from "@myself/schema";
 
 /**
  * Response controls. One component per response type, all sharing the same
@@ -62,6 +62,9 @@ export function SingleChoice({ item, scale, value, onAnswer }: ControlProps) {
   // itself conveys the answer (used for handedness).
   if (item.presentation === "spectrum") {
     const ordered = item.spectrumReverse ? [...scale.options].reverse() : scale.options;
+    const chosen = ordered.find((o) => o.code === selected);
+    const first = ordered[0];
+    const last = ordered[ordered.length - 1];
     return (
       <div className="spectrum" role="radiogroup" aria-label={item.stem.text}>
         <div className="spectrum-row">
@@ -71,6 +74,10 @@ export function SingleChoice({ item, scale, value, onAnswer }: ControlProps) {
               type="button"
               role="radio"
               aria-checked={selected === o.code}
+              // The visible label is hidden on narrow screens, where the axis
+              // has no room for five of them — so the accessible name has to
+              // carry the whole answer regardless of what is on screen.
+              aria-label={o.label}
               className={`spectrum-option${selected === o.code ? " selected" : ""}`}
               onClick={() => onAnswer({ kind: "choice", code: o.code }, auto)}
             >
@@ -79,6 +86,17 @@ export function SingleChoice({ item, scale, value, onAnswer }: ControlProps) {
             </button>
           ))}
         </div>
+        {/* Narrow screens keep the left-to-right axis — that arrangement IS the
+            question — and drop to end anchors plus a readout of the choice,
+            because five labels cannot sit side by side on a phone. Both are
+            hidden by CSS once there is room for the full labels. */}
+        <div className="spectrum-ends" aria-hidden="true">
+          <span>{first?.label}</span>
+          <span>{last?.label}</span>
+        </div>
+        <p className="spectrum-status" aria-live="polite">
+          {chosen ? chosen.label : "Tap anywhere along the line"}
+        </p>
       </div>
     );
   }
@@ -433,16 +451,15 @@ export function DateControl({ item, value, onAnswer, onValidity, onSubmit }: Con
    */
   const today = new Date();
   const iso0 = (d: Date) => d.toISOString().slice(0, 10);
+  // The oldest age is capped here as well as in the schema. A release cannot
+  // be published above the ceiling, and if one somehow arrives that way — an
+  // older manifest, a hand-edited file — the control still refuses it.
+  const maxAge = Math.min(item.maxAgeYears ?? ABSOLUTE_MAX_AGE_YEARS, ABSOLUTE_MAX_AGE_YEARS);
   const latest =
     item.minAgeYears !== undefined
       ? iso0(new Date(today.getFullYear() - item.minAgeYears, today.getMonth(), today.getDate()))
       : iso0(today); // never the future
-  const earliest =
-    item.maxAgeYears !== undefined
-      ? iso0(new Date(today.getFullYear() - item.maxAgeYears, today.getMonth(), today.getDate()))
-      : item.minYear
-        ? `${item.minYear}-01-01`
-        : undefined;
+  const earliest = iso0(new Date(today.getFullYear() - maxAge, today.getMonth(), today.getDate()));
 
   const check = (iso: string): string | null => {
     const d = new Date(`${iso}T00:00:00`);
@@ -456,8 +473,10 @@ export function DateControl({ item, value, onAnswer, onValidity, onSubmit }: Con
     if (item.minAgeYears !== undefined && age < item.minAgeYears) {
       return `That would make you ${age} — please check the year you were born`;
     }
-    if (item.maxAgeYears !== undefined && age > item.maxAgeYears) {
-      return "Please check the year you were born";
+    if (age > maxAge) {
+      return age > ABSOLUTE_MAX_AGE_YEARS
+        ? "Please check the year — that date is too long ago"
+        : "Please check the year you were born";
     }
     return null;
   };
