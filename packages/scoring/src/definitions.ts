@@ -112,18 +112,19 @@ export const scoreEhiSf: ScoringInput = {
     { op: "mean", items: ["writing", "throwing", "toothbrush", "spoon"], output: "lq", minValid: 4 },
     {
       // Veale (2014) reports left-handed ≤ -60, right-handed ≥ +60, mixed in
-      // between. The wording here is what a participant reads back, so it is
-      // plain rather than clinical (D-33).
+      // between. These labels are read back to the participant inside the
+      // sentence "your answers suggest you're ___", so they are written to
+      // complete it plainly (D-34).
       op: "classify",
       input: "lq",
       bands: [
-        { label: "strongly left-handed", min: -100, max: -90 },
+        { label: "very left-handed", min: -100, max: -90 },
         { label: "left-handed", min: -89.999, max: -60 },
-        { label: "mixed-handed, leaning left", min: -59.999, max: -20 },
-        { label: "mixed-handed", min: -19.999, max: 19.999 },
-        { label: "mixed-handed, leaning right", min: 20, max: 59.999 },
+        { label: "mostly left-handed", min: -59.999, max: -20 },
+        { label: "equally comfortable with either hand", min: -19.999, max: 19.999 },
+        { label: "mostly right-handed", min: 20, max: 59.999 },
         { label: "right-handed", min: 60, max: 89.999 },
-        { label: "strongly right-handed", min: 90, max: 100 },
+        { label: "very right-handed", min: 90, max: 100 },
       ],
       output: "lq_band",
     },

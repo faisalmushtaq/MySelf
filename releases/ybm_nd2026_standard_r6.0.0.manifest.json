@@ -960,25 +960,25 @@
               "revision": 1,
               "variable": "ehi_lq_feedback",
               "stem": {
-                "text": "Your handedness score is {lq}",
+                "text": "Your answers suggest you're {band}",
+                "pipes": {
+                  "band": {
+                    "kind": "score",
+                    "scoringKey": "score.ehi_sf",
+                    "output": "lq_band",
+                    "fallback": "somewhere in the middle"
+                  }
+                }
+              },
+              "lede": {
+                "text": "Your handedness score is {lq}, on a scale from -100 (always the left hand) to +100 (always the right hand).",
                 "pipes": {
                   "lq": {
                     "kind": "score",
                     "scoringKey": "score.ehi_sf",
                     "output": "lq",
                     "decimals": 1,
-                    "fallback": "—"
-                  }
-                }
-              },
-              "lede": {
-                "text": "That puts you in the {band} range.\n\nThe scale runs from -100 (uses the left hand for everything) to +100 (uses the right hand for everything). Most people are somewhere near one end; being in the middle is genuinely uncommon, not a mistake.",
-                "pipes": {
-                  "band": {
-                    "kind": "score",
-                    "scoringKey": "score.ehi_sf",
-                    "output": "lq_band",
-                    "fallback": "mixed-handed"
+                    "fallback": "not complete"
                   }
                 }
               },
@@ -6211,7 +6211,7 @@
           "input": "lq",
           "bands": [
             {
-              "label": "strongly left-handed",
+              "label": "very left-handed",
               "min": -100,
               "max": -90
             },
@@ -6221,17 +6221,17 @@
               "max": -60
             },
             {
-              "label": "mixed-handed, leaning left",
+              "label": "mostly left-handed",
               "min": -59.999,
               "max": -20
             },
             {
-              "label": "mixed-handed",
+              "label": "equally comfortable with either hand",
               "min": -19.999,
               "max": 19.999
             },
             {
-              "label": "mixed-handed, leaning right",
+              "label": "mostly right-handed",
               "min": 20,
               "max": 59.999
             },
@@ -6241,7 +6241,7 @@
               "max": 89.999
             },
             {
-              "label": "strongly right-handed",
+              "label": "very right-handed",
               "min": 90,
               "max": 100
             }
@@ -6510,5 +6510,5 @@
   "prompts": {},
   "modelConfigs": {},
   "assets": {},
-  "hash": "sha256:78235480c26f3bd82b45c087c1d52fdb88b50ac184721972b67f50a968806422"
+  "hash": "sha256:7b60b9a49be166b62a7683b0f298124c36ad03664aa66e15bf1cebf041115591"
 }
