@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { AnswerStore, Walker } from "@myself/engine";
 import { releaseManifest } from "@myself/schema";
-import rawManifest from "../../../releases/ybm_nd2026_standard_r5.0.0.manifest.json";
+import rawManifest from "../../../releases/ybm_nd2026_standard_r6.0.0.manifest.json";
 import { flattenManifest, reminderOf } from "./lib/flatten.js";
 import { resolveText } from "./lib/pipes.js";
 
@@ -275,6 +275,27 @@ describe("manifest flattening", () => {
   it("does not promise a date format the operating system controls", () => {
     const dob = flattened.units.find((u) => u.item.key === "dob");
     expect(dob?.item.stem.text).not.toMatch(/dd\/mm|mm\/dd|yyyy/i);
+  });
+
+
+  it("no longer asks the two sleep-priority questions", () => {
+    const keys = flattened.units.map((u) => `${u.instrument}.${u.item.key}`);
+    expect(keys.some((k) => k.startsWith("ybm_sleep_priorities."))).toBe(false);
+    for (const u of flattened.units) {
+      expect(u.item.stem.text).not.toMatch(/most important to you for getting a good night/i);
+      expect(u.item.stem.text).not.toMatch(/find out more about your own sleep/i);
+    }
+    // the sleep section still exists — the KSS is still asked
+    expect(flattened.units.some((u) => u.instrument === "kss")).toBe(true);
+  });
+
+  it("offers the answer list from the finish screen rather than on the way to it", () => {
+    const review = manifest.composition.screens["review"];
+    expect(review?.title?.text).toBe("Change an answer");
+    expect(review?.body.text).toMatch(/isn't right/i);
+    // and the finish screen no longer tells them to hand over before they
+    // have had the chance to change anything
+    expect(manifest.composition.screens["finish"]?.body.text).not.toMatch(/hand the iPad back/i);
   });
 
   it("resolves the consent withdrawal-date pipe from the session start", () => {

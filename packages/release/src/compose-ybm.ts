@@ -81,13 +81,14 @@ export const ybmComposition: AssessmentDraftInput = {
   },
   offline: { surveyOfflineCapable: true },
   screens: {
-    // A last look before finishing. People notice a wrong answer when they
-    // see it written down, not while they are giving it (D-30).
+    // Reached from the finish screen, not imposed on the way to it (D-31).
+    // Most people are done when they are done; the list is for the minority
+    // who know they got something wrong.
     review: {
       kind: "information",
-      title: { text: "Before you finish" },
+      title: { text: "Change an answer" },
       body: {
-        text: "Here's everything you told us. Have a scroll through — if anything looks wrong, tap it and you can change it.",
+        text: "Here's everything you told us. Tap anything that isn't right and you can change it.",
       },
     },
     // The name given at the very start comes back at the very end, so the
@@ -106,7 +107,7 @@ export const ybmComposition: AssessmentDraftInput = {
         },
       },
       body: {
-        text: "That's everything — thanks for taking part in the Yorkshire Brain Map study. Please hand the iPad back to the researcher.",
+        text: "That's everything — thanks for taking part in the Yorkshire Brain Map study.",
       },
     },
   },
@@ -139,10 +140,12 @@ export const ybmComposition: AssessmentDraftInput = {
       key: "sleep",
       title: "Sleep",
       transition: "Next: sleep.",
-      components: [
-        { kind: "instrument", ref: { instrument: "kss", version: "1.0", ...en } },
-        { kind: "module", ref: { instrument: "ybm_sleep_priorities", version: "1.0", ...en } },
-      ],
+      // The two sleep-priority questions ("what feels most important for a
+      // good night's sleep", "what would you most like to know about your own
+      // sleep") are dropped from this fielding (D-31). The module stays in the
+      // library, encoded and versioned, so bringing it back is a composition
+      // edit rather than a re-encoding.
+      components: [{ kind: "instrument", ref: { instrument: "kss", version: "1.0", ...en } }],
     },
     {
       key: "wellbeing",

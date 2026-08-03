@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { AnswerStore, Walker, type AnswerValue, type PresentableUnit } from "@myself/engine";
 import { releaseManifest, responseScale, type ReleaseManifest, type ResponseScale } from "@myself/schema";
-import rawManifest from "../../../releases/ybm_nd2026_standard_r5.0.0.manifest.json";
+import rawManifest from "../../../releases/ybm_nd2026_standard_r6.0.0.manifest.json";
 import { flattenManifest } from "./lib/flatten.js";
 import { resolveText } from "./lib/pipes.js";
 import {
@@ -19,7 +19,7 @@ import { SurveyScreen } from "./components/SurveyScreen.js";
 
 /**
  * MySelf Go — participant application (preview build).
- * Renders the frozen YBM r5.0.0 release entirely from its manifest, saves
+ * Renders the frozen YBM r6.0.0 release entirely from its manifest, saves
  * every response to encrypted IndexedDB before advancing, works offline via
  * the service worker, and returns to a neutral start screen on handover.
  */
@@ -37,7 +37,7 @@ type Phase =
   | { kind: "running"; session: SessionRow; index: number; fromReview?: boolean }
   | { kind: "checkin"; session: SessionRow; index: number; firstSkipped: number }
   | { kind: "pace"; session: SessionRow; index: number }
-  /** Last look over everything before finishing (D-30). */
+  /** The answer list, reached from the finish screen on request (D-31). */
   | { kind: "review"; session: SessionRow }
   | { kind: "finished"; session: SessionRow };
 
@@ -304,14 +304,9 @@ export default function App() {
       }
 
       if (next === null) {
-        // Straight past the last question used to end the session. Now it
-        // offers a look back first — the session is only completed once the
-        // participant says they are done (D-30).
-        if (reviewScreen) {
-          await appendEvent(phase.session, "review.opened", undefined, timing.current.summary(), from, tMono());
-          setPhase({ kind: "review", session: phase.session });
-          return;
-        }
+        // The last question leads to "you've finished" — not to a wall of
+        // everything they just answered. The review is offered there, for the
+        // minority who know they got something wrong (D-31).
         await appendEvent(phase.session, "session.completed", undefined, timing.current.summary(), from, tMono());
         await completeSession(phase.session);
         setPhase({ kind: "finished", session: phase.session });
@@ -513,7 +508,7 @@ export default function App() {
           allowBack={manifest.composition.allowBackNavigation}
           sectionTitles={flattened.sectionTitles}
           sessionStart={new Date(phase.session.startedAt)}
-          title={reviewScreen.title ? resolveText(reviewScreen.title.text, reviewScreen.title.pipes, storeRef.current, new Date(phase.session.startedAt)) : "Before you finish"}
+          title={reviewScreen.title ? resolveText(reviewScreen.title.text, reviewScreen.title.pipes, storeRef.current, new Date(phase.session.startedAt)) : "Change an answer"}
           body={resolveText(reviewScreen.body.text, reviewScreen.body.pipes, storeRef.current, new Date(phase.session.startedAt))}
           onEdit={(index) => {
             void appendEvent(phase.session, "review.opened", unitKeyOf(index), { editing: true }, index, tMono());
@@ -523,6 +518,8 @@ export default function App() {
           }}
           onFinish={() => {
             void (async () => {
+              // Coming back from a change re-completes the session, so the
+              // completion event always follows the last edit in the log.
               await appendEvent(phase.session, "session.completed", undefined, timing.current.summary(), 0, tMono());
               await completeSession(phase.session);
               setPhase({ kind: "finished", session: phase.session });
@@ -548,6 +545,27 @@ export default function App() {
               : "You've finished — thank you."}
           </p>
           <p className="hint">Your answers are saved safely on this device.</p>
+
+          {/* Offered, not imposed. Most people are done when they are done;
+              the list is there for the minority who know they got something
+              wrong, and it sits below the finish message rather than in front
+              of it (D-31). */}
+          {reviewScreen && (
+            <div className="finish-amend">
+              <p className="finish-amend-q">Need to change anything?</p>
+              <button
+                type="button"
+                className="finish-amend-go"
+                onClick={() => {
+                  void appendEvent(phase.session, "review.opened", undefined, { from: "finish" }, 0, tMono());
+                  setPhase({ kind: "review", session: phase.session });
+                }}
+              >
+                Go back to my answers
+              </button>
+            </div>
+          )}
+
           <button type="button" className="next big" onClick={handover}>
             Hand back to the researcher
           </button>
