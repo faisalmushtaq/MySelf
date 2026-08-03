@@ -764,3 +764,46 @@ decisions:
       describes a data flow that ends on the iPads — syncing to a server needs
       an amendment. Until that is approved the file-based handover route stays
       the one used for real fieldwork; the server runs on synthetic data.
+
+  - id: D-37
+    topic: Identifiers, linkage, and correcting a mistyped code
+    decision: identifiers-diverted-at-ingest-linkage-behind-an-audited-service
+    detail: >
+      Found 2026-08-03 while answering a hosting question: the "identifiers
+      live apart" principle in D-35 and docs/05 was documented but never
+      implemented. First names, surnames and dates of birth were ordinary
+      response rows, appeared in the researcher view's wide table, and were
+      written into the BIDS export as phenotype/ybm_identity.tsv. A deposited
+      archive would have carried children's names in it.
+      Fixed at the definition layer, not by filtering downstream. Items carry
+      an `identifying` flag, frozen into the release like everything else, set
+      on first_name, last_name, dob and the four secret-code components.
+      `ingest` diverts those answers into a separate identity partition that
+      the caller must handle deliberately; they never become response rows, so
+      no table, view or export has to remember to leave them out. Published as
+      r7.0.0 because the export shape changes.
+      The age is derived from the date of birth at the session date and kept as
+      an ordinary variable, in whole years: that is what the research needed
+      the date for, and a decimal age is a date of birth in disguise.
+      Researcher direction, same day: names must be retrievable on request —
+      participants sometimes give the wrong code — and must link to the UPN
+      that schools provide. That is a reason to hold names in a controlled
+      place, not a reason to put them back in the response data. Added a
+      linkage service: code -> person, person -> every code they have ever
+      typed (including codes not in the registry, which is exactly what a
+      mistype looks like), and UPN attachment with a one-UPN-one-pupil
+      constraint. Owner-only, a written justification required and stored, and
+      logged before the answer is returned so an attempt that found nothing is
+      still visible.
+      A mistyped code is repaired by recording a correction, never by editing
+      the log. Corrections are applied when the dataset is derived, resolve
+      through chains, and are reversible by withdrawal — the event log
+      continues to say what the participant actually typed, which is the only
+      honest account of the sitting.
+      Recorded plainly in the tests: the participant code is a pseudonym, not
+      an anonymisation. It cannot be reversed to a name, which is the property
+      the study relies on, but it is built from the components, so anyone who
+      knows the scheme reads the mother's initials, a house digit, a birth
+      month and two postcode letters straight off it. Deliberate trade for a
+      code a participant can reproduce years later (D-23); the reason the code
+      is treated as pseudonymous rather than anonymous data.

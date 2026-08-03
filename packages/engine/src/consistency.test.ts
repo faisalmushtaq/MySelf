@@ -34,6 +34,7 @@ const monthItem: ItemDefinition = {
   stem: { text: "The month you were born" },
   required: "hard",
   allowDecline: false,
+  identifying: false,
   scale: "scale.month_12",
   scaleVersion: "1.0.0",
   presentation: "compact",

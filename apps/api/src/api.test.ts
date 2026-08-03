@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { Authenticator, CAPABILITIES, can, hashToken, mintDeviceToken, rolesFromClaims } from "./auth.js";
 import { migrate, type Db } from "./db/index.js";
 import { batchId, ingestBatch, storedSessions, type SyncBatch } from "./routes/sync.js";
+import { storeIdentity } from "./routes/identity.js";
 import { buildServer } from "./server.js";
 import { createTestDb } from "./testing/pglite.js";
 
@@ -294,5 +295,164 @@ describe("the API surface", () => {
     for (const url of ["/studies/ybm/sessions", "/devices", "/audit", "/roles"]) {
       expect((await app.inject({ method: "GET", url })).statusCode, url).toBe(401);
     }
+  });
+});
+
+describe("linkage", () => {
+  const auth = new Authenticator({ issuer: "https://localhost/none", audience: "myself", devBypass: true });
+  const server = () => buildServer({ db, auth, allowedOrigins: [] });
+  const owner = { authorization: "Bearer dev:owner:owner" };
+  const why = { justification: "wave 2 code does not match wave 1 for this pupil" };
+
+  beforeEach(async () => {
+    await storeIdentity(db, "ybm", [
+      { participantId: "JA101CD", sessionId: "s1", variable: "first_name", value: "Amara", recordedAt: "2026-03-01T09:00:00.000Z" },
+      { participantId: "JA101CD", sessionId: "s1", variable: "last_name", value: "Hussain", recordedAt: "2026-03-01T09:00:00.000Z" },
+      { participantId: "JA101CD", sessionId: "s1", variable: "dob", value: "2011-07-04", recordedAt: "2026-03-01T09:00:00.000Z" },
+      { participantId: "JE101CD", sessionId: "s2", variable: "first_name", value: "Amara", recordedAt: "2026-09-01T09:00:00.000Z" },
+      { participantId: "JE101CD", sessionId: "s2", variable: "last_name", value: "Hussain", recordedAt: "2026-09-01T09:00:00.000Z" },
+    ]);
+  });
+
+  it("turns a code back into a person when an owner asks", async () => {
+    const app = server();
+    const res = await app.inject({
+      method: "POST",
+      url: "/identity/lookup",
+      headers: owner,
+      payload: { participantCode: "JA101CD", ...why },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toMatchObject({ givenName: "Amara", familyName: "Hussain", dateOfBirth: "2011-07-04" });
+  });
+
+  it("refuses a researcher, and refuses anyone who will not say why", async () => {
+    const app = server();
+    const asResearcher = await app.inject({
+      method: "POST",
+      url: "/identity/lookup",
+      headers: { authorization: "Bearer dev:rita:researcher" },
+      payload: { participantCode: "JA101CD", ...why },
+    });
+    expect(asResearcher.statusCode).toBe(403);
+
+    const noReason = await app.inject({
+      method: "POST",
+      url: "/identity/lookup",
+      headers: owner,
+      payload: { participantCode: "JA101CD", justification: "" },
+    });
+    expect(noReason.statusCode).toBe(400);
+  });
+
+  it("logs the lookup even when it finds nobody", async () => {
+    const app = server();
+    const res = await app.inject({
+      method: "POST",
+      url: "/identity/lookup",
+      headers: owner,
+      payload: { participantCode: "ZZ999ZZ", ...why },
+    });
+    expect(res.statusCode).toBe(404);
+    // A log of successes is not a log. The attempt is what needed recording.
+    const { rows } = await db.query<{ participant: string; justification: string }>(
+      "SELECT participant, justification FROM identity.access_log",
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ participant: "ZZ999ZZ" });
+  });
+
+  it("finds every code a name has been filed under, which is how a mistype is caught", async () => {
+    const app = server();
+    const res = await app.inject({
+      method: "POST",
+      url: "/identity/search",
+      headers: owner,
+      payload: { study: "ybm", familyName: "Hussain", givenName: "Amara", ...why },
+    });
+    expect(res.statusCode).toBe(200);
+    const codes = (res.json().hits as { participantCode: string }[]).map((h) => h.participantCode).sort();
+    expect(codes).toEqual(["JA101CD", "JE101CD"]);
+  });
+
+  it("records a correction, and the aliases it produces are what ingest needs", async () => {
+    const app = server();
+    const made = await app.inject({
+      method: "POST",
+      url: "/identity/corrections",
+      headers: owner,
+      payload: {
+        study: "ybm",
+        wrongCode: "JE101CD",
+        rightCode: "JA101CD",
+        reason: "same name and date of birth; mother's initials mistyped at wave 2",
+      },
+    });
+    expect(made.statusCode).toBe(200);
+
+    const listed = await app.inject({ method: "GET", url: "/studies/ybm/corrections", headers: owner });
+    expect(listed.json().aliases).toEqual({ JE101CD: "JA101CD" });
+
+    // Withdrawing it puts everything back — the correction was never an edit.
+    const id = listed.json().corrections[0].correction_id;
+    const withdrawn = await app.inject({
+      method: "POST",
+      url: `/studies/ybm/corrections/${id}/withdraw`,
+      headers: owner,
+    });
+    expect(withdrawn.json().withdrawn).toBe(true);
+    const after = await app.inject({ method: "GET", url: "/studies/ybm/corrections", headers: owner });
+    expect(after.json().aliases).toEqual({});
+  });
+
+  it("refuses a correction that points at a code which is itself corrected away", async () => {
+    const app = server();
+    const send = (wrongCode: string, rightCode: string) =>
+      app.inject({
+        method: "POST",
+        url: "/identity/corrections",
+        headers: owner,
+        payload: { study: "ybm", wrongCode, rightCode, reason: "same pupil, checked against the register" },
+      });
+    await send("JE101CD", "JA101CD");
+    const chained = await send("XX111YY", "JE101CD");
+    expect(chained.statusCode).toBe(409);
+    expect(chained.json().error).toMatch(/itself corrected/);
+  });
+
+  it("links a UPN, and refuses to give the same one to two participants", async () => {
+    const app = server();
+    const link = (participantCode: string) =>
+      app.inject({
+        method: "POST",
+        url: "/identity/upn",
+        headers: owner,
+        payload: {
+          study: "ybm",
+          participantCode,
+          upn: "A123456789012",
+          source: "school register, September 2026",
+          ...why,
+        },
+      });
+    expect((await link("JA101CD")).statusCode).toBe(200);
+    const clash = await link("JE101CD");
+    expect(clash.statusCode).toBe(409);
+    expect(clash.json().conflict).toMatch(/already linked/);
+  });
+
+  it("keeps the first name on file when a later wave spells it differently", async () => {
+    // Evidence to look at, not a reason to overwrite the register quietly.
+    await storeIdentity(db, "ybm", [
+      { participantId: "JA101CD", sessionId: "s3", variable: "first_name", value: "Amarah", recordedAt: "2027-03-01T09:00:00.000Z" },
+    ]);
+    const { rows } = await db.query<{ given_name: string }>(
+      "SELECT given_name FROM identity.participants WHERE participant_code = 'JA101CD'",
+    );
+    expect(rows[0]!.given_name).toBe("Amara");
+    const claims = await db.query<{ given_name: string }>(
+      "SELECT given_name FROM identity.code_claims WHERE session_id = 's3'",
+    );
+    expect(claims.rows[0]!.given_name).toBe("Amarah");
   });
 });

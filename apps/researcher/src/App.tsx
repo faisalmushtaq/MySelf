@@ -1,10 +1,19 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { buildBidsExport, buildDemoSessions, buildZip, summarise, wideTable, type Dataset } from "@myself/store";
 import { DataTable, downloadCsv } from "./components/DataTable.js";
+import { Linkage } from "./components/Linkage.js";
 import { ParticipantPanel } from "./components/ParticipantPanel.js";
 import { Summary } from "./components/Summary.js";
 import { buildDataset } from "./lib/build.js";
-import { addSessions, clearAll, importExportFile, storedSessions, type ImportReport } from "./lib/db.js";
+import {
+  addSessions,
+  aliases,
+  clearAll,
+  importExportFile,
+  storeIdentity,
+  storedSessions,
+  type ImportReport,
+} from "./lib/db.js";
 import { defaultColumns } from "./lib/filter.js";
 import { latestRelease } from "./lib/releases.js";
 
@@ -27,7 +36,7 @@ const STUDY = "YBM-ND2026";
 
 const plural = (n: number, noun: string): string => `${n} ${noun}${n === 1 ? "" : "s"}`;
 
-type Tab = "overview" | "table" | "data";
+type Tab = "overview" | "table" | "linkage" | "data";
 
 export default function App() {
   const [dataset, setDataset] = useState<Dataset | null>(null);
@@ -44,8 +53,14 @@ export default function App() {
   const reload = useCallback(async () => {
     setBusy(true);
     const sessions = await storedSessions();
-    const built = buildDataset(sessions, STUDY);
+    // Corrections are applied here, at derivation, so a repaired code joins a
+    // participant's waves without anything being rewritten (D-37).
+    const built = buildDataset(sessions, STUDY, await aliases());
     setDataset(built.dataset);
+    // Names go to their own table, never into the dataset the rest of this
+    // app reads. They are needed to repair a code and to link a UPN, and the
+    // Linkage tab is the only place they surface.
+    await storeIdentity(built.identity);
     setIssues({ rejected: built.rejected, warnings: built.warnings });
     setBusy(false);
   }, []);
@@ -120,9 +135,9 @@ export default function App() {
           </p>
         </div>
         <nav className="tabs">
-          {(["overview", "table", "data"] as Tab[]).map((t) => (
+          {(["overview", "table", "linkage", "data"] as Tab[]).map((t) => (
             <button key={t} type="button" className={tab === t ? "tab on" : "tab"} onClick={() => setTab(t)}>
-              {t === "overview" ? "Overview" : t === "table" ? "Table" : "Data in and out"}
+              {t === "overview" ? "Overview" : t === "table" ? "Table" : t === "linkage" ? "Linkage" : "Data in and out"}
             </button>
           ))}
         </nav>
@@ -185,6 +200,8 @@ export default function App() {
           onSelectParticipant={setSelected}
         />
       )}
+
+      {tab === "linkage" && <Linkage onCorrectionsChanged={() => void reload()} />}
 
       {tab === "data" && (
         <section className="panel data-panel">

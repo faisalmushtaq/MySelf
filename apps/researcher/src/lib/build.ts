@@ -1,4 +1,4 @@
-import { emptyDataset, ingest, type Dataset, type DeviceSession } from "@myself/store";
+import { emptyDataset, ingest, type Dataset, type DeviceSession, type IdentityRow } from "@myself/store";
 import { latestRelease, releasesByHash } from "./releases.js";
 
 /**
@@ -12,12 +12,18 @@ import { latestRelease, releasesByHash } from "./releases.js";
 
 export interface BuildResult {
   dataset: Dataset;
+  /** Names and code components, kept apart from the dataset (D-37). */
+  identity: IdentityRow[];
   rejected: { sessionId: string; reason: string }[];
   warnings: string[];
 }
 
-export function buildDataset(sessions: DeviceSession[], study: string): BuildResult {
-  if (sessions.length === 0) return { dataset: emptyDataset(), rejected: [], warnings: [] };
+export function buildDataset(
+  sessions: DeviceSession[],
+  study: string,
+  aliases: Record<string, string> = {},
+): BuildResult {
+  if (sessions.length === 0) return { dataset: emptyDataset(), identity: [], rejected: [], warnings: [] };
 
   const groups = new Map<string, DeviceSession[]>();
   for (const s of sessions) {
@@ -34,6 +40,7 @@ export function buildDataset(sessions: DeviceSession[], study: string): BuildRes
   });
 
   let dataset = emptyDataset();
+  const identity: IdentityRow[] = [];
   const rejected: BuildResult["rejected"] = [];
   const warnings: string[] = [];
 
@@ -54,11 +61,12 @@ export function buildDataset(sessions: DeviceSession[], study: string): BuildRes
       );
     }
     const sortedGroup = [...group].sort((a, b) => a.startedAt.localeCompare(b.startedAt));
-    const result = ingest(sortedGroup, { manifest: release.manifest, study, existing: dataset });
+    const result = ingest(sortedGroup, { manifest: release.manifest, study, existing: dataset, aliases });
     dataset = result.dataset;
+    identity.push(...result.identity);
     rejected.push(...result.rejected);
     warnings.push(...result.warnings);
   }
 
-  return { dataset, rejected, warnings };
+  return { dataset, identity, rejected, warnings };
 }

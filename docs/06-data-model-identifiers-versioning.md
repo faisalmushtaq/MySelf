@@ -156,3 +156,58 @@ following the layout is what lets the EEG drop in beside it later.
 Not yet built: sync, server storage, access control, the audit slip and the
 codebook/crosswalk generators described in §5. Until those exist the researcher
 view is a laptop tool holding real answers, and is treated as such.
+
+## 7. Identifiers and linkage (r7.0.0, D-37)
+
+Section 6 described the data layer as built. This corrects a gap in it that was
+found on 2026-08-03: the separation described above was documented but not
+implemented, and names were reaching the phenotype export.
+
+**Identifying items are marked in the definition, not filtered downstream.**
+`identifying: true` is set on `first_name`, `last_name`, `dob` and the four
+secret-code components, and is frozen into the release. `ingest` diverts those
+answers into a separate identity partition; they never become response rows.
+Nothing downstream has to remember to exclude them, because they never arrive.
+
+**Age replaces date of birth in the research data.** Derived at the session
+date, in whole years — a decimal age is a date of birth in disguise.
+
+**The participant code is a pseudonym, not an anonymisation.** It cannot be
+reversed to a name. It is built from the components, so anyone who knows the
+scheme reads the mother's initials, a house digit, a birth month and two
+postcode letters off it. That is the trade for a code a participant can
+reproduce years later without being told it (D-23), and it is why the code is
+handled as pseudonymous data.
+
+### Linkage service
+
+Names are held — deliberately, in the `identity` schema — because two jobs
+need them:
+
+| Job | Route | Who |
+|---|---|---|
+| Who is this code? | `POST /identity/lookup` | owner |
+| What codes has this person used? | `POST /identity/search` | owner |
+| Attach the school's UPN | `POST /identity/upn` | owner |
+| These two codes are the same child | `POST /identity/corrections` | owner |
+
+Every call requires a written justification, stores it, and logs **before**
+returning an answer — a log of successes is not a log. The search covers codes
+that were claimed but never registered, which is exactly what a mistyped code
+looks like. UPNs are unique per study: one UPN, one pupil, refused at entry
+rather than found in an analysis.
+
+### Correcting a mistyped code
+
+Someone gives a slightly different code at wave 2 and arrives as a stranger.
+The repair is a **correction record**, applied when the dataset is derived:
+
+- the event log is never edited — it says what the participant actually typed,
+  which is the only honest account of the sitting
+- corrections resolve through chains, and a correction pointing at a code that
+  is itself corrected away is refused
+- withdrawing the correction puts everything back exactly as it was
+
+The researcher view's **Linkage** tab does all of this locally today, against
+its own identity table, and the API does the same against the identity schema
+once the server is up.
