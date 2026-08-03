@@ -1,0 +1,91 @@
+# MySelf server stack.
+#
+# Four containers: Postgres, Keycloak (sign-in and who-is-an-admin), the API,
+# and Caddy in front doing TLS. It runs the same way on a laptop and on a
+# rented box — the only difference is the .env file and a DNS record.
+#
+# Nothing here is specific to one hosting provider. That is the point: the
+# study can move host without a rebuild, and nothing in the core path depends
+# on a service only one company sells.
+
+name: myself
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-myself}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-myself}
+    volumes:
+      - db-data:/var/lib/postgresql/data
+      # Nightly dumps land here; the backup script copies them off the box.
+      - ./backups:/backups
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-myself}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    # Not published. Only the API and the backup job reach the database, and
+    # both are on this network — a Postgres port open to the internet is how
+    # most of these stories end.
+    expose:
+      - "5432"
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.0
+    restart: unless-stopped
+    command: start --http-enabled=true --proxy-headers=xforwarded --hostname=https://${DOMAIN}/auth --http-relative-path=/auth
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN:-admin}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?set KEYCLOAK_ADMIN_PASSWORD in .env}
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://db:5432/${POSTGRES_DB:-myself}
+      KC_DB_USERNAME: ${POSTGRES_USER:-myself}
+      KC_DB_PASSWORD: ${POSTGRES_PASSWORD}
+      KC_DB_SCHEMA: keycloak
+    depends_on:
+      db:
+        condition: service_healthy
+    expose:
+      - "8080"
+
+  api:
+    build:
+      context: ..
+      dockerfile: infra/Dockerfile.api
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-myself}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-myself}
+      OIDC_ISSUER: https://${DOMAIN}/auth/realms/myself
+      OIDC_AUDIENCE: ${OIDC_AUDIENCE:-myself}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS}
+      PORT: 8080
+      NODE_ENV: production
+    depends_on:
+      db:
+        condition: service_healthy
+    expose:
+      - "8080"
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: ${DOMAIN}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - api
+      - keycloak
+
+volumes:
+  db-data:
+  caddy-data:
+  caddy-config:
