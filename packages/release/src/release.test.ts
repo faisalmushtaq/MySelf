@@ -15,11 +15,11 @@ const registries: Registries = {
 };
 
 const meta = {
-  version: "6.0.0",
-  publishedAt: "2026-08-02T12:00:00.000Z",
+  version: "7.0.0",
+  publishedAt: "2026-08-03T18:00:00.000Z",
   publishedBy: "faisalmushtaq",
   engineVersion: "0.1.0",
-  decisionRefs: ["D-01", "D-02", "D-03", "D-04", "D-05", "D-06", "D-07", "D-08", "D-09", "D-17", "D-18"],
+  decisionRefs: ["D-09", "D-23", "D-35", "D-37"],
 };
 
 describe("canonical JSON", () => {
@@ -32,12 +32,12 @@ describe("canonical JSON", () => {
   });
 });
 
-describe("YBM release r6.0.0", () => {
+describe("YBM release r7.0.0", () => {
   it("passes the publish gate and produces a verifiable manifest", () => {
     const manifest = buildRelease(ybmComposition, registries, meta);
     expect(manifest.hash).toMatch(/^sha256:[0-9a-f]{64}$/);
     expect(verifyManifestHash(manifest)).toBe(true);
-    expect(manifest.release.key).toBe("ybm_nd2026_standard_r6_0_0");
+    expect(manifest.release.key).toBe("ybm_nd2026_standard_r7_0_0");
   });
 
   it("is deterministic: identical inputs give an identical hash", () => {
@@ -48,7 +48,7 @@ describe("YBM release r6.0.0", () => {
 
   it("freezes every component of the composition and its scales/scoring", () => {
     const manifest = buildRelease(ybmComposition, registries, meta);
-    // 18 from r6.0.0: the two sleep-priority questions were dropped from this
+    // 18 since r6.0.0: the two sleep-priority questions were dropped from this
     // fielding (D-31), so their module is no longer a component.
     expect(Object.keys(manifest.instruments)).toHaveLength(18);
     expect(Object.keys(manifest.instruments).some((k) => k.includes("sleep_priorities"))).toBe(false);
@@ -64,7 +64,7 @@ describe("YBM release r6.0.0", () => {
     // The frozen file is what devices actually run. If someone edits an item,
     // a scale or the composition without republishing, this fails: the release
     // on disk would no longer be the release the sources describe.
-    const path = fileURLToPath(new URL("../../../releases/ybm_nd2026_standard_r6.0.0.manifest.json", import.meta.url));
+    const path = fileURLToPath(new URL("../../../releases/ybm_nd2026_standard_r7.0.0.manifest.json", import.meta.url));
     const committed = JSON.parse(readFileSync(path, "utf8")) as {
       hash: string;
       release: { version: string; publishedAt: string; publishedBy: string; engineVersion: string; decisionRefs: string[] };

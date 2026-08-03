@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { AnswerStore } from "@myself/engine";
 import { releaseManifest, scoringDefinition } from "@myself/schema";
-import rawManifest from "../../../releases/ybm_nd2026_standard_r6.0.0.manifest.json";
+import rawManifest from "../../../releases/ybm_nd2026_standard_r7.0.0.manifest.json";
 import { resolveText, useScoringDefinitions } from "./lib/pipes.js";
 
 /**

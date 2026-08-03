@@ -200,6 +200,7 @@ export const ybmIdentity: ModuleInput = {
         {
           responseType: "text_short",
           key: "first_name",
+          identifying: true,
           revision: 1,
           variable: "first_name",
           legacyVariable: "first_name",
@@ -211,6 +212,7 @@ export const ybmIdentity: ModuleInput = {
         {
           responseType: "text_short",
           key: "last_name",
+          identifying: true,
           revision: 1,
           variable: "last_name",
           legacyVariable: "last_name",
@@ -222,6 +224,7 @@ export const ybmIdentity: ModuleInput = {
         {
           responseType: "date",
           key: "dob",
+          identifying: true,
           revision: 1,
           variable: "dob",
           legacyVariable: "DoB ",
@@ -258,6 +261,7 @@ export const ybmIdentity: ModuleInput = {
         {
           responseType: "text_short",
           key: "ps_mother_initials",
+          identifying: true,
           revision: 1,
           variable: "ps_mother_initials",
           required: "hard",
@@ -271,6 +275,7 @@ export const ybmIdentity: ModuleInput = {
         {
           responseType: "text_short",
           key: "ps_house_digit",
+          identifying: true,
           revision: 1,
           variable: "ps_house_digit",
           required: "hard",
@@ -284,6 +289,7 @@ export const ybmIdentity: ModuleInput = {
         {
           responseType: "single_choice",
           key: "ps_birth_month",
+          identifying: true,
           revision: 1,
           variable: "ps_birth_month",
           required: "hard",
@@ -307,6 +313,7 @@ export const ybmIdentity: ModuleInput = {
         {
           responseType: "text_short",
           key: "ps_postcode_letters",
+          identifying: true,
           revision: 1,
           variable: "ps_postcode_letters",
           required: "hard",

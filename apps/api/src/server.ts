@@ -13,6 +13,18 @@ import {
 } from "./auth.js";
 import { migrate, type Db } from "./db/index.js";
 import { createPostgres } from "./db/postgres.js";
+import {
+  aliasesFor,
+  correctionShape,
+  linkUpn,
+  lookupByCode,
+  lookupShape,
+  recordCorrection,
+  searchByPerson,
+  searchShape,
+  upnShape,
+  withdrawCorrection,
+} from "./routes/identity.js";
 import { batchShape, ingestBatch, storedSessions } from "./routes/sync.js";
 
 /**
@@ -174,6 +186,74 @@ export function buildServer(options: ServerOptions) {
     // Revocation is how a lost iPad stops being able to reach the study, so it
     // says plainly whether it changed anything.
     return { deviceId, revoked: result.rowCount > 0 };
+  });
+
+  // ── Linkage: names back out, and the join to the UPN ───────────────────
+  // Owner-only, justification required, every call logged whether it found
+  // anything or not.
+  app.post("/identity/lookup", async (request, reply) => {
+    const person = await requirePerson(request, reply, "read_identifiers");
+    if (!person) return;
+    const parsed = lookupShape.safeParse(request.body);
+    if (!parsed.success) return reply.status(400).send({ error: parsed.error.flatten() });
+    const found = await lookupByCode(db, person.subject, parsed.data);
+    return found ?? reply.status(404).send({ error: "no registry entry for that code" });
+  });
+
+  app.post("/identity/search", async (request, reply) => {
+    const person = await requirePerson(request, reply, "read_identifiers");
+    if (!person) return;
+    const parsed = searchShape.safeParse(request.body);
+    if (!parsed.success) return reply.status(400).send({ error: parsed.error.flatten() });
+    return { hits: await searchByPerson(db, person.subject, parsed.data) };
+  });
+
+  app.post("/identity/upn", async (request, reply) => {
+    const person = await requirePerson(request, reply, "read_identifiers");
+    if (!person) return;
+    const parsed = upnShape.safeParse(request.body);
+    if (!parsed.success) return reply.status(400).send({ error: parsed.error.flatten() });
+    const result = await linkUpn(db, person.subject, parsed.data);
+    return result.linked ? result : reply.status(409).send(result);
+  });
+
+  app.post("/identity/corrections", async (request, reply) => {
+    const person = await requirePerson(request, reply, "read_identifiers");
+    if (!person) return;
+    const parsed = correctionShape.safeParse(request.body);
+    if (!parsed.success) return reply.status(400).send({ error: parsed.error.flatten() });
+    const result = await recordCorrection(db, person.subject, parsed.data);
+    return result.recorded ? result : reply.status(409).send(result);
+  });
+
+  app.get("/studies/:study/corrections", async (request, reply) => {
+    const person = await requirePerson(request, reply, "read");
+    if (!person) return;
+    const { study } = request.params as { study: string };
+    const { rows } = await db.query(
+      `SELECT correction_id, wrong_code, right_code, reason, made_by, made_at, withdrawn_at
+         FROM research.code_corrections WHERE study = $1 ORDER BY made_at DESC`,
+      [study],
+    );
+    // The live map is returned too, because it is what the researcher view
+    // must pass to ingest for the corrections to take effect.
+    return { corrections: rows, aliases: await aliasesFor(db, study) };
+  });
+
+  app.post("/studies/:study/corrections/:id/withdraw", async (request, reply) => {
+    const person = await requirePerson(request, reply, "read_identifiers");
+    if (!person) return;
+    const { study, id } = request.params as { study: string; id: string };
+    return { withdrawn: await withdrawCorrection(db, person.subject, study, Number(id)) };
+  });
+
+  app.get("/identity/access-log", async (request, reply) => {
+    const person = await requirePerson(request, reply, "manage_people");
+    if (!person) return;
+    const { rows } = await db.query(
+      "SELECT access_id, at, actor, action, participant, justification FROM identity.access_log ORDER BY at DESC LIMIT 500",
+    );
+    return { accessLog: rows };
   });
 
   app.get("/audit", async (request, reply) => {

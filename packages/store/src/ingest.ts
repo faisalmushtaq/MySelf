@@ -1,6 +1,6 @@
 import type { ReleaseManifest, ResponseScale, ScoringDefinition } from "@myself/schema";
 import { executeScoring } from "@myself/scoring";
-import type { Dataset, ResponseRow, ScoreRow, SessionRow } from "./dataset.js";
+import type { Dataset, IdentityRow, ResponseRow, ScoreRow, SessionRow } from "./dataset.js";
 import { deriveParticipantCode } from "./identity.js";
 
 /**
@@ -43,10 +43,29 @@ export interface IngestOptions {
   study: string;
   /** Sessions already in the dataset, so waves continue rather than restart. */
   existing?: Dataset;
+  /**
+   * Corrections to derived participant codes: wrong code -> the right one.
+   *
+   * People mistype their code, most often at a later wave — a different first
+   * letter of a mother's name, a house they have moved from. The repair is a
+   * mapping applied here, at derivation, and never an edit to the event log:
+   * the log records what the participant actually typed, which is the only
+   * honest account of the sitting, and the correction is a separate, audited
+   * fact about it. Re-deriving with the mapping removed puts everything back.
+   */
+  aliases?: Record<string, string>;
 }
 
 export interface IngestResult {
   dataset: Dataset;
+  /**
+   * Names, dates of birth and secret-code components, held apart.
+   *
+   * Returned rather than folded into the dataset so that storing them is an
+   * explicit act by the caller — the identity schema, a separate project, or
+   * nowhere at all. Nothing in `dataset` depends on them.
+   */
+  identity: IdentityRow[];
   /** Sessions that could not be attached to a participant, and why. */
   rejected: { sessionId: string; reason: string }[];
   warnings: string[];
@@ -74,16 +93,17 @@ const site = (studyCode: string): string | undefined => {
 
 /** Flatten the manifest's frozen instruments into item and scale lookups. */
 function indexManifest(manifest: ReleaseManifest) {
-  const items = new Map<string, { variable: string; scaleKey?: string }>();
+  const items = new Map<string, { variable: string; scaleKey?: string; identifying: boolean }>();
   const instrumentOf = new Map<string, string>();
   for (const def of Object.values(manifest.instruments)) {
     const inst = def as { instrument: string; forms: { items: Record<string, unknown>[] }[] };
     for (const form of inst.forms) {
       for (const raw of form.items) {
-        const it = raw as { key: string; variable: string; scale?: string };
+        const it = raw as { key: string; variable: string; scale?: string; identifying?: boolean };
         items.set(`${inst.instrument}.${it.key}`, {
           variable: it.variable,
           ...(it.scale ? { scaleKey: it.scale } : {}),
+          identifying: it.identifying === true,
         });
         instrumentOf.set(`${inst.instrument}.${it.key}`, inst.instrument);
       }
@@ -196,6 +216,22 @@ function secretParts(items: Map<string, ItemState>) {
   };
 }
 
+/**
+ * Whole years between a date of birth and a reference date.
+ *
+ * Whole years, not a fraction: a decimal age is a date of birth wearing a hat,
+ * and reconstructing the date from it is arithmetic.
+ */
+function ageAt(dobIso: string, atIso: string): number | null {
+  const dob = new Date(dobIso);
+  const at = new Date(atIso);
+  if (Number.isNaN(dob.getTime()) || Number.isNaN(at.getTime())) return null;
+  let years = at.getUTCFullYear() - dob.getUTCFullYear();
+  const monthDiff = at.getUTCMonth() - dob.getUTCMonth();
+  if (monthDiff < 0 || (monthDiff === 0 && at.getUTCDate() < dob.getUTCDate())) years -= 1;
+  return years >= 0 && years <= 120 ? years : null;
+}
+
 /** Render an answer for the readable columns of an export. */
 function present(value: unknown, scale: ResponseScale | undefined) {
   const v = value as
@@ -240,6 +276,7 @@ export function ingest(sessions: DeviceSession[], options: IngestOptions): Inges
   const warnings: string[] = [];
 
   const existing = options.existing;
+  const identityRows: IdentityRow[] = [];
   const sessionRows: SessionRow[] = existing ? [...existing.sessions] : [];
   const responseRows: ResponseRow[] = existing ? [...existing.responses] : [];
   const scoreRows: ScoreRow[] = existing ? [...existing.scores] : [];
@@ -254,7 +291,10 @@ export function ingest(sessions: DeviceSession[], options: IngestOptions): Inges
     }
 
     const { items, reviewEdits, durationMs, foregroundMs } = replay(session);
-    const participantId = deriveParticipantCode(secretParts(items));
+    const derived = deriveParticipantCode(secretParts(items));
+    // A correction resolves through as many hops as it takes, so fixing A->B
+    // and later B->C does not leave A pointing at a code nobody uses.
+    const participantId = derived === null ? null : resolveAlias(derived, options.aliases);
     if (!participantId) {
       // Without a complete code there is no key to file this under, and
       // guessing one would join it to the wrong person. Held back, not dropped.
@@ -276,6 +316,55 @@ export function ingest(sessions: DeviceSession[], options: IngestOptions): Inges
       if (!meta) continue; // an item not in this release: nothing to file it as
       const scale = meta.scaleKey ? scales.get(meta.scaleKey) : undefined;
       const shown = present(st.value, scale);
+
+      if (meta.identifying) {
+        // Names, dates of birth and the secret-code components never become a
+        // response row. They divert here, into a partition the caller has to
+        // handle deliberately, so no export, table or view downstream has to
+        // remember to leave them out — they are simply not in the data.
+        const rendered = shown.text ?? (shown.value === null ? null : String(shown.value));
+        if (st.status === "answered" && rendered !== null) {
+          identityRows.push({
+            participantId,
+            sessionId: session.sessionId,
+            study,
+            variable: meta.variable,
+            value: rendered,
+            recordedAt: session.startedAt,
+          });
+          // The age is the part of a date of birth that the research actually
+          // needs. Derived here, at a known reference date, so analysts are not
+          // tempted to ask for the date itself later.
+          if (meta.variable === "dob") {
+            const age = ageAt(rendered, session.startedAt);
+            if (age !== null) {
+              responseRows.push({
+                sessionId: session.sessionId,
+                participantId,
+                // Filed as a demographic, not under the identity instrument:
+                // it is an ordinary analysis variable, and leaving it there
+                // would create a phenotype file named for a set of columns
+                // that no longer exist.
+                instrument: "ybm_demographics",
+                item: "age_years",
+                variable: "age_years",
+                status: "answered",
+                value: age,
+                text: null,
+                label: null,
+                dwellMs: st.dwellMs,
+                visits: st.visits,
+                tooFast: st.tooFast,
+                changed: st.changed,
+              });
+            }
+          }
+        }
+        if (st.status === "answered") answered += 1;
+        if (st.status === "skipped" || st.status === "declined") skipped += 1;
+        continue;
+      }
+
       if (st.status === "answered") answered += 1;
       if (st.status === "skipped" || st.status === "declined") skipped += 1;
       if (st.tooFast) tooFast += 1;
@@ -331,6 +420,7 @@ export function ingest(sessions: DeviceSession[], options: IngestOptions): Inges
       responses: responseRows,
       scores: scoreRows,
     },
+    identity: identityRows,
     rejected,
     warnings,
   };
@@ -380,6 +470,26 @@ function scoreSession(
     }
   }
   return rows;
+}
+
+/**
+ * Follow a chain of corrections to the code actually in use.
+ *
+ * Loops are possible if somebody records A->B and B->A; the walk is bounded
+ * and returns where it got to rather than hanging, because a monitoring screen
+ * that never renders is worse than one showing an odd code.
+ */
+export function resolveAlias(code: string, aliases: Record<string, string> | undefined): string {
+  if (!aliases) return code;
+  const seen = new Set<string>([code]);
+  let current = code;
+  for (let hops = 0; hops < 16; hops += 1) {
+    const next = aliases[current];
+    if (next === undefined || seen.has(next)) return current;
+    seen.add(next);
+    current = next;
+  }
+  return current;
 }
 
 /** One row per person, summarising every wave they have taken part in. */

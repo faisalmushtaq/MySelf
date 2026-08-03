@@ -21,6 +21,7 @@ const stubItem = (key: string, variable: string): ItemDefinition => ({
   stem: { text: key },
   required: "soft",
   allowDecline: false,
+  identifying: false,
   scale: "scale.yes_no",
   scaleVersion: "1.0.0",
   presentation: "cards",

@@ -8,14 +8,14 @@ import { releaseManifest, type ReleaseManifest } from "@myself/schema";
 import { buildBidsExport } from "./bids.js";
 import { buildDemoSessions } from "./demo.js";
 import { deriveParticipantCode, isParticipantCode, monthNumber } from "./identity.js";
-import { ingest, type DeviceEvent, type DeviceSession } from "./ingest.js";
+import { ingest, resolveAlias, type DeviceEvent, type DeviceSession } from "./ingest.js";
 import { summarise, summariseNumbers, wideTable } from "./summary.js";
 import { buildZip } from "./zip.js";
 
 const manifest: ReleaseManifest = releaseManifest.parse(
   JSON.parse(
     readFileSync(
-      fileURLToPath(new URL("../../../releases/ybm_nd2026_standard_r6.0.0.manifest.json", import.meta.url)),
+      fileURLToPath(new URL("../../../releases/ybm_nd2026_standard_r7.0.0.manifest.json", import.meta.url)),
       "utf8",
     ),
   ),
@@ -477,5 +477,159 @@ describe("zip", () => {
     const listing = execFileSync("unzip", ["-t", archive], { encoding: "utf8" });
     expect(listing).toMatch(/No errors detected/);
     rmSync(dir, { recursive: true, force: true });
+  });
+});
+
+describe("identifiers are structurally absent from the research data", () => {
+  /**
+   * The rule this pins: a name, a date of birth or a secret-code component
+   * cannot appear in the dataset, the wide table or any exported file. Not
+   * "is filtered out" — cannot appear, because ingest never puts it there.
+   *
+   * It is worth a test of this shape because the failure is silent and only
+   * discovered by someone opening a deposited archive and finding a child's
+   * name in it.
+   */
+  const built = () => {
+    const sessions = buildDemoSessions({ manifest, participants: 6, seed: 11 });
+    const result = ingest(sessions, { manifest, study: "ybm" });
+    return { ...result, files: buildBidsExport(result.dataset, { manifest, datasetName: "test" }) };
+  };
+
+  it("routes names, dates of birth and code components to the identity partition", () => {
+    const { identity } = built();
+    const variables = new Set(identity.map((r) => r.variable));
+    expect(variables).toContain("first_name");
+    expect(variables).toContain("last_name");
+    expect(variables).toContain("dob");
+    expect(variables).toContain("ps_mother_initials");
+    expect(variables).toContain("ps_postcode_letters");
+  });
+
+  it("keeps them out of the responses entirely", () => {
+    const { dataset } = built();
+    const leaked = dataset.responses.filter((r) =>
+      ["first_name", "last_name", "dob", "ps_mother_initials", "ps_house_digit", "ps_birth_month", "ps_postcode_letters"].includes(
+        r.variable,
+      ),
+    );
+    expect(leaked).toEqual([]);
+  });
+
+  it("keeps them out of the wide table the researcher view filters", () => {
+    const { dataset } = built();
+    const table = wideTable(dataset);
+    const columns = table.columns.map((c) => c.key);
+    expect(columns).not.toContain("first_name");
+    expect(columns).not.toContain("dob");
+  });
+
+  it("puts no name and no date of birth anywhere in the BIDS export", () => {
+    const { identity, files } = built();
+    const everything = files.map((f) => f.content).join("\n");
+    // Searched for verbatim: the actual names and dates these demo people
+    // gave. A single occurrence anywhere is a failure.
+    for (const row of identity) {
+      if (!["first_name", "last_name", "dob"].includes(row.variable)) continue;
+      expect(everything.includes(row.value), `${row.variable} "${row.value}" reached the export`).toBe(false);
+    }
+    // And no file is written for the identity instrument at all: with its
+    // items diverted there is nothing left in it to export.
+    expect(files.some((f) => f.path.includes("ybm_identity"))).toBe(false);
+  });
+
+  it("exports no column for any code component", () => {
+    const { files } = built();
+    const headers = files.filter((f) => f.path.endsWith(".tsv")).map((f) => f.content.split("\n")[0] ?? "");
+    for (const header of headers) {
+      for (const variable of ["ps_mother_initials", "ps_house_digit", "ps_birth_month", "ps_postcode_letters"]) {
+        expect(header).not.toContain(variable);
+      }
+    }
+  });
+
+  it("records that the participant code encodes its components, by design", () => {
+    // Being straight about what the pseudonym is and is not. The code cannot
+    // be reversed to a name, which is the property the study relies on — but
+    // it is built from the components, so anyone who knows the scheme reads
+    // the mother's initials, a house digit, a birth month and two postcode
+    // letters straight off it. That is a deliberate trade for a code the
+    // participant can reproduce years later without being told it (D-23), and
+    // it is the reason the code is treated as pseudonymous data rather than
+    // anonymous.
+    const { dataset, identity } = built();
+    const person = dataset.participants[0]!;
+    const parts = identity.filter((r) => r.participantId === person.participantId);
+    const initials = parts.find((r) => r.variable === "ps_mother_initials")?.value;
+    expect(initials).toBeTruthy();
+    expect(person.participantId.startsWith(initials!.toUpperCase())).toBe(true);
+  });
+
+  it("keeps the age, which is what the research needed the date of birth for", () => {
+    const { dataset } = built();
+    const ages = dataset.responses.filter((r) => r.variable === "age_years");
+    expect(ages.length).toBeGreaterThan(0);
+    for (const age of ages) {
+      expect(typeof age.value).toBe("number");
+      expect(age.value).toBeGreaterThan(4);
+      expect(age.value).toBeLessThan(120);
+      // Whole years only: a decimal age is a date of birth in disguise.
+      expect(Number.isInteger(age.value)).toBe(true);
+    }
+  });
+
+  it("still links waves, because the code is derived before the parts are put aside", () => {
+    const { dataset } = built();
+    expect(dataset.participants.length).toBeGreaterThan(0);
+    for (const p of dataset.participants) expect(isParticipantCode(p.participantId)).toBe(true);
+    expect(dataset.participants.some((p) => p.sessionCount > 1)).toBe(true);
+  });
+});
+
+describe("correcting a mistyped code", () => {
+  /**
+   * The commonest real failure in a longitudinal study: someone gives a
+   * slightly different code at wave 2 and arrives in the data as a stranger.
+   * The repair has to join their waves without ever editing what they typed.
+   */
+  const alice = { initials: "JA", digit: "1", month: 1, postcode: "CD" };
+  const mistyped = { initials: "JE", digit: "1", month: 1, postcode: "CD" };
+
+  it("leaves the two apart when nothing has been corrected", () => {
+    const { dataset } = ingest(
+      [session("w1", alice, { startedAt: "2026-03-01T09:00:00.000Z" }), session("w2", mistyped, { startedAt: "2026-09-01T09:00:00.000Z" })],
+      { manifest, study: "ybm" },
+    );
+    expect(dataset.participants).toHaveLength(2);
+  });
+
+  it("joins the waves once the correction is recorded", () => {
+    const { dataset } = ingest(
+      [session("w1", alice, { startedAt: "2026-03-01T09:00:00.000Z" }), session("w2", mistyped, { startedAt: "2026-09-01T09:00:00.000Z" })],
+      { manifest, study: "ybm", aliases: { JE101CD: "JA101CD" } },
+    );
+    expect(dataset.participants).toHaveLength(1);
+    const person = dataset.participants[0]!;
+    expect(person.participantId).toBe("JA101CD");
+    expect(person.sessionCount).toBe(2);
+    // And the waves are numbered in the order the sittings happened.
+    expect(dataset.sessions.map((s) => s.wave)).toEqual([1, 2]);
+  });
+
+  it("does not touch the event log — removing the correction undoes it", () => {
+    const sessions = [session("w1", alice), session("w2", mistyped, { startedAt: "2026-09-01T09:00:00.000Z" })];
+    const corrected = ingest(sessions, { manifest, study: "ybm", aliases: { JE101CD: "JA101CD" } });
+    const reverted = ingest(sessions, { manifest, study: "ybm" });
+    expect(corrected.dataset.participants).toHaveLength(1);
+    expect(reverted.dataset.participants).toHaveLength(2);
+    // The identity rows still say what was actually typed, both times.
+    const initials = corrected.identity.filter((r) => r.variable === "ps_mother_initials").map((r) => r.value);
+    expect(initials.sort()).toEqual(["JA", "JE"]);
+  });
+
+  it("follows a chain of corrections and survives one that loops", () => {
+    expect(resolveAlias("A", { A: "B", B: "C" })).toBe("C");
+    expect(resolveAlias("A", { A: "B", B: "A" })).toBe("B");
+    expect(resolveAlias("A", undefined)).toBe("A");
   });
 });

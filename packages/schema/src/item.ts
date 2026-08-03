@@ -94,6 +94,20 @@ const baseItem = {
   required: z.enum(["hard", "soft", "optional"]).default("soft"),
   /** Offer an explicit decline control (D-05 / A-44). */
   allowDecline: z.boolean().default(false),
+  /**
+   * This item's answer can identify the person who gave it.
+   *
+   * Set on names, dates of birth and the components the participant code is
+   * derived from. It is not a label: an item marked this way is routed to the
+   * identity partition at ingest and is structurally absent from the research
+   * dataset, the researcher view and every export. Nothing downstream has to
+   * remember to exclude it, because it never arrives.
+   *
+   * Marking an item is therefore a data-handling decision, not a presentation
+   * one, and changing it changes what leaves the building — which is why it is
+   * frozen into the release like everything else.
+   */
+  identifying: z.boolean().default(false),
   /** Intra-module display condition (e.g. Age_smartphone if smartphone owned). */
   displayIf: logicExpr.optional(),
   /** Illustration token drawn beside the question (e.g. "object:pen"). */

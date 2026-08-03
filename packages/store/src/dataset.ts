@@ -111,6 +111,24 @@ export const scoreRow = z.object({
   warnings: z.array(z.string()),
 });
 
+/**
+ * One identifying answer, held apart from everything else.
+ *
+ * These rows are the only place a name, a date of birth or a secret-code
+ * component exists after ingest. They are returned from `ingest` in their own
+ * partition so a caller has to decide, explicitly, to store them — and the
+ * exports, the researcher view and the wide table are built from `responses`,
+ * which cannot contain them.
+ */
+export const identityRow = z.object({
+  participantId: z.string().min(1),
+  sessionId: z.string().min(1),
+  study: z.string().min(1),
+  variable: z.string().min(1),
+  value: z.string(),
+  recordedAt: z.string().datetime(),
+});
+
 export const dataset = z.object({
   /** Provenance for the whole dataset, carried into every export. */
   generatedAt: z.string().datetime(),
@@ -127,6 +145,7 @@ export type ParticipantRow = z.infer<typeof participantRow>;
 export type SessionRow = z.infer<typeof sessionRow>;
 export type ResponseRow = z.infer<typeof responseRow>;
 export type ScoreRow = z.infer<typeof scoreRow>;
+export type IdentityRow = z.infer<typeof identityRow>;
 export type Dataset = z.infer<typeof dataset>;
 
 export const emptyDataset = (): Dataset => ({
