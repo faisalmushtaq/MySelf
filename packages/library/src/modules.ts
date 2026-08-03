@@ -157,6 +157,22 @@ export const ybmIntroConsent: ModuleInput = {
             { key: "agree", text: { text: "I agree to take part in this study" } },
           ],
         },
+        // Placed after consent and before the first question: the last thing
+        // read before answering starts (D-30). Deliberately short — a wall of
+        // exhortation is skipped, and the point is one idea.
+        {
+          responseType: "info",
+          key: "why_it_matters",
+          revision: 1,
+          variable: "why_accurate",
+          required: "optional",
+          stem: { text: "Why your answers matter" },
+          lede: {
+            text: "There are no right or wrong answers here — only true ones.\n\nWhat you tell us goes into research on how sleep, screens and feelings fit together for people your age, and on what actually helps. That only works if the answers are really yours, including the ones that aren't flattering.\n\nA rushed or made-up answer doesn't just lose one number. It makes the whole picture slightly less true — for everyone the research is meant to help.\n\nSo take your time. And if you'd rather not answer something, leave it blank — that's always allowed.",
+          },
+          researcherNote:
+            "Brief statement of why accurate responding matters, shown once after consent (D-30). Not a consent statement and carries no agreement — informational only.",
+        },
       ],
     },
   ],
@@ -210,7 +226,9 @@ export const ybmIdentity: ModuleInput = {
           variable: "dob",
           legacyVariable: "DoB ",
           required: "hard",
-          stem: { text: "Date of Birth (dd/mm/yyyy)" },
+          // No format hint: the native picker decides the order shown, so
+          // promising "dd/mm/yyyy" is a claim the app does not control (D-30).
+          stem: { text: "What's your date of birth?" },
           minYear: 1990,
           maxYear: 2026,
           // Plausibility only — a mistyped year is caught, an unusual but real

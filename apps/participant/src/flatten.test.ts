@@ -255,6 +255,28 @@ describe("manifest flattening", () => {
     expect(e.dwellMaxSeconds).toBeGreaterThan(e.dwellHintSeconds);
   });
 
+
+  it("explains why accurate answers matter, once, before any question", () => {
+    const at = (key: string) => flattened.units.findIndex((u) => u.item.key === key);
+    const why = flattened.units.find((u) => u.item.key === "why_it_matters");
+    expect(why?.item.responseType).toBe("info");
+    expect(why?.item.lede?.text).toMatch(/no right or wrong answers/i);
+    // after consent, before the first question that collects anything
+    expect(at("consent")).toBeLessThan(at("why_it_matters"));
+    expect(at("why_it_matters")).toBeLessThan(at("first_name"));
+  });
+
+  it("offers a review of every answer before the session is finished", () => {
+    const review = manifest.composition.screens["review"];
+    expect(review?.title?.text).toBeTruthy();
+    expect(review?.body.text).toMatch(/change it/i);
+  });
+
+  it("does not promise a date format the operating system controls", () => {
+    const dob = flattened.units.find((u) => u.item.key === "dob");
+    expect(dob?.item.stem.text).not.toMatch(/dd\/mm|mm\/dd|yyyy/i);
+  });
+
   it("resolves the consent withdrawal-date pipe from the session start", () => {
     const store = new AnswerStore();
     const text = resolveText(

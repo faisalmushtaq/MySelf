@@ -81,6 +81,15 @@ export const ybmComposition: AssessmentDraftInput = {
   },
   offline: { surveyOfflineCapable: true },
   screens: {
+    // A last look before finishing. People notice a wrong answer when they
+    // see it written down, not while they are giving it (D-30).
+    review: {
+      kind: "information",
+      title: { text: "Before you finish" },
+      body: {
+        text: "Here's everything you told us. Have a scroll through — if anything looks wrong, tap it and you can change it.",
+      },
+    },
     // The name given at the very start comes back at the very end, so the
     // last thing a participant reads is addressed to them (D-26). The pipe
     // carries a fallback, so a lost or skipped name reads naturally too.
