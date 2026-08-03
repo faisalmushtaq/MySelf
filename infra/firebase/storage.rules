@@ -1,0 +1,23 @@
+rules_version = '2';
+
+/**
+ * Exports bucket.
+ *
+ * The nightly BIDS snapshot is written by a Cloud Function using the admin
+ * SDK, which these rules do not apply to. No client writes, and only signed-in
+ * people read — an export URL that works for anyone with the link would undo
+ * every other control in the platform.
+ */
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /exports/{allPaths=**} {
+      allow read: if request.auth != null
+        && request.auth.token.get('device', false) == false
+        && request.auth.token.get('role', '') in ['owner', 'researcher', 'analyst'];
+      allow write: if false;
+    }
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}
