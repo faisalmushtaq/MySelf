@@ -3,4 +3,8 @@ dist/
 *.tsbuildinfo
 .env
 .env.*
+# ...but not the templates. `.env.*` swallowed `.env.example`, so the file the
+# setup instructions tell you to copy was never in the repository — the first
+# step of getting a key working failed with "No such file or directory".
+!.env.example
 coverage/

@@ -23,15 +23,57 @@ const here = (p) => fileURLToPath(new URL(p, import.meta.url));
 
 // .env.local, read directly. A dependency to parse six lines is not worth the
 // supply chain it brings.
-if (existsSync(here("./.env.local"))) {
-  for (const line of readFileSync(here("./.env.local"), "utf8").split("\n")) {
-    const match = /^\s*([A-Z_][A-Z0-9_]*)\s*=\s*(.*)$/.exec(line);
-    if (match && !process.env[match[1]]) process.env[match[1]] = match[2].trim();
+//
+// Quotes are stripped because people paste them, and a key wrapped in quotes
+// fails as an authentication error, which reads like a bad key rather than a
+// bad copy-and-paste.
+const envFile = here("./.env.local");
+if (existsSync(envFile)) {
+  for (const line of readFileSync(envFile, "utf8").split("\n")) {
+    const match = /^\s*(?:export\s+)?([A-Z_][A-Z0-9_]*)\s*=\s*(.*)$/.exec(line);
+    if (match && !process.env[match[1]]) {
+      process.env[match[1]] = match[2].trim().replace(/^["']|["']$/g, "");
+    }
   }
 }
 
-const key = process.env.OPENAI_API_KEY ?? "";
+const key = (process.env.OPENAI_API_KEY ?? "").trim();
 const live = key.length > 0;
+
+/**
+ * Say what is wrong and what to type, rather than only what happened.
+ *
+ * Running on the mock is a legitimate mode — it is how the whole journey gets
+ * demonstrated without a key or a bill — so this is not an error. But somebody
+ * who has just followed the setup steps and still sees "mock" needs to know
+ * which of the two possible reasons they are looking at.
+ */
+if (!live) {
+  console.log(
+    [
+      "",
+      "Running on the DETERMINISTIC MOCK — no model calls will be made.",
+      existsSync(envFile)
+        ? `  ${envFile} exists but has no OPENAI_API_KEY line with a value in it.`
+        : `  ${envFile} does not exist.`,
+      "",
+      "  To make live calls, either put the key in that file:",
+      "",
+      "      cd apps/mystory-lab",
+      "      cp .env.example .env.local",
+      '      echo "OPENAI_API_KEY=sk-..." >> .env.local',
+      "      node server.mjs",
+      "",
+      "  or pass it for one run without a file at all:",
+      "",
+      "      OPENAI_API_KEY=sk-... node server.mjs",
+      "",
+      "  Never paste the key into a chat, an issue or a commit — anywhere it is",
+      "  written down is somewhere it has to be rotated from.",
+      "",
+    ].join("\n"),
+  );
+}
 
 /** Provenance rows, held in memory — this is a lab, not a study. */
 const modelCalls = [];
@@ -146,9 +188,8 @@ const server = createServer(async (req, res) => {
 const port = Number(process.env.PORT ?? 4300);
 server.listen(port, () => {
   console.log(`MyStory lab on http://localhost:${port}`);
-  console.log(
-    live
-      ? "OpenAI key found — live calls available, and the mock is still selectable."
-      : "No OPENAI_API_KEY: running on the deterministic mock. Put a key in .env.local for live calls.",
-  );
+  // The last four characters only: enough to tell two keys apart when one has
+  // been rotated, and not enough to be worth anything to anyone reading over a
+  // shoulder or scrolling back through a terminal.
+  if (live) console.log(`OpenAI key found (…${key.slice(-4)}) — live calls available, mock still selectable.`);
 });
