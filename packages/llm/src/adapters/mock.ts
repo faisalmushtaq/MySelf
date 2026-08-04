@@ -72,7 +72,7 @@ export class MockAdapter implements ModelAdapter {
   }
 
   /** Build the smallest value that satisfies a JSON schema. */
-  private fabricate(schema: Record<string, unknown>, seed: number, prompt: ResolvedPrompt): unknown {
+  private fabricate(schema: Record<string, unknown>, seed: number, prompt: ResolvedPrompt, key?: string): unknown {
     const type = schema["type"] as string | undefined;
     if (schema["enum"]) {
       const options = schema["enum"] as unknown[];
@@ -85,7 +85,7 @@ export class MockAdapter implements ModelAdapter {
         const out: Record<string, unknown> = {};
         for (const key of required) {
           const child = properties[key];
-          if (child) out[key] = this.fabricate(child, seed + key.length, prompt);
+          if (child) out[key] = this.fabricate(child, seed + key.length, prompt, key);
         }
         return out;
       }
@@ -101,6 +101,14 @@ export class MockAdapter implements ModelAdapter {
         return min + (seed % Math.max(1, max - min + 1));
       }
       case "boolean":
+        // Some booleans steer the run rather than describing it, and a coin
+        // flip there makes a mocked interview end after one question. Where
+        // the field decides whether an interview is over, answer it from the
+        // conversation — which is what a real model would be doing.
+        if (key === "interviewDone") {
+          return prompt.messages.filter((m) => m.role === "user").length >= 4;
+        }
+        if (key === "changed") return true;
         return seed % 2 === 0;
       default: {
         // Echo a little of what the participant said, so a mocked run reads

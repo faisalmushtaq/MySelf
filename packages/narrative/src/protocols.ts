@@ -217,4 +217,121 @@ export const futureSelf: NarrativeProtocol = narrativeProtocol.parse({
   ],
 });
 
-export const protocols: NarrativeProtocol[] = [microNarrative, futureSelf];
+/**
+ * `np.micro_narrative_full` — the CHI 2025 journey, end to end.
+ *
+ * Faithful to the original's structure (docs/08 §8.1): a guided interview over
+ * a researcher-authored question list, extraction into the researcher's keys
+ * using only the participant's words, three persona-voiced retellings, the
+ * participant choosing one, rating it, and correcting it if it is not right.
+ *
+ * The configuration is the original's TOML, typed: collector persona,
+ * questions, language style, topic restriction, extraction keys, three
+ * summariser personas, a one-shot example. A researcher changes the study by
+ * changing this object, not by changing code.
+ *
+ * What is deliberately different is failure and safety, not method. Completion
+ * is a field in the structured output rather than the word FINISHED, which a
+ * participant could say and end their own interview. Every output is validated
+ * against the schema it was asked for. A persona that fails to generate is
+ * absent rather than replaced by an apology string in the data slot. And
+ * typing-dynamics quality control is off by default: in a school, a child who
+ * pastes from Notes is not a bot.
+ */
+export const microNarrativeFull: NarrativeProtocol = narrativeProtocol.parse({
+  ...microNarrative,
+  key: "np.micro_narrative_full",
+  version: "1.0.0",
+  name: "Micro-narrative (full journey)",
+  researchQuestion:
+    "How does this young person describe their own experience, and which retelling of it do they recognise as theirs?",
+  estimatedMinutes: 12,
+
+  interview: {
+    persona:
+      "a friendly researcher talking to a young person aged 11 to 16, who is genuinely curious and never in a hurry",
+    questions: [
+      "Can you tell me about a time recently when {topic} came up for you?",
+      "What was happening around then — where were you, and who else was there?",
+      "How did that leave you feeling at the time?",
+      "Has anything changed since, or does it still feel the same?",
+    ],
+    languageStyle:
+      "Short sentences, everyday words, nothing a 12-year-old would have to look up. No jargon and no therapy language.",
+    topicRestriction: "{topic}, and how this young person has experienced it",
+    maxTurns: 12,
+  },
+
+  extraction: {
+    keys: {
+      what_happened: "What did the participant say actually happened?",
+      who_was_there: "Who else did they mention being involved or present?",
+      how_it_felt: "How did they say it made them feel?",
+      what_changed: "What did they say has changed since, if anything?",
+    },
+  },
+
+  scenario: {
+    personas: [
+      "a writer who tells it plainly and briefly, in the order it happened",
+      "a writer who leads with how it felt, and keeps the events light",
+      "a writer who keeps the young person's own turns of phrase wherever possible",
+    ],
+    adaptBelowRating: 10,
+    maxRating: 10,
+  },
+
+  // Off for school samples. A study running on a crowdsourced adult panel
+  // turns it on, and the thresholds are the original's.
+  qualityControl: { enabled: false, maxCharsPerSecond: 15, longMessageChars: 250, flagAboveShare: 0.3 },
+
+  stages: [
+    {
+      key: "intro",
+      kind: "introduction",
+      text: "Hi {first_name} — this last part is a short conversation.",
+      lede:
+        "I will ask you a few questions about {topic}, one at a time. There are no right answers and nothing here is marked. Afterwards I will show you a few short write-ups of what you told me, and you can pick the one that fits best — or tell me what is wrong with it.",
+    },
+    {
+      key: "interview",
+      kind: "collect",
+      modelConfigKey: "mc.openai.gpt4o.t07",
+      minChars: 2,
+      maxChars: 2000,
+      maxTurns: 12,
+      fallbackText: "Thank you — that is really helpful.",
+    },
+    { key: "extract", kind: "extract", modelConfigKey: "mc.openai.gpt4o.t07", text: "" },
+    { key: "write", kind: "generate", modelConfigKey: "mc.openai.gpt4o.t07", text: "" },
+    {
+      key: "choose",
+      kind: "select",
+      text: "Here are a few short write-ups of what you told me. Which one fits best?",
+      lede: "None of them will be perfect. Pick the closest and you can fix it next.",
+    },
+    {
+      key: "rate",
+      kind: "rate",
+      text: "How well does that one describe what you told me?",
+      lede: "0 means it is not you at all. 10 means it is exactly right.",
+    },
+    {
+      key: "revise",
+      kind: "adapt",
+      modelConfigKey: "mc.openai.gpt4o.t07",
+      text: "What would you change about it?",
+      lede: "Tell me in your own words and I will rewrite it. What you write here is kept alongside it.",
+      optional: true,
+    },
+    {
+      key: "debrief",
+      kind: "debrief",
+      text: "Thank you, {first_name}. That is everything.",
+      lede:
+        "What you wrote is stored with the rest of your answers under your secret code. If you want it taken out later, that code is how we find it.",
+    },
+  ],
+});
+
+export const protocols: NarrativeProtocol[] = [microNarrativeFull, microNarrative, futureSelf];

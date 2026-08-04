@@ -24,19 +24,52 @@ import { z } from "zod";
  *   "the model cannot fabricate an answer" structural rather than aspirational.
  */
 
+/**
+ * The stages a protocol can be built from.
+ *
+ * The first five reproduce the CHI 2025 journey faithfully — guided
+ * elicitation, extraction, persona-voiced retellings, participant choice,
+ * rating and adaptation. Those are not interface steps: docs/08 §8.2 records
+ * that the choice, the rating and the adaptation history are data, and the
+ * whole method rests on the participant being the one who decides whether a
+ * retelling of their experience is right.
+ */
 export const narrativeStageKind = z.enum([
   /** Researcher-authored text shown before anything is asked. */
   "introduction",
-  /** The participant is asked for their own words. Always their words. */
+  /**
+   * A single open question in the participant's own words — the simple case,
+   * used by the shorter protocols that sit inside a questionnaire.
+   */
   "elicit",
-  /** A model-generated follow-up question, schema-constrained. */
+  /**
+   * The guided interview: a researcher-authored question list administered
+   * conversationally, one at a time, by the model. Multi-turn, and it ends
+   * when the model says every question is covered — see `interviewDone` in the
+   * output schema, which replaces the original's "FINISHED" sentinel. The
+   * sentinel could be spoken by a participant and end their own interview.
+   */
+  "collect",
+  /**
+   * Extraction: the participant's answers reduced to the researcher's keys,
+   * using only words the participant used, null where they did not say.
+   * Never shown; it is the substrate the retellings are built from.
+   */
+  "extract",
+  /** Persona-voiced candidate retellings, generated from the extraction. */
+  "generate",
+  /** The participant picks the one that fits. Their choice is data. */
+  "select",
+  /** A rating of the chosen retelling. A perfect score skips adaptation. */
+  "rate",
+  /** The participant says what is wrong; the model revises; they accept or not. */
+  "adapt",
+  /** A single model-generated follow-up question, for the simpler protocols. */
   "follow_up",
   /** A model-generated interpretation the participant then confirms or corrects. */
   "interpret",
   /** The participant confirms, corrects or rejects what the model produced. */
   "confirm",
-  /** A rating of the model's interpretation, on a researcher-defined scale. */
-  "rate",
   /** Researcher-authored closing text. */
   "debrief",
 ]);
@@ -101,6 +134,80 @@ export const safeguardingRule = z.object({
   disclosure: z.string().min(1),
 });
 
+/**
+ * The guided interview, as the original configures it in TOML.
+ *
+ * A fixed researcher-authored question list, asked conversationally one at a
+ * time, in a stated voice, restricted to a stated topic. Faithful to §8.2's
+ * first assumption: guided elicitation, not free composition — the questions
+ * are the researcher's and the words are the participant's.
+ */
+export const interviewConfig = z.object({
+  /** The voice the model interviews in. */
+  persona: z.string().min(1),
+  /** Asked one at a time, in order, conversationally. */
+  questions: z.array(z.string().min(1)).min(1),
+  /** How to speak: reading level, register, sentence length. */
+  languageStyle: z.string().min(1),
+  /** What the model must decline to discuss. Prompt-level, as in the original. */
+  topicRestriction: z.string().min(1),
+  /** How many exchanges before the interview is closed regardless. */
+  maxTurns: z.number().int().min(1).max(40).default(20),
+});
+
+/**
+ * Extraction: the researcher's keys, and the question each one answers.
+ *
+ * The instruction that matters is "use only words the text contains, and leave
+ * a key null if they did not say" — §8.2's second assumption. A summariser
+ * that fills gaps plausibly is producing data the participant never gave.
+ */
+export const extractionConfig = z.object({
+  keys: z.record(z.string().min(1)),
+});
+
+/**
+ * Retelling: the personas, and the worked example that sets the register.
+ *
+ * Three personas in the original, and three is a sensible default, but the
+ * number is the researcher's to set. Each writes the same extraction in its
+ * own voice; the participant chooses between them.
+ */
+export const scenarioConfig = z.object({
+  personas: z.array(z.string().min(1)).min(2),
+  /** One-shot example: a conversation and the retelling it should produce. */
+  example: z.object({ conversation: z.string().min(1), scenario: z.string().min(1) }).optional(),
+  /** Below this, the participant is offered the chance to correct it. */
+  adaptBelowRating: z.number().int().min(0).max(10).default(10),
+  maxRating: z.number().int().min(1).max(10).default(10),
+});
+
+/**
+ * Typing-dynamics quality signals (§8.2, assumption 5).
+ *
+ * Aimed at crowdsourced adult samples, where a share of responses are pasted
+ * or generated. Kept because it is genuinely novel and load-bearing there —
+ * and off by default for school samples, where a child typing slowly on a
+ * borrowed iPad must never be treated as a bot.
+ */
+export const qualityControlConfig = z.object({
+  enabled: z.boolean().default(false),
+  /** Characters per second above which typing is implausibly fast. */
+  maxCharsPerSecond: z.number().positive().default(15),
+  /** A message longer than this, or with newlines, looks pasted. */
+  longMessageChars: z.number().int().positive().default(250),
+  /** Share of messages tripping any signal before the session is flagged. */
+  flagAboveShare: z.number().min(0).max(1).default(0.3),
+  /**
+   * Stop before generating anything and save what there is.
+   *
+   * The original stops the run. That is right where the alternative is paying
+   * for scenarios built on pasted text — and wrong if it ever silently
+   * discards a real participant, so what is collected is always saved.
+   */
+  stopBeforeGeneration: z.boolean().default(true),
+});
+
 export const narrativeProtocol = z.object({
   key: z.string().regex(/^np\.[a-z0-9_]+$/, "protocol keys look like np.micro_narrative"),
   version: z.string().min(1),
@@ -128,6 +235,12 @@ export const narrativeProtocol = z.object({
    */
   permittedIdentifiers: z.array(z.string()).default([]),
 
+  /** Present when the protocol runs the full guided-interview journey. */
+  interview: interviewConfig.optional(),
+  extraction: extractionConfig.optional(),
+  scenario: scenarioConfig.optional(),
+  qualityControl: qualityControlConfig.default({}),
+
   offlineFallback,
   safeguarding: z.array(safeguardingRule).default([]),
   /**
@@ -141,6 +254,10 @@ export const narrativeProtocol = z.object({
 
 export type NarrativeProtocol = z.infer<typeof narrativeProtocol>;
 export type NarrativeStage = z.infer<typeof narrativeStage>;
+export type InterviewConfig = z.infer<typeof interviewConfig>;
+export type ExtractionConfig = z.infer<typeof extractionConfig>;
+export type ScenarioConfig = z.infer<typeof scenarioConfig>;
+export type QualityControlConfig = z.infer<typeof qualityControlConfig>;
 export type PromptTemplate = z.infer<typeof promptTemplate>;
 export type SafeguardingRule = z.infer<typeof safeguardingRule>;
 export type OfflineFallback = z.infer<typeof offlineFallback>;
@@ -189,13 +306,46 @@ export function checkProtocol(protocol: NarrativeProtocol): string[] {
       }
     }
 
-    const needsModel = stage.kind === "follow_up" || stage.kind === "interpret";
-    if (needsModel) {
-      if (!stage.prompt) problems.push(`stage '${stage.key}' is a model stage with no prompt`);
+    if (stage.kind === "collect" && !protocol.interview) {
+      problems.push(`stage '${stage.key}' runs a guided interview but the protocol configures no questions`);
+    }
+    if (stage.kind === "extract" && !protocol.extraction) {
+      problems.push(`stage '${stage.key}' extracts, but the protocol declares no keys to extract into`);
+    }
+    if ((stage.kind === "generate" || stage.kind === "select") && !protocol.scenario) {
+      problems.push(`stage '${stage.key}' needs personas, and the protocol declares none`);
+    }
+    if (stage.kind === "select" && !protocol.stages.some((s) => s.kind === "generate")) {
+      problems.push(`stage '${stage.key}' asks the participant to choose between retellings nothing generates`);
+    }
+    if (stage.kind === "adapt" && !protocol.stages.some((s) => s.kind === "select" || s.kind === "generate")) {
+      problems.push(`stage '${stage.key}' revises a retelling no stage produced`);
+    }
+
+    /**
+     * Two kinds of model stage.
+     *
+     * The guided-journey stages — interview, extraction, retelling, revision —
+     * use the module's own prompt templates and output schemas, because those
+     * templates ARE the method (docs/08 §8.2) and a study that rewrote them
+     * would no longer be running it. What a researcher configures is the
+     * questions, the keys and the personas, checked above.
+     *
+     * The open stages — a one-off follow-up or interpretation — carry their
+     * own prompt and schema, because there is no fixed method to preserve.
+     */
+    const journeyStage = ["collect", "extract", "generate", "adapt"].includes(stage.kind);
+    const openModelStage = stage.kind === "follow_up" || stage.kind === "interpret";
+
+    if (journeyStage || openModelStage) {
       if (!stage.modelConfigKey) problems.push(`stage '${stage.key}' names no model config`);
       else if (!models.has(stage.modelConfigKey)) {
         problems.push(`stage '${stage.key}' names model config '${stage.modelConfigKey}', which is not defined`);
       }
+    }
+
+    if (openModelStage) {
+      if (!stage.prompt) problems.push(`stage '${stage.key}' is a model stage with no prompt`);
       if (!stage.outputSchema) {
         problems.push(`stage '${stage.key}' has no output schema — model output must be schema-constrained`);
       }
@@ -222,14 +372,14 @@ export function checkProtocol(protocol: NarrativeProtocol): string[] {
   }
 
   if (protocol.offlineFallback === "predefined_fallback") {
-    for (const stage of protocol.stages.filter((s) => s.kind === "follow_up" || s.kind === "interpret")) {
+    for (const stage of protocol.stages.filter((s) => s.kind === "follow_up" || s.kind === "interpret" || s.kind === "collect")) {
       if (!stage.fallbackText) {
         problems.push(`stage '${stage.key}' has no fallbackText, but the protocol falls back to predefined text`);
       }
     }
   }
 
-  if (!protocol.stages.some((s) => s.kind === "elicit")) {
+  if (!protocol.stages.some((s) => s.kind === "elicit" || s.kind === "collect")) {
     problems.push("a narrative protocol with no elicitation stage collects no narrative");
   }
 
