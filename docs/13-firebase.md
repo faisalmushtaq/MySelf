@@ -171,6 +171,30 @@ Every import is from a narrow subpath (`firebase-functions/logger`,
 provider including Realtime Database, which drags in `@firebase/database-compat`
 and fails on a missing `@firebase/app` — a package nothing here uses.
 
+### 5.2 Pointing the pages at it
+
+Two build-time values, both public, neither secret:
+
+```bash
+MYSELF_RELAY_URL='https://europe-west2-<project>.cloudfunctions.net/llmRelay'
+MYSELF_FIREBASE_CONFIG='{"apiKey":"…","authDomain":"<project>.firebaseapp.com","projectId":"<project>"}'
+```
+
+The web config comes from the Firebase console: **Project settings → Your apps
+→ Web app**. A web config is a set of public identifiers — the `apiKey` names a
+project, it does not authorise anything. What authorises is the signed-in
+account and the security rules. Both are baked in at build time rather than
+typed into the page, so nobody can point a page at a different project or a
+different endpoint.
+
+Without them a build is **mock-only**, which is exactly what the public preview
+should be: the whole journey, every staged record, every failure path, no key
+and no cost.
+
+With them the page offers sign-in, and the relay makes calls for whoever is
+signed in. Sign-in is scoped to the tab — somebody demonstrating the module on a
+borrowed machine should not leave an account behind them.
+
 Give that URL to the apps as `MYSELF_RELAY_URL` at build time. Rotating the key
 is `functions:secrets:set` again followed by a redeploy; nothing else changes.
 
