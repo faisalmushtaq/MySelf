@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="en-GB">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>MySelf — narrative lab</title>
+    <style>
+      /* Same tokens as the participant app, deliberately plainer. This is a
+         workbench: the point is to see the records, not to look finished. */
+      :root {
+        --canvas: #fcfcfb; --paper: #fff; --text: #000; --muted: #6b6b68;
+        --hairline: rgba(0,0,0,.14); --strong: rgba(0,0,0,.34);
+        --accent: #067843; --warn: #a33b00;
+        --ui: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+      }
+      * { box-sizing: border-box; }
+      body { margin: 0; background: var(--canvas); color: var(--text); font-family: var(--ui); font-size: 15px; }
+      .wrap { display: grid; grid-template-columns: minmax(340px, 1fr) minmax(380px, 1fr); gap: 1.5rem;
+              max-width: 1500px; margin: 0 auto; padding: 1.25rem 1.5rem 4rem; }
+      header { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 1rem; align-items: flex-end;
+               justify-content: space-between; padding-bottom: .9rem; border-bottom: 1px solid var(--hairline); }
+      h1 { font-size: 1.3rem; font-weight: 600; margin: 0; letter-spacing: -.01em; }
+      .dim { color: var(--muted); font-weight: 400; }
+      .note { color: var(--muted); font-size: .85rem; margin: .25rem 0 0; line-height: 1.5; }
+      .panel { background: var(--paper); border: 1px solid var(--hairline); border-radius: 10px;
+               padding: 1rem 1.15rem 1.15rem; margin-top: 1rem; }
+      h2 { font-size: 1rem; font-weight: 600; margin: 0 0 .5rem; }
+      label { display: block; font-size: .85rem; font-weight: 500; margin: .7rem 0 .25rem; }
+      input, select, textarea {
+        width: 100%; padding: .55rem .7rem; border: 1px solid var(--strong); border-radius: 8px;
+        font: inherit; background: var(--paper); }
+      textarea { min-height: 6rem; resize: vertical; }
+      button { min-height: 40px; padding: 0 1rem; border-radius: 8px; font: inherit; font-weight: 500; cursor: pointer; }
+      .primary { border: 1px solid var(--accent); background: var(--accent); color: #fff; }
+      .secondary { border: 1px solid var(--strong); background: var(--paper); color: var(--text); }
+      button:disabled { opacity: .45; cursor: not-allowed; }
+      .row { display: flex; flex-wrap: wrap; gap: .6rem; margin-top: .9rem; align-items: center; }
+      .screen { border: 1px solid var(--hairline); border-radius: 10px; padding: 1.1rem 1.2rem; background: var(--paper); }
+      .stem { font-size: 1.25rem; font-weight: 600; letter-spacing: -.01em; line-height: 1.35; }
+      .lede { color: var(--muted); margin-top: .5rem; line-height: 1.55; }
+      .badge { display: inline-block; font-size: .72rem; font-weight: 600; letter-spacing: .04em;
+               text-transform: uppercase; color: var(--muted); border: 1px solid var(--hairline);
+               border-radius: 999px; padding: .1rem .5rem; }
+      .badge.model { color: var(--accent); border-color: var(--accent); }
+      .badge.warn { color: var(--warn); border-color: var(--warn); }
+      table { width: 100%; border-collapse: collapse; font-size: .82rem; margin-top: .5rem; }
+      th { text-align: left; font-weight: 500; color: var(--muted); border-bottom: 1px solid var(--hairline); padding: .3rem .5rem .3rem 0; }
+      td { border-bottom: 1px solid var(--hairline); padding: .3rem .5rem .3rem 0; vertical-align: top; }
+      td.wrapcell { white-space: pre-wrap; word-break: break-word; max-width: 30rem; }
+      .src-participant { color: var(--accent); font-weight: 600; }
+      .src-model { color: #4a3fb5; font-weight: 600; }
+      .src-system { color: var(--muted); }
+      .scroll { max-height: 26rem; overflow-y: auto; }
+      code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .8rem; }
+      .alert { border: 1px solid var(--warn); background: rgba(163,59,0,.07); border-radius: 8px;
+               padding: .6rem .8rem; font-size: .85rem; margin-top: .8rem; }
+      @media (max-width: 900px) { .wrap { grid-template-columns: 1fr; } }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <header>
+        <div>
+          <h1>MySelf <span class="dim">narrative lab</span></h1>
+          <p class="note" id="mode">…</p>
+        </div>
+        <span class="badge" id="providerBadge">—</span>
+      </header>
+
+      <section>
+        <div class="panel">
+          <h2>Set up a run</h2>
+          <label for="protocol">Protocol</label>
+          <select id="protocol"></select>
+          <label for="firstName">First name (piped into what the participant reads)</label>
+          <input id="firstName" value="Amara" placeholder="leave blank to see it read correctly without one" />
+          <label for="topic">Topic</label>
+          <input id="topic" value="how school has been this term" />
+          <label for="provider">Provider</label>
+          <select id="provider">
+            <option value="mock">Deterministic mock — no key, no cost, repeatable</option>
+            <option value="openai">OpenAI — live call</option>
+          </select>
+          <div class="row">
+            <label style="margin: 0; display: flex; gap: .4rem; align-items: center; font-weight: 400;">
+              <input type="checkbox" id="online" checked style="width: auto;" /> online
+            </label>
+            <button class="primary" id="start">Start</button>
+          </div>
+          <p class="note" id="gate"></p>
+        </div>
+
+        <div class="panel">
+          <h2>What the participant sees</h2>
+          <div class="screen" id="screen">
+            <p class="note">Start a run to see the first screen.</p>
+          </div>
+          <div id="fallbackNote"></div>
+          <div class="row" id="controls"></div>
+        </div>
+      </section>
+
+      <section>
+        <div class="panel">
+          <h2>Staged records</h2>
+          <p class="note">
+            Every record, in order, with its source. The participant's own words are never produced by the model —
+            that is enforced when a record is appended, not checked afterwards.
+          </p>
+          <div class="scroll">
+            <table id="records">
+              <thead><tr><th>#</th><th>Source</th><th>Kind</th><th>Content</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="panel">
+          <h2>Model calls</h2>
+          <p class="note">
+            One row per call, written before it runs and completed after. A call that failed is part of the record.
+          </p>
+          <div class="scroll">
+            <table id="calls">
+              <thead><tr><th>Stage</th><th>Model</th><th>Status</th><th>ms</th><th>Tokens</th><th>Identifiers</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <script type="module">
+      const $ = (id) => document.getElementById(id);
+      let sessionId = null;
+      let current = null;
+
+      const api = async (path, body) => {
+        const res = await fetch(path, {
+          method: body ? "POST" : "GET",
+          headers: body ? { "content-type": "application/json" } : {},
+          body: body ? JSON.stringify(body) : undefined,
+        });
+        if (!res.ok) throw new Error((await res.json()).error ?? res.statusText);
+        return res.json();
+      };
+
+      const info = await api("/api/protocols");
+      $("mode").textContent = info.live
+        ? "A key is configured, so live calls are available. The mock is still the default."
+        : "No key configured — running on the deterministic mock, which exercises every path including the failures.";
+      for (const p of info.protocols) {
+        const option = document.createElement("option");
+        option.value = p.key;
+        option.textContent = `${p.name} (${p.key}@${p.version})`;
+        $("protocol").append(option);
+      }
+      if (!info.live) $("provider").querySelector('[value="openai"]').disabled = true;
+
+      const showGate = () => {
+        const p = info.protocols.find((x) => x.key === $("protocol").value);
+        $("gate").textContent = p.problems.length
+          ? `Publish gate: ${p.problems.join(" · ")}`
+          : `Publish gate: clean. Identifiers permitted in prompts: ${p.permittedIdentifiers.length ? p.permittedIdentifiers.join(", ") : "none"}.`;
+      };
+      $("protocol").addEventListener("change", showGate);
+      showGate();
+
+      const render = (data) => {
+        current = data.screen;
+        const s = data.screen;
+        const modelMade = s.kind === "follow_up" || s.kind === "interpret";
+
+        $("screen").innerHTML = s.finished
+          ? '<p class="stem">Finished.</p>'
+          : `${modelMade ? '<span class="badge model">written automatically</span>' : `<span class="badge">${s.kind}</span>`}
+             <p class="stem">${s.text ? escapeHtml(s.text) : "<em>(no text — the stage is a container)</em>"}</p>
+             ${s.lede ? `<p class="lede">${escapeHtml(s.lede)}</p>` : ""}
+             ${s.expectsInput ? '<textarea id="input" placeholder="type as the participant would"></textarea>' : ""}`;
+
+        $("fallbackNote").innerHTML = s.fallback
+          ? `<div class="alert"><strong>Fallback applied:</strong> ${escapeHtml(s.fallback.reason)} → <code>${s.fallback.applied}</code>.
+             Nothing the participant said was lost.</div>`
+          : "";
+
+        $("controls").innerHTML = s.finished
+          ? ""
+          : `${s.expectsInput ? '<button class="primary" id="send">Send</button>' : '<button class="primary" id="cont">Continue</button>'}
+             ${s.optional ? '<button class="secondary" id="skip">Skip this one</button>' : ""}`;
+
+        $("send")?.addEventListener("click", () => turn({ action: "submit", input: $("input").value }));
+        $("cont")?.addEventListener("click", () => turn({ action: "next" }));
+        $("skip")?.addEventListener("click", () => turn({ action: "skip" }));
+
+        const rows = (data.records ?? []).map(
+          (r) => `<tr><td>${r.seq}</td>
+            <td class="src-${r.source}">${r.source}</td>
+            <td><code>${r.kind}</code></td>
+            <td class="wrapcell">${escapeHtml(r.text ?? (r.data ? JSON.stringify(r.data) : ""))}</td></tr>`,
+        );
+        $("records").querySelector("tbody").innerHTML = rows.join("");
+
+        const callRows = (data.calls ?? []).map(
+          (c) => `<tr><td>${c.stage}</td><td>${c.modelServed ?? c.modelRequested}</td>
+            <td>${c.status}${c.errorKind ? ` <span class="badge warn">${c.errorKind}</span>` : ""}</td>
+            <td>${c.latencyMs ?? "—"}</td>
+            <td>${c.usage ? `${c.usage.inputTokens ?? "?"}/${c.usage.outputTokens ?? "?"}` : "—"}</td>
+            <td>${c.containedIdentifiers ? '<span class="badge warn">yes</span>' : "no"}</td></tr>`,
+        );
+        if (callRows.length) $("calls").querySelector("tbody").innerHTML = callRows.join("");
+      };
+
+      const escapeHtml = (s) =>
+        String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+
+      const turn = async (payload) => {
+        const data = await api("/api/turn", { sessionId, ...payload });
+        render(data);
+      };
+
+      $("start").addEventListener("click", async () => {
+        const data = await api("/api/start", {
+          protocol: $("protocol").value,
+          firstName: $("firstName").value,
+          topic: $("topic").value,
+          provider: $("provider").value,
+          online: $("online").checked,
+        });
+        sessionId = data.sessionId;
+        $("providerBadge").textContent = `provider: ${data.provider}`;
+        $("calls").querySelector("tbody").innerHTML = "";
+        render(data);
+      });
+    </script>
+  </body>
+</html>

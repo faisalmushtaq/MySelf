@@ -149,3 +149,87 @@ fieldwork rather than after.
   consistent with that. The replacement must record the failure as a failure —
   a declared fallback that never overwrites a data slot — rather than leaving an
   analyst to infer it from a blank.
+
+---
+
+## 10. Built (2026-08-03): `@myself/llm`, `@myself/narrative`, and the lab
+
+The module described above now exists, on the deterministic mock and against
+OpenAI. What follows is what was built and the decisions that changed on
+contact with the code.
+
+### 10.1 Three pieces
+
+**`@myself/llm`** — the provider-independent gateway. Adapters (OpenAI over
+plain fetch; a seeded, schema-aware mock) turn a resolved prompt into text and
+normalise errors. Everything else is the gateway's: the provenance row written
+*before* the call and completed after, schema validation on the way back,
+backoff on transient failures, and a refusal to retry the ones where retrying
+is wrong — a safety block is not a flaky network.
+
+**`@myself/narrative`** — protocols, staged records and the runner. A protocol
+declares its stages, prompts, model config, output schemas, fallbacks and
+safeguarding rules; `checkProtocol` is its publish gate. Records are appended
+through `refuseReason`, which is what makes "a model can never produce a
+participant's words" structural rather than aspirational.
+
+**`apps/narrative-lab`** — a standalone runner on `localhost:4300`: one Node
+file and one HTML page. It exists so a protocol can be exercised in seconds
+without clicking through a hundred and fifty survey questions, and so the
+OpenAI key lives in a server process, which is where a provider key belongs.
+Without a key it runs on the mock, which exercises every path including the
+failures.
+
+### 10.2 The participant's name
+
+The researcher asked for it to be usable. It is — **in what the participant
+reads**, resolved on the device. It is deliberately *not* in
+`permittedIdentifiers`, so the publish gate refuses any prompt that tries to
+send it to a provider, with a message saying why.
+
+A study that genuinely needs the model to use the name adds `first_name` to
+`permittedIdentifiers` on its own copy of the protocol. That is one line, and
+it is meant to be: it puts a child's name in front of a third party, the
+provenance row then records `containedIdentifiers: true`, and the consent
+wording — which currently promises names are not linked to research materials
+— would need to change to match. Both paths are tested.
+
+### 10.3 Four things the build changed
+
+- **A screen with no text is a blank screen in front of a child.** The first
+  protocol had a stage that rendered nothing. A test now walks every stage of
+  every shipped protocol and fails if it would render empty.
+- **The answer to the model's follow-up question was being dropped.** The
+  follow-up is a model stage, and only participant stages recorded anything —
+  so the second half of every conversation went nowhere. Found by running the
+  lab, not by reading the code. Now recorded as `participant_clarification`,
+  linked to the question it answers, and safeguarded like any other text.
+- **Structured output was requested but never checked.** The JSON schema went
+  to the provider and the response came back unvalidated — precisely the flaw
+  §8.3 criticises in the audited app. The gateway now validates against the
+  same schema it sent, and a mismatch is a failure that goes to the declared
+  fallback.
+- **Multi-turn elicitation is expressed as stages, not a loop counter.** A
+  half-implemented `maxTurns` loop was removed: what a participant will
+  experience should be readable from the protocol, not inferred from the
+  runner.
+
+### 10.4 Running it
+
+```bash
+cd apps/narrative-lab
+cp .env.example .env.local     # add OPENAI_API_KEY for live calls; .env.local is gitignored
+node server.mjs                # http://localhost:4300
+```
+
+The lab shows, side by side, what the participant sees and every staged record
+and model call it produced — including the failed ones.
+
+### 10.5 Still to do
+
+Slotting it into an assessment: a `narrative` section type in the composition
+so a protocol is placeable like an instrument, the release manifest freezing
+protocol and prompt versions, and narrative records syncing to their own
+Firestore document (`docs/08` §9.3). The module is built to drop in — the
+runner takes a protocol and a context and knows nothing about how it was
+reached — but that wiring is not written yet.
