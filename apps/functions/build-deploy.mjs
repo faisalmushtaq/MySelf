@@ -23,7 +23,16 @@ import { build } from "esbuild";
  */
 
 const here = (p) => fileURLToPath(new URL(p, import.meta.url));
-const out = here("./deploy");
+
+/**
+ * Inside the Firebase project directory, not beside the source.
+ *
+ * The CLI refuses a `source` outside the directory holding firebase.json —
+ * "is outside of project directory" — so a bundle written next to the
+ * TypeScript cannot be deployed however correct it is. It goes where the CLI
+ * will look, and is gitignored: it is build output, not source.
+ */
+const out = here("../../infra/firebase/functions");
 
 rmSync(out, { recursive: true, force: true });
 mkdirSync(out, { recursive: true });
