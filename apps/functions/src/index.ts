@@ -10,3 +10,4 @@ initializeApp();
 export { enrolDevice, revokeDevice, setRole, listPeople } from "./admin.js";
 export { captureIdentity, lookupParticipant, searchParticipants, linkIdentifier, recordRelationship } from "./identity.js";
 export { nightlyExport, exportNow } from "./export.js";
+export { llmRelay } from "./relay.js";

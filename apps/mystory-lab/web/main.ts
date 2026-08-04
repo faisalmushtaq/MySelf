@@ -21,6 +21,8 @@ import { NarrativeRunner, checkProtocol, protocols, type NarrativeProtocol, type
 const $ = (id: string) => document.getElementById(id)!;
 
 let live = false;
+/** The deployed relay this build was given, if any. */
+let relay: string | null = null;
 let sessionId: string | null = null;
 let localRunner: NarrativeRunner | null = null;
 let localCalls: ModelCall[] = [];
@@ -52,17 +54,36 @@ async function api<T>(path: string, body?: unknown): Promise<T> {
  * ways: by `server.mjs` during prompt-writing, and as static files on Pages
  * for anyone who wants to see what the module does.
  */
+declare const __RELAY_URL__: string;
+
+/**
+ * Three ways this page can reach a model, in order of preference.
+ *
+ *   The local server, when one is running with a key. What a researcher uses
+ *   while writing prompts.
+ *   The deployed relay, when this build was given one. The Cloud Function
+ *   holds the key; the page holds nothing.
+ *   Nothing, in which case the mock does the whole job — which is what the
+ *   public preview is, and is a complete demonstration rather than a
+ *   degraded one.
+ */
 async function detectServer(): Promise<void> {
   try {
     const info = await api<{ live: boolean }>("/api/protocols");
     live = info.live;
+    if (live) relay = null;
   } catch {
-    live = false; // static hosting; the mock does the whole job
+    // No local server. A build pointed at the relay can still make live calls,
+    // once somebody is signed in to authorise them.
+    relay = __RELAY_URL__ || null;
+    live = false;
   }
   $("mode").textContent = live
     ? "A key is configured on the server, so live calls are available. The mock is still the default."
-    : "Running entirely in this page on the deterministic mock — no key, no cost, nothing sent anywhere. Every path works, including the failures.";
-  if (!live) {
+    : relay
+      ? "Live calls go through the study's relay, which holds the key — this page never does. Sign in to use it. The mock is still the default."
+      : "Running entirely in this page on the deterministic mock — no key, no cost, nothing sent anywhere. Every path works, including the failures.";
+  if (!live && !relay) {
     ($("provider") as HTMLSelectElement).querySelector<HTMLOptionElement>('[value="openai"]')!.disabled = true;
   }
 }
