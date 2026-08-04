@@ -136,13 +136,23 @@ cannot be done through a permission check nobody can yet pass — so this runs o
 a laptop against Google's application-default credentials, and can only do what
 that person could already do in the console.
 
-```bash
-gcloud auth application-default login          # once
+Sign in to the app with that address FIRST — an account is created by signing
+in, not by being named here.
 
-# Sign in to the app with this address FIRST — the account is created by
-# signing in, not by being named here.
+```bash
+# With gcloud:
+gcloud auth application-default login
 pnpm --filter @myself/functions grant you@leeds.ac.uk owner --project myself-research
+
+# Without installing anything: Firebase console -> Project settings ->
+# Service accounts -> Generate new private key, then
+pnpm --filter @myself/functions grant you@leeds.ac.uk owner \
+  --project myself-research --key-file ~/Downloads/key.json
 ```
+
+Delete the key file afterwards. It is a credential to the whole project, and
+the reason to prefer gcloud where it is available is that gcloud's credentials
+expire and a downloaded key does not.
 
 Sign out and back in afterwards: a role arrives in a new token, not the one you
 are already holding.
