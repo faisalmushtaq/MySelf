@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { modelConfig } from "@myself/llm";
 import { protocols } from "@myself/narrative";
 import { releasesByHash } from "./releases.js";
-import { ALLOWED_ORIGIN, configFor, relayRequest, type Caller } from "./relay-policy.js";
+import { ALLOWED_ORIGIN, configFor, mayCall, relayRequest, type Caller } from "./relay-policy.js";
 
 /**
  * The relay's job is to be the only thing holding a key, and the only thing
@@ -88,5 +88,29 @@ describe("which pages may call it", () => {
     expect(ALLOWED_ORIGIN.test("https://faisalmushtaq.github.io.evil.example")).toBe(false);
     expect(ALLOWED_ORIGIN.test("https://evil.example")).toBe(false);
     expect(ALLOWED_ORIGIN.test("http://faisalmushtaq.github.io")).toBe(false);
+  });
+});
+
+describe("who may spend the study's model budget", () => {
+  /**
+   * The failure this prevents: Google sign-in is open to the world, so anyone
+   * can arrive holding a valid token for this project. If a verified token
+   * were enough, the public page would be a stranger's route to the study's
+   * OpenAI bill.
+   */
+  it("refuses a signed-in stranger with no role", () => {
+    expect(mayCall({})).toBe(false);
+    expect(mayCall({ role: "" })).toBe(false);
+    expect(mayCall({ role: "friend-of-the-project" })).toBe(false);
+    expect(mayCall({ device: false })).toBe(false);
+    // A truthy-looking claim that is not the boolean true is not a device.
+    expect(mayCall({ device: "true" })).toBe(false);
+  });
+
+  it("admits an enrolled device and anybody an owner gave a role", () => {
+    expect(mayCall({ device: true })).toBe(true);
+    for (const role of ["owner", "researcher", "analyst"]) {
+      expect(mayCall({ role })).toBe(true);
+    }
   });
 });

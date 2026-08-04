@@ -27,7 +27,17 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      # The Firebase web config is a set of PUBLIC identifiers — the apiKey
+      # names a project, it does not authorise anything. What authorises is a
+      # signed-in account carrying a role an owner granted, checked by the
+      # relay. It is here rather than in a secret because it ships inside the
+      # built JavaScript either way, and pretending otherwise would be theatre.
       - run: pnpm -r build
+        env:
+          MYSELF_FIREBASE_CONFIG: >-
+            {"apiKey":"AIzaSyCqcaFWJMobljhX63s--l4NEPZV6IXWJvM",
+             "authDomain":"myself-research.firebaseapp.com",
+             "projectId":"myself-research"}
       # After the build, because it reads the service worker the build emits:
       # a preview server has none, which is how /researcher/ shipped broken twice.
       - run: pnpm -r test

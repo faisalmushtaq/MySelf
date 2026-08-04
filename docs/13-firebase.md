@@ -218,6 +218,13 @@ published, and refusing until it had been through a release would mean
 publishing protocols nobody had run. An iPad gets no such latitude: a fielded
 run that is not reproducible should not be happening in front of a child.
 
+**A verified token is not a permission.** Google sign-in is open to the world
+by design, so anyone at all can arrive holding a valid token for this project.
+The relay therefore requires an enrolled device, or an account carrying a role
+an owner granted (`owner`, `researcher`, `analyst`). Signing in says who you
+are; the role is how the study says it knows you. Without this the public page
+would be a stranger's route to the study's OpenAI bill.
+
 **It is metered.** Every call is counted per caller per day (600 by default,
 `MYSELF_RELAY_DAILY_LIMIT`), and every call writes a provenance row server-side
 — what was sent, which snapshot answered, latency, tokens, and whether it
