@@ -95,6 +95,7 @@ interface Frame {
 
 function render(frame: Frame): void {
   const s = frame.screen;
+  currentKind = s.kind;
   const modelWrote = ["follow_up", "interpret", "collect", "adapt"].includes(s.kind);
 
   // The stages where the participant is choosing or rating need their own
@@ -115,7 +116,25 @@ function render(frame: Frame): void {
        </div>`
     : "";
 
-  const shown = s.scenario ? `<blockquote class="scenario">${escapeHtml(s.scenario)}</blockquote>` : "";
+  /**
+   * At the adapt stage the retelling is the participant's to rewrite.
+   *
+   * The original offers direct text editing alongside asking the model for a
+   * change (§8.1), and the two are different data: a sentence a young person
+   * typed is evidence in a way a model's reading of their instruction is not.
+   * Everywhere else the retelling is quoted, not editable.
+   */
+  const shown = !s.scenario
+    ? ""
+    : s.editable
+      ? `<label class="field-label" for="scenarioEdit">The write-up — change it here if you like</label>
+         <textarea id="scenarioEdit" class="scenario-edit" rows="6">${escapeHtml(s.scenario)}</textarea>`
+      : `<blockquote class="scenario">${escapeHtml(s.scenario)}</blockquote>`;
+
+  const unchangedNote = s.unchanged
+    ? `<p class="lede warn-text">The model could not make that change from your own words, so it left the
+       write-up as it was. You can edit it yourself above.</p>`
+    : "";
 
   $("screen").innerHTML = s.finished
     ? `<p class="stem">Finished.</p>${s.stopped ? `<p class="lede">Stopped: ${escapeHtml(s.stopped.reason)}</p>` : ""}`
@@ -123,18 +142,36 @@ function render(frame: Frame): void {
        <p class="stem">${s.text ? escapeHtml(s.text) : "<em>(this stage shows nothing)</em>"}</p>
        ${s.lede ? `<p class="lede">${escapeHtml(s.lede)}</p>` : ""}
        ${shown}
+       ${unchangedNote}
        ${choices ? `<div class="choices">${choices}</div>` : ""}
        ${rating}
-       ${s.expectsInput && !choices && !rating ? '<textarea id="input" placeholder="type as the participant would"></textarea>' : ""}`;
+       ${
+         s.expectsInput && !choices && !rating
+           ? `<textarea id="input" placeholder="${
+               s.editable ? "or tell me what to change and I will rewrite it" : "type as the participant would"
+             }"></textarea>`
+           : ""
+       }`;
 
   $("fallbackNote").innerHTML = s.fallback
     ? `<div class="alert"><strong>Fallback applied:</strong> ${escapeHtml(s.fallback.reason)} →
        <code>${escapeHtml(s.fallback.applied)}</code>. Nothing the participant said was lost.</div>`
     : "";
 
+  // At the adapt stage there are three things a participant can do, which is
+  // what the original offers: keep their own edit, ask the model to rewrite,
+  // or put back what was there before.
   $("controls").innerHTML = s.finished
     ? ""
-    : `${s.expectsInput ? '<button class="primary" id="send">Send</button>' : '<button class="primary" id="cont">Continue</button>'}
+    : `${
+        s.editable
+          ? `<button class="primary" id="keep">Keep my version</button>
+             <button class="secondary" id="send">Ask for a rewrite</button>
+             <button class="secondary" id="revert">Undo the last change</button>`
+          : s.expectsInput
+            ? '<button class="primary" id="send">Send</button>'
+            : '<button class="primary" id="cont">Continue</button>'
+      }
        ${s.optional ? '<button class="secondary" id="skip">Skip this one</button>' : ""}`;
 
   document.getElementById("send")?.addEventListener("click", () => {
@@ -145,6 +182,11 @@ function render(frame: Frame): void {
   });
   document.getElementById("cont")?.addEventListener("click", () => void turn({ action: "next" }));
   document.getElementById("skip")?.addEventListener("click", () => void turn({ action: "skip" }));
+  document.getElementById("keep")?.addEventListener("click", () => {
+    const edited = (document.getElementById("scenarioEdit") as HTMLTextAreaElement | null)?.value ?? "";
+    void turn({ action: "edit", input: edited });
+  });
+  document.getElementById("revert")?.addEventListener("click", () => void turn({ action: "revert" }));
 
   $("records").querySelector("tbody")!.innerHTML = frame.records
     .map(
@@ -169,18 +211,77 @@ function render(frame: Frame): void {
 
 // ── Driving a run ─────────────────────────────────────────────────────────
 
-async function turn(payload: { action: string; input?: string }): Promise<void> {
-  if (localRunner) {
-    const screen =
-      payload.action === "next"
-        ? await localRunner.next()
-        : payload.action === "skip"
-          ? await localRunner.skip()
-          : await localRunner.submit(payload.input ?? "");
-    render({ screen, records: localRunner.all, calls: localCalls });
+/**
+ * What is happening while nothing is happening.
+ *
+ * A live model call is seconds, not milliseconds, and the stage after the
+ * interview makes several: extract, then one retelling per persona. Without
+ * this the page sits there after a click, which reads as broken — the first
+ * live run of this looked "slow and glitchy" for exactly that reason, and the
+ * retellings appeared to never arrive when in fact nobody had waited.
+ *
+ * The wording is per stage, because "working…" does not tell anyone whether to
+ * keep waiting. A participant is told how many pieces of writing are coming.
+ */
+const WAITING: Record<string, string> = {
+  collect: "Thinking about what you said — if that was the last question, the write-ups take a few seconds…",
+  extract: "Reading back over the conversation…",
+  generate: "Writing the short versions — this takes a few seconds…",
+  adapt: "Rewriting it the way you asked…",
+  follow_up: "Thinking about what you said…",
+  interpret: "Reading back over what you wrote…",
+};
+
+let busy = false;
+/** The kind of stage on screen, so the waiting note can say what is coming. */
+let currentKind = "introduction";
+
+function setBusy(stageKind: string | null): void {
+  busy = stageKind !== null;
+  const controls = $("controls");
+  controls.querySelectorAll("button").forEach((b) => (b.disabled = busy));
+  const existing = document.getElementById("waiting");
+  if (stageKind === null) {
+    existing?.remove();
     return;
   }
-  render(await api<Frame>("/api/turn", { sessionId, ...payload }));
+  const note = existing ?? document.createElement("p");
+  note.id = "waiting";
+  note.className = "waiting";
+  note.textContent = WAITING[stageKind] ?? "Working";
+  if (!existing) controls.append(note);
+}
+
+async function turn(payload: { action: string; input?: string }): Promise<void> {
+  // Ignore a second click while a call is in flight: double-submitting a turn
+  // is how a participant ends up paying for two interviews of themselves.
+  if (busy) return;
+  setBusy(currentKind);
+  try {
+    if (localRunner) {
+      const screen =
+        payload.action === "next"
+          ? await localRunner.next()
+          : payload.action === "skip"
+            ? await localRunner.skip()
+            : payload.action === "edit"
+              ? localRunner.editScenario(payload.input ?? "")
+              : payload.action === "revert"
+                ? localRunner.revertScenario()
+                : await localRunner.submit(payload.input ?? "");
+      render({ screen, records: localRunner.all, calls: localCalls });
+      return;
+    }
+    render(await api<Frame>("/api/turn", { sessionId, ...payload }));
+  } catch (error) {
+    // A failed turn must not leave the page disabled and silent.
+    $("screen").innerHTML =
+      `<span class="badge warn">something went wrong</span>
+       <p class="stem">${escapeHtml(String((error as Error).message ?? error))}</p>
+       <p class="lede">Nothing you wrote has been lost — it is in the records below.</p>`;
+  } finally {
+    setBusy(null);
+  }
 }
 
 $("start").addEventListener("click", () => {

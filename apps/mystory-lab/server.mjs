@@ -218,12 +218,18 @@ const server = createServer(async (req, res) => {
       const runner = sessions.get(body.sessionId);
       if (!runner) return json(res, 404, { error: "no such session" });
 
+      // `edit` and `revert` make no model call: the participant is rewriting
+      // the retelling themselves, or putting back what was there before.
       const screen =
         body.action === "next"
           ? await runner.next()
           : body.action === "skip"
             ? await runner.skip()
-            : await runner.submit(body.input ?? "");
+            : body.action === "edit"
+              ? runner.editScenario(body.input ?? "")
+              : body.action === "revert"
+                ? runner.revertScenario()
+                : await runner.submit(body.input ?? "");
       json(res, 200, {
         screen,
         records: runner.all,
