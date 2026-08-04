@@ -1,5 +1,6 @@
 import { createServer } from "node:http";
 import { readFileSync, existsSync } from "node:fs";
+import { extname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { Gateway, MockAdapter, OpenAiAdapter } from "@myself/llm";
 import { NarrativeRunner, checkProtocol, protocols } from "@myself/narrative";
@@ -101,6 +102,61 @@ const json = (res, status, body) => {
   res.end(JSON.stringify(body));
 };
 
+/**
+ * The built page, served at the path it was built for.
+ *
+ * Vite builds with `base: "/MySelf/mystory/"` so the same output can be
+ * published beside MyThoughts and the researcher view, which means the
+ * index.html asks for `/MySelf/mystory/assets/…` and only works when it is
+ * served under that prefix. Serving it at `/` gives a page with no script.
+ *
+ * `/` redirects there rather than 404ing, because `/` is what somebody types
+ * after reading "MyStory lab on http://localhost:4300".
+ */
+const BASE = process.env.MYSELF_MYSTORY_BASE ?? "/MySelf/mystory/";
+// vite.config.ts sets root: "web" and outDir: "../dist", so the build lands
+// beside this file rather than one level up from it.
+const dist = here("./dist");
+
+const TYPES = {
+  ".html": "text/html; charset=utf-8",
+  ".js": "text/javascript; charset=utf-8",
+  ".css": "text/css; charset=utf-8",
+  ".json": "application/json",
+  ".svg": "image/svg+xml",
+  ".png": "image/png",
+  ".woff2": "font/woff2",
+  ".map": "application/json",
+};
+
+function serveStatic(pathname, res) {
+  if (pathname === "/" || `${pathname}/` === BASE) {
+    res.writeHead(302, { location: BASE }).end();
+    return true;
+  }
+  if (!pathname.startsWith(BASE)) return false;
+
+  if (!existsSync(dist)) {
+    res.writeHead(503, { "content-type": "text/plain; charset=utf-8" });
+    res.end(
+      `The lab has not been built yet — ${dist} does not exist.\n\n` +
+        "  cd apps/mystory-lab\n  pnpm build\n  node server.mjs\n",
+    );
+    return true;
+  }
+
+  // Everything under the base is a file in dist/, and anything that is not is
+  // the page itself: this is a single-page app with no routes of its own.
+  const rest = pathname.slice(BASE.length);
+  const file = resolve(dist, rest === "" ? "index.html" : rest);
+  // Resolved and then checked, so a request for ../../.env cannot escape.
+  const target = file.startsWith(dist) && existsSync(file) ? file : resolve(dist, "index.html");
+
+  res.writeHead(200, { "content-type": TYPES[extname(target)] ?? "application/octet-stream" });
+  res.end(readFileSync(target));
+  return true;
+}
+
 const readBody = async (req) => {
   const chunks = [];
   for await (const chunk of req) chunks.push(chunk);
@@ -111,10 +167,8 @@ const server = createServer(async (req, res) => {
   const url = new URL(req.url, "http://localhost");
 
   try {
-    if (req.method === "GET" && url.pathname === "/") {
-      res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
-      res.end(readFileSync(here("./src/index.html"), "utf8"));
-      return;
+    if (req.method === "GET" && !url.pathname.startsWith("/api/")) {
+      if (serveStatic(url.pathname, res)) return;
     }
 
     if (req.method === "GET" && url.pathname === "/api/protocols") {
@@ -187,7 +241,7 @@ const server = createServer(async (req, res) => {
 
 const port = Number(process.env.PORT ?? 4300);
 server.listen(port, () => {
-  console.log(`MyStory lab on http://localhost:${port}`);
+  console.log(`MyStory lab on http://localhost:${port}${BASE}`);
   // The last four characters only: enough to tell two keys apart when one has
   // been rotated, and not enough to be worth anything to anyone reading over a
   // shoulder or scrolling back through a terminal.
