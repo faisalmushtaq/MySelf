@@ -72,6 +72,71 @@
       .rating input { width: auto; }
       .scenario { margin: .9rem 0 0; padding: .8rem 1rem; border-left: 3px solid var(--accent);
                   background: #f7faf8; font-size: 1rem; line-height: 1.55; }
+
+      /* ── The conversation ────────────────────────────────────────────────
+         A message thread, because that is what it is: a young person and a
+         bot taking turns. The alternative — one screen replaced by the next —
+         loses everything already said, which is the part they are being asked
+         to recognise as theirs. */
+      .thread { display: flex; flex-direction: column; gap: .75rem; max-height: 26rem;
+                overflow-y: auto; padding: .3rem .1rem .3rem 0; scroll-behavior: smooth; }
+      .msg { display: flex; gap: .55rem; align-items: flex-start; max-width: 90%; }
+      .msg.from-them { align-self: flex-start; }
+      .msg.from-me { align-self: flex-end; flex-direction: row-reverse; }
+      .avatar { flex: 0 0 30px; height: 30px; border-radius: 8px; display: grid; place-items: center;
+                font-size: 1rem; line-height: 1; }
+      .from-them .avatar { background: #f4a340; }
+      .from-me .avatar { background: #e2604f; }
+      .bubble { padding: .55rem .8rem; border-radius: 14px; line-height: 1.5; font-size: .95rem;
+                background: var(--off-white); border: 1px solid var(--hairline); }
+      .from-me .bubble { background: var(--accent); border-color: var(--accent); color: #fff; }
+      .bubble.system { background: transparent; border: 0; color: var(--muted); font-size: .85rem;
+                       padding-left: 0; font-style: italic; }
+
+      /* The thinking dots, on the bot's side of the thread where a reply will
+         appear — not a spinner somewhere else on the page. */
+      .dots { display: inline-flex; gap: .22rem; padding: .2rem 0; }
+      .dots span { width: 6px; height: 6px; border-radius: 50%; background: var(--muted);
+                   animation: blink 1.3s infinite ease-in-out both; }
+      .dots span:nth-child(2) { animation-delay: .18s; }
+      .dots span:nth-child(3) { animation-delay: .36s; }
+      @keyframes blink { 0%, 80%, 100% { opacity: .25; transform: translateY(0); }
+                         40% { opacity: 1; transform: translateY(-2px); } }
+      .thinking-label { color: var(--muted); font-size: .82rem; margin: .1rem 0 0; }
+
+      /* The composer, as a message box rather than a form field. */
+      .composer { display: flex; gap: .5rem; align-items: flex-end; margin-top: .9rem; }
+      .composer textarea { flex: 1; min-height: 2.6rem; max-height: 9rem; padding: .55rem .7rem;
+                           border-radius: 14px; resize: none; }
+      .send-round { flex: 0 0 auto; width: 38px; height: 38px; border-radius: 50%; padding: 0;
+                    display: grid; place-items: center; font-size: 1.05rem; }
+
+      /* ── Choosing, rating, adapting ──────────────────────────────────── */
+      .cards { display: flex; flex-direction: column; gap: .7rem; margin-top: .9rem; }
+      .card-choice { border: 1px solid var(--hairline); border-radius: 12px; padding: .8rem .9rem;
+                     cursor: pointer; margin: 0; font-weight: 400; display: block; }
+      .card-choice:hover { border-color: var(--accent); }
+      .card-choice.picked { border-color: var(--accent); background: var(--accent-wash); }
+      .card-choice input { position: absolute; opacity: 0; pointer-events: none; }
+      .card-choice .who { color: var(--muted); font-size: .78rem; text-transform: lowercase;
+                          letter-spacing: .02em; display: block; margin-bottom: .3rem; }
+
+      .slider-wrap { margin-top: 1rem; }
+      .slider-ends { display: flex; justify-content: space-between; font-size: .85rem; font-weight: 500; }
+      .slider-ends .low { color: #c0392b; }
+      .slider-ends .high { color: #1e7a46; }
+      input[type="range"] { width: 100%; margin: .5rem 0 .2rem; accent-color: var(--accent); }
+      .slider-value { text-align: center; color: var(--muted); font-size: .85rem; }
+
+      .adapt-block { margin-top: 1rem; }
+      .adapt-block h3 { margin: 0 0 .5rem; font-size: 1rem; }
+      .scenario-edit { width: 100%; min-height: 8rem; padding: .7rem .8rem; border-radius: 10px;
+                       border: 1px solid var(--accent); background: var(--off-white);
+                       font: inherit; line-height: 1.55; resize: vertical; }
+      .adapt-ai { border: 1px solid var(--hairline); border-radius: 12px; padding: .8rem .9rem; margin-top: 1rem; }
+      .hint-right { text-align: right; color: var(--muted); font-size: .78rem; margin: .25rem 0 0; }
+      .warn-text { color: var(--warn); }
+
       @media (max-width: 900px) { .wrap { grid-template-columns: 1fr; } }
     </style>
   </head>
@@ -110,9 +175,10 @@
 
         <div class="panel">
           <h2>What the participant sees</h2>
-          <div class="screen" id="screen">
-            <p class="note">Start a run to see the first screen.</p>
+          <div class="thread" id="thread">
+            <p class="note">Start a run to see the conversation.</p>
           </div>
+          <div id="stageArea"></div>
           <div id="fallbackNote"></div>
           <div class="row" id="controls"></div>
         </div>
