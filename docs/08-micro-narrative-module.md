@@ -160,6 +160,10 @@ contact with the code.
 
 ### 10.1 Three pieces
 
+The participant-facing name for this module is **MyStory**, beside MyThoughts
+for the questionnaires (D-16). `@myself/narrative` and `np.*` stay as the
+technical names for the method itself.
+
 **`@myself/llm`** — the provider-independent gateway. Adapters (OpenAI over
 plain fetch; a seeded, schema-aware mock) turn a resolved prompt into text and
 normalise errors. Everything else is the gateway's: the provenance row written
@@ -216,7 +220,7 @@ wording — which currently promises names are not linked to research materials
 
 ### 10.4 Running it
 
-**On the web, no install:** `https://faisalmushtaq.github.io/MySelf/narrative/`
+**On the web, no install:** `https://faisalmushtaq.github.io/MySelf/mystory/`
 
 The same page, built as static files, runs the protocols **in the browser**
 against the deterministic mock. Every stage, every staged record, every

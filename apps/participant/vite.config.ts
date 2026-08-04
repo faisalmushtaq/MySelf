@@ -34,6 +34,21 @@ export default defineConfig({
         globPatterns: ["**/*.{js,css,html,svg,png,json,woff2}"],
         // The bundled release manifest must be available offline.
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
+        /**
+         * The other apps live under this service worker's scope, and must not
+         * be swallowed by it.
+         *
+         * Workbox answers every navigation inside the scope with this app's
+         * index.html, so it can work offline in a school hall with no network.
+         * That is right for the survey and catastrophic for its neighbours:
+         * without this denylist, /researcher/ and /narrative/ both served the
+         * questionnaire to anyone whose browser had ever cached it. It looked
+         * fine on a plain preview server, where no service worker exists —
+         * which is exactly why it survived to be deployed.
+         */
+        navigateFallbackDenylist: [
+          new RegExp(`^${base.replace(/\/$/, "")}/(researcher|mystory)/`),
+        ],
       },
     }),
   ],

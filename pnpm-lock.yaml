@@ -86,7 +86,7 @@ importers:
         specifier: ^2.1.0
         version: 2.1.9(@types/node@22.20.1)(terser@5.49.0)
 
-  apps/narrative-lab:
+  apps/mystory-lab:
     dependencies:
       '@myself/llm':
         specifier: workspace:*
