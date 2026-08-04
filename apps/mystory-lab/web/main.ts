@@ -1,5 +1,6 @@
-import { Gateway, MockAdapter, type ModelCall } from "@myself/llm";
+import { Gateway, MockAdapter, RelayAdapter, type ModelCall } from "@myself/llm";
 import { NarrativeRunner, checkProtocol, protocols, type NarrativeProtocol, type Screen } from "@myself/narrative";
+import { session } from "./session.js";
 
 /**
  * The lab, in the browser.
@@ -475,23 +476,42 @@ $("start").addEventListener("click", () => {
       return;
     }
 
-    // In-page, on the mock. Identical protocol, identical runner.
+    /**
+     * In this page, against whichever adapter applies.
+     *
+     * The relay when one is configured and somebody is signed in — it holds
+     * the key and this page never does. The mock otherwise, which is a
+     * complete demonstration rather than a degraded one.
+     */
+    const wantsRelay = ($("provider") as HTMLSelectElement).value === "openai" && relay;
+    const token = wantsRelay ? await session.token() : null;
+    if (wantsRelay && !token) {
+      $("bootNote").innerHTML =
+        `<div class="alert">Sign in first — the relay will not spend money for somebody it cannot name.</div>`;
+      return;
+    }
+
     localCalls = [];
     const gateway = new Gateway({
-      adapters: [new MockAdapter()],
+      adapters:
+        wantsRelay && token
+          ? [new RelayAdapter({ url: relay!, token }), new MockAdapter()]
+          : [new MockAdapter()],
       onCall: (call) => {
         const at = localCalls.findIndex((c) => c.callId === call.callId);
         if (at >= 0) localCalls[at] = call;
         else localCalls.push(call);
       },
     });
-    const protocol = onMock(protocols.find((p) => p.key === key)!);
+    const declared = protocols.find((p) => p.key === key)!;
+    const protocol = wantsRelay && token ? declared : onMock(declared);
     localRunner = new NarrativeRunner(
       protocol,
       { sessionId: `lab_${Date.now().toString(36)}`, variables: { first_name: firstName, topic }, online },
       gateway,
     );
-    $("providerBadge").textContent = "provider: mock (in this page)";
+    $("providerBadge").textContent =
+      wantsRelay && token ? "provider: relay (the key stays on the server)" : "provider: mock (in this page)";
     render({ screen: localRunner.start(), records: localRunner.all, calls: localCalls });
   })();
 });
@@ -507,4 +527,29 @@ $("start").addEventListener("click", () => {
 (window as unknown as { __mystoryReady?: boolean }).__mystoryReady = true;
 ($("start") as HTMLButtonElement).disabled = false;
 
-void detectServer();
+/**
+ * Sign-in, shown only where it does something.
+ *
+ * A local server with a key needs nobody signed in — it is the researcher's
+ * own machine. The relay does: it spends money, and it will not do that for a
+ * caller it cannot name.
+ */
+function wireSignIn(): void {
+  const signIn = $("signIn") as HTMLButtonElement;
+  const out = $("signOut") as HTMLButtonElement;
+  if (!session.available || !relay) return;
+
+  session.onChange((user) => {
+    signIn.hidden = user !== null;
+    out.hidden = user === null;
+    $("who").textContent = user ? `signed in as ${user.email ?? user.uid}` : "not signed in";
+  });
+  signIn.addEventListener("click", () => {
+    void session.signIn().catch((error: Error) => {
+      $("bootNote").innerHTML = `<div class="alert">Could not sign in: ${escapeHtml(error.message)}</div>`;
+    });
+  });
+  out.addEventListener("click", () => void session.signOut());
+}
+
+void detectServer().then(wireSignIn);
