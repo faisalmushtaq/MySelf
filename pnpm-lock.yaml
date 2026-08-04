@@ -168,6 +168,9 @@ importers:
       '@fontsource/inter':
         specifier: ^5.3.0
         version: 5.3.0
+      '@myself/narrative':
+        specifier: workspace:*
+        version: link:../../packages/narrative
       '@myself/schema':
         specifier: workspace:*
         version: link:../../packages/schema

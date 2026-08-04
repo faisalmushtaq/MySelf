@@ -194,8 +194,11 @@ describe("placing a narrative protocol in a composition", () => {
     expect(interviewer.system).toContain(approved.interview!.persona);
     expect(interviewer.system).toContain("1. Can you tell me about a time recently");
     // One frozen prompt per persona: which one wrote a retelling is a fact.
-    expect(manifest.prompts[`pt.scenario.0@${approved.version}`]).toBeDefined();
-    expect(manifest.prompts[`pt.scenario.2@${approved.version}`]).toBeDefined();
+    // Keyed by persona name, not by position: which voice wrote a retelling
+    // has to survive a later wave reordering the list.
+    for (const persona of approved.scenario!.personas) {
+      expect(manifest.prompts[`pt.scenario.${persona.key}@${approved.version}`]).toBeDefined();
+    }
     expect(manifest.modelConfigs["mc.openai.gpt4o.t07"]).toMatchObject({ model: "gpt-4o", temperature: 0.7 });
   });
 

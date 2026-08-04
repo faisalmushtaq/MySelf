@@ -10,8 +10,11 @@ import {
 import {
   ADAPT_SYSTEM,
   checkProtocol,
+  collectionComplete,
   EXTRACTION_SYSTEM,
   INTERVIEWER_SYSTEM,
+  keyQuestions,
+  keysString,
   numberedQuestions,
   oneShot,
   SCENARIO_SYSTEM,
@@ -187,18 +190,29 @@ function freezePrompts(protocol: NarrativeProtocol): Record<string, unknown> {
       INTERVIEWER_SYSTEM.replace("{persona}", protocol.interview.persona)
         .replace("{language_style}", protocol.interview.languageStyle)
         .replace("{topic_restriction}", protocol.interview.topicRestriction)
-        .replace("{questions}", numberedQuestions(protocol.interview.questions)),
+        .replace("{questions}", numberedQuestions(protocol.interview.questions))
+        .replace("{collection_complete}", collectionComplete(protocol.interview.questions.length)),
       { maxTurns: protocol.interview.maxTurns },
     );
   }
   if (protocol.extraction) {
-    at("pt.extraction", EXTRACTION_SYSTEM, { keys: protocol.extraction.keys });
+    const keys = protocol.extraction.keys;
+    at(
+      "pt.extraction",
+      EXTRACTION_SYSTEM.replace("{keys_string}", keysString(Object.keys(keys))).replace("{questions}", keyQuestions(keys)),
+      { keys },
+    );
   }
   if (protocol.scenario) {
-    // One per persona: three personas are three different instructions, and
-    // which one produced a given retelling is part of the record.
+    // One per persona, keyed by name: three personas are three different
+    // instructions, and which one produced a given retelling is part of the
+    // record. An index would stop meaning anything if a wave reordered them.
     protocol.scenario.personas.forEach((persona, index) => {
-      at(`pt.scenario.${index}`, SCENARIO_SYSTEM.replace("{persona}", persona) + oneShot(protocol), { persona, index });
+      at(
+        `pt.scenario.${persona.key}`,
+        SCENARIO_SYSTEM.replace("{persona}", persona.text).replace("{one_shot}", oneShot(protocol)),
+        { persona: persona.key, index },
+      );
     });
     at("pt.adapt", ADAPT_SYSTEM);
   }

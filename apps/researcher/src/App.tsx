@@ -3,6 +3,7 @@ import { buildBidsExport, buildDemoSessions, buildZip, summarise, wideTable, typ
 import { DataTable, downloadCsv } from "./components/DataTable.js";
 import { Linkage } from "./components/Linkage.js";
 import { ParticipantPanel } from "./components/ParticipantPanel.js";
+import { Protocols } from "./components/Protocols.js";
 import { Summary } from "./components/Summary.js";
 import { buildDataset } from "./lib/build.js";
 import {
@@ -38,7 +39,7 @@ const STUDY = "YBM-ND2026";
 
 const plural = (n: number, noun: string): string => `${n} ${noun}${n === 1 ? "" : "s"}`;
 
-type Tab = "overview" | "table" | "linkage" | "data";
+type Tab = "overview" | "table" | "linkage" | "mystory" | "data";
 
 export default function App() {
   const [dataset, setDataset] = useState<Dataset | null>(null);
@@ -138,9 +139,17 @@ export default function App() {
           </p>
         </div>
         <nav className="tabs">
-          {(["overview", "table", "linkage", "data"] as Tab[]).map((t) => (
+          {(["overview", "table", "linkage", "mystory", "data"] as Tab[]).map((t) => (
             <button key={t} type="button" className={tab === t ? "tab on" : "tab"} onClick={() => setTab(t)}>
-              {t === "overview" ? "Overview" : t === "table" ? "Table" : t === "linkage" ? "Linkage" : "Data in and out"}
+              {t === "overview"
+                ? "Overview"
+                : t === "table"
+                  ? "Table"
+                  : t === "linkage"
+                    ? "Linkage"
+                    : t === "mystory"
+                      ? "MyStory"
+                      : "Data in and out"}
             </button>
           ))}
         </nav>
@@ -249,6 +258,8 @@ export default function App() {
       )}
 
       {tab === "linkage" && <Linkage onCorrectionsChanged={() => void reload()} />}
+
+      {tab === "mystory" && <Protocols />}
 
       {tab === "data" && (
         <section className="panel data-panel">

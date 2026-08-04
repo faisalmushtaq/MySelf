@@ -648,3 +648,153 @@ th {
 .reveal-ask .search {
   min-width: 22rem;
 }
+
+/* ------------------------------------------------------ MyStory protocols */
+
+.protocols .protocol-source {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  margin: 0.9rem 0 1rem;
+}
+
+.protocols select {
+  min-height: 40px;
+  padding: 0 0.6rem;
+  border: 1px solid var(--hairline-strong);
+  border-radius: 8px;
+  background: var(--paper);
+  font: inherit;
+  max-width: 30rem;
+}
+
+.file-button {
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px;
+  padding: 0 1rem;
+  border-radius: 8px;
+  border: 1px solid var(--hairline-strong);
+  background: var(--paper);
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.file-button input[type="file"] {
+  display: none;
+}
+
+.tabs.inner {
+  margin: 1rem 0 0.25rem;
+}
+
+.protocol-form h3 {
+  margin: 1.6rem 0 0.2rem;
+  padding-top: 0.9rem;
+  border-top: 1px solid var(--hairline);
+}
+
+.protocol-field {
+  display: block;
+  margin-top: 0.9rem;
+  max-width: 52rem;
+}
+
+.protocol-field .dim {
+  display: block;
+  font-size: 0.85rem;
+  margin-bottom: 0.35rem;
+}
+
+.protocol-field input[type="text"],
+.protocol-field input[type="number"],
+.protocol-field textarea,
+.protocol-row textarea,
+.protocol-row input[type="text"] {
+  width: 100%;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid var(--hairline-strong);
+  border-radius: 8px;
+  background: var(--paper);
+  font: inherit;
+  line-height: 1.45;
+  resize: vertical;
+}
+
+.protocol-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  margin-bottom: 0.4rem;
+}
+
+.protocol-row.keyed .protocol-key {
+  flex: 0 0 9rem;
+}
+
+.protocol-index {
+  flex: 0 0 1.4rem;
+  padding-top: 0.55rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+
+.secondary.small {
+  min-height: 34px;
+  padding: 0 0.65rem;
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+
+.protocol-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  gap: 0.75rem;
+  max-width: 52rem;
+}
+
+.protocol-grid .protocol-field {
+  margin-top: 0;
+}
+
+.protocol-check {
+  display: flex;
+  gap: 0.6rem;
+  align-items: flex-start;
+  margin-top: 0.9rem;
+  max-width: 52rem;
+  font-size: 0.92rem;
+}
+
+.protocol-pre {
+  margin: 0.5rem 0 0;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--hairline);
+  border-radius: 8px;
+  background: var(--off-white);
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 0.82rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-x: auto;
+}
+
+.protocol-prompts details {
+  margin-top: 0.8rem;
+  border: 1px solid var(--hairline);
+  border-radius: 8px;
+  padding: 0.6rem 0.9rem;
+  background: var(--paper);
+}
+
+.protocol-prompts summary {
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.protocol-file-actions {
+  display: flex;
+  gap: 0.6rem;
+  margin: 0.9rem 0 0;
+}
