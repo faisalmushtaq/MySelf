@@ -4,18 +4,29 @@ packages:
 
 # Dependencies allowed to run install scripts.
 #
-# pnpm 10+ blocks postinstall scripts by default and exits non-zero until
-# somebody approves them interactively. That is a sensible default — an install
-# script is arbitrary code from a stranger — but "run this interactive command
-# before anything works" is not a first step for a researcher cloning the repo,
-# and the answer would be the same every time.
-#
-# So the answer is recorded here, in version control, where it can be reviewed
-# like any other dependency decision:
+# pnpm blocks a dependency's install scripts by default and exits non-zero
+# until somebody approves them. That is a sensible default — an install script
+# is arbitrary code from a stranger — but "run this interactive command before
+# anything works" is not a first step for a researcher cloning the repo, and
+# the answer would be the same every time. So the answer is recorded here,
+# where it can be reviewed like any other dependency decision:
 #
 #   esbuild        downloads its platform binary. Vite does not build without it.
 #   protobufjs     used by firebase-admin.
 #   @firebase/util part of the Firebase SDK.
+#
+# BOTH SPELLINGS ARE HERE ON PURPOSE. pnpm 11 renamed the setting: it reads
+# `allowBuilds` and ignores `onlyBuiltDependencies`, which is what pnpm 10
+# reads. Neither version objects to the other's key, and dropping either one
+# means whoever is on that version gets a failed install and a prompt telling
+# them to approve builds by hand. Verified against 10.33.0 and 11.20.0.
+#
+# When the project settles on pnpm 11 everywhere, delete the second block.
+allowBuilds:
+  "@firebase/util": true
+  esbuild: true
+  protobufjs: true
+
 onlyBuiltDependencies:
   - "@firebase/util"
   - esbuild
