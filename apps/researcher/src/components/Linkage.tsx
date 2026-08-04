@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import {
   accessLog,
   corrections,
+  identifierFile,
   lookupByCode,
   recordCorrection,
   searchPeople,
@@ -215,6 +216,38 @@ export function Linkage({ onCorrectionsChanged }: { onCorrectionsChanged: () => 
       </div>
 
       {note && <p className="note warn">{note}</p>}
+
+      <h3>Take the identifiers out</h3>
+      <p className="note">
+        Participant code beside the identifiers, and nothing else — no answers. Join it to the phenotype tables on{" "}
+        <code>participant_id</code>, or send it to a linkage service. It is deliberately a separate file: one
+        carrying both identifiers and answers is the thing this platform is arranged not to produce by accident.
+      </p>
+      <div className="row">
+        <button
+          type="button"
+          className="secondary"
+          disabled={!ready}
+          onClick={() => {
+            void (async () => {
+              const csv = await identifierFile(why.trim());
+              const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement("a");
+              a.href = url;
+              a.download = `myself_identifiers_${new Date().toISOString().slice(0, 10)}.csv`;
+              document.body.appendChild(a);
+              a.click();
+              a.remove();
+              setTimeout(() => URL.revokeObjectURL(url), 30_000);
+              setNote("Identifier file downloaded — it contains names. Put it straight into approved storage.");
+              refresh();
+            })();
+          }}
+        >
+          Download identifier file (CSV)
+        </button>
+      </div>
 
       <h3>Corrections in force</h3>
       <p className="note">

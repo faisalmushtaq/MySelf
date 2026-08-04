@@ -79,3 +79,157 @@ UI/logic/LLM/storage all interleaved in Streamlit session state; no separation o
 **Do not retain (with documented reasons):** the Streamlit runtime (no offline capability, no session recovery, unsuitable for iPad-managed collection — this is the brief's core requirement, not fashion); client-side LLM calls with provider keys (moves to the server gateway); DynamoDB single-item storage (replaced by append-only staged records with provenance); unvalidated JSON parsing (replaced by schema-constrained outputs); the "FINISHED" sentinel (replaced by structured completion signalling in the model-output schema, which also closes the injection hole); the stubbed safety check (replaced by the configured safeguarding pipeline — and per the licence's community commitment, this safety design can be shared back to the micro-narratives community); the apology-string failure mode (replaced by declared fallbacks that never overwrite data slots).
 
 **Net effect:** MySelf's `np.*` protocol family is a faithful generalisation of the CHI 2025 method — same interaction science, new engine. The YBM `np.future_self` protocol is simpler than the full method (single elicitation + optional follow-up); a full `np.micro_narrative` protocol replicating the collect→extract→personas→select→rate→adapt journey is specified as the module's second seed protocol so existing research designs port over directly.
+
+---
+
+## 9. What a completed run actually produces (measured, 2026-08-03)
+
+The audit in §8 was of the code. This is of its **output**: a real run of 27
+participants, supplied by the principal researcher, measured rather than
+estimated. It settles the sizing question for integrating narratives into the
+survey platform.
+
+**Currently deployed at**
+`https://micro-narratives-brain-health-l2uumbz34dgukhmddtizyn.streamlit.app/`
+— Streamlit Community Cloud, the runtime §8.4 recommends not retaining.
+
+### 9.1 Output shape
+
+Fifteen columns, DynamoDB-typed JSON (`{"S": …}`, `{"L": […]}`, `{"M": {…}}`)
+carried through into the export:
+
+| Column | Filled | Notes |
+|---|---|---|
+| `session_id`, `participant_id` | 27/27 | participant ids are free text ("The happy") |
+| `chat_history` | 27/27 | structured turns — the participant's own words |
+| `chat_history_single_string` | 27/27 | **the same content flattened** |
+| `initial_scenario`, `final_scenario` | 26/27 | one run produced neither |
+| `initial_scenario_review_score` | 26/27 | quality-control score |
+| `scenarios` | 27/27 | the persona variants, with judgements |
+| `summary_answers` | 27/27 | closing structured answers |
+| `quality_control`, `quality_tracing` | 27/27 | paste ratios, typing anomalies |
+| `completion_status`, `completion_time` | 27/27 | seconds, as a float |
+| `flagged_for_review` | 27/27 | all 0 in this run |
+| `langsmith_session_id` | **0/27** | tracing was off — as §8 says it is by default |
+
+### 9.2 Size
+
+| | per participant |
+|---|---|
+| Median | **12.3 kB** |
+| Mean | 12.6 kB |
+| Largest | 20.1 kB |
+
+Against a survey sitting at ~54 kB, a sitting carrying both is ~66 kB — about
+**7% of one Firestore document**, so no chunking and no spill path. A thousand
+participants with narratives is ~66 MB against a 1 GiB free tier; ten thousand
+is still inside it.
+
+**Storage is not the constraint and will not become one.** The model calls are:
+a ten-turn guided conversation plus generation and adaptation is the budget
+line, and it should be priced per participant against the chosen model before
+fieldwork rather than after.
+
+### 9.3 Decisions this settles for the integration
+
+- **Narratives get their own document**, `studies/{study}/narratives/{sessionId}`,
+  not a field on the sitting. They arrive later and only where there is
+  connectivity, so attaching one must not mean re-uploading 54 kB of survey log
+  over a school wifi — and analyses that do not want narratives never pay to
+  read them.
+- **Store the structured chat history only.** The flattened string is the same
+  content again, about 20% of the payload, and two copies are two things that
+  can disagree. Derive it on read.
+- **Drop the DynamoDB type wrappers at ingest.** `{"S": "…"}` is an artefact of
+  where the data happened to be stored, not of what it means.
+- **`participant_id` becomes the derived code.** Free text ("The happy") cannot
+  link a narrative to a survey sitting or to a later wave.
+- **One run in 27 produced no scenario at all.** §8.3 records that generation
+  failures store an apology string in the scenario slot; a missing pair here is
+  consistent with that. The replacement must record the failure as a failure —
+  a declared fallback that never overwrites a data slot — rather than leaving an
+  analyst to infer it from a blank.
+
+---
+
+## 10. Built (2026-08-03): `@myself/llm`, `@myself/narrative`, and the lab
+
+The module described above now exists, on the deterministic mock and against
+OpenAI. What follows is what was built and the decisions that changed on
+contact with the code.
+
+### 10.1 Three pieces
+
+**`@myself/llm`** — the provider-independent gateway. Adapters (OpenAI over
+plain fetch; a seeded, schema-aware mock) turn a resolved prompt into text and
+normalise errors. Everything else is the gateway's: the provenance row written
+*before* the call and completed after, schema validation on the way back,
+backoff on transient failures, and a refusal to retry the ones where retrying
+is wrong — a safety block is not a flaky network.
+
+**`@myself/narrative`** — protocols, staged records and the runner. A protocol
+declares its stages, prompts, model config, output schemas, fallbacks and
+safeguarding rules; `checkProtocol` is its publish gate. Records are appended
+through `refuseReason`, which is what makes "a model can never produce a
+participant's words" structural rather than aspirational.
+
+**`apps/narrative-lab`** — a standalone runner on `localhost:4300`: one Node
+file and one HTML page. It exists so a protocol can be exercised in seconds
+without clicking through a hundred and fifty survey questions, and so the
+OpenAI key lives in a server process, which is where a provider key belongs.
+Without a key it runs on the mock, which exercises every path including the
+failures.
+
+### 10.2 The participant's name
+
+The researcher asked for it to be usable. It is — **in what the participant
+reads**, resolved on the device. It is deliberately *not* in
+`permittedIdentifiers`, so the publish gate refuses any prompt that tries to
+send it to a provider, with a message saying why.
+
+A study that genuinely needs the model to use the name adds `first_name` to
+`permittedIdentifiers` on its own copy of the protocol. That is one line, and
+it is meant to be: it puts a child's name in front of a third party, the
+provenance row then records `containedIdentifiers: true`, and the consent
+wording — which currently promises names are not linked to research materials
+— would need to change to match. Both paths are tested.
+
+### 10.3 Four things the build changed
+
+- **A screen with no text is a blank screen in front of a child.** The first
+  protocol had a stage that rendered nothing. A test now walks every stage of
+  every shipped protocol and fails if it would render empty.
+- **The answer to the model's follow-up question was being dropped.** The
+  follow-up is a model stage, and only participant stages recorded anything —
+  so the second half of every conversation went nowhere. Found by running the
+  lab, not by reading the code. Now recorded as `participant_clarification`,
+  linked to the question it answers, and safeguarded like any other text.
+- **Structured output was requested but never checked.** The JSON schema went
+  to the provider and the response came back unvalidated — precisely the flaw
+  §8.3 criticises in the audited app. The gateway now validates against the
+  same schema it sent, and a mismatch is a failure that goes to the declared
+  fallback.
+- **Multi-turn elicitation is expressed as stages, not a loop counter.** A
+  half-implemented `maxTurns` loop was removed: what a participant will
+  experience should be readable from the protocol, not inferred from the
+  runner.
+
+### 10.4 Running it
+
+```bash
+cd apps/narrative-lab
+cp .env.example .env.local     # add OPENAI_API_KEY for live calls; .env.local is gitignored
+node server.mjs                # http://localhost:4300
+```
+
+The lab shows, side by side, what the participant sees and every staged record
+and model call it produced — including the failed ones.
+
+### 10.5 Still to do
+
+Slotting it into an assessment: a `narrative` section type in the composition
+so a protocol is placeable like an instrument, the release manifest freezing
+protocol and prompt versions, and narrative records syncing to their own
+Firestore document (`docs/08` §9.3). The module is built to drop in — the
+runner takes a protocol and a context and knows nothing about how it was
+reached — but that wiring is not written yet.

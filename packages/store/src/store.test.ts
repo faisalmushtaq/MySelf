@@ -710,3 +710,62 @@ describe("twins", () => {
     expect(collisions).toEqual([]);
   });
 });
+
+describe("a sitting somebody did not finish", () => {
+  /**
+   * Stopping early is data, not an error. A young person who answers forty
+   * questions and puts the iPad down has told us forty things, and every one
+   * of them is kept — this is emphatically NOT the same as a storage fault
+   * that loses part of a record.
+   */
+  const abandoned = (id: string) =>
+    session(id, { initials: "JA", digit: "1", month: 1, postcode: "CD" }, {
+      complete: false,
+      extra: [
+        ev("response.recorded", "kss.q1", { value: { kind: "choice", code: 3 } }),
+        ev("response.recorded", "swemwbs.optimistic", { value: { kind: "choice", code: 4 } }),
+        ev("item.skipped", "swemwbs.useful"),
+        // …and then they stopped. Nothing further was ever presented.
+      ],
+    });
+
+  it("keeps every answer that was given", () => {
+    const { dataset } = ingest([abandoned("a1")], { manifest, study: "ybm" });
+    const answered = dataset.responses.filter((r) => r.status === "answered");
+    expect(answered.some((r) => r.variable === "kss_q1")).toBe(true);
+    expect(answered.some((r) => r.variable === "swemwbs_q1")).toBe(true);
+    expect(dataset.responses.find((r) => r.variable === "swemwbs_q2")?.status).toBe("skipped");
+  });
+
+  it("counts the person, the sitting and the wave like any other", () => {
+    const { dataset, rejected } = ingest([abandoned("a1")], { manifest, study: "ybm" });
+    expect(rejected).toEqual([]);
+    expect(dataset.participants).toHaveLength(1);
+    expect(dataset.sessions[0]!.complete).toBe(false);
+    expect(dataset.sessions[0]!.wave).toBe(1);
+  });
+
+  it("scores what can be scored and says the rest is missing", () => {
+    // A partial scale is reported as partial, not silently averaged over the
+    // items that happen to be present.
+    const { dataset } = ingest([abandoned("a1")], { manifest, study: "ybm" });
+    expect(dataset.scores.length).toBeGreaterThan(0);
+  });
+
+  it("exports it, marked as unfinished rather than left out", () => {
+    const { dataset } = ingest([abandoned("a1")], { manifest, study: "ybm" });
+    const files = buildBidsExport(dataset, { manifest, datasetName: "test" });
+    const sessions = files.find((f) => f.path.endsWith("sessions.tsv"))!.content;
+    expect(sessions).toContain("ses-01");
+    // `complete` is a column to filter on, so an analyst decides what to do
+    // with an unfinished sitting rather than never learning it existed.
+    expect(sessions.split("\n")[0]).toContain("complete");
+  });
+
+  it("shows up in the table, which is how you notice a room that struggled", () => {
+    const { dataset } = ingest([abandoned("a1")], { manifest, study: "ybm" });
+    const table = wideTable(dataset);
+    expect(table.rows).toHaveLength(1);
+    expect(table.rows[0]!["complete"]).toBe("no");
+  });
+});

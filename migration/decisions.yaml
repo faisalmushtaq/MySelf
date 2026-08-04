@@ -882,3 +882,38 @@ decisions:
       scheduled exports, so "free" means a card on file billed at zero, with a
       budget alert. Without Blaze the identity separation cannot be enforced,
       so it is not really optional for this design.
+
+  - id: D-40
+    topic: The micro-narrative module, and the participant's name in prompts
+    decision: protocol-declared-stages-gated-identifiers-standalone-lab
+    detail: >
+      Built 2026-08-03 at the researcher's request, testable on its own so a
+      protocol can be exercised without running the whole survey, and shaped to
+      drop into an assessment later as a module.
+      Three packages: a provider-independent gateway (@myself/llm) with an
+      OpenAI adapter and a seeded schema-aware mock; the protocol, staged
+      records and runner (@myself/narrative); and a standalone lab
+      (apps/narrative-lab) that holds the API key in a server process, which is
+      where a provider key belongs and matches where the Cloud Function will
+      hold it.
+      THE NAME. The researcher asked that the first name be feedable. It is
+      piped into participant-facing text, resolved on the device, and is
+      deliberately NOT in permittedIdentifiers — so the publish gate refuses
+      any prompt that tries to send it to a provider. A study that needs the
+      model to use it adds one line to its own copy of the protocol; the
+      provenance row then records containedIdentifiers, and the consent
+      wording would need to change, since it currently promises names are not
+      linked to research materials. Both paths are tested.
+      FOUR THINGS THE BUILD CHANGED, each found by running it rather than
+      reading it: a stage that rendered a blank screen (now a test over every
+      stage of every shipped protocol); the answer to the model's follow-up
+      question being silently dropped, because the follow-up is a model stage
+      and only participant stages recorded anything — the second half of every
+      conversation went nowhere; structured output requested from the provider
+      but never validated on the way back, which is exactly the flaw the audit
+      criticised in the original app; and a half-implemented turn counter
+      removed, so what a participant experiences is readable from the protocol
+      rather than inferred from the runner.
+      Not yet done: placing a protocol in a composition, freezing protocol and
+      prompt versions into the release manifest, and syncing narrative records
+      to their own Firestore document.

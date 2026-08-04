@@ -39,6 +39,9 @@ export interface PersonRecord {
   dateOfBirth: string | null;
   upn: string | null;
   upnSource: string | null;
+  /** Collected in the survey under explicit approval, or given by a parent. */
+  nhsNumber: string | null;
+  nhsSource: string | null;
   /** Every code this person has typed, right or wrong, wave by wave. */
   claims: { sessionId: string; claimedCode: string; givenName: string | null; familyName: string | null; recordedAt: string }[];
 }
@@ -225,6 +228,8 @@ export async function storeIdentity(rows: IdentityRow[]): Promise<number> {
         dateOfBirth: dob,
         upn: null,
         upnSource: null,
+        nhsNumber: null,
+        nhsSource: null,
         claims: [claim],
       });
     }
@@ -373,4 +378,53 @@ export async function relationshipsFor(participantCode: string): Promise<Relatio
 
 export async function allRelationships(): Promise<Relationship[]> {
   return (await db.relationships.toArray()).sort((a, b) => a.participantCode.localeCompare(b.participantCode));
+}
+
+/**
+ * The identifier file: participant code beside the identifiers, and nothing
+ * else.
+ *
+ * This is the file you join to the phenotype tables on `participant_id`, and
+ * the file a linkage service is sent. It is generated here, from the identity
+ * table alone, and deliberately carries no answers: a file that had both would
+ * be the one thing this platform is arranged to avoid producing by accident.
+ *
+ * Getting it requires a reason, which is stored — the same as any other look
+ * at a name.
+ */
+export async function identifierFile(justification: string): Promise<string> {
+  await noteAccess("identifier_file", "all participants", justification);
+  const people = (await db.people.toArray()).sort((a, b) => a.participantCode.localeCompare(b.participantCode));
+  const escape = (value: string | null) => {
+    if (value === null || value === "") return "";
+    return /[",\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
+  };
+  const header = "participant_id,given_name,family_name,date_of_birth,upn,nhs_number,n_sittings";
+  const rows = people.map((p) =>
+    [
+      p.participantCode,
+      escape(p.givenName),
+      escape(p.familyName),
+      escape(p.dateOfBirth),
+      escape(p.upn),
+      escape(p.nhsNumber),
+      String(p.claims.length),
+    ].join(","),
+  );
+  return `${[header, ...rows].join("\n")}\n`;
+}
+
+export async function setNhsNumber(
+  code: string,
+  nhsNumber: string,
+  source: string,
+  justification: string,
+): Promise<{ ok: boolean; conflict?: string }> {
+  await noteAccess("link_nhs_number", code, justification);
+  const clash = await db.people.filter((p) => p.nhsNumber === nhsNumber && p.participantCode !== code).first();
+  if (clash) return { ok: false, conflict: `that NHS number is already linked to ${clash.participantCode}` };
+  const person = await db.people.get(code);
+  if (!person) return { ok: false, conflict: "no record for that code" };
+  await db.people.put({ ...person, nhsNumber, nhsSource: source });
+  return { ok: true };
 }

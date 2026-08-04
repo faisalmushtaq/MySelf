@@ -24,16 +24,41 @@ import { latestRelease, releasesByHash } from "./releases.js";
 /** Read every sitting and derive the dataset, the same way the browser does. */
 export async function buildStudyDataset(study: string): Promise<{ dataset: Dataset; sittings: number }> {
   const db = research();
-  const snap = await db.collection(paths.sessions(study)).where("quarantined", "!=", true).get();
+  // Every sitting, filtered in code rather than in the query.
+  //
+  // Firestore's `!=` operator excludes documents that do not have the field at
+  // all, so `where("quarantined", "!=", true)` returns only the sittings that
+  // were explicitly marked false — which, before this was found, was none of
+  // them. The export would have been silently near-empty. At study sizes the
+  // whole collection is a cheap read, and filtering here cannot be walked into
+  // that way.
+  const snap = await db.collection(paths.sessions(study)).get();
 
   const sessions: DeviceSession[] = [];
+  let quarantinedCount = 0;
   for (const document of snap.docs) {
     const data = document.data() as SessionDoc;
+    if (data.quarantined === true) {
+      quarantinedCount += 1;
+      continue;
+    }
     const chunks: ChunkDoc[] =
       data.chunkCount > 0
         ? (await db.collection(paths.sessionChunks(study, data.sessionId)).get()).docs.map((c) => c.data() as ChunkDoc)
         : [];
-    sessions.push(joinSession(data, chunks));
+    try {
+      sessions.push(joinSession(data, chunks));
+    } catch (error) {
+      // A sitting whose chunks are incomplete is left out and shouted about
+      // rather than exported short. The device still holds its copy, so this
+      // is recoverable — quietly exporting a truncated log would not be.
+      logger.error("incomplete sitting left out of the export", {
+        sessionId: data.sessionId,
+        expectedChunks: data.chunkCount,
+        found: chunks.length,
+        error: String(error),
+      });
+    }
   }
 
   const corrections = await db.collection(paths.corrections(study)).get();
@@ -82,6 +107,9 @@ export async function buildStudyDataset(study: string): Promise<{ dataset: Datas
     }
   }
 
+  if (quarantinedCount > 0) {
+    logger.warn("quarantined sittings left out of the export", { quarantinedCount });
+  }
   return { dataset, sittings: sessions.length };
 }
 
