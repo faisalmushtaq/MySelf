@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import { mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { build } from "esbuild";
@@ -68,5 +69,22 @@ writeFileSync(
     2,
   )}\n`,
 );
+
+/**
+ * Install the two runtime dependencies, here, before deploying.
+ *
+ * Not for the cloud — Google installs them again from the package.json above.
+ * For the CLI: it loads the bundle in this directory and reads which functions
+ * it exports, to decide what to create, update and leave alone. Without
+ * node_modules it cannot, and says "Couldn't find firebase-functions package
+ * in your source code" followed by an unexplained failure.
+ *
+ * npm rather than pnpm, because pnpm's symlinked layout is not what the
+ * uploaded tarball should contain.
+ */
+execFileSync("npm", ["install", "--omit=dev", "--no-audit", "--no-fund", "--loglevel=error"], {
+  cwd: out,
+  stdio: "inherit",
+});
 
 console.log(`packaged into ${out}`);
