@@ -11,7 +11,8 @@
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
-    "package": "node build-deploy.mjs"
+    "package": "node build-deploy.mjs",
+    "grant": "node grant-role.mjs"
   },
   "dependencies": {
     "@myself/firebase": "workspace:*",
