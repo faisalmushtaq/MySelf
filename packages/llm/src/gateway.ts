@@ -1,5 +1,5 @@
-import { createHash, randomUUID } from "node:crypto";
 import type { z } from "zod";
+import { callId, sha256Hex } from "./hash.js";
 import {
   ModelError,
   type ModelAdapter,
@@ -48,7 +48,7 @@ export interface CallRequest<T> {
   identifyingVariables?: string[];
 }
 
-const hash = (value: string): string => createHash("sha256").update(value).digest("hex");
+const hash = sha256Hex;
 
 const flatten = (prompt: ResolvedPrompt): string =>
   [`system: ${prompt.system}`, ...prompt.messages.map((m) => `${m.role}: ${m.content}`)].join("\n");
@@ -73,7 +73,7 @@ export class Gateway {
     const resolved = flatten(request.prompt);
     const identifying = (request.identifyingVariables ?? []).filter((v) => v in request.prompt.variables);
     const call: ModelCall = {
-      callId: `mc_${randomUUID()}`,
+      callId: `mc_${callId()}`,
       sessionId: request.sessionId,
       protocolKey: request.protocolKey,
       stage: request.stage,
