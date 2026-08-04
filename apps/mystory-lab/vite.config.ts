@@ -1,7 +1,7 @@
 import { defineConfig } from "vite";
 
-// Published beside the participant app and the researcher view.
-const base = process.env["MYSELF_NARRATIVE_BASE"] ?? "/MySelf/narrative/";
+// MyStory, published beside MyThoughts and the researcher view.
+const base = process.env["MYSELF_MYSTORY_BASE"] ?? "/MySelf/mystory/";
 
 export default defineConfig({
   base,

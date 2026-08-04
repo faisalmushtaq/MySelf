@@ -917,3 +917,29 @@ decisions:
       Not yet done: placing a protocol in a composition, freezing protocol and
       prompt versions into the release manifest, and syncing narrative records
       to their own Firestore document.
+
+  - id: D-41
+    topic: One service worker, three apps under one origin
+    decision: denylist-siblings-from-the-navigation-fallback
+    detail: >
+      Reported by the researcher 2026-08-03: the MyStory URL served the survey.
+      Confirmed by rebuilding without the fix and reproducing it — the page
+      title came back "MySelf" rather than "MySelf — MyStory".
+      Cause: the participant app is a PWA whose service worker answers EVERY
+      navigation inside its scope with its own index.html, which is what lets
+      it work in a school hall with no network. Its scope is /MySelf/, so it
+      was swallowing /MySelf/researcher/ and /MySelf/mystory/ as well. Fixed
+      with navigateFallbackDenylist covering both siblings.
+      Two lessons recorded rather than the fix alone. First, this had been
+      shipped and described as working: it was only ever tested on a plain
+      preview server, where no service worker exists, so the failure could not
+      appear. Anything served under a PWA's scope must now be tested against
+      the assembled deploy artefact with the worker actively controlling the
+      page — which is how the fix was verified, and how the bug was reproduced
+      to confirm the diagnosis. Second, the researcher view had the same defect
+      and nobody had noticed, so a report about one app was really a report
+      about two.
+      Also renamed at the researcher's direction: the module is MyStory, and
+      now says so — /MySelf/mystory/, "MySelf — MyStory", apps/mystory-lab.
+      The technical package names (@myself/narrative, np.*) are unchanged;
+      MyStory is the product name, micro-narrative is the method.

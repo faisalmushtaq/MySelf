@@ -5,7 +5,7 @@ import { Gateway, MockAdapter, OpenAiAdapter } from "@myself/llm";
 import { NarrativeRunner, checkProtocol, protocols } from "@myself/narrative";
 
 /**
- * The narrative lab: run a protocol on its own, without the survey.
+ * The MyStory lab: run a narrative protocol on its own, without the survey.
  *
  * Two reasons this is a separate app rather than a page in the participant
  * app. It lets a researcher iterate on prompts and stages in seconds instead
@@ -145,7 +145,7 @@ const server = createServer(async (req, res) => {
 
 const port = Number(process.env.PORT ?? 4300);
 server.listen(port, () => {
-  console.log(`narrative lab on http://localhost:${port}`);
+  console.log(`MyStory lab on http://localhost:${port}`);
   console.log(
     live
       ? "OpenAI key found — live calls available, and the mock is still selectable."
