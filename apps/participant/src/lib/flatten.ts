@@ -82,6 +82,9 @@ export function flattenManifest(manifest: ReleaseManifest): FlattenedRelease {
             stem: { text: form.instructions },
             required: "optional",
             allowDecline: false,
+            // Administration text, not a participant answer — nothing here can
+            // identify anyone, so it never diverts to the identity partition.
+            identifying: false,
           };
           units.push({
             instrument: ref.instrument,

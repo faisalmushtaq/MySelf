@@ -95,14 +95,37 @@ interface Frame {
 
 function render(frame: Frame): void {
   const s = frame.screen;
-  const modelWrote = s.kind === "follow_up" || s.kind === "interpret";
+  const modelWrote = ["follow_up", "interpret", "collect", "adapt"].includes(s.kind);
+
+  // The stages where the participant is choosing or rating need their own
+  // controls: a list of retellings to pick between, or a 0-10 scale. Typing
+  // an index into a text box is a developer's idea of an interface.
+  const choices = (s.choices ?? [])
+    .map(
+      (c) => `<label class="choice">
+          <input type="radio" name="choice" value="${c.index}"${c.index === 0 ? " checked" : ""} />
+          <span><em>${escapeHtml(c.persona)}</em><br />${escapeHtml(c.text)}</span>
+        </label>`,
+    )
+    .join("");
+
+  const rating = s.rating
+    ? `<div class="rating">
+         ${Array.from({ length: s.rating.max + 1 }, (_, i) => `<label><input type="radio" name="rating" value="${i}"${i === s.rating!.max ? " checked" : ""} /><span>${i}</span></label>`).join("")}
+       </div>`
+    : "";
+
+  const shown = s.scenario ? `<blockquote class="scenario">${escapeHtml(s.scenario)}</blockquote>` : "";
 
   $("screen").innerHTML = s.finished
-    ? '<p class="stem">Finished.</p>'
+    ? `<p class="stem">Finished.</p>${s.stopped ? `<p class="lede">Stopped: ${escapeHtml(s.stopped.reason)}</p>` : ""}`
     : `${modelWrote ? '<span class="badge model">written automatically</span>' : `<span class="badge">${s.kind}</span>`}
        <p class="stem">${s.text ? escapeHtml(s.text) : "<em>(this stage shows nothing)</em>"}</p>
        ${s.lede ? `<p class="lede">${escapeHtml(s.lede)}</p>` : ""}
-       ${s.expectsInput ? '<textarea id="input" placeholder="type as the participant would"></textarea>' : ""}`;
+       ${shown}
+       ${choices ? `<div class="choices">${choices}</div>` : ""}
+       ${rating}
+       ${s.expectsInput && !choices && !rating ? '<textarea id="input" placeholder="type as the participant would"></textarea>' : ""}`;
 
   $("fallbackNote").innerHTML = s.fallback
     ? `<div class="alert"><strong>Fallback applied:</strong> ${escapeHtml(s.fallback.reason)} →
@@ -115,7 +138,10 @@ function render(frame: Frame): void {
        ${s.optional ? '<button class="secondary" id="skip">Skip this one</button>' : ""}`;
 
   document.getElementById("send")?.addEventListener("click", () => {
-    void turn({ action: "submit", input: (document.getElementById("input") as HTMLTextAreaElement).value });
+    const picked = document.querySelector<HTMLInputElement>('input[name="choice"]:checked');
+    const rated = document.querySelector<HTMLInputElement>('input[name="rating"]:checked');
+    const typed = document.getElementById("input") as HTMLTextAreaElement | null;
+    void turn({ action: "submit", input: picked?.value ?? rated?.value ?? typed?.value ?? "" });
   });
   document.getElementById("cont")?.addEventListener("click", () => void turn({ action: "next" }));
   document.getElementById("skip")?.addEventListener("click", () => void turn({ action: "skip" }));

@@ -177,7 +177,7 @@ safeguarding rules; `checkProtocol` is its publish gate. Records are appended
 through `refuseReason`, which is what makes "a model can never produce a
 participant's words" structural rather than aspirational.
 
-**`apps/narrative-lab`** — a standalone runner on `localhost:4300`: one Node
+**`apps/mystory-lab`** — a standalone runner on `localhost:4300`: one Node
 file and one HTML page. It exists so a protocol can be exercised in seconds
 without clicking through a hundred and fifty survey questions, and so the
 OpenAI key lives in a server process, which is where a provider key belongs.
@@ -232,7 +232,7 @@ leaving the page.
 **Locally, with live model calls:**
 
 ```bash
-cd apps/narrative-lab
+cd apps/mystory-lab
 cp .env.example .env.local     # add OPENAI_API_KEY; .env.local is gitignored
 pnpm build && node server.mjs  # http://localhost:4300
 ```
@@ -244,7 +244,49 @@ arrangement the Cloud Function will have.
 Either way the lab shows, side by side, what the participant sees and every
 staged record and model call it produced, including the failed ones.
 
-### 10.5 Still to do
+### 10.5 Faithful to the original: `np.micro_narrative_full` (D-42)
+
+The first build implemented the *method* — elicit, retell, confirm — but not
+the original app's **journey**. The researcher asked for fidelity to the app
+now running on Streamlit, so §8.1's flow was re-implemented stage for stage.
+`np.micro_narrative_full` is that protocol; `np.micro_narrative` and
+`np.future_self` remain as the shorter forms.
+
+| Original (`app.py`, `llm_config.py`) | Here | Same, or deliberately different |
+|---|---|---|
+| Consent, then identify | `introduction`, participant details from the session | Same. The name is resolved on the device (§10.2). |
+| LLM-guided Q&A over a numbered question list, one at a time | `collect`, driven by `interviewConfig.questions` | Same prompt, same one-at-a-time rule, same persona and language style. |
+| Interviewer emits the literal string `FINISHED` to end | `interviewDone: boolean` in the structured output | **Different.** A sentinel a participant can type — or a model can echo — is not a control signal. It is now a schema field. |
+| Typing-dynamics gate before generation | `qualityControlConfig`, `quality.ts` | Same signals (paste, chars/sec, long/multi-line, share threshold). **Off by default**, and it never discards: see the header of `quality.ts` for why a school hall is not a crowdsourced panel. |
+| Extraction into researcher-defined keys | `extract`, `extractionConfig.keys` | Same, plus: every key is required and nullable, so "did not say" is representable and the model is not pressed into filling a gap. Temperature clamped to 0.1. |
+| Three persona scenarios generated | `generate`, one call per `scenarioConfig.personas` | Same, including the one-shot example that sets the register. Each carries a `confidence` rather than silently padding a thin account. |
+| Participant reviews and picks one | `select` | Same. |
+| Participant rates the fit | `rate`, 0–10 | Same. Full marks skip the adaptation stage — there is nothing to change. |
+| Participant asks for a change; LLM revises | `adapt` | Same, plus a `changed: false` return when the request cannot be honoured from the participant's own words, instead of inventing material to satisfy it. |
+| Save | staged records throughout | **Different.** The original saves at the end; a dropped connection loses the session. Every stage is recorded as it happens (§3), so a session that stops halfway is still data. |
+
+The four prompt templates are in `packages/narrative/src/prompts.ts`,
+reproduced from `llm_config.py` rather than rewritten: their wording — reuse
+the participant's own words, no advice, no diagnosis, third person — *is* the
+method, and improving the prose would change what the study measures.
+
+### 10.6 Where the API key goes
+
+`apps/mystory-lab/.env.local`, one line:
+
+```
+OPENAI_API_KEY=sk-...
+```
+
+`.env.local` is gitignored. `server.mjs` reads it at start-up and holds it in
+the Node process; the browser page never sees it, and never can — it asks the
+server to make the call. Do not paste the key into a chat, an issue or a
+commit: anywhere it is written down is somewhere it has to be rotated from.
+
+When this moves into the platform proper the key moves to a Cloud Function's
+secret, which is the same arrangement with a different process holding it.
+
+### 10.7 Still to do
 
 Slotting it into an assessment: a `narrative` section type in the composition
 so a protocol is placeable like an instrument, the release manifest freezing

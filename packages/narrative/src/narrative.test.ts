@@ -3,7 +3,8 @@ import { Gateway, MockAdapter, type ModelCall } from "@myself/llm";
 import { checkProtocol, narrativeProtocol, type NarrativeProtocol } from "./protocol.js";
 import { originalsIntact, participantWords, refuseReason } from "./records.js";
 import { NarrativeRunner, resolveText } from "./runner.js";
-import { futureSelf, microNarrative } from "./protocols.js";
+import { futureSelf, microNarrative, microNarrativeFull } from "./protocols.js";
+import { aggregate, shouldStopBeforeGeneration, signalsFor } from "./quality.js";
 
 /**
  * The test matrix docs/08 §7 asks for, plus the two invariants that make this
@@ -391,5 +392,169 @@ describe("every stage the shipped protocols declare shows something", () => {
         ).toBe(true);
       }
     }
+  });
+});
+
+describe("the full CHI 2025 journey", () => {
+  /**
+   * Faithfulness to the original is the point (docs/08 §8.2), so these test
+   * the method rather than the plumbing: a guided interview over the
+   * researcher's questions, extraction that does not invent, personas the
+   * participant chooses between, a rating, and a correction in their words.
+   */
+  const full = () => mocked(microNarrativeFull);
+
+  const runThrough = async (answers: string[], opts: { protocol?: NarrativeProtocol } = {}) => {
+    const runner = new NarrativeRunner(opts.protocol ?? full(), context(), gatewayWith(new MockAdapter()));
+    runner.start();
+    let screen = await runner.next(); // past the introduction, into the interview
+    for (const answer of answers) {
+      screen = await runner.submit(answer);
+      if (!screen.expectsInput || screen.kind !== "collect") break;
+    }
+    return { runner, screen };
+  };
+
+  it("interviews before it writes anything", async () => {
+    const { runner, screen } = await runThrough(["It happened at school last week."]);
+    expect(screen.kind).toBe("collect");
+    expect(screen.expectsInput).toBe(true);
+    // Nothing has been generated: no retelling exists until the interview ends.
+    expect(runner.outcome.candidates).toHaveLength(0);
+    expect(runner.outcome.finalScenario).toBeNull();
+  });
+
+  it("closes the interview at the researcher's turn limit rather than running for ever", async () => {
+    const short = full();
+    short.interview = { ...short.interview!, maxTurns: 2 };
+    const { runner } = await runThrough(["First answer here.", "Second answer here."], { protocol: short });
+    expect(runner.outcome.interviewDone).toBe(true);
+  });
+
+  it("cannot be ended by a participant saying the wrong word", async () => {
+    // The original ended on a "FINISHED" sentinel in the model's reply, which
+    // a participant could speak and a model could echo. Completion is now a
+    // field in the structured output.
+    const { runner, screen } = await runThrough(["FINISHED"]);
+    expect(runner.outcome.interviewDone).toBe(false);
+    expect(screen.kind).toBe("collect");
+  });
+
+  it("extracts into the researcher's keys, and keeps a null where nothing was said", async () => {
+    const short = full();
+    short.interview = { ...short.interview!, maxTurns: 1 };
+    const { runner } = await runThrough(["We fell out over something at lunch and it was horrible."], {
+      protocol: short,
+    });
+    const keys = Object.keys(microNarrativeFull.extraction!.keys);
+    expect(Object.keys(runner.outcome.extraction).sort()).toEqual(keys.sort());
+  });
+
+  it("offers one retelling per persona, and the participant picks", async () => {
+    const short = full();
+    short.interview = { ...short.interview!, maxTurns: 1 };
+    const { runner, screen } = await runThrough(["We fell out at lunch and it was horrible."], { protocol: short });
+
+    expect(screen.kind).toBe("select");
+    expect(screen.choices).toHaveLength(microNarrativeFull.scenario!.personas.length);
+    expect(runner.outcome.candidates.map((c) => c.persona)).toEqual(microNarrativeFull.scenario!.personas);
+
+    const rating = await runner.submit("1");
+    expect(rating.kind).toBe("rate");
+    // The choice itself is recorded as data, not just used for navigation.
+    const choice = runner.all.find((r) => r.data && "chosenIndex" in r.data);
+    expect(choice?.data).toMatchObject({ chosenIndex: 1, offered: 3 });
+    expect(runner.outcome.chosenIndex).toBe(1);
+  });
+
+  it("skips the correction step when the participant says it is exactly right", async () => {
+    const short = full();
+    short.interview = { ...short.interview!, maxTurns: 1 };
+    const { runner } = await runThrough(["We fell out at lunch."], { protocol: short });
+    await runner.submit("0"); // choose
+    const after = await runner.submit("10"); // rate
+
+    expect(after.kind).toBe("debrief");
+    expect(runner.all.some((r) => r.kind === "stage_skipped" && (r.data as { reason?: string })?.reason === "rated_full_marks")).toBe(true);
+  });
+
+  it("offers the correction step when it is not right, and keeps both versions", async () => {
+    const short = full();
+    short.interview = { ...short.interview!, maxTurns: 1 };
+    const { runner } = await runThrough(["We fell out at lunch."], { protocol: short });
+    await runner.submit("0");
+    const adapt = await runner.submit("6");
+    expect(adapt.kind).toBe("adapt");
+    const before = runner.outcome.finalScenario;
+
+    await runner.submit("It was more that I felt left out, not that we argued.");
+    // The revision is a new record beside the old, and the correction is
+    // linked to what it corrected.
+    expect(runner.all.filter((r) => r.kind === "model_shown").length).toBeGreaterThan(1);
+    const correction = runner.all.find((r) => r.kind === "participant_correction");
+    expect(correction?.refersTo).toBeTruthy();
+    expect(runner.outcome.finalScenario).not.toBe(before);
+    expect(originalsIntact(runner.all)).toBe(true);
+  });
+
+  it("never lets a model record become the participant's words, all journey long", async () => {
+    const short = full();
+    short.interview = { ...short.interview!, maxTurns: 1 };
+    const { runner } = await runThrough(["We fell out at lunch."], { protocol: short });
+    await runner.submit("0");
+    await runner.submit("4");
+    await runner.submit("It was more that I felt left out.");
+    for (const record of runner.all.filter((r) => r.kind === "participant_original")) {
+      expect(record.source).toBe("participant");
+    }
+    expect(originalsIntact(runner.all)).toBe(true);
+  });
+});
+
+describe("typing-dynamics quality control", () => {
+  const config = { enabled: true, maxCharsPerSecond: 15, longMessageChars: 250, flagAboveShare: 0.3, stopBeforeGeneration: true };
+
+  it("spots a paste, implausible speed, and a long multi-line answer", () => {
+    expect(signalsFor({ text: "typed at a normal pace", composeMs: 8000, pasted: false }, config).suspect).toBe(false);
+    expect(signalsFor({ text: "pasted in", composeMs: 8000, pasted: true }, config).pasted).toBe(true);
+    expect(signalsFor({ text: "x".repeat(300), composeMs: 8000, pasted: false }, config).longOrMultiline).toBe(true);
+    expect(signalsFor({ text: "a".repeat(200), composeMs: 1000, pasted: false }, config).fastTyping).toBe(true);
+  });
+
+  it("does not compute a speed from an implausibly short compose time", () => {
+    // Dividing by almost zero produces a number that means nothing; the paste
+    // flag is what catches that case.
+    expect(signalsFor({ text: "hi", composeMs: 20, pasted: false }, config).charsPerSecond).toBeNull();
+  });
+
+  it("flags a session only above the researcher's share, not at it", () => {
+    const clean = { pasted: false, fastTyping: false, longOrMultiline: false, charsPerSecond: 3, suspect: false };
+    const dirty = { ...clean, pasted: true, suspect: true };
+    // Exactly 30% is not "more than 30%".
+    expect(aggregate([dirty, ...Array(9).fill(clean)], config).flagged).toBe(false);
+    expect(aggregate([dirty, dirty, dirty, dirty, ...Array(6).fill(clean)], config).flagged).toBe(true);
+  });
+
+  it("does nothing at all when the study has not turned it on", () => {
+    const off = { ...config, enabled: false };
+    const dirty = { pasted: true, fastTyping: true, longOrMultiline: true, charsPerSecond: 99, suspect: true };
+    expect(aggregate([dirty, dirty], off).flagged).toBe(false);
+    expect(shouldStopBeforeGeneration(aggregate([dirty, dirty], off), off)).toBe(false);
+  });
+
+  it("stops before generating, and still keeps everything collected", async () => {
+    const strict = mocked(microNarrativeFull);
+    strict.interview = { ...strict.interview!, maxTurns: 1 };
+    strict.qualityControl = config;
+    const runner = new NarrativeRunner(strict, context(), gatewayWith(new MockAdapter()));
+    runner.start();
+    await runner.next();
+    const screen = await runner.submit("x".repeat(400), { composeMs: 500, pasted: true });
+
+    expect(screen.stopped?.reason).toMatch(/quality signals/);
+    expect(runner.outcome.candidates).toHaveLength(0);
+    // Nothing is discarded: what they wrote is on the record either way.
+    expect(participantWords(runner.all)).toHaveLength(1);
+    expect(runner.outcome.quality.flagged).toBe(true);
   });
 });

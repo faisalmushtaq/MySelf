@@ -1,5 +1,18 @@
 import { ModelError, type Gateway, type ModelConfig, type ResolvedPrompt } from "@myself/llm";
-import { isIdentifying, placeholdersIn, type NarrativeProtocol, type NarrativeStage } from "./protocol.js";
+import { isIdentifying, type NarrativeProtocol, type NarrativeStage } from "./protocol.js";
+import {
+  ADAPT_SCHEMA,
+  ADAPT_SYSTEM,
+  EXTRACTION_SYSTEM,
+  INTERVIEWER_SCHEMA,
+  INTERVIEWER_SYSTEM,
+  SCENARIO_SCHEMA,
+  SCENARIO_SYSTEM,
+  extractionSchema,
+  numberedQuestions,
+  oneShot,
+} from "./prompts.js";
+import { aggregate, shouldStopBeforeGeneration, signalsFor, type MessageSignals, type MessageTrace } from "./quality.js";
 import { refuseReason, type NarrativeRecord, type RecordKind, type RecordSource } from "./records.js";
 
 /**
@@ -41,6 +54,14 @@ export interface Screen {
   optional: boolean;
   /** Set when the model could not be reached and a fallback was applied. */
   fallback?: { reason: string; applied: NarrativeProtocol["offlineFallback"] };
+  /** Candidate retellings, for the stage where the participant chooses. */
+  choices?: { index: number; persona: string; text: string }[];
+  /** The retelling under discussion, at the rate and adapt stages. */
+  scenario?: string;
+  /** Rating bounds, at the rate stage. */
+  rating?: { max: number };
+  /** Set when quality signals stopped the run before anything was generated. */
+  stopped?: { reason: string };
   finished: boolean;
 }
 
@@ -73,6 +94,15 @@ export class NarrativeRunner {
   private records: NarrativeRecord[] = [];
   private stageIndex = 0;
   private seq = 0;
+  /** The guided interview's transcript, oldest first. */
+  private transcript: { role: "assistant" | "user"; content: string }[] = [];
+  private interviewTurns = 0;
+  private interviewDone = false;
+  private extraction: Record<string, string | null> = {};
+  private candidates: { index: number; persona: string; text: string }[] = [];
+  private chosen: { index: number; persona: string; text: string } | null = null;
+  private finalScenario: string | null = null;
+  private signals: MessageSignals[] = [];
 
   constructor(
     private readonly protocol: NarrativeProtocol,
@@ -143,11 +173,25 @@ export class NarrativeRunner {
    * The participant's words are recorded first, before any model is called,
    * so a failure after this point cannot cost them what they said.
    */
-  async submit(input: string): Promise<Screen> {
+  async submit(input: string, trace?: Omit<MessageTrace, "text">): Promise<Screen> {
     const stage = this.stage;
     if (!stage) return this.finishedScreen();
 
-    if (stage.kind === "elicit" || stage.kind === "confirm" || stage.kind === "rate" || stage.kind === "follow_up") {
+    // Quality signals are computed from how the message was composed, not from
+    // what it says. Recorded for every participant message, acted on only if
+    // the protocol turns them on.
+    if (trace && input.trim().length > 0) {
+      this.signals.push(signalsFor({ text: input, ...trace }, this.protocol.qualityControl));
+    }
+
+    if (stage.kind === "collect") return this.continueInterview(stage, input);
+    if (stage.kind === "select") return this.chooseCandidate(stage, input);
+    if (stage.kind === "rate") return this.recordRating(stage, input);
+    if (stage.kind === "adapt") return this.reviseScenario(stage, input);
+
+    // `rate` is handled above by the guided journey; what remains here are the
+    // simpler stages the shorter protocols are built from.
+    if (stage.kind === "elicit" || stage.kind === "confirm" || stage.kind === "follow_up") {
       const trimmed = input.trim();
       if (stage.kind === "follow_up") {
         // The model asked a question and the participant answered it on the
@@ -178,8 +222,6 @@ export class NarrativeRunner {
           text: trimmed,
           refersTo: target?.recordId ?? null,
         });
-      } else {
-        this.append(stage.key, "participant", "participant_rating", { data: { rating: trimmed } });
       }
     }
 
@@ -213,9 +255,13 @@ export class NarrativeRunner {
     const next = this.stage;
     if (!next) return this.finishedScreen();
 
-    if (next.kind === "follow_up" || next.kind === "interpret") {
-      return this.runModelStage(next);
-    }
+    if (next.kind === "collect") return this.openInterview(next);
+    if (next.kind === "extract") return this.runExtraction(next);
+    if (next.kind === "generate") return this.runGeneration(next);
+    if (next.kind === "follow_up" || next.kind === "interpret") return this.runModelStage(next);
+    if (next.kind === "select") return this.offerChoices(next);
+    if (next.kind === "rate") return this.offerRating(next);
+    if (next.kind === "adapt") return this.offerAdaptation(next);
 
     const { text } = resolveText(next.text, this.context.variables, this.permittedForDisplay());
     this.append(next.key, "system", "request_shown", { text });
@@ -329,6 +375,337 @@ export class NarrativeRunner {
         data: { rule: rule.key, tier: rule.tier, matched: hit, reviewers: rule.reviewers },
       });
     }
+  }
+
+  // ── The guided journey ──────────────────────────────────────────────────
+
+  /** Ask the model for its next interview turn, given the transcript so far. */
+  private async interviewerTurn(stage: NarrativeStage): Promise<{ reply: string; done: boolean } | null> {
+    const interview = this.protocol.interview;
+    const config = this.modelFor(stage);
+    if (!interview || !config) return null;
+
+    const system = INTERVIEWER_SYSTEM.replace("{persona}", interview.persona)
+      .replace("{language_style}", interview.languageStyle)
+      .replace("{topic_restriction}", interview.topicRestriction)
+      .replace("{questions}", numberedQuestions(interview.questions));
+
+    const prompt: ResolvedPrompt = {
+      promptKey: "pt.interviewer",
+      promptVersion: this.protocol.version,
+      system,
+      messages: this.transcript.length > 0 ? [...this.transcript] : [{ role: "user", content: "(the participant is ready)" }],
+      variables: {},
+    };
+    this.append(stage.key, "system", "prompt_resolved", {
+      text: system,
+      data: { promptKey: prompt.promptKey, turns: this.transcript.length },
+    });
+
+    try {
+      const result = await this.gateway.call<{ reply: string; interviewDone: boolean }>({
+        sessionId: this.context.sessionId,
+        protocolKey: this.protocol.key,
+        stage: stage.key,
+        prompt,
+        config,
+        jsonSchema: { name: "interviewer_turn", schema: INTERVIEWER_SCHEMA as unknown as Record<string, unknown> },
+        identifyingVariables: this.protocol.permittedIdentifiers,
+      });
+      this.append(stage.key, "model", "model_raw", { text: result.raw });
+      const validated = this.append(stage.key, "model", "model_validated", {
+        data: result.output as unknown as Record<string, unknown>,
+      });
+      this.append(stage.key, "system", "model_shown", { text: result.output.reply, refersTo: validated.recordId });
+      this.transcript.push({ role: "assistant", content: result.output.reply });
+      return { reply: result.output.reply, done: result.output.interviewDone === true };
+    } catch {
+      return null;
+    }
+  }
+
+  private async openInterview(stage: NarrativeStage): Promise<Screen> {
+    if (!this.context.online && this.protocol.offlineFallback !== "queue_authorised") {
+      return this.applyFallback(stage, "no connection");
+    }
+    const turn = await this.interviewerTurn(stage);
+    if (!turn) return this.applyFallback(stage, "the interviewer could not be reached");
+    return { ...this.screenFor(stage, turn.reply), expectsInput: true };
+  }
+
+  /**
+   * One exchange of the guided interview.
+   *
+   * The participant's answer is recorded before the model is asked anything,
+   * so a failure here cannot cost them what they just wrote. The interview
+   * ends when the model says every question is covered, or when the
+   * researcher's turn limit is reached — never because a word appeared in the
+   * transcript.
+   */
+  private async continueInterview(stage: NarrativeStage, input: string): Promise<Screen> {
+    const interview = this.protocol.interview;
+    const said = input.trim();
+    if (said.length < stage.minChars) {
+      this.append(stage.key, "system", "validation_result", {
+        data: { ok: false, reason: "too_short", minChars: stage.minChars },
+      });
+      return this.screenFor(stage, "Could you say a little more?");
+    }
+
+    this.append(stage.key, "participant", "participant_original", { text: said.slice(0, stage.maxChars) });
+    this.flagSafeguarding(stage.key, said);
+    this.transcript.push({ role: "user", content: said });
+    this.interviewTurns += 1;
+
+    const limit = interview?.maxTurns ?? stage.maxTurns;
+    if (this.interviewTurns >= limit) {
+      this.interviewDone = true;
+      this.append(stage.key, "system", "validation_result", { data: { interviewClosed: "turn_limit", limit } });
+      return this.advance();
+    }
+
+    const turn = await this.interviewerTurn(stage);
+    if (!turn) return this.applyFallback(stage, "the interviewer could not be reached");
+    if (turn.done) {
+      this.interviewDone = true;
+      return this.advance();
+    }
+    return { ...this.screenFor(stage, turn.reply), expectsInput: true };
+  }
+
+  /** The participant's answers, reduced to the researcher's keys. */
+  private async runExtraction(stage: NarrativeStage): Promise<Screen> {
+    const keys = this.protocol.extraction?.keys;
+    const config = this.modelFor(stage);
+    if (!keys || !config) return this.applyFallback(stage, "the stage is not configured for extraction");
+
+    const quality = aggregate(this.signals, this.protocol.qualityControl);
+    if (shouldStopBeforeGeneration(quality, this.protocol.qualityControl)) {
+      // Everything collected is already recorded. What stops is the spending
+      // of model calls on it, and the showing of a retelling built on it.
+      this.append(stage.key, "system", "fallback_applied", {
+        data: { reason: "quality_signals", quality },
+      });
+      return {
+        ...this.finishedScreen(),
+        stopped: { reason: "quality signals crossed the threshold set for this study" },
+      };
+    }
+
+    const conversation = this.transcript.map((m) => `${m.role === "user" ? "Participant" : "Interviewer"}: ${m.content}`).join("\n");
+    const prompt: ResolvedPrompt = {
+      promptKey: "pt.extraction",
+      promptVersion: this.protocol.version,
+      system: EXTRACTION_SYSTEM,
+      messages: [{ role: "user", content: conversation }],
+      variables: {},
+    };
+    this.append(stage.key, "system", "prompt_resolved", { text: EXTRACTION_SYSTEM, data: { keys: Object.keys(keys) } });
+
+    try {
+      const result = await this.gateway.call<Record<string, string | null>>({
+        sessionId: this.context.sessionId,
+        protocolKey: this.protocol.key,
+        stage: stage.key,
+        prompt,
+        // Extraction is the one stage that must not improvise, so it runs at
+        // the low temperature the original used.
+        config: { ...config, temperature: Math.min(config.temperature, 0.1) },
+        jsonSchema: { name: "extraction", schema: extractionSchema(keys) },
+      });
+      this.append(stage.key, "model", "model_raw", { text: result.raw });
+      this.append(stage.key, "model", "model_validated", { data: result.output as Record<string, unknown> });
+      this.extraction = result.output;
+      return this.advance();
+    } catch {
+      return this.applyFallback(stage, "extraction failed");
+    }
+  }
+
+  /** One retelling per persona, from the extraction. */
+  private async runGeneration(stage: NarrativeStage): Promise<Screen> {
+    const scenario = this.protocol.scenario;
+    const config = this.modelFor(stage);
+    if (!scenario || !config) return this.applyFallback(stage, "the stage is not configured for generation");
+
+    const answers = Object.entries(this.extraction)
+      .map(([key, value]) => `${this.protocol.extraction?.keys[key] ?? key}\n${value ?? "(they did not say)"}`)
+      .join("\n\n");
+
+    const produced: { index: number; persona: string; text: string }[] = [];
+    for (const [index, persona] of scenario.personas.entries()) {
+      const system = SCENARIO_SYSTEM.replace("{persona}", persona) + oneShot(this.protocol);
+      const prompt: ResolvedPrompt = {
+        promptKey: "pt.scenario",
+        promptVersion: this.protocol.version,
+        system,
+        messages: [{ role: "user", content: answers }],
+        variables: {},
+      };
+      this.append(stage.key, "system", "prompt_resolved", { text: system, data: { persona, index } });
+      try {
+        const result = await this.gateway.call<{ scenario: string; confidence: string }>({
+          sessionId: this.context.sessionId,
+          protocolKey: this.protocol.key,
+          stage: stage.key,
+          prompt,
+          config,
+          jsonSchema: { name: "scenario", schema: SCENARIO_SCHEMA as unknown as Record<string, unknown> },
+        });
+        this.append(stage.key, "model", "model_raw", { text: result.raw });
+        this.append(stage.key, "model", "model_validated", {
+          data: { ...(result.output as unknown as Record<string, unknown>), persona, index },
+        });
+        produced.push({ index, persona, text: result.output.scenario });
+      } catch {
+        // One persona failing is not the run failing. The original stored an
+        // apology string in the scenario slot; here the candidate is simply
+        // absent, which is visible rather than disguised as a retelling.
+        this.append(stage.key, "system", "fallback_applied", { data: { persona, index, reason: "generation failed" } });
+      }
+    }
+
+    if (produced.length === 0) return this.applyFallback(stage, "no retelling could be generated");
+    this.candidates = produced;
+    return this.advance();
+  }
+
+  private offerChoices(stage: NarrativeStage): Screen {
+    const { text } = resolveText(stage.text, this.context.variables, this.permittedForDisplay());
+    this.append(stage.key, "system", "request_shown", {
+      text,
+      data: { candidates: this.candidates.map((c) => ({ index: c.index, persona: c.persona })) },
+    });
+    for (const candidate of this.candidates) {
+      this.append(stage.key, "system", "model_shown", { text: candidate.text, data: { index: candidate.index } });
+    }
+    return { ...this.screenFor(stage, text), expectsInput: true, choices: this.candidates };
+  }
+
+  private async chooseCandidate(stage: NarrativeStage, input: string): Promise<Screen> {
+    const index = Number.parseInt(input.trim(), 10);
+    const picked = this.candidates.find((c) => c.index === index) ?? this.candidates[0];
+    if (!picked) return this.advance();
+    this.chosen = picked;
+    this.finalScenario = picked.text;
+    // The choice is data, not navigation (§8.2, assumption 3).
+    this.append(stage.key, "participant", "participant_reaction", {
+      text: picked.text,
+      data: { chosenIndex: picked.index, persona: picked.persona, offered: this.candidates.length },
+    });
+    return this.advance();
+  }
+
+  private offerRating(stage: NarrativeStage): Screen {
+    const { text } = resolveText(stage.text, this.context.variables, this.permittedForDisplay());
+    this.append(stage.key, "system", "request_shown", { text });
+    return {
+      ...this.screenFor(stage, text),
+      expectsInput: true,
+      ...(this.finalScenario ? { scenario: this.finalScenario } : {}),
+      rating: { max: this.protocol.scenario?.maxRating ?? 10 },
+    };
+  }
+
+  private async recordRating(stage: NarrativeStage, input: string): Promise<Screen> {
+    const max = this.protocol.scenario?.maxRating ?? 10;
+    const rating = Math.max(0, Math.min(max, Number.parseInt(input.trim(), 10) || 0));
+    this.append(stage.key, "participant", "participant_rating", {
+      data: { rating, max, scenarioIndex: this.chosen?.index ?? null },
+    });
+
+    // A perfect score short-circuits adaptation, as in the original: there is
+    // nothing to correct, and asking anyway invites a change nobody wanted.
+    const threshold = this.protocol.scenario?.adaptBelowRating ?? max;
+    if (rating >= threshold) {
+      const adaptIndex = this.protocol.stages.findIndex((s) => s.kind === "adapt");
+      if (adaptIndex > this.stageIndex) {
+        this.append(stage.key, "system", "stage_skipped", { data: { reason: "rated_full_marks", rating } });
+        this.stageIndex = adaptIndex;
+      }
+    }
+    return this.advance();
+  }
+
+  private offerAdaptation(stage: NarrativeStage): Screen {
+    const { text } = resolveText(stage.text, this.context.variables, this.permittedForDisplay());
+    this.append(stage.key, "system", "request_shown", { text });
+    return {
+      ...this.screenFor(stage, text),
+      expectsInput: true,
+      ...(this.finalScenario ? { scenario: this.finalScenario } : {}),
+    };
+  }
+
+  /** The participant says what is wrong; the model revises exactly that. */
+  private async reviseScenario(stage: NarrativeStage, input: string): Promise<Screen> {
+    const request = input.trim();
+    const config = this.modelFor(stage);
+    if (request.length === 0 || !config || !this.finalScenario) return this.advance();
+
+    const target = [...this.records].reverse().find((r) => r.kind === "model_shown");
+    this.append(stage.key, "participant", "participant_correction", {
+      text: request,
+      refersTo: target?.recordId ?? null,
+    });
+    this.flagSafeguarding(stage.key, request);
+
+    const prompt: ResolvedPrompt = {
+      promptKey: "pt.adaptation",
+      promptVersion: this.protocol.version,
+      system: ADAPT_SYSTEM,
+      messages: [
+        { role: "user", content: `The account:\n${this.finalScenario}\n\nWhat they want changed:\n${request}` },
+      ],
+      variables: {},
+    };
+    this.append(stage.key, "system", "prompt_resolved", { text: ADAPT_SYSTEM });
+
+    try {
+      const result = await this.gateway.call<{ newScenario: string; changed: boolean }>({
+        sessionId: this.context.sessionId,
+        protocolKey: this.protocol.key,
+        stage: stage.key,
+        prompt,
+        config,
+        jsonSchema: { name: "adaptation", schema: ADAPT_SCHEMA as unknown as Record<string, unknown> },
+      });
+      this.append(stage.key, "model", "model_raw", { text: result.raw });
+      const validated = this.append(stage.key, "model", "model_validated", {
+        data: result.output as unknown as Record<string, unknown>,
+      });
+      // The revision is a new record beside the old one. Nothing is
+      // overwritten, so the sequence of what was shown and what was asked for
+      // survives for the analysis.
+      this.finalScenario = result.output.newScenario;
+      this.append(stage.key, "system", "model_shown", { text: result.output.newScenario, refersTo: validated.recordId });
+      return { ...this.screenFor(stage, result.output.newScenario), expectsInput: true, scenario: this.finalScenario };
+    } catch {
+      return this.applyFallback(stage, "the revision could not be made");
+    }
+  }
+
+  private modelFor(stage: NarrativeStage): ModelConfig | undefined {
+    return this.protocol.models.find((m) => m.key === stage.modelConfigKey) as ModelConfig | undefined;
+  }
+
+  /** What the run produced, for storage alongside the records. */
+  get outcome(): {
+    extraction: Record<string, string | null>;
+    candidates: { index: number; persona: string; text: string }[];
+    chosenIndex: number | null;
+    finalScenario: string | null;
+    quality: ReturnType<typeof aggregate>;
+    interviewDone: boolean;
+  } {
+    return {
+      extraction: this.extraction,
+      candidates: this.candidates,
+      chosenIndex: this.chosen?.index ?? null,
+      finalScenario: this.finalScenario,
+      quality: aggregate(this.signals, this.protocol.qualityControl),
+      interviewDone: this.interviewDone,
+    };
   }
 
   private renderModelOutput(output: unknown, raw: string): string {
