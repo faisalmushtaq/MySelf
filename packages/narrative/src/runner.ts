@@ -61,6 +61,14 @@ export interface Screen {
   choices?: { index: number; persona: string; text: string }[];
   /** The retelling under discussion, at the rate and adapt stages. */
   scenario?: string;
+  /**
+   * Whether the participant may rewrite `scenario` themselves, rather than
+   * only ask the model to. The original offers both (§8.1) and they are
+   * different data: their own sentence, or a model's reading of a request.
+   */
+  editable?: boolean;
+  /** The model reported it could not honour the request from their own words. */
+  unchanged?: boolean;
   /** Rating bounds, at the rate stage. */
   rating?: { max: number };
   /** Set when quality signals stopped the run before anything was generated. */
@@ -568,40 +576,69 @@ export class NarrativeRunner {
       })
       .join("\n");
 
-    const produced: { index: number; persona: string; text: string }[] = [];
-    for (const [index, persona] of scenario.personas.entries()) {
+    /**
+     * The personas write at the same time, as the original's do.
+     *
+     * Not an optimisation — it is the difference between a usable stage and an
+     * abandoned one. Each retelling is an independent call on the same
+     * extraction, and run one after another that is three round trips of a
+     * young person looking at a screen that does nothing. §8.1 records the
+     * original as generating its three candidates in parallel; running them in
+     * sequence was a plain infidelity.
+     *
+     * The prompt records are written first, in persona order, so the log reads
+     * the same way regardless of which call happens to return first.
+     */
+    const attempts = scenario.personas.map((persona, index) => {
       const system =
         SCENARIO_SYSTEM.replace("{persona}", this.configText(persona.text)).replace("{one_shot}", oneShot(this.protocol));
-      const prompt: ResolvedPrompt = {
-        promptKey: `pt.scenario.${persona.key}`,
-        promptVersion: this.protocol.version,
-        system,
-        messages: [{ role: "user", content: answers }],
-        variables: {},
-      };
       this.append(stage.key, "system", "prompt_resolved", { text: system, data: { persona: persona.key, index } });
-      try {
-        const result = await this.gateway.call<{ scenario: string; confidence: string }>({
-          sessionId: this.context.sessionId,
-          protocolKey: this.protocol.key,
-          stage: stage.key,
-          prompt,
-          config,
-          jsonSchema: { name: "scenario", schema: SCENARIO_SCHEMA as unknown as Record<string, unknown> },
-        });
-        this.append(stage.key, "model", "model_raw", { text: result.raw });
-        this.append(stage.key, "model", "model_validated", {
-          data: { ...(result.output as unknown as Record<string, unknown>), persona: persona.key, index },
-        });
-        produced.push({ index, persona: persona.key, text: result.output.scenario });
-      } catch {
+      return { persona, index, system };
+    });
+
+    const settled = await Promise.all(
+      attempts.map(async ({ persona, index, system }) => {
+        const prompt: ResolvedPrompt = {
+          promptKey: `pt.scenario.${persona.key}`,
+          promptVersion: this.protocol.version,
+          system,
+          messages: [{ role: "user", content: answers }],
+          variables: {},
+        };
+        try {
+          const result = await this.gateway.call<{ scenario: string; confidence: string }>({
+            sessionId: this.context.sessionId,
+            protocolKey: this.protocol.key,
+            stage: stage.key,
+            prompt,
+            config,
+            jsonSchema: { name: "scenario", schema: SCENARIO_SCHEMA as unknown as Record<string, unknown> },
+          });
+          return { persona, index, result };
+        } catch {
+          return { persona, index, result: null };
+        }
+      }),
+    );
+
+    // Recorded in persona order once every call has come back, so the staged
+    // records are deterministic even though the calls were not.
+    const produced: { index: number; persona: string; text: string }[] = [];
+    for (const { persona, index, result } of settled) {
+      if (!result) {
         // One persona failing is not the run failing. The original stored an
         // apology string in the scenario slot; here the candidate is simply
         // absent, which is visible rather than disguised as a retelling.
         this.append(stage.key, "system", "fallback_applied", {
           data: { persona: persona.key, index, reason: "generation failed" },
         });
+        continue;
       }
+      this.append(stage.key, "model", "model_raw", { text: result.raw });
+      this.append(stage.key, "model", "model_validated", {
+        data: { ...(result.output as unknown as Record<string, unknown>), persona: persona.key, index },
+      });
+      produced.push({ index, persona: persona.key, text: result.output.scenario });
     }
 
     if (produced.length === 0) return this.applyFallback(stage, "no retelling could be generated");
@@ -672,6 +709,77 @@ export class NarrativeRunner {
     return {
       ...this.screenFor(stage, text),
       expectsInput: true,
+      // The retelling itself, offered for editing. The original lets a
+      // participant rewrite it directly as well as ask the model to (§8.1),
+      // and a sentence a young person typed is evidence in a way a model's
+      // reading of their instruction is not.
+      editable: true,
+      ...(this.finalScenario ? { scenario: this.finalScenario } : {}),
+    };
+  }
+
+  /**
+   * The participant rewrites the retelling themselves.
+   *
+   * No model call: this text IS the change. It is recorded as
+   * `participant_edit`, pointing at the version it replaced, so the analysis
+   * can tell a rewrite in a young person's own words from a paraphrase the
+   * model produced on their instruction — and can reconstruct every version
+   * in order, because nothing is overwritten.
+   */
+  editScenario(text: string): Screen {
+    const stage = this.stage;
+    const edited = text.trim();
+    if (!stage || edited.length === 0) return this.current();
+    if (edited === this.finalScenario) return this.current();
+
+    const shown = [...this.records].reverse().find((r) => r.kind === "model_shown" || r.kind === "participant_edit");
+    this.append(stage.key, "participant", "participant_edit", {
+      text: edited,
+      refersTo: shown?.recordId ?? null,
+      data: { replaced: this.finalScenario },
+    });
+    this.flagSafeguarding(stage.key, edited);
+    this.finalScenario = edited;
+    return { ...this.current(), scenario: edited };
+  }
+
+  /**
+   * Reject the last change and go back to what it replaced.
+   *
+   * The original offers accept/reject/reset on an AI adaptation. Rejecting
+   * does not delete anything: the rejected version stays in the record, and a
+   * new record says it was put back. What a participant turned down is a
+   * finding about the retelling, not noise to be swept up.
+   */
+  revertScenario(): Screen {
+    const stage = this.stage;
+    if (!stage) return this.current();
+    const previous = [...this.records]
+      .reverse()
+      .find((r) => r.kind === "participant_edit" && typeof r.data?.["replaced"] === "string");
+    const replaced =
+      (previous?.data?.["replaced"] as string | undefined) ??
+      this.candidates.find((c) => c.index === this.chosen?.index)?.text;
+    if (!replaced || replaced === this.finalScenario) return this.current();
+
+    this.append(stage.key, "participant", "participant_reaction", {
+      text: "put the previous version back",
+      data: { rejected: this.finalScenario, restored: replaced },
+    });
+    this.finalScenario = replaced;
+    return { ...this.current(), scenario: replaced };
+  }
+
+  /** Re-show the current screen without advancing or calling anything. */
+  private current(): Screen {
+    const stage = this.stage;
+    if (!stage) return this.finishedScreen();
+    const { text } = resolveText(stage.text, this.context.variables, this.permittedForDisplay());
+    return {
+      ...this.screenFor(stage, text),
+      expectsInput: true,
+      ...(stage.kind === "adapt" ? { editable: true } : {}),
       ...(this.finalScenario ? { scenario: this.finalScenario } : {}),
     };
   }
@@ -718,7 +826,16 @@ export class NarrativeRunner {
       // survives for the analysis.
       this.finalScenario = result.output.newScenario;
       this.append(stage.key, "system", "model_shown", { text: result.output.newScenario, refersTo: validated.recordId });
-      return { ...this.screenFor(stage, result.output.newScenario), expectsInput: true, scenario: this.finalScenario };
+      return {
+        ...this.screenFor(stage, result.output.newScenario),
+        expectsInput: true,
+        editable: true,
+        // The model may report that it could not honour the request from the
+        // participant's own words. Saying so is better than a revision that
+        // quietly invented the difference.
+        ...(result.output.changed === false ? { unchanged: true } : {}),
+        scenario: this.finalScenario,
+      };
     } catch {
       return this.applyFallback(stage, "the revision could not be made");
     }

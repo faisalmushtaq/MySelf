@@ -34,6 +34,12 @@
       .primary { border: 1px solid var(--accent); background: var(--accent); color: #fff; }
       .secondary { border: 1px solid var(--strong); background: var(--paper); color: var(--text); }
       button:disabled { opacity: .45; cursor: not-allowed; }
+      .waiting { margin: .6rem 0 0; color: #6b6b68; font-size: .9rem; }
+      .waiting::after { content: "…"; animation: dots 1.2s steps(4, end) infinite; }
+      @keyframes dots { 0% { opacity: .3 } 50% { opacity: 1 } 100% { opacity: .3 } }
+      .scenario-edit { width: 100%; min-height: 8rem; padding: .6rem .7rem; border: 1px solid rgba(0,0,0,.34);
+        border-radius: 8px; font: inherit; line-height: 1.5; resize: vertical; }
+      .warn-text { color: #a33b00; }
       .row { display: flex; flex-wrap: wrap; gap: .6rem; margin-top: .9rem; align-items: center; }
       .screen { border: 1px solid var(--hairline); border-radius: 10px; padding: 1.1rem 1.2rem; background: var(--paper); }
       .stem { font-size: 1.25rem; font-weight: 600; letter-spacing: -.01em; line-height: 1.35; }

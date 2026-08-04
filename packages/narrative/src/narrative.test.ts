@@ -568,3 +568,81 @@ describe("typing-dynamics quality control", () => {
     expect(runner.outcome.quality.flagged).toBe(true);
   });
 });
+
+describe("the participant rewriting the retelling themselves", () => {
+  /**
+   * §8.1: the original offers "direct text editing and/or AI-assisted
+   * adaptation chat with accept/reject/reset". Only the second half was built.
+   * A sentence a young person typed is evidence in a way a model's reading of
+   * their instruction is not, so the two must be distinguishable afterwards.
+   */
+  const toAdapt = async () => {
+    const protocol = mocked(microNarrativeFull);
+    protocol.interview = { ...protocol.interview!, maxTurns: 1 };
+    const runner = new NarrativeRunner(protocol, context(), gatewayWith(new MockAdapter()));
+    runner.start();
+    let screen = await runner.next();
+    while (screen.kind === "introduction") screen = await runner.next();
+    screen = await runner.submit("We fell out at lunch and it was horrible.");
+    screen = await runner.submit("0"); // choose the first retelling
+    screen = await runner.submit("6"); // rate it below full marks
+    return { runner, screen };
+  };
+
+  it("offers the retelling for editing, not just for comment", async () => {
+    const { screen } = await toAdapt();
+    expect(screen.kind).toBe("adapt");
+    expect(screen.editable).toBe(true);
+    expect(screen.scenario).toBeTruthy();
+  });
+
+  it("keeps a participant's own edit as their words, not as a correction", async () => {
+    const { runner } = await toAdapt();
+    const before = runner.outcome.finalScenario;
+    const screen = runner.editScenario("It was at lunch and I felt left out for the rest of the day.");
+
+    expect(screen.scenario).toBe("It was at lunch and I felt left out for the rest of the day.");
+    expect(runner.outcome.finalScenario).toBe("It was at lunch and I felt left out for the rest of the day.");
+
+    const edit = runner.all.find((r) => r.kind === "participant_edit");
+    expect(edit?.source).toBe("participant");
+    // It says what it replaced, so every version is reconstructable in order.
+    expect(edit?.data?.["replaced"]).toBe(before);
+    expect(edit?.refersTo).toBeTruthy();
+    // And it is not filed as a correction: a correction asks the model to
+    // change something; this IS the change.
+    expect(runner.all.some((r) => r.kind === "participant_correction")).toBe(false);
+    expect(originalsIntact(runner.all)).toBe(true);
+  });
+
+  it("makes no model call for an edit, because there is nothing to ask", async () => {
+    const { runner } = await toAdapt();
+    const before = calls.length;
+    runner.editScenario("My own words, thank you.");
+    expect(calls).toHaveLength(before);
+  });
+
+  it("ignores an edit that changes nothing, rather than filling the log with it", async () => {
+    const { runner } = await toAdapt();
+    const unchanged = runner.outcome.finalScenario!;
+    runner.editScenario(unchanged);
+    runner.editScenario("   ");
+    expect(runner.all.some((r) => r.kind === "participant_edit")).toBe(false);
+  });
+
+  it("puts back the previous version without deleting the one turned down", async () => {
+    const { runner } = await toAdapt();
+    const original = runner.outcome.finalScenario!;
+    runner.editScenario("A version they then thought better of.");
+    const screen = runner.revertScenario();
+
+    expect(screen.scenario).toBe(original);
+    expect(runner.outcome.finalScenario).toBe(original);
+    // What they rejected stays on the record — turning a retelling down is a
+    // finding about it, not noise to be swept up.
+    expect(runner.all.some((r) => r.text === "A version they then thought better of.")).toBe(true);
+    // The LAST reaction: choosing a retelling writes one of these too.
+    const reactions = runner.all.filter((r) => r.kind === "participant_reaction");
+    expect(reactions[reactions.length - 1]?.data?.["rejected"]).toBe("A version they then thought better of.");
+  });
+});

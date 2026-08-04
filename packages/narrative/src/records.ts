@@ -35,6 +35,16 @@ export const recordKind = z.enum([
   "participant_reaction",
   "participant_rating",
   "participant_correction",
+  /**
+   * The participant rewriting the retelling themselves, in their own words.
+   *
+   * Distinct from `participant_correction`, which asks the model to make a
+   * change. This one IS the change: the text is theirs, not a model's reading
+   * of a request. §8.1 records the original as offering both, and the
+   * distinction matters for analysis — a sentence a young person typed is
+   * evidence in a way a paraphrase of their instruction is not.
+   */
+  "participant_edit",
   "safeguarding_flag",
   "stage_skipped",
   "fallback_applied",
