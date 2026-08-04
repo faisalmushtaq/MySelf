@@ -216,14 +216,29 @@ wording — which currently promises names are not linked to research materials
 
 ### 10.4 Running it
 
+**On the web, no install:** `https://faisalmushtaq.github.io/MySelf/narrative/`
+
+The same page, built as static files, runs the protocols **in the browser**
+against the deterministic mock. Every stage, every staged record, every
+fallback — no key, no cost, nothing sent anywhere. That is what makes it
+shareable: a colleague or a committee can click through exactly what a young
+person would see and exactly what would be stored, without a single request
+leaving the page.
+
+**Locally, with live model calls:**
+
 ```bash
 cd apps/narrative-lab
-cp .env.example .env.local     # add OPENAI_API_KEY for live calls; .env.local is gitignored
-node server.mjs                # http://localhost:4300
+cp .env.example .env.local     # add OPENAI_API_KEY; .env.local is gitignored
+pnpm build && node server.mjs  # http://localhost:4300
 ```
 
-The lab shows, side by side, what the participant sees and every staged record
-and model call it produced — including the failed ones.
+The page asks whether a server is there and uses it when it is. The key stays
+in the server process — a provider key never reaches a page, which is the same
+arrangement the Cloud Function will have.
+
+Either way the lab shows, side by side, what the participant sees and every
+staged record and model call it produced, including the failed ones.
 
 ### 10.5 Still to do
 

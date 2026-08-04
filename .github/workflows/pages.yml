@@ -33,6 +33,9 @@ jobs:
       # app's service worker out of the researcher view's scope — a shared
       # scope would have the survey's cache serving the wrong build.
       - run: cp -R apps/researcher/dist apps/participant/dist/researcher
+      # The narrative lab, static: it runs the protocols in the page against
+      # the deterministic mock, so it needs no server and no key.
+      - run: cp -R apps/narrative-lab/dist apps/participant/dist/narrative
       - uses: actions/upload-pages-artifact@v3
         with:
           path: apps/participant/dist
