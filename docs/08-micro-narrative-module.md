@@ -393,7 +393,21 @@ key in a school. The device sends the model *key*, not the parameters, so the
 function reads the settings from the frozen release and a tampered page cannot
 raise the temperature or point the study somewhere else.
 
-### 10.9 Still to do
+### 10.9 Seeing it as a participant
+
+`?view=participant` on the lab URL, or the button in the corner. The setup
+panel, the staged records and the model-call log disappear; the conversation
+is left on its own, at the size a young person reads it.
+
+It is the same markup and the same runner with the instrumentation hidden,
+which is the point: a mock-up of the participant experience would drift from
+the real one inside a week. And it is in the URL so it can be sent to
+somebody — a colleague, a teacher, an ethics committee — who should see what a
+young person sees and nothing about how it is built.
+
+    https://faisalmushtaq.github.io/MySelf/mystory/?view=participant
+
+### 10.10 Still to do
 
 The relay's other end: the Cloud Function that holds the key, checks the
 requested config against the frozen release, and makes the call. And narrative
