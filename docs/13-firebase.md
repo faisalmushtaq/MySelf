@@ -156,6 +156,20 @@ firebase deploy --only functions:llmRelay --project myself-research
 # prints: https://europe-west2-myself-research.cloudfunctions.net/llmRelay
 ```
 
+**The region is set in `apps.ts`, not `index.ts`.** ES modules evaluate
+imports before the importing module's body, so `setGlobalOptions` in the entry
+point ran after every re-exported module had already defined its functions —
+the region silently did not apply, and all twelve would have deployed to
+us-central1, the wrong continent from a Firestore location that is permanent.
+It now lives in the module every function file imports, and a test reads the
+region off each endpoint the way the CLI does.
+
+**The packaging step runs `npm install` in the output directory.** Not for the
+cloud, which installs again from the generated package.json — for the CLI,
+which loads the bundle to discover which functions it exports. Without
+node_modules it reports "Couldn't find firebase-functions package in your
+source code" and then fails without explanation.
+
 **Where the bundle goes.** Into `infra/firebase/functions/`, beside
 `firebase.json`, and gitignored. The CLI refuses a `source` outside the
 directory holding `firebase.json` — "is outside of project directory" — so a

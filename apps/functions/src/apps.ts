@@ -1,6 +1,23 @@
 import { initializeApp, getApps, cert, type App } from "firebase-admin/app";
+import { setGlobalOptions } from "firebase-functions/v2/options";
 import { getAuth } from "firebase-admin/auth";
 import { getFirestore, type Firestore } from "firebase-admin/firestore";
+
+/**
+ * Where the functions run, set before any of them is defined.
+ *
+ * This lives here, in the module every function file imports, because ES
+ * modules evaluate imports before the importing module's body: calling
+ * `setGlobalOptions` in index.ts ran it AFTER every `export … from` had
+ * already defined its functions, so the region silently did not apply and
+ * everything would have deployed to us-central1 — the wrong continent from
+ * the data, on a study whose Firestore location is permanent.
+ *
+ * europe-west2 is London. Set once, checked by a test that reads the region
+ * off each endpoint the way the deploy tooling does.
+ */
+export const REGION = "europe-west2";
+setGlobalOptions({ region: REGION, maxInstances: 10 });
 
 /**
  * Two Firebase projects, reached from one set of functions.
