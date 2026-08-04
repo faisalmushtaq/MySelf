@@ -1,6 +1,6 @@
 import { onDocumentWritten } from "firebase-functions/v2/firestore";
 import { HttpsError, onCall, type CallableRequest } from "firebase-functions/v2/https";
-import { logger } from "firebase-functions";
+import * as logger from "firebase-functions/logger";
 import { FieldValue } from "firebase-admin/firestore";
 import { joinSession, paths, type SessionDoc } from "@myself/firebase";
 import { ingest } from "@myself/store";

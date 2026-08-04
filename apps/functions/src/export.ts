@@ -1,6 +1,6 @@
 import { onSchedule } from "firebase-functions/v2/scheduler";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
-import { logger } from "firebase-functions";
+import * as logger from "firebase-functions/logger";
 import { getStorage } from "firebase-admin/storage";
 import { joinSession, paths, type ChunkDoc, type SessionDoc } from "@myself/firebase";
 import { buildBidsExport, buildZip, emptyDataset, ingest, type Dataset, type DeviceSession } from "@myself/store";

@@ -1,5 +1,5 @@
 import { FieldValue } from "firebase-admin/firestore";
-import { logger } from "firebase-functions";
+import * as logger from "firebase-functions/logger";
 import { defineSecret } from "firebase-functions/params";
 import { onRequest } from "firebase-functions/v2/https";
 import { Gateway, OpenAiAdapter, type ModelCall } from "@myself/llm";
