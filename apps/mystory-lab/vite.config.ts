@@ -36,6 +36,16 @@ function deriveRelayUrl(): string {
 const relayUrl = deriveRelayUrl();
 
 /**
+ * When this page was built.
+ *
+ * Shown in the corner, because "is the change I just merged actually live?"
+ * has no answer from a page that looks the same either way — and a stale
+ * service worker or a deploy still running are indistinguishable from a bug
+ * until you can read a timestamp off the thing in front of you.
+ */
+const buildStamp = new Date().toISOString().slice(0, 16).replace("T", " ");
+
+/**
  * The Firebase web config, so the page can sign somebody in.
  *
  * None of it is secret — a web config is a set of public identifiers, and the
@@ -49,6 +59,7 @@ export default defineConfig({
   define: {
     __RELAY_URL__: JSON.stringify(relayUrl),
     __FIREBASE_CONFIG__: JSON.stringify(firebaseConfig),
+    __BUILD_STAMP__: JSON.stringify(buildStamp),
   },
   root: "web",
   build: { outDir: "../dist", emptyOutDir: true },

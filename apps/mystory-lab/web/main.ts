@@ -56,6 +56,7 @@ async function api<T>(path: string, body?: unknown): Promise<T> {
  * for anyone who wants to see what the module does.
  */
 declare const __RELAY_URL__: string;
+declare const __BUILD_STAMP__: string;
 
 /**
  * Three ways this page can reach a model, in order of preference.
@@ -579,5 +580,6 @@ function wireViewToggle(): void {
   toggle.addEventListener("click", () => apply(!document.body.classList.contains("participant-view")));
 }
 
+$("buildStamp").textContent = `built ${__BUILD_STAMP__} UTC`;
 wireViewToggle();
 void detectServer().then(wireSignIn);
