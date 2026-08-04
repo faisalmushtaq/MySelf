@@ -23,6 +23,21 @@ export class RelayError extends Error {
   }
 }
 
+/**
+ * Roles that may spend the study's model budget.
+ *
+ * A verified token is not a permission. Google sign-in is open to the world by
+ * design, so anyone at all can arrive holding a valid token for this project —
+ * and if that were enough, a page on the open web would be a stranger's route
+ * to the study's OpenAI bill. Signing in says who you are; a role is how the
+ * study says it knows you.
+ */
+export const ROLES: ReadonlySet<string> = new Set(["owner", "researcher", "analyst"]);
+
+export function mayCall(claims: { device?: unknown; role?: unknown }): boolean {
+  return claims.device === true || (typeof claims.role === "string" && ROLES.has(claims.role));
+}
+
 export interface Caller {
   uid: string;
   /** An enrolled iPad, as opposed to a signed-in member of the research team. */

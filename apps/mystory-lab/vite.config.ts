@@ -10,7 +10,30 @@ const base = process.env["MYSELF_MYSTORY_BASE"] ?? "/MySelf/mystory/";
  * place where somebody can point the study at an endpoint of their choosing.
  * Absent, the built page runs the mock, which is what the public preview is.
  */
-const relayUrl = process.env["MYSELF_RELAY_URL"] ?? "";
+const firebaseConfigRaw = process.env["MYSELF_FIREBASE_CONFIG"] ?? "";
+
+/**
+ * Where the relay lives.
+ *
+ * Derived from the project when it is not given explicitly: a function
+ * deployed to europe-west2 answers at
+ * `https://europe-west2-<project>.cloudfunctions.net/llmRelay`, so knowing the
+ * project is knowing the URL, and one fewer value to copy between a console
+ * and a build is one fewer place to get it wrong. `MYSELF_RELAY_URL` overrides
+ * it for anyone running the function somewhere else.
+ */
+function deriveRelayUrl(): string {
+  const explicit = process.env["MYSELF_RELAY_URL"];
+  if (explicit) return explicit;
+  try {
+    const projectId = (JSON.parse(firebaseConfigRaw || "null") as { projectId?: string } | null)?.projectId;
+    return projectId ? `https://europe-west2-${projectId}.cloudfunctions.net/llmRelay` : "";
+  } catch {
+    return "";
+  }
+}
+
+const relayUrl = deriveRelayUrl();
 
 /**
  * The Firebase web config, so the page can sign somebody in.
@@ -19,7 +42,7 @@ const relayUrl = process.env["MYSELF_RELAY_URL"] ?? "";
  * `apiKey` names a project rather than authorising anything. It is baked in at
  * build time so nobody can point this page at a different project.
  */
-const firebaseConfig = process.env["MYSELF_FIREBASE_CONFIG"] ?? "";
+const firebaseConfig = firebaseConfigRaw;
 
 export default defineConfig({
   base,

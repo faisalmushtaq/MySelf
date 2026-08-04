@@ -10,6 +10,7 @@ import {
   CALLS_PER_CALLER_PER_DAY,
   RelayError,
   configFor,
+  mayCall,
   relayRequest,
   type Caller,
 } from "./relay-policy.js";
@@ -36,15 +37,38 @@ import {
 
 const OPENAI_API_KEY = defineSecret("OPENAI_API_KEY");
 
+/**
+ * Who is asking, and whether they are anybody.
+ *
+ * A verified token is not a permission. Google sign-in is open to the world by
+ * design, so anyone at all can arrive holding a perfectly valid token for this
+ * project — and if that were enough, a page on the open web would be a
+ * stranger's route to spending the study's model budget.
+ *
+ * So a caller must be an enrolled device, or must carry a role an owner
+ * granted them. Signing in is how you say who you are; the role is how the
+ * study says it knows you.
+ */
 async function authenticate(header: string | undefined): Promise<Caller> {
   const token = header?.startsWith("Bearer ") ? header.slice(7) : null;
   if (!token) throw new RelayError(401, "auth", "sign in, or enrol this device, before asking for a model call");
+
+  let decoded;
   try {
-    const decoded = await auth().verifyIdToken(token);
-    return { uid: decoded.uid, device: decoded["device"] === true };
+    decoded = await auth().verifyIdToken(token);
   } catch {
     throw new RelayError(401, "auth", "that credential is not valid");
   }
+
+  const device = decoded["device"] === true;
+  if (!mayCall({ device: decoded["device"], role: decoded["role"] })) {
+    throw new RelayError(
+      403,
+      "auth",
+      "you are signed in, but this account has no role on this study. An owner grants one before it can make model calls.",
+    );
+  }
+  return { uid: decoded.uid, device };
 }
 
 /**
