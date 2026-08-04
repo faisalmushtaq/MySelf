@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { allInstruments, allModules, allScales } from "@myself/library";
+import { microNarrativeFull, type NarrativeProtocol } from "@myself/narrative";
 import { allScoring } from "@myself/scoring";
 import { buildRelease, PublishGateError, verifyManifestHash, type Registries } from "./builder.js";
 import { canonicalJson, contentHash } from "./canonical.js";
@@ -125,12 +126,6 @@ describe("publish gate", () => {
     expect(() => buildRelease(ybmComposition, dupRegistries, meta)).toThrow(/duplicate variable 'sm_use'/);
   });
 
-  it("rejects narrative components until protocol support lands (explicit failure, not silence)", () => {
-    const bad = structuredClone(ybmComposition);
-    bad.sections[8]!.components.push({ kind: "narrative", protocol: "np.micro_narrative", protocolVersion: "1.0.0" });
-    expect(() => buildRelease(bad, registries, meta)).toThrow(/narrative components not yet supported/);
-  });
-
   it("rejects a question that branches on an answer given later", () => {
     // The condition would be evaluated against an empty answer, so the item
     // would vanish from every session and nobody would notice until the data
@@ -174,5 +169,91 @@ describe("publish gate", () => {
     const consent = badRegistries.modules.find((m) => m.instrument === "ybm_intro_consent")!;
     consent.forms[0]!.items[0]!.stem = { text: "Welcome {name}" }; // placeholder without pipe declaration
     expect(() => buildRelease(ybmComposition, badRegistries, meta)).toThrow(/unresolved placeholder '\{name\}'/);
+  });
+});
+
+describe("placing a narrative protocol in a composition", () => {
+  const approved: NarrativeProtocol = { ...microNarrativeFull, approvalStatus: "approved" };
+  const withNarrative = structuredClone(ybmComposition);
+  withNarrative.sections.push({
+    key: "mystory",
+    title: "MyStory",
+    transition: "One last part — a short conversation.",
+    components: [
+      { kind: "narrative", protocol: approved.key, protocolVersion: approved.version },
+    ],
+  });
+  const registriesWithProtocol: Registries = { ...registries, narrativeProtocols: [approved] };
+
+  it("freezes the protocol, its assembled prompts and its model configs", () => {
+    const manifest = buildRelease(withNarrative, registriesWithProtocol, meta);
+    expect(manifest.narrativeProtocols[`${approved.key}@${approved.version}`]).toBeDefined();
+    // What went to the provider is answerable from the release alone, without
+    // re-deriving it from a template and a config that have both moved on.
+    const interviewer = manifest.prompts[`pt.interviewer@${approved.version}`] as { system: string };
+    expect(interviewer.system).toContain(approved.interview!.persona);
+    expect(interviewer.system).toContain("1. Can you tell me about a time recently");
+    // One frozen prompt per persona: which one wrote a retelling is a fact.
+    // Keyed by persona name, not by position: which voice wrote a retelling
+    // has to survive a later wave reordering the list.
+    for (const persona of approved.scenario!.personas) {
+      expect(manifest.prompts[`pt.scenario.${persona.key}@${approved.version}`]).toBeDefined();
+    }
+    expect(manifest.modelConfigs["mc.openai.gpt4o.t07"]).toMatchObject({ model: "gpt-4o", temperature: 0.7 });
+  });
+
+  it("leaves session variables standing rather than pretending to know them", () => {
+    const manifest = buildRelease(withNarrative, registriesWithProtocol, meta);
+    const interviewer = manifest.prompts[`pt.interviewer@${approved.version}`] as { system: string };
+    expect(interviewer.system).toContain("{topic}");
+  });
+
+  it("changes the release hash when the protocol changes", () => {
+    // A protocol edit is a different study. If the hash did not move, two
+    // fieldings running different questions would be indistinguishable later.
+    const a = buildRelease(withNarrative, registriesWithProtocol, meta);
+    const edited: NarrativeProtocol = {
+      ...approved,
+      interview: { ...approved.interview!, questions: ["Tell me about school."] },
+    };
+    const b = buildRelease(withNarrative, { ...registries, narrativeProtocols: [edited] }, meta);
+    expect(a.hash).not.toBe(b.hash);
+  });
+
+  it("refuses a protocol the composition names but nobody supplied", () => {
+    expect(() => buildRelease(withNarrative, registries, meta)).toThrow(/unresolved narrative protocol/);
+  });
+
+  it("refuses a protocol that has not been approved", () => {
+    expect(() => buildRelease(withNarrative, { ...registries, narrativeProtocols: [microNarrativeFull] }, meta)).toThrow(
+      /is 'draft' — only an approved protocol can be fielded/,
+    );
+  });
+
+  it("runs the protocol's own gate, so a leaked name cannot reach a release", () => {
+    const leaky: NarrativeProtocol = {
+      ...approved,
+      permittedVariables: ["first_name", "topic"],
+      permittedIdentifiers: [],
+      interview: { ...approved.interview!, questions: ["Hi {first_name}, what happened?"] },
+    };
+    expect(() => buildRelease(withNarrative, { ...registries, narrativeProtocols: [leaky] }, meta)).toThrow(
+      /not listed in permittedIdentifiers/,
+    );
+  });
+
+  it("refuses a protocol that pauses offline in a composition promising otherwise", () => {
+    const offlineDraft = structuredClone(withNarrative);
+    offlineDraft.offline.narrativeConnectivity = "offline_capable_with_queue";
+    const pausing: NarrativeProtocol = { ...approved, offlineFallback: "pause_module" };
+    expect(() => buildRelease(offlineDraft, { ...registries, narrativeProtocols: [pausing] }, meta)).toThrow(
+      /pauses when offline/,
+    );
+  });
+
+  it("leaves a release without a narrative section untouched", () => {
+    const manifest = buildRelease(ybmComposition, registriesWithProtocol, meta);
+    expect(manifest.narrativeProtocols).toEqual({});
+    expect(manifest.prompts).toEqual({});
   });
 });

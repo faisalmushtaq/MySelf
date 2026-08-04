@@ -174,7 +174,16 @@ export const extractionConfig = z.object({
  * own voice; the participant chooses between them.
  */
 export const scenarioConfig = z.object({
-  personas: z.array(z.string().min(1)).min(2),
+  /**
+   * Each persona is a name and the instruction that gives it its voice.
+   *
+   * The name is not decoration. The original keys its personas — `formal`,
+   * `sibling`, `goth` — and stores which one wrote the retelling a participant
+   * chose. "Which voice did young people pick?" is a finding; "persona 2" is
+   * not an answer to it, and stops being one entirely the moment a later wave
+   * reorders the list.
+   */
+  personas: z.array(z.object({ key: z.string().min(1), text: z.string().min(1) })).min(2),
   /** One-shot example: a conversation and the retelling it should produce. */
   example: z.object({ conversation: z.string().min(1), scenario: z.string().min(1) }).optional(),
   /** Below this, the participant is offered the chance to correct it. */
@@ -298,6 +307,39 @@ export function checkProtocol(protocol: NarrativeProtocol): string[] {
       problems.push(`'${id}' is listed as a permitted identifier but not as a permitted variable`);
     }
   }
+
+  /**
+   * The researcher's configuration goes into the prompts verbatim, so a
+   * placeholder in a question, a persona or the topic restriction is prompt
+   * text and is checked as prompt text.
+   *
+   * Two ways this bites. A mistyped `{topik}` reaches the model as those seven
+   * characters, and the interview quietly asks about nothing. And `{first_name}`
+   * typed into a question is a child's name sent to a third party — the same
+   * decision the gate protects everywhere else, arriving by a different door.
+   */
+  const checkPromptConfig = (where: string, template: string): void => {
+    for (const variable of placeholdersIn(template)) {
+      if (!permitted.has(variable)) {
+        problems.push(`${where} uses {${variable}}, which is not a permitted variable`);
+      } else if (isIdentifying(variable) && !identifiers.has(variable)) {
+        problems.push(
+          `${where} puts {${variable}} in front of the model, but it is not listed in permittedIdentifiers — sending an identifier to a provider has to be a stated decision`,
+        );
+      }
+    }
+  };
+
+  if (protocol.interview) {
+    checkPromptConfig("the interviewer persona", protocol.interview.persona);
+    checkPromptConfig("the language style", protocol.interview.languageStyle);
+    checkPromptConfig("the topic restriction", protocol.interview.topicRestriction);
+    protocol.interview.questions.forEach((question, i) => checkPromptConfig(`interview question ${i + 1}`, question));
+  }
+  for (const [key, question] of Object.entries(protocol.extraction?.keys ?? {})) {
+    checkPromptConfig(`extraction key '${key}'`, question);
+  }
+  protocol.scenario?.personas.forEach((persona) => checkPromptConfig(`persona '${persona.key}'`, persona.text));
 
   for (const stage of protocol.stages) {
     for (const variable of placeholdersIn(stage.text) .concat(placeholdersIn(stage.lede ?? ""))) {

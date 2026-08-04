@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import { logicExpr } from "./logic.js";
 import { instrumentVersion } from "./instrument.js";
 import { responseScale } from "./response-scale.js";
-import { narrativeProtocol } from "./narrative.js";
 import { kssInstrument, kssScaleAsAdministered, kssScaleCanonical } from "./fixtures/kss.js";
 
 describe("response scales", () => {
@@ -76,41 +75,5 @@ describe("logic AST", () => {
 
   it("rejects an unknown operator", () => {
     expect(() => logicExpr.parse({ op: "regex", target: { item: smOwn }, value: ".*" })).toThrow();
-  });
-});
-
-describe("narrative protocol", () => {
-  it("requires fallbackText only when declared behaviour needs it (schema-level shape check)", () => {
-    const minimal = {
-      key: "np.micro_narrative",
-      version: "1.0.0",
-      name: "Micro-narrative (generalised CHI 2025 protocol)",
-      construct: "Lived-experience narrative",
-      intendedUse: "Guided story elicitation",
-      ageRange: { min: 11, max: 18 },
-      language: "en-GB",
-      readingLevel: "standard",
-      introduction: "We'd like to hear your story.",
-      questions: ["What happened?", "How did it make you feel?"],
-      responseModes: ["text"],
-      interviewerPersona: "A supportive school counsellor collecting stories.",
-      languageStyle: "Empathetic, youth-friendly, descriptive.",
-      topicRestriction: "Stay on the study topic; never answer for the participant.",
-      extractionKeys: { what: "What happened?", feeling: "How did they feel?" },
-      scenarioPersonas: [{ key: "formal", description: "A formal developmental psychologist." }],
-      prompts: [{ role: "interviewer", key: "pt.micro_narrative.interviewer", version: "1.0.0" }],
-      systemInstructions: "You are part of a research protocol. Do not diagnose or advise.",
-      modelConfigKey: "mc.openai.gpt4o.t03",
-      outputSchemas: { scenario: { type: "object" } },
-      safeguarding: [],
-      connectivity: "offline_capable_with_queue",
-      offlineBehaviour: "queue_authorised",
-      estimatedSeconds: 480,
-      consentRequirements: "Study consent covering LLM processing.",
-      dataGovernanceNote: "No direct identifiers reach the provider.",
-      owner: "ybm",
-      changelog: "1.0.0: initial",
-    };
-    expect(narrativeProtocol.parse(minimal).selectionRequired).toBe(true);
   });
 });

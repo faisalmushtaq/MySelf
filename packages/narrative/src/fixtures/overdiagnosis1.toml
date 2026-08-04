@@ -1,0 +1,159 @@
+# This file is used to configure the micro-narratives Streamlit app.
+#
+# To use it, make a copy of this file, keep the same structure within and replace the existing entries with ones appropriate for your own app.
+#
+# This file uses the TOML format. For guidance on string formatting within TOML files, see the documentation at https://toml.io/
+#
+# The config file is specified by one of the following. If multiple options are available, the first is used:
+# 1. Run the app with `streamlit run app.py path-to-file/config-file-name.toml`
+# 2. Add the line `CONFIG_FILE = 'path-to-file/config-file-name.toml'` to your Streamlit secrets configuration.
+# 3. If none of the options above is used, the app shows the config page, where you can paste a config or insert the default `configs/example_social.toml` example.
+#
+# In principle, anything that is set in quotes (either via " or """) in this file can be changed by you. 
+#
+# The story/logic for setting up the chatbot is as follows: there is one major interviewer or counselor (called "persona" under the section setting up the data collection bot) whose aim is to collect stories. 
+# This interviewer engages three other "helper" interviewers (which, in this example, are called "formal", "sibling", and "goth" under the section setting up the data extraction and story generation bots).
+# Those helper interviewers are tasked to collect stories and represent them with a certain voice, e.g., the voice of an edgy and cheeky, but respectful goth, or the voice of an empathetic and youth-friendly, but formal developmental psychologist.  
+# You can set up different personas in whichever way you like/need, including choosing names for them.
+# 
+# All three personas must be provided under `[summaries.personas]' in the data extraction and story generation bots section. Additional personas will not be used.
+#
+# The one-shot example provided for the LLM at the end of this file is the same for all personas.
+
+### Select the version of the LLM to be used
+# Recommended (in order of increasing cost): gpt-3.5-turbo-1106, gpt-4o
+# Specifying the model is optional; by default, gpt-4o will be used
+model = "gpt-4o"
+
+### Quality control
+# If true, the app computes quality-control metrics after the chat finishes.
+# If the interaction is flagged, the app stops before scenario generation.
+# If this setting is omitted, the code defaults to false.
+quality_control_flagging = true
+
+### This is the text that will be shown on the first page
+[consent]
+
+intro_and_consent = """## Exploring ideas on the perceptions of over-diagnosis of neurodevelopmental conditions
+
+Hello!
+
+You are going to chat with a chatbot for a few minutes (in the same way you would interact with ChatGPT or other AI software).
+
+The chatbot will ask you some questions about perceptions of the over-diagnosis of mental health and neurodevelopmental conditions (such as ADHD and autism).
+
+Please discuss the questions with your group before typing your answers. You may use personal stories or examples, but please do not share other people's personal information.
+
+If you do not understand any of the questions, please ask the researcher for support.
+
+After answering the questions, the chatbot will generate three short stories (micro-narratives) based on your responses. As a group, you will choose the story that best reflects your opinions and voice, and you will have the opportunity to edit it before submitting.
+
+To continue, please confirm that you have read and understood this information.
+"""
+
+### Participant settings
+[participant]
+
+require_participant_id = true
+editable_participant_id = true
+text = "Please enter your group name below."
+
+###  This section sets up the data collection bot. ###
+# You can put in as many questions as you like
+# If you include "{previous_scenario}" in the intro text below, the app will try to fetch
+# the participant's latest previous final scenario from the configured read database.
+[collection]
+persona = "You're a researcher collecting people's views about the perceived over-diagnosis of mental health and neurodevelopmental conditions, particularly ADHD and autism."
+
+language_type = "Use a friendly, neutral and conversational tone. Avoid leading participants towards any particular opinion."
+
+intro = """
+Hello! Thank you for taking part.
+
+Today I'd like to ask you a few questions about perceptions of the over-diagnosis of mental health and neurodevelopmental conditions, particularly ADHD and autism.
+
+I'll begin with a general question and then ask about any experiences or examples that have influenced your views.
+"""
+
+questions = [
+    "Some people think mental health and neurodevelopmental conditions (e.g., ADHD) are diagnosed too often, while others think more people are getting the help they need. What does your group think?",
+    "What has made your group think this? Have you had any specific experiences? For example, have you seen something on social media or has someone said something to you?",
+    "Can you share a little more about your experiences? Which condition or label was mainly being discussed?",
+    "What was being said or written about neurodevelopmental conditions in this instance?",
+    "How did it make the group feel?",
+    "Does the group think people usually speak about diagnosis in this way?",
+    "What are the problems with speaking about over-diagnosis in this way?",
+    "How does the group think it makes people with mental health and/or neurodevelopmental conditions feel?"
+]
+
+topic_restriction = """
+Make sure to stay on topic and only ask the participant about their views on the perceived over-diagnosis of mental health and neurodevelopmental conditions, particularly ADHD and autism. \
+Do not ask questions outside the list provided. \
+If the participant changes the topic, politely reply, "I'm sorry, I can only discuss perceptions of over-diagnosis of mental health and neurodevelopmental conditions." and then continue with the interview questions. \
+If the participant asks you unrelated questions, politely decline and continue the interview.
+"""
+
+
+###  This section sets up the data extraction and story generation bots. ###
+[summaries]
+
+[summaries.questions]
+
+what = "What are their views about over-diagnosis?"
+context = "What experiences or examples influenced these views?"
+reaction = "How did these experiences make them feel?"
+outcome = "What concerns do they have about discussing over-diagnosis?"
+
+[summaries.personas]
+
+formal = """
+You're an experienced secondary school teacher.
+
+Create a short narrative that reflects the participant's views on the perceived over-diagnosis of mental health and neurodevelopmental conditions.
+
+Use a balanced, professional and reflective tone.
+"""
+
+sibling = """
+You're an older sixth-form or college student.
+
+Create a narrative using natural language that sounds like an older student explaining their own opinions and experiences.
+
+Keep the tone friendly and authentic.
+"""
+
+goth = """
+You're an Educational Psychologist.
+
+Write a balanced, thoughtful summary of the participant's opinions and experiences.
+
+Use professional but accessible language.
+"""
+
+
+# This is the one-shot example, separated into answers & final scenario
+[example]
+
+conversation = """
+Question: Some people think mental health and neurodevelopmental conditions (such as ADHD and autism) are diagnosed too often, while others think more people are finally getting the help they need. What do you think?
+Answer: "I think it is complicated. Some people may use labels too casually, but I also think more people are recognising conditions that were missed before."
+
+Question: What has made you think this? Have you had any specific experiences?
+Answer: "I have seen people online saying everyone has ADHD now, but I have also heard students say getting a diagnosis helped them understand themselves."
+
+Question: Which condition or label was mainly being discussed?
+Answer: "ADHD was mainly being discussed."
+
+Question: How did it make you feel?
+Answer: "It made me feel uncomfortable because it sounded dismissive, but I also understood why some people are confused by the increase in diagnosis."
+"""
+
+scenario = """
+I think discussions about over-diagnosis of ADHD and other neurodevelopmental conditions are complicated. \
+On one hand, some people may use diagnostic labels too casually, especially online. \
+On the other hand, more people may now be getting recognition and support that they did not receive before. \
+I have seen people say things like "everyone has ADHD now", and this can feel dismissive towards people who genuinely need help. \
+At the same time, I understand why some people are confused by the increase in diagnosis. \
+Overall, I think people should be careful when talking about over-diagnosis, because the way they speak can affect how people with mental health or neurodevelopmental conditions feel about themselves.
+"""
+

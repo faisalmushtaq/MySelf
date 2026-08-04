@@ -7,6 +7,19 @@ import {
   scoringDefinition,
   type ReleaseManifest,
 } from "@myself/schema";
+import {
+  ADAPT_SYSTEM,
+  checkProtocol,
+  collectionComplete,
+  EXTRACTION_SYSTEM,
+  INTERVIEWER_SYSTEM,
+  keyQuestions,
+  keysString,
+  numberedQuestions,
+  oneShot,
+  SCENARIO_SYSTEM,
+  type NarrativeProtocol,
+} from "@myself/narrative";
 import type { z } from "zod";
 import { canonicalJson, contentHash } from "./canonical.js";
 
@@ -22,6 +35,13 @@ export interface Registries {
   modules: z.input<typeof moduleDefinition>[];
   scales: z.input<typeof responseScale>[];
   scoring: z.input<typeof scoringDefinition>[];
+  /**
+   * Narrative protocols available for placement. Optional: most releases do
+   * not carry one, and a composition that references a protocol without
+   * supplying it fails the gate rather than publishing a release that cannot
+   * be run.
+   */
+  narrativeProtocols?: NarrativeProtocol[];
 }
 
 export interface PublishMeta {
@@ -139,6 +159,78 @@ function auditDependencies(
   return failures;
 }
 
+/**
+ * The prompts a protocol will actually send, assembled at publish time.
+ *
+ * The protocol carries the researcher's configuration and the module carries
+ * the templates; neither on its own is what went to the provider. Assembling
+ * them here means the release answers "what was this child's interviewer told
+ * to do?" directly, instead of requiring someone to re-derive it years later
+ * from a template and a config that have both moved on.
+ *
+ * Session variables — `{topic}`, `{participant_words}` — are deliberately left
+ * standing. They are resolved per participant, and a release that pretended to
+ * know their values would be lying about what is fixed.
+ */
+function freezePrompts(protocol: NarrativeProtocol): Record<string, unknown> {
+  const frozen: Record<string, unknown> = {};
+  const at = (key: string, system: string, notes?: Record<string, unknown>) => {
+    frozen[`${key}@${protocol.version}`] = {
+      key,
+      version: protocol.version,
+      protocol: protocol.key,
+      system,
+      ...(notes ?? {}),
+    };
+  };
+
+  if (protocol.interview) {
+    at(
+      "pt.interviewer",
+      INTERVIEWER_SYSTEM.replace("{persona}", protocol.interview.persona)
+        .replace("{language_style}", protocol.interview.languageStyle)
+        .replace("{topic_restriction}", protocol.interview.topicRestriction)
+        .replace("{questions}", numberedQuestions(protocol.interview.questions))
+        .replace("{collection_complete}", collectionComplete(protocol.interview.questions.length)),
+      { maxTurns: protocol.interview.maxTurns },
+    );
+  }
+  if (protocol.extraction) {
+    const keys = protocol.extraction.keys;
+    at(
+      "pt.extraction",
+      EXTRACTION_SYSTEM.replace("{keys_string}", keysString(Object.keys(keys))).replace("{questions}", keyQuestions(keys)),
+      { keys },
+    );
+  }
+  if (protocol.scenario) {
+    // One per persona, keyed by name: three personas are three different
+    // instructions, and which one produced a given retelling is part of the
+    // record. An index would stop meaning anything if a wave reordered them.
+    protocol.scenario.personas.forEach((persona, index) => {
+      at(
+        `pt.scenario.${persona.key}`,
+        SCENARIO_SYSTEM.replace("{persona}", persona.text).replace("{one_shot}", oneShot(protocol)),
+        { persona: persona.key, index },
+      );
+    });
+    at("pt.adapt", ADAPT_SYSTEM);
+  }
+
+  // The open stages carry their own templates rather than the method's.
+  for (const stage of protocol.stages) {
+    if (stage.prompt) {
+      frozen[`${stage.prompt.key}@${stage.prompt.version}`] = {
+        ...stage.prompt,
+        protocol: protocol.key,
+        stage: stage.key,
+        ...(stage.outputSchema ? { outputSchema: stage.outputSchema } : {}),
+      };
+    }
+  }
+  return frozen;
+}
+
 export function buildRelease(
   draftInput: z.input<typeof assessmentDraft>,
   registries: Registries,
@@ -150,10 +242,15 @@ export function buildRelease(
   const scales = registries.scales.map((s) => responseScale.parse(s));
   const scoring = registries.scoring.map((s) => scoringDefinition.parse(s));
 
+  const protocolRegistry = registries.narrativeProtocols ?? [];
+
   const failures: string[] = [];
   const frozenInstruments: Record<string, unknown> = {};
   const frozenScales: Record<string, unknown> = {};
   const frozenScoring: Record<string, unknown> = {};
+  const frozenProtocols: Record<string, unknown> = {};
+  const frozenPrompts: Record<string, unknown> = {};
+  const frozenModelConfigs: Record<string, unknown> = {};
   const scaleByKey = new Map(scales.map((s) => [s.key, s]));
   const scoringByKey = new Map(scoring.map((s) => [s.key, s]));
   const seenVariables = new Map<string, string>();
@@ -161,7 +258,40 @@ export function buildRelease(
   for (const section of draft.sections) {
     for (const component of section.components) {
       if (component.kind === "narrative") {
-        failures.push(`narrative components not yet supported by this builder (section '${section.key}')`);
+        const protocol = protocolRegistry.find(
+          (p) => p.key === component.protocol && p.version === component.protocolVersion,
+        );
+        if (!protocol) {
+          failures.push(
+            `unresolved narrative protocol '${component.protocol}@${component.protocolVersion}' in section '${section.key}'`,
+          );
+          continue;
+        }
+        // The protocol's own publish gate, run here rather than trusted: a
+        // release is the last point at which a prompt that leaks a name, or a
+        // stage that would show a child a blank screen, can still be stopped.
+        for (const problem of checkProtocol(protocol)) {
+          failures.push(`narrative protocol '${protocol.key}': ${problem}`);
+        }
+        if (protocol.approvalStatus !== "approved") {
+          failures.push(
+            `narrative protocol '${protocol.key}' is '${protocol.approvalStatus}' — only an approved protocol can be fielded`,
+          );
+        }
+        // Model stages need the network. A composition that promises the whole
+        // survey works offline, and then places a protocol that cannot fall
+        // back, has promised something it cannot do.
+        if (
+          draft.offline.narrativeConnectivity === "offline_capable_with_queue" &&
+          protocol.offlineFallback === "pause_module"
+        ) {
+          failures.push(
+            `narrative protocol '${protocol.key}' pauses when offline, but section '${section.key}' is composed as offline-capable`,
+          );
+        }
+        frozenProtocols[`${protocol.key}@${protocol.version}`] = protocol;
+        Object.assign(frozenPrompts, freezePrompts(protocol));
+        for (const model of protocol.models) frozenModelConfigs[model.key] = model;
         continue;
       }
       if (component.kind === "screen") continue;
@@ -255,9 +385,9 @@ export function buildRelease(
     instruments: frozenInstruments,
     scales: frozenScales,
     scoring: frozenScoring,
-    narrativeProtocols: {},
-    prompts: {},
-    modelConfigs: {},
+    narrativeProtocols: frozenProtocols,
+    prompts: frozenPrompts,
+    modelConfigs: frozenModelConfigs,
     assets: {},
   };
 

@@ -270,7 +270,78 @@ reproduced from `llm_config.py` rather than rewritten: their wording — reuse
 the participant's own words, no advice, no diagnosis, third person — *is* the
 method, and improving the prose would change what the study measures.
 
-### 10.6 Where the API key goes
+### 10.6 Study configuration files (D-43)
+
+Checked line by line against
+[`Lynn-linboliu/micro-narratives-overdiagnosis`](https://github.com/Lynn-linboliu/micro-narratives-overdiagnosis),
+which is the app the researcher actually runs.
+
+The first pass at this shipped a format that *resembled* the original's —
+different section names, personas as a bare array, no `[consent]` or
+`[participant]` tables. It would have loaded nothing anyone had written. The
+reader now takes the original's format: the sections and key names
+`llm_config.py` reads. **All six study configs that ship with that app load
+untouched**, and are kept as fixtures in `packages/narrative/src/fixtures/`
+so "their files load" is tested against their files.
+
+```toml
+model = "gpt-4o"                 # top level
+quality_control_flagging = true  # top level
+
+[consent]        intro_and_consent
+[participant]    require_participant_id, editable_participant_id, text
+[collection]     persona, language_type, intro, questions[], topic_restriction
+[summaries.questions]   key -> the question that key answers
+[summaries.personas]    name -> the voice that writes the retelling
+[example]        conversation, scenario
+[myself]         everything below — all of it optional
+```
+
+**The `[myself]` table** is the only addition, and it carries what the
+original has no field for and a school study cannot do without: the
+safeguarding declaration, which variables may reach a prompt, what happens
+with no network, the model parameters, and the participant-facing words the
+original hard-codes in `app.py` (§8.3 lists that as debt — the phrasing a
+child reads is a study decision).
+
+A file with no `[myself]` table **loads and runs**. It **cannot be fielded**:
+with no safeguarding declaration it fails the release gate. Trying a config
+out costs nothing; putting it in front of a child requires somebody to have
+written down what happens if that child says something frightening.
+
+**Personas are keyed, not indexed.** The original stores which of `formal`,
+`sibling`, `goth` wrote the retelling a participant chose. "Persona 2" is not
+an answer to *which voice did young people recognise as theirs*, and stops
+meaning anything the first time a wave reorders the list.
+
+**`{previous_scenario}` is carried through** — §8.2's fourth assumption, a
+later wave re-presenting what this participant last said. As in the original,
+a config that pipes it without tracking a participant ID is refused, because
+there would be nothing to look it up by.
+
+Two ways to work on one:
+
+```bash
+pnpm --filter @myself/narrative check protocols/your_study.toml
+```
+
+validates it, runs the publish gate, and prints every screen as a participant
+would read it — so a mistyped `{placeholder}` shows up as a mistyped
+placeholder rather than as a blank screen in front of a child. Or the
+**MyStory tab in the researcher view**, which is the same file with boxes
+round it: open a `.toml`, edit the questions, personas, keys, model and the
+words on screen, read the four prompts *as assembled* for that study, and
+download the file to commit. It saves nowhere — a protocol that ran a study
+belongs in version control with everything else that produced the data.
+
+**A bug this exposed.** Interview questions, the topic restriction and the
+personas are pasted into the prompts verbatim, so `{topic}` in a question was
+being sent to the model as those seven characters — and `{first_name}` in one
+would have reached a provider without passing the identifier gate, which
+every other route to a prompt is checked by. Both are now resolved and both
+are checked.
+
+### 10.7 Where the API key goes
 
 `apps/mystory-lab/.env.local`, one line:
 
@@ -286,11 +357,45 @@ commit: anywhere it is written down is somewhere it has to be rotated from.
 When this moves into the platform proper the key moves to a Cloud Function's
 secret, which is the same arrangement with a different process holding it.
 
-### 10.7 Still to do
+### 10.8 Placing it in an assessment (D-44)
 
-Slotting it into an assessment: a `narrative` section type in the composition
-so a protocol is placeable like an instrument, the release manifest freezing
-protocol and prompt versions, and narrative records syncing to their own
-Firestore document (`docs/08` §9.3). The module is built to drop in — the
-runner takes a protocol and a context and knows nothing about how it was
-reached — but that wiring is not written yet.
+`kind: "narrative"` is now a section component, so a protocol sits in a
+composition next to an instrument:
+
+```ts
+{ kind: "narrative", protocol: "np.micro_narrative_full", protocolVersion: "1.0.0" }
+```
+
+**Publishing freezes it.** The release carries the protocol, its **assembled**
+prompts — persona, questions and topic restriction already substituted in, so
+the manifest answers *what was this child's interviewer told to do?* without
+anyone re-deriving it from a template and a config that have both moved on —
+and every model config it names. Session variables like `{topic}` are left
+standing, because a release that pretended to know their values would be
+lying about what is fixed. Editing a protocol moves the release hash: two
+fieldings running different questions must not be indistinguishable later.
+
+**The gate runs at publish**, not only when a researcher remembers to run it.
+A release is refused if the protocol is missing, if it fails `checkProtocol`,
+if its `approvalStatus` is not `approved`, or if it pauses offline inside a
+section composed as offline-capable.
+
+**In the participant app**, a narrative is one position in the walk. It
+carries a marker item, so display conditions, ordering, back navigation and
+timing need no special case; the survey screen sees `unit.narrative` and hands
+over to the module. The marker is never a response slot — there is no path
+from a model to an answer, which is what makes "the model cannot fabricate a
+participant's response" structural rather than a matter of care.
+
+**Model calls from a device go through `RelayAdapter`**, which posts to our
+own endpoint rather than to a provider. A provider key in a page is a provider
+key in a school. The device sends the model *key*, not the parameters, so the
+function reads the settings from the frozen release and a tampered page cannot
+raise the temperature or point the study somewhere else.
+
+### 10.9 Still to do
+
+The relay's other end: the Cloud Function that holds the key, checks the
+requested config against the frozen release, and makes the call. And narrative
+records syncing to their own Firestore document (§9.3). Everything up to the
+network is built and tested.

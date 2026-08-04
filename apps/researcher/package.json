@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@fontsource/inter": "^5.3.0",
+    "@myself/narrative": "workspace:*",
     "@myself/schema": "workspace:*",
     "@myself/store": "workspace:*",
     "dexie": "^4.0.8",

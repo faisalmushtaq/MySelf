@@ -407,7 +407,11 @@ describe("the full CHI 2025 journey", () => {
   const runThrough = async (answers: string[], opts: { protocol?: NarrativeProtocol } = {}) => {
     const runner = new NarrativeRunner(opts.protocol ?? full(), context(), gatewayWith(new MockAdapter()));
     runner.start();
-    let screen = await runner.next(); // past the introduction, into the interview
+    // Past the consent page and the interviewer's opening, into the interview.
+    // Both come from the study's own file: `[consent] intro_and_consent` and
+    // `[collection] intro`.
+    let screen = await runner.next();
+    while (screen.kind === "introduction") screen = await runner.next();
     for (const answer of answers) {
       screen = await runner.submit(answer);
       if (!screen.expectsInput || screen.kind !== "collect") break;
@@ -457,7 +461,12 @@ describe("the full CHI 2025 journey", () => {
 
     expect(screen.kind).toBe("select");
     expect(screen.choices).toHaveLength(microNarrativeFull.scenario!.personas.length);
-    expect(runner.outcome.candidates.map((c) => c.persona)).toEqual(microNarrativeFull.scenario!.personas);
+    // Recorded by persona NAME — `plain`, `feeling`, `their_words` — because
+    // which voice a young person recognised as theirs is a finding, and an
+    // index stops meaning anything the moment a wave reorders the list.
+    expect(runner.outcome.candidates.map((c) => c.persona)).toEqual(
+      microNarrativeFull.scenario!.personas.map((p) => p.key),
+    );
 
     const rating = await runner.submit("1");
     expect(rating.kind).toBe("rate");
@@ -548,8 +557,9 @@ describe("typing-dynamics quality control", () => {
     strict.qualityControl = config;
     const runner = new NarrativeRunner(strict, context(), gatewayWith(new MockAdapter()));
     runner.start();
-    await runner.next();
-    const screen = await runner.submit("x".repeat(400), { composeMs: 500, pasted: true });
+    let screen = await runner.next();
+    while (screen.kind === "introduction") screen = await runner.next();
+    screen = await runner.submit("x".repeat(400), { composeMs: 500, pasted: true });
 
     expect(screen.stopped?.reason).toMatch(/quality signals/);
     expect(runner.outcome.candidates).toHaveLength(0);

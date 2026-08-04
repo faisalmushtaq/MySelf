@@ -8,7 +8,10 @@ import {
   INTERVIEWER_SYSTEM,
   SCENARIO_SCHEMA,
   SCENARIO_SYSTEM,
+  collectionComplete,
   extractionSchema,
+  keyQuestions,
+  keysString,
   numberedQuestions,
   oneShot,
 } from "./prompts.js";
@@ -156,6 +159,23 @@ export class NarrativeRunner {
   private permittedForPrompt(): Set<string> {
     const identifiers = new Set(this.protocol.permittedIdentifiers);
     return new Set(this.protocol.permittedVariables.filter((v) => !isIdentifying(v) || identifiers.has(v)));
+  }
+
+  /**
+   * Resolve a piece of researcher-authored configuration on its way into a
+   * prompt — an interview question, the topic restriction, a persona.
+   *
+   * These read like fixed text but they are not: a study sets its topic once
+   * and writes "when {topic} came up for you" in the question, exactly as the
+   * original pipes its topic in. Without this the model is asked to enquire
+   * about the literal string "{topic}".
+   *
+   * It resolves against the PROMPT set, not the display set, so an identifier
+   * the protocol has not explicitly released is left unsubstituted rather than
+   * carried to a provider by a placeholder somebody typed into a question.
+   */
+  private configText(template: string): string {
+    return resolveText(template, this.context.variables, this.permittedForPrompt()).text;
   }
 
   /** Start, or re-show the current screen. */
@@ -385,10 +405,11 @@ export class NarrativeRunner {
     const config = this.modelFor(stage);
     if (!interview || !config) return null;
 
-    const system = INTERVIEWER_SYSTEM.replace("{persona}", interview.persona)
-      .replace("{language_style}", interview.languageStyle)
-      .replace("{topic_restriction}", interview.topicRestriction)
-      .replace("{questions}", numberedQuestions(interview.questions));
+    const system = INTERVIEWER_SYSTEM.replace("{persona}", this.configText(interview.persona))
+      .replace("{language_style}", this.configText(interview.languageStyle))
+      .replace("{topic_restriction}", this.configText(interview.topicRestriction))
+      .replace("{questions}", numberedQuestions(interview.questions.map((q) => this.configText(q))))
+      .replace("{collection_complete}", collectionComplete(interview.questions.length));
 
     const prompt: ResolvedPrompt = {
       promptKey: "pt.interviewer",
@@ -475,9 +496,13 @@ export class NarrativeRunner {
 
   /** The participant's answers, reduced to the researcher's keys. */
   private async runExtraction(stage: NarrativeStage): Promise<Screen> {
-    const keys = this.protocol.extraction?.keys;
+    const declared = this.protocol.extraction?.keys;
     const config = this.modelFor(stage);
-    if (!keys || !config) return this.applyFallback(stage, "the stage is not configured for extraction");
+    if (!declared || !config) return this.applyFallback(stage, "the stage is not configured for extraction");
+    // The key's question becomes a schema description, so it is prompt text.
+    const keys = Object.fromEntries(
+      Object.entries(declared).map(([key, question]) => [key, this.configText(question)]),
+    );
 
     const quality = aggregate(this.signals, this.protocol.qualityControl);
     if (shouldStopBeforeGeneration(quality, this.protocol.qualityControl)) {
@@ -492,15 +517,20 @@ export class NarrativeRunner {
       };
     }
 
-    const conversation = this.transcript.map((m) => `${m.role === "user" ? "Participant" : "Interviewer"}: ${m.content}`).join("\n");
+    // "Human:" / "AI:", as the original labels the transcript it extracts from.
+    const conversation = this.transcript.map((m) => `${m.role === "user" ? "Human" : "AI"}: ${m.content}`).join("\n");
+    const system = EXTRACTION_SYSTEM.replace("{keys_string}", keysString(Object.keys(keys))).replace(
+      "{questions}",
+      keyQuestions(keys),
+    );
     const prompt: ResolvedPrompt = {
       promptKey: "pt.extraction",
       promptVersion: this.protocol.version,
-      system: EXTRACTION_SYSTEM,
-      messages: [{ role: "user", content: conversation }],
+      system,
+      messages: [{ role: "user", content: `Message to date:\n${conversation}` }],
       variables: {},
     };
-    this.append(stage.key, "system", "prompt_resolved", { text: EXTRACTION_SYSTEM, data: { keys: Object.keys(keys) } });
+    this.append(stage.key, "system", "prompt_resolved", { text: system, data: { keys: Object.keys(keys) } });
 
     try {
       const result = await this.gateway.call<Record<string, string | null>>({
@@ -528,21 +558,28 @@ export class NarrativeRunner {
     const config = this.modelFor(stage);
     if (!scenario || !config) return this.applyFallback(stage, "the stage is not configured for generation");
 
+    // "Question: … / Answer: …", as `_generate_q_and_a` lays it out. A key the
+    // extraction left null is shown as such rather than omitted, so the writer
+    // is told what was not said instead of being left to fill the gap.
     const answers = Object.entries(this.extraction)
-      .map(([key, value]) => `${this.protocol.extraction?.keys[key] ?? key}\n${value ?? "(they did not say)"}`)
-      .join("\n\n");
+      .map(([key, value]) => {
+        const question = this.protocol.extraction?.keys[key];
+        return `Question: ${question ? this.configText(question) : key}\nAnswer: ${value ?? "(they did not say)"}`;
+      })
+      .join("\n");
 
     const produced: { index: number; persona: string; text: string }[] = [];
     for (const [index, persona] of scenario.personas.entries()) {
-      const system = SCENARIO_SYSTEM.replace("{persona}", persona) + oneShot(this.protocol);
+      const system =
+        SCENARIO_SYSTEM.replace("{persona}", this.configText(persona.text)).replace("{one_shot}", oneShot(this.protocol));
       const prompt: ResolvedPrompt = {
-        promptKey: "pt.scenario",
+        promptKey: `pt.scenario.${persona.key}`,
         promptVersion: this.protocol.version,
         system,
         messages: [{ role: "user", content: answers }],
         variables: {},
       };
-      this.append(stage.key, "system", "prompt_resolved", { text: system, data: { persona, index } });
+      this.append(stage.key, "system", "prompt_resolved", { text: system, data: { persona: persona.key, index } });
       try {
         const result = await this.gateway.call<{ scenario: string; confidence: string }>({
           sessionId: this.context.sessionId,
@@ -554,14 +591,16 @@ export class NarrativeRunner {
         });
         this.append(stage.key, "model", "model_raw", { text: result.raw });
         this.append(stage.key, "model", "model_validated", {
-          data: { ...(result.output as unknown as Record<string, unknown>), persona, index },
+          data: { ...(result.output as unknown as Record<string, unknown>), persona: persona.key, index },
         });
-        produced.push({ index, persona, text: result.output.scenario });
+        produced.push({ index, persona: persona.key, text: result.output.scenario });
       } catch {
         // One persona failing is not the run failing. The original stored an
         // apology string in the scenario slot; here the candidate is simply
         // absent, which is visible rather than disguised as a retelling.
-        this.append(stage.key, "system", "fallback_applied", { data: { persona, index, reason: "generation failed" } });
+        this.append(stage.key, "system", "fallback_applied", {
+          data: { persona: persona.key, index, reason: "generation failed" },
+        });
       }
     }
 

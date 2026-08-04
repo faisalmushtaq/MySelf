@@ -14,7 +14,9 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "check": "node dist/cli.js check",
+    "write": "node dist/cli.js write"
   },
   "dependencies": {
     "@myself/llm": "workspace:*",
@@ -23,5 +25,8 @@
   "devDependencies": {
     "typescript": "^5.6.0",
     "vitest": "^2.1.0"
+  },
+  "bin": {
+    "mystory-protocol": "./dist/cli.js"
   }
 }

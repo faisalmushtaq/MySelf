@@ -18,6 +18,7 @@
   },
   "dependencies": {
     "@myself/library": "workspace:*",
+    "@myself/narrative": "workspace:*",
     "@myself/schema": "workspace:*",
     "@myself/scoring": "workspace:*",
     "zod": "^3.23.8"

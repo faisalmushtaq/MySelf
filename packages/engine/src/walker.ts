@@ -18,6 +18,17 @@ export interface PresentableUnit {
   sectionKey: string;
   /** Conjunction of section-, component- and item-level display conditions. */
   displayIf?: LogicExpr | undefined;
+  /**
+   * Set when this position is a narrative module (MyStory) rather than a
+   * question. The unit still carries an item, so display conditions, ordering,
+   * back navigation and timing all work the way they do everywhere else — the
+   * only thing that differs is what gets drawn when the walker arrives here.
+   *
+   * The item is a marker, never a response slot: nothing the module produces
+   * can populate an answer, which is what keeps "a model cannot fabricate a
+   * participant's response" structural rather than a matter of care.
+   */
+  narrative?: { protocol: string; version: string };
 }
 
 export interface WalkPosition {
