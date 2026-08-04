@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { readFileSync, writeFileSync } from "node:fs";
-import { basename } from "node:path";
+import { basename, isAbsolute, resolve } from "node:path";
 import { ZodError } from "zod";
 import { parseProtocolFile, protocolToToml, TomlError } from "./config.js";
 import { checkProtocol } from "./protocol.js";
@@ -28,6 +28,7 @@ const usage = `MyStory protocol files
   write <np.protocol_key> [out] write a shipped protocol out as a starting point
 
 Shipped protocols: ${protocols.map((p) => p.key).join(", ")}
+
 `;
 
 function check(path: string): number {
@@ -106,9 +107,26 @@ function write(key: string, out: string | undefined): number {
   return 0;
 }
 
+/**
+ * Resolve a path the way the person typing it expects.
+ *
+ * The documented command is run from the repository root:
+ *
+ *   pnpm --filter @myself/narrative check protocols/my_study.toml
+ *
+ * but pnpm runs the script with the working directory set to the package, so
+ * `protocols/…` would be looked for inside `packages/narrative/`. pnpm sets
+ * INIT_CWD to where the command was actually invoked, which is the directory
+ * the relative path was written against.
+ */
+const fromCallerCwd = (path: string): string => {
+  const base = process.env["INIT_CWD"];
+  return !base || isAbsolute(path) ? path : resolve(base, path);
+};
+
 const [command, ...rest] = process.argv.slice(2);
-if (command === "check" && rest[0]) process.exit(check(rest[0]));
-else if (command === "write" && rest[0]) process.exit(write(rest[0], rest[1]));
+if (command === "check" && rest[0]) process.exit(check(fromCallerCwd(rest[0])));
+else if (command === "write" && rest[0]) process.exit(write(rest[0], rest[1] ? fromCallerCwd(rest[1]) : undefined));
 else {
   console.error(usage);
   process.exit(2);

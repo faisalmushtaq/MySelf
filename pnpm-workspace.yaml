@@ -1,3 +1,22 @@
 packages:
   - "packages/*"
   - "apps/*"
+
+# Dependencies allowed to run install scripts.
+#
+# pnpm 10+ blocks postinstall scripts by default and exits non-zero until
+# somebody approves them interactively. That is a sensible default — an install
+# script is arbitrary code from a stranger — but "run this interactive command
+# before anything works" is not a first step for a researcher cloning the repo,
+# and the answer would be the same every time.
+#
+# So the answer is recorded here, in version control, where it can be reviewed
+# like any other dependency decision:
+#
+#   esbuild        downloads its platform binary. Vite does not build without it.
+#   protobufjs     used by firebase-admin.
+#   @firebase/util part of the Firebase SDK.
+onlyBuiltDependencies:
+  - "@firebase/util"
+  - esbuild
+  - protobufjs
