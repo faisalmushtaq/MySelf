@@ -131,11 +131,21 @@ gcloud projects add-iam-policy-binding myself-identity \
 firebase deploy --only functions --project myself-research
 ```
 
-Then make yourself an owner once, from a machine with admin credentials:
+Then make yourself an owner once. Somebody has to be first, and being first
+cannot be done through a permission check nobody can yet pass — so this runs on
+a laptop against Google's application-default credentials, and can only do what
+that person could already do in the console.
 
 ```bash
-node -e "require('firebase-admin').initializeApp();require('firebase-admin').auth().getUserByEmail('you@leeds.ac.uk').then(u=>require('firebase-admin').auth().setCustomUserClaims(u.uid,{role:'owner'}))"
+gcloud auth application-default login          # once
+
+# Sign in to the app with this address FIRST — the account is created by
+# signing in, not by being named here.
+pnpm --filter @myself/functions grant you@leeds.ac.uk owner --project myself-research
 ```
+
+Sign out and back in afterwards: a role arrives in a new token, not the one you
+are already holding.
 
 After that, every other account is administered through the researcher view.
 
