@@ -28,6 +28,9 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm -r build
+      # After the build, because it reads the service worker the build emits:
+      # a preview server has none, which is how /researcher/ shipped broken twice.
+      - run: pnpm -r test
       # Both apps ship from one artifact: the participant app at the root, the
       # researcher view one level down. Separate paths keep the participant
       # app's service worker out of the researcher view's scope — a shared

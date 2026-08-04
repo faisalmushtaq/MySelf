@@ -47,7 +47,7 @@ export default defineConfig({
          * which is exactly why it survived to be deployed.
          */
         navigateFallbackDenylist: [
-          new RegExp(`^${base.replace(/\/$/, "")}/(researcher|mystory)/`),
+          new RegExp(`^${base.replace(/\/$/, "")}/(researcher|mystory)(/|$)`),
         ],
       },
     }),
