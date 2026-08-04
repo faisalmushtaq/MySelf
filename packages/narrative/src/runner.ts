@@ -69,6 +69,8 @@ export interface Screen {
   editable?: boolean;
   /** The model reported it could not honour the request from their own words. */
   unchanged?: boolean;
+  /** They pressed "ask for a rewrite" without saying what to change. */
+  needsRequest?: boolean;
   /** Rating bounds, at the rate stage. */
   rating?: { max: number };
   /** Set when quality signals stopped the run before anything was generated. */
@@ -745,6 +747,19 @@ export class NarrativeRunner {
   }
 
   /**
+   * Keep this version and move on.
+   *
+   * The finishing move for the adapt stage, and the only one: saving the
+   * participant's own text and advancing are the same act, so they are the
+   * same button. Passing text that has not changed is fine — it records
+   * nothing and still advances.
+   */
+  async keepScenario(text: string): Promise<Screen> {
+    this.editScenario(text);
+    return this.advance();
+  }
+
+  /**
    * Reject the last change and go back to what it replaced.
    *
    * The original offers accept/reject/reset on an AI adaptation. Rejecting
@@ -788,7 +803,18 @@ export class NarrativeRunner {
   private async reviseScenario(stage: NarrativeStage, input: string): Promise<Screen> {
     const request = input.trim();
     const config = this.modelFor(stage);
-    if (request.length === 0 || !config || !this.finalScenario) return this.advance();
+
+    /**
+     * An empty request is not "I am finished".
+     *
+     * It used to advance, because when this stage had one button an empty box
+     * plausibly meant "no changes thanks". With a rewrite button it means the
+     * participant pressed it without saying what to change — and ending their
+     * session there, before showing them anything, is the worst reading of it.
+     * Finishing is now `keepScenario`, which is a button that says so.
+     */
+    if (request.length === 0) return { ...this.current(), needsRequest: true };
+    if (!config || !this.finalScenario) return this.applyFallback(stage, "there is nothing to revise");
 
     const target = [...this.records].reverse().find((r) => r.kind === "model_shown");
     this.append(stage.key, "participant", "participant_correction", {
