@@ -552,4 +552,32 @@ function wireSignIn(): void {
   out.addEventListener("click", () => void session.signOut());
 }
 
+/**
+ * The participant view.
+ *
+ * The same markup and the same runner with the instrumentation hidden, so
+ * what is being looked at is what would actually run — a mock-up would drift
+ * from the thing within a week.
+ *
+ * It is in the URL (`?view=participant`) so it can be sent to somebody: a
+ * colleague, a teacher, an ethics committee. Someone opening that link should
+ * see what a young person sees and nothing about how it is built.
+ */
+function wireViewToggle(): void {
+  const toggle = $("viewToggle") as HTMLButtonElement;
+
+  const apply = (participant: boolean) => {
+    document.body.classList.toggle("participant-view", participant);
+    toggle.textContent = participant ? "Back to the lab" : "See it as a participant";
+    const url = new URL(window.location.href);
+    if (participant) url.searchParams.set("view", "participant");
+    else url.searchParams.delete("view");
+    window.history.replaceState(null, "", url);
+  };
+
+  apply(new URL(window.location.href).searchParams.get("view") === "participant");
+  toggle.addEventListener("click", () => apply(!document.body.classList.contains("participant-view")));
+}
+
+wireViewToggle();
 void detectServer().then(wireSignIn);

@@ -137,6 +137,29 @@
       .hint-right { text-align: right; color: var(--muted); font-size: .78rem; margin: .25rem 0 0; }
       .warn-text { color: var(--warn); }
 
+      /* ── Participant view ────────────────────────────────────────────────
+         The conversation on its own, at the size a young person actually
+         reads it, with the study's instrumentation out of the way. The lab
+         panels are for the researcher; a screen carrying both is neither.
+         Same markup and the same runner — only the chrome differs, so what
+         is being looked at is what would run. */
+      body.participant-view .lab-only { display: none !important; }
+      body.participant-view .wrap { grid-template-columns: 1fr; max-width: 42rem; padding-top: 1.5rem; }
+      body.participant-view header { border: 0; padding-bottom: .5rem; }
+      body.participant-view .panel { border: 0; padding: 0; background: transparent; }
+      body.participant-view .panel > h2 { display: none; }
+      body.participant-view .thread { max-height: none; overflow: visible; gap: 1rem; }
+      body.participant-view .bubble { font-size: 1.08rem; line-height: 1.6; padding: .8rem 1.05rem; }
+      body.participant-view .msg { max-width: 100%; }
+      body.participant-view .avatar { flex-basis: 34px; height: 34px; font-size: 1.15rem; }
+      body.participant-view .stem { font-size: 1.25rem; }
+      body.participant-view .composer textarea,
+      body.participant-view .scenario-edit { font-size: 1.05rem; }
+      body.participant-view .card-choice { font-size: 1.05rem; line-height: 1.6; padding: 1rem 1.1rem; }
+      body.participant-view button { min-height: 46px; font-size: 1rem; }
+      body.participant-view .view-toggle { position: fixed; right: 1rem; bottom: 1rem; opacity: .5; }
+      body.participant-view .view-toggle:hover { opacity: 1; }
+
       @media (max-width: 900px) { .wrap { grid-template-columns: 1fr; } }
     </style>
   </head>
@@ -145,18 +168,18 @@
       <header>
         <div>
           <h1>MySelf <span class="dim">MyStory</span></h1>
-          <p class="note" id="mode">Loading\u2026</p>
+          <p class="note lab-only" id="mode">Loading…</p>
         </div>
         <div class="row" style="align-items: center;">
-          <span class="note" id="who"></span>
-          <button class="secondary" id="signIn" hidden>Sign in</button>
-          <button class="secondary" id="signOut" hidden>Sign out</button>
-          <span class="badge" id="providerBadge">—</span>
+          <span class="note lab-only" id="who"></span>
+          <button class="secondary lab-only" id="signIn" hidden>Sign in</button>
+          <button class="secondary lab-only" id="signOut" hidden>Sign out</button>
+          <span class="badge lab-only" id="providerBadge">—</span>
         </div>
       </header>
 
       <section>
-        <div class="panel">
+        <div class="panel lab-only">
           <h2>Set up a run</h2>
           <label for="protocol">Protocol</label>
           <select id="protocol"></select>
@@ -185,13 +208,13 @@
             <p class="note">Start a run to see the conversation.</p>
           </div>
           <div id="stageArea"></div>
-          <div id="fallbackNote"></div>
+          <div id="fallbackNote" class="lab-only"></div>
           <div class="row" id="controls"></div>
         </div>
       </section>
 
       <section>
-        <div class="panel">
+        <div class="panel lab-only">
           <h2>Staged records</h2>
           <p class="note">
             Every record, in order, with its source. The participant's own words are never produced by the model —
@@ -205,7 +228,7 @@
           </div>
         </div>
 
-        <div class="panel">
+        <div class="panel lab-only">
           <h2>Model calls</h2>
           <p class="note">
             One row per call, written before it runs and completed after. A call that failed is part of the record.
@@ -229,6 +252,8 @@
       the difference — the useful question "should I wait, or reload?" had no
       answer. This runs first, plainly, without the bundle.
     -->
+    <button class="secondary view-toggle" id="viewToggle" type="button">See it as a participant</button>
+
     <script>
       (function () {
         var banner = function (html) {
