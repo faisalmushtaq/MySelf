@@ -1,5 +1,5 @@
 import { HttpsError, onCall, type CallableRequest } from "firebase-functions/v2/https";
-import { logger } from "firebase-functions";
+import * as logger from "firebase-functions/logger";
 import { FieldValue } from "firebase-admin/firestore";
 import { paths } from "@myself/firebase";
 import { STUDY, auth, research } from "./apps.js";

@@ -147,12 +147,29 @@ anyone with the page; a key on a device is a key in a school. So the key lives
 in Secret Manager, is read into one Cloud Function, and never leaves it.
 
 ```bash
+cd infra/firebase
+
 # Paste the key when prompted. It is not echoed, not logged, and not in git.
 firebase functions:secrets:set OPENAI_API_KEY --project myself-research
 
 firebase deploy --only functions:llmRelay --project myself-research
 # prints: https://europe-west2-myself-research.cloudfunctions.net/llmRelay
 ```
+
+**Why the functions are bundled before deploying.** Firebase uploads the
+functions directory and runs `npm install` inside Google's build environment,
+where our five `workspace:*` dependencies mean nothing — a deploy straight from
+`apps/functions` fails at the end of a long upload with a message about a
+missing package rather than about the workspace. So a predeploy step bundles
+everything into one file with the workspace packages and the release manifests
+inlined, and deploys from a directory whose `package.json` names only
+`firebase-admin` and `firebase-functions`, which npm can actually fetch. The
+predeploy hook is in `firebase.json`; there is nothing extra to remember.
+
+Every import is from a narrow subpath (`firebase-functions/logger`,
+`firebase-functions/v2/options`) rather than a barrel. The barrels load every
+provider including Realtime Database, which drags in `@firebase/database-compat`
+and fails on a missing `@firebase/app` — a package nothing here uses.
 
 Give that URL to the apps as `MYSELF_RELAY_URL` at build time. Rotating the key
 is `functions:secrets:set` again followed by a redeploy; nothing else changes.
