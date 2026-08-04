@@ -145,7 +145,7 @@
       <header>
         <div>
           <h1>MySelf <span class="dim">MyStory</span></h1>
-          <p class="note" id="mode">…</p>
+          <p class="note" id="mode">Loading\u2026</p>
         </div>
         <span class="badge" id="providerBadge">—</span>
       </header>
@@ -168,9 +168,10 @@
             <label style="margin: 0; display: flex; gap: .4rem; align-items: center; font-weight: 400;">
               <input type="checkbox" id="online" checked style="width: auto;" /> online
             </label>
-            <button class="primary" id="start">Start</button>
+            <button class="primary" id="start" disabled>Start</button>
           </div>
           <p class="note" id="gate"></p>
+          <div id="bootNote"></div>
         </div>
 
         <div class="panel">
@@ -214,6 +215,44 @@
       </section>
     </div>
 
+    <!--
+      Say what state the page is in, before the module that would say it loads.
+
+      A page that has not finished loading looks identical to a page that has
+      failed: an empty protocol list and a placeholder where a sentence should
+      be. That happened on a phone, and there was nothing on screen to tell
+      the difference — the useful question "should I wait, or reload?" had no
+      answer. This runs first, plainly, without the bundle.
+    -->
+    <script>
+      (function () {
+        var banner = function (html) {
+          var el = document.getElementById("bootNote");
+          if (el) el.innerHTML = html;
+        };
+        var failed = function (what) {
+          banner(
+            '<div class="alert"><strong>This page did not finish loading.</strong> ' +
+              what +
+              " Reload the page; if it keeps happening, tell the research team what this says." +
+              "</div>",
+          );
+        };
+        window.addEventListener("error", function (e) {
+          // A failed script tag reports a plain Event with no message.
+          failed(e.message ? "It reported: " + e.message : "A file it needs could not be loaded.");
+        });
+        window.addEventListener("unhandledrejection", function (e) {
+          failed("It reported: " + (e.reason && e.reason.message ? e.reason.message : String(e.reason)));
+        });
+        // Nothing has replaced this after five seconds means it is not coming.
+        setTimeout(function () {
+          if (!window.__mystoryReady) {
+            failed("It is still waiting for a file, which usually means a slow or blocked connection.");
+          }
+        }, 5000);
+      })();
+    </script>
     <script type="module" src="/main.ts"></script>
   </body>
 </html>

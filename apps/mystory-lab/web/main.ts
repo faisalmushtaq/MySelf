@@ -475,4 +475,15 @@ $("start").addEventListener("click", () => {
   })();
 });
 
+/**
+ * The page is up.
+ *
+ * Set once the protocol list, the gate and the mode line are all filled in,
+ * so the plain script in the document can tell "still loading" from "failed"
+ * — which look identical from the outside, and which have opposite answers to
+ * "should I wait?".
+ */
+(window as unknown as { __mystoryReady?: boolean }).__mystoryReady = true;
+($("start") as HTMLButtonElement).disabled = false;
+
 void detectServer();
