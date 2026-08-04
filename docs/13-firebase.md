@@ -266,6 +266,21 @@ the permissive default.
 Inside the free quotas at this study's size: 1,000 sittings ≈ 54 MB against
 1 GiB; a full dataset load ≈ 1,000 reads against 50,000/day.
 
+**Container images are the one cost that accrues without anyone looking.** Each
+deploy builds an image per function into Artifact Registry, and the deploy
+prompts for how long to keep them. They are build artifacts: the running
+function does not need old ones, and their only use is rolling back. A year's
+retention across a period of iterating on prompts is gigabytes nobody reads.
+
+```bash
+firebase functions:artifacts:setpolicy --location europe-west2 --days 7 --project myself-research
+```
+
+Note `--location`: the CLI defaults to `us-central1`, which is not where these
+functions are, so without it you set a policy on an empty registry and leave the
+real one alone. Seven days is enough to roll back a bad deploy and not enough to
+hoard; Firebase's own default is one.
+
 Model calls are the one real cost, and they are the researcher's to watch: a
 full micro-narrative journey is roughly 1–3p on `gpt-4o` at this protocol's
 sizes. A hundred participants is a few pounds; the daily per-caller ceiling is
