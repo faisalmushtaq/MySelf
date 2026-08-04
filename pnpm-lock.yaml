@@ -60,6 +60,12 @@ importers:
       '@myself/firebase':
         specifier: workspace:*
         version: link:../../packages/firebase
+      '@myself/llm':
+        specifier: workspace:*
+        version: link:../../packages/llm
+      '@myself/narrative':
+        specifier: workspace:*
+        version: link:../../packages/narrative
       '@myself/schema':
         specifier: workspace:*
         version: link:../../packages/schema

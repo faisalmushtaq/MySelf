@@ -139,12 +139,60 @@ node -e "require('firebase-admin').initializeApp();require('firebase-admin').aut
 
 After that, every other account is administered through the researcher view.
 
+### 5.1 The model relay, and the OpenAI key (D-45)
+
+MyStory needs model calls made from an iPad in a school and from a page on the
+open web, and **neither may hold the key**. A key in a page is readable by
+anyone with the page; a key on a device is a key in a school. So the key lives
+in Secret Manager, is read into one Cloud Function, and never leaves it.
+
+```bash
+# Paste the key when prompted. It is not echoed, not logged, and not in git.
+firebase functions:secrets:set OPENAI_API_KEY --project myself-research
+
+firebase deploy --only functions:llmRelay --project myself-research
+# prints: https://europe-west2-myself-research.cloudfunctions.net/llmRelay
+```
+
+Give that URL to the apps as `MYSELF_RELAY_URL` at build time. Rotating the key
+is `functions:secrets:set` again followed by a redeploy; nothing else changes.
+
+**The caller sends a model config KEY, not model parameters.** Provider, model,
+temperature and token ceiling are read from the frozen release manifest bundled
+into the function. A tampered page cannot raise the temperature, point the study
+at a different model, or ask for ten thousand tokens — and a study's published
+parameters stay the parameters it actually ran on, which is the entire reason
+for freezing them. The request schema has nowhere to put those fields at all,
+which is a stronger guarantee than a check that ignores them.
+
+**A device may only run published configurations.** A signed-in member of the
+research team may also run a config a shipped protocol declares but no release
+has frozen yet — writing prompts means running a protocol before it is
+published, and refusing until it had been through a release would mean
+publishing protocols nobody had run. An iPad gets no such latitude: a fielded
+run that is not reproducible should not be happening in front of a child.
+
+**It is metered.** Every call is counted per caller per day (600 by default,
+`MYSELF_RELAY_DAILY_LIMIT`), and every call writes a provenance row server-side
+— what was sent, which snapshot answered, latency, tokens, and whether it
+failed. A relay that will make any number of calls for anyone who asks is a bill
+with an API in front of it, and a device's account of a call it did not make is
+a guess.
+
+**Origins are a list somebody wrote down** (`*.github.io` and localhost), not
+the permissive default.
+
 ---
 
 ## 6. Cost
 
 Inside the free quotas at this study's size: 1,000 sittings ≈ 54 MB against
 1 GiB; a full dataset load ≈ 1,000 reads against 50,000/day.
+
+Model calls are the one real cost, and they are the researcher's to watch: a
+full micro-narrative journey is roughly 1–3p on `gpt-4o` at this protocol's
+sizes. A hundred participants is a few pounds; the daily per-caller ceiling is
+what stops a loop turning that into a surprise.
 
 **Blaze plan is required** for Cloud Functions and scheduled exports — a card on
 file, billed £0 in practice. Put a **£5 budget alert** on it. Without Blaze you
