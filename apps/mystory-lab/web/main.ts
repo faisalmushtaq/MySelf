@@ -131,10 +131,13 @@ function render(frame: Frame): void {
          <textarea id="scenarioEdit" class="scenario-edit" rows="6">${escapeHtml(s.scenario)}</textarea>`
       : `<blockquote class="scenario">${escapeHtml(s.scenario)}</blockquote>`;
 
-  const unchangedNote = s.unchanged
-    ? `<p class="lede warn-text">The model could not make that change from your own words, so it left the
-       write-up as it was. You can edit it yourself above.</p>`
-    : "";
+  const unchangedNote = s.needsRequest
+    ? `<p class="lede warn-text">Tell me what you would like changed in the box below, and I will rewrite it —
+       or change the write-up yourself above and press "Keep my version".</p>`
+    : s.unchanged
+      ? `<p class="lede warn-text">The model could not make that change from your own words, so it left the
+         write-up as it was. You can edit it yourself above.</p>`
+      : "";
 
   $("screen").innerHTML = s.finished
     ? `<p class="stem">Finished.</p>${s.stopped ? `<p class="lede">Stopped: ${escapeHtml(s.stopped.reason)}</p>` : ""}`
@@ -165,14 +168,18 @@ function render(frame: Frame): void {
     ? ""
     : `${
         s.editable
-          ? `<button class="primary" id="keep">Keep my version</button>
+          ? `<button class="primary" id="keep">Keep this and finish</button>
              <button class="secondary" id="send">Ask for a rewrite</button>
              <button class="secondary" id="revert">Undo the last change</button>`
           : s.expectsInput
             ? '<button class="primary" id="send">Send</button>'
             : '<button class="primary" id="cont">Continue</button>'
       }
-       ${s.optional ? '<button class="secondary" id="skip">Skip this one</button>' : ""}`;
+       ${
+         s.optional
+           ? `<button class="secondary" id="skip">${s.editable ? "Leave it as it is" : "Skip this one"}</button>`
+           : ""
+       }`;
 
   document.getElementById("send")?.addEventListener("click", () => {
     const picked = document.querySelector<HTMLInputElement>('input[name="choice"]:checked');
@@ -184,7 +191,7 @@ function render(frame: Frame): void {
   document.getElementById("skip")?.addEventListener("click", () => void turn({ action: "skip" }));
   document.getElementById("keep")?.addEventListener("click", () => {
     const edited = (document.getElementById("scenarioEdit") as HTMLTextAreaElement | null)?.value ?? "";
-    void turn({ action: "edit", input: edited });
+    void turn({ action: "keep", input: edited });
   });
   document.getElementById("revert")?.addEventListener("click", () => void turn({ action: "revert" }));
 
@@ -264,8 +271,8 @@ async function turn(payload: { action: string; input?: string }): Promise<void> 
           ? await localRunner.next()
           : payload.action === "skip"
             ? await localRunner.skip()
-            : payload.action === "edit"
-              ? localRunner.editScenario(payload.input ?? "")
+            : payload.action === "keep"
+              ? await localRunner.keepScenario(payload.input ?? "")
               : payload.action === "revert"
                 ? localRunner.revertScenario()
                 : await localRunner.submit(payload.input ?? "");

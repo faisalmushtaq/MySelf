@@ -225,8 +225,8 @@ const server = createServer(async (req, res) => {
           ? await runner.next()
           : body.action === "skip"
             ? await runner.skip()
-            : body.action === "edit"
-              ? runner.editScenario(body.input ?? "")
+            : body.action === "keep"
+              ? await runner.keepScenario(body.input ?? "")
               : body.action === "revert"
                 ? runner.revertScenario()
                 : await runner.submit(body.input ?? "");
