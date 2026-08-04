@@ -20,6 +20,17 @@ export interface RelayOptions {
   url: string;
   /** Bearer token identifying this enrolled device. */
   token?: string | undefined;
+  /**
+   * The provider this relay stands in for. Defaults to OpenAI.
+   *
+   * A relay is a transport, not a provider: the study's config says `openai`
+   * because that is what will answer, and this is only how the prompt gets
+   * there. The gateway routes by provider name, so a relay that called itself
+   * "relay" was never selected for an OpenAI config — the lookup found
+   * nothing, threw before a call was made, and the failure surfaced as a
+   * transport error with no provenance row to explain it.
+   */
+  serves?: "openai" | "anthropic" | undefined;
 }
 
 interface RelayResponse {
@@ -41,10 +52,11 @@ const KINDS = new Set([
 ]);
 
 export class RelayAdapter implements ModelAdapter {
-  readonly provider = "relay";
+  readonly provider: string;
 
   constructor(private readonly options: RelayOptions) {
     if (!options.url) throw new Error("the relay adapter needs the endpoint it should post to");
+    this.provider = options.serves ?? "openai";
   }
 
   async generate(
