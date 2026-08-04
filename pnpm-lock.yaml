@@ -291,6 +291,9 @@ importers:
       '@myself/library':
         specifier: workspace:*
         version: link:../library
+      '@myself/narrative':
+        specifier: workspace:*
+        version: link:../narrative
       '@myself/schema':
         specifier: workspace:*
         version: link:../schema

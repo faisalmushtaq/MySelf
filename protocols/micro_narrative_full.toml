@@ -1,0 +1,122 @@
+# MyStory — study configuration
+#
+# This is the micro-narratives app's own config format, not a lookalike: the
+# same sections and key names that `llm_config.py` reads. A .toml written for
+# that app drops in here and runs, and a file written here runs there.
+#
+# Check one before it goes anywhere near a school:
+#
+#   pnpm --filter @myself/narrative check protocols/your_study.toml
+#
+# which validates it, runs the publish gate, and prints every screen as a
+# participant would read it — so a mistyped {placeholder} shows up as a mistyped
+# placeholder rather than as a blank screen in front of a child.
+#
+# The [myself] table is the only addition, and every field in it is optional. A
+# file without one loads and runs; it cannot be FIELDED until it has a
+# safeguarding declaration, which is the right place for that boundary.
+#
+# What no config contains: the four prompt templates, the stage order and the
+# output schemas. Those are the method (docs/08 §8.2), shared by every study
+# running it.
+
+model = "gpt-4o"
+quality_control_flagging = false
+
+[consent]
+intro_and_consent = "Hi {first_name} — this last part is a short conversation."
+
+[participant]
+require_participant_id = false
+editable_participant_id = true
+text = ""
+
+[collection]
+persona = "You're a friendly researcher talking to a young person aged 11 to 16. You are genuinely curious and never in a hurry."
+language_type = "Use short sentences and everyday words — nothing a 12-year-old would have to look up. No jargon and no therapy language."
+intro = "I will ask you a few questions about {topic}, one at a time. There are no right answers and nothing here is marked. Afterwards I will show you a few short write-ups of what you told me, and you can pick the one that fits best — or tell me what is wrong with it."
+questions = [
+  "Can you tell me about a time recently when {topic} came up for you?",
+  "What was happening around then — where were you, and who else was there?",
+  "How did that leave you feeling at the time?",
+  "Has anything changed since, or does it still feel the same?",
+]
+topic_restriction = "Stay on the topic of {topic} and how this young person has experienced it. If they raise something else, acknowledge it briefly and return to the questions."
+
+[summaries.questions]
+what_happened = "What did the participant say actually happened?"
+who_was_there = "Who else did they mention being involved or present?"
+how_it_felt = "How did they say it made them feel?"
+what_changed = "What did they say has changed since, if anything?"
+
+[summaries.personas]
+plain = "You write plainly and briefly, telling it in the order it happened."
+feeling = "You lead with how it felt, and keep the events light."
+their_words = "You keep the young person's own turns of phrase wherever you can."
+
+[example]
+conversation = """
+Question: Can you tell me about a time recently when this came up for you?
+Answer: "There was a group chat and people were being off with one of my mates. I didn't say anything at the time."
+
+Question: How did that leave you feeling at the time?
+Answer: "Bad, mostly at myself. I kept thinking I should have said something.\""""
+scenario = "In a group chat, people were being off with one of their friends and they did not say anything at the time. Afterwards they felt bad, mostly at themselves, and kept thinking they should have said something."
+
+[myself]
+key = "np.micro_narrative_full"
+version = "1.0.0"
+name = "Micro-narrative (full journey)"
+research_question = "How does this young person describe their own experience, and which retelling of it do they recognise as theirs?"
+owner = "faisalmushtaq"
+approval_status = "draft"
+language = "en-GB"
+estimated_minutes = 12
+age_min = 10
+age_max = 19
+permitted_variables = ["first_name", "topic"]
+permitted_identifiers = []
+provider = "openai"
+temperature = 0.7
+max_output_tokens = 400
+timeout_seconds = 30
+max_attempts = 3
+training_use_opt_out = true
+retention_note = "zero-retention endpoint requested"
+region = "eu"
+outro = "Great, I think I got all I need -- but let me double check!"
+select_text = "Here are a few short write-ups of what you told me. Which one fits best?"
+select_lede = "None of them will be perfect. Pick the closest and you can fix it next."
+rate_text = "How well does that one describe what you told me?"
+rate_lede = "0 means it is not you at all. 10 means it is exactly right."
+adapt_text = "What would you change about it?"
+adapt_lede = "Tell me in your own words and I will rewrite it. What you write here is kept alongside it."
+debrief_text = "Thank you, {first_name}. That is everything."
+debrief_lede = "What you wrote is stored with the rest of your answers under your secret code. If you want it taken out later, that code is how we find it."
+fallback_text = "Thank you — that is really helpful."
+max_turns = 12
+min_chars = 2
+max_chars = 2000
+max_chars_per_second = 15
+long_message_chars = 250
+flag_above_share = 0.3
+stop_before_generation = true
+offline_fallback = "continue_without_model"
+safeguarding_declaration = "No automated safeguarding decisions. Lexicon rules raise a flag for researcher review only; nobody is contacted automatically and nothing is shown to the participant. Participants are told their answers are read by the research team later, and are not monitored as they type."
+consent_requirements = ["consent.narrative_ai_assistance", "consent.free_text_storage"]
+
+[[myself.safeguarding]]
+key = "distress_lexicon"
+kind = "lexicon"
+terms = [
+  "kill myself",
+  "end my life",
+  "self harm",
+  "self-harm",
+  "hurt myself",
+  "want to die",
+  "suicide",
+]
+tier = "safeguarding_review"
+reviewers = ["principal_investigator"]
+disclosure = "What you write here is read by the research team after the session — not while you are typing. If you need to talk to someone now, the last page has the numbers."

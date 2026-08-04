@@ -60,6 +60,35 @@ export function flattenManifest(manifest: ReleaseManifest): FlattenedRelease {
     if (section.transition) transitions.set(section.key, section.transition);
 
     for (const component of section.components) {
+      if (component.kind === "narrative") {
+        // A narrative is one position in the walk, like a question. It carries
+        // a marker item so conditions, ordering, back navigation and timing
+        // need no special case; the survey screen checks `narrative` and hands
+        // over to the module instead of drawing a question.
+        const protocol = manifest.narrativeProtocols[`${component.protocol}@${component.protocolVersion}`];
+        if (!protocol) {
+          throw new Error(
+            `manifest inconsistency: section '${section.key}' places '${component.protocol}@${component.protocolVersion}', which is not frozen into this release`,
+          );
+        }
+        units.push({
+          instrument: component.protocol,
+          sectionKey: section.key,
+          narrative: { protocol: component.protocol, version: component.protocolVersion },
+          displayIf: and(section.displayIf, component.displayIf),
+          item: {
+            responseType: "info",
+            key: `__narrative_${component.protocol.replace(/^np\./, "")}`,
+            revision: 1,
+            variable: `meta_narr_${component.protocol.replace(/^np\./, "").slice(0, 20)}`,
+            stem: { text: "" },
+            required: "optional",
+            allowDecline: false,
+            identifying: false,
+          },
+        });
+        continue;
+      }
       if (component.kind !== "instrument" && component.kind !== "module") continue;
       const ref = component.ref;
       const refKey = `${ref.instrument}@${ref.version}${ref.variant ? `+${ref.variant}` : ""}/${ref.language}/${ref.informant}/${ref.readingLevel}`;

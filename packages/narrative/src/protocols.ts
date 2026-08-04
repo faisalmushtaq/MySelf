@@ -1,3 +1,4 @@
+import { protocolConfig, protocolFromConfig, type ProtocolConfig } from "./config.js";
 import { narrativeProtocol, type NarrativeProtocol } from "./protocol.js";
 
 /**
@@ -225,113 +226,118 @@ export const futureSelf: NarrativeProtocol = narrativeProtocol.parse({
  * using only the participant's words, three persona-voiced retellings, the
  * participant choosing one, rating it, and correcting it if it is not right.
  *
- * The configuration is the original's TOML, typed: collector persona,
- * questions, language style, topic restriction, extraction keys, three
- * summariser personas, a one-shot example. A researcher changes the study by
- * changing this object, not by changing code.
+ * IT IS DEFINED AS A STUDY CONFIGURATION, not as a hand-written object, and
+ * that is the point. The original is one TOML file per study; this is the same
+ * file, typed and checked. A researcher runs a different study by copying
+ * `protocols/micro_narrative_full.toml`, changing the questions and the
+ * personas, and dropping it in — and because what ships is the same shape they
+ * are editing, there is no privileged version of this protocol that behaves in
+ * a way their file cannot.
  *
- * What is deliberately different is failure and safety, not method. Completion
- * is a field in the structured output rather than the word FINISHED, which a
- * participant could say and end their own interview. Every output is validated
- * against the schema it was asked for. A persona that fails to generate is
- * absent rather than replaced by an apology string in the data slot. And
- * typing-dynamics quality control is off by default: in a school, a child who
- * pastes from Notes is not a bot.
+ * What is deliberately different from the original is failure and safety, not
+ * method. Completion is a field in the structured output rather than the word
+ * FINISHED, which a participant could say and end their own interview. Every
+ * output is validated against the schema it was asked for. A persona that
+ * fails to generate is absent rather than replaced by an apology string in the
+ * data slot. And typing-dynamics quality control is off by default: in a
+ * school, a child who pastes from Notes is not a bot.
  */
-export const microNarrativeFull: NarrativeProtocol = narrativeProtocol.parse({
-  ...microNarrative,
-  key: "np.micro_narrative_full",
-  version: "1.0.0",
-  name: "Micro-narrative (full journey)",
-  researchQuestion:
-    "How does this young person describe their own experience, and which retelling of it do they recognise as theirs?",
-  estimatedMinutes: 12,
+export const microNarrativeFullConfig: ProtocolConfig = protocolConfig.parse({
+  model: "gpt-4o",
+  quality_control_flagging: false,
 
-  interview: {
+  consent: {
+    intro_and_consent: "Hi {first_name} — this last part is a short conversation.",
+  },
+
+  participant: { require_participant_id: true, editable_participant_id: false, text: "" },
+
+  collection: {
     persona:
-      "a friendly researcher talking to a young person aged 11 to 16, who is genuinely curious and never in a hurry",
+      "You're a friendly researcher talking to a young person aged 11 to 16. You are genuinely curious and never in a hurry.",
+    language_type:
+      "Use short sentences and everyday words — nothing a 12-year-old would have to look up. No jargon and no therapy language.",
+    intro:
+      "I will ask you a few questions about {topic}, one at a time. There are no right answers and nothing here is marked. Afterwards I will show you a few short write-ups of what you told me, and you can pick the one that fits best — or tell me what is wrong with it.",
     questions: [
       "Can you tell me about a time recently when {topic} came up for you?",
       "What was happening around then — where were you, and who else was there?",
       "How did that leave you feeling at the time?",
       "Has anything changed since, or does it still feel the same?",
     ],
-    languageStyle:
-      "Short sentences, everyday words, nothing a 12-year-old would have to look up. No jargon and no therapy language.",
-    topicRestriction: "{topic}, and how this young person has experienced it",
-    maxTurns: 12,
+    topic_restriction:
+      "Stay on the topic of {topic} and how this young person has experienced it. If they raise something else, acknowledge it briefly and return to the questions.",
   },
 
-  extraction: {
-    keys: {
+  summaries: {
+    questions: {
       what_happened: "What did the participant say actually happened?",
       who_was_there: "Who else did they mention being involved or present?",
       how_it_felt: "How did they say it made them feel?",
       what_changed: "What did they say has changed since, if anything?",
     },
+    personas: {
+      plain: "You write plainly and briefly, telling it in the order it happened.",
+      feeling: "You lead with how it felt, and keep the events light.",
+      their_words: "You keep the young person's own turns of phrase wherever you can.",
+    },
   },
 
-  scenario: {
-    personas: [
-      "a writer who tells it plainly and briefly, in the order it happened",
-      "a writer who leads with how it felt, and keeps the events light",
-      "a writer who keeps the young person's own turns of phrase wherever possible",
-    ],
-    adaptBelowRating: 10,
-    maxRating: 10,
+  example: {
+    conversation: [
+      "Question: Can you tell me about a time recently when this came up for you?",
+      'Answer: "There was a group chat and people were being off with one of my mates. I didn\'t say anything at the time."',
+      "",
+      "Question: How did that leave you feeling at the time?",
+      'Answer: "Bad, mostly at myself. I kept thinking I should have said something."',
+    ].join("\n"),
+    scenario:
+      "In a group chat, people were being off with one of their friends and they did not say anything at the time. Afterwards they felt bad, mostly at themselves, and kept thinking they should have said something.",
   },
 
-  // Off for school samples. A study running on a crowdsourced adult panel
-  // turns it on, and the thresholds are the original's.
-  qualityControl: { enabled: false, maxCharsPerSecond: 15, longMessageChars: 250, flagAboveShare: 0.3 },
+  myself: {
+    key: "np.micro_narrative_full",
+    version: "1.0.0",
+    name: "Micro-narrative (full journey)",
+    research_question:
+      "How does this young person describe their own experience, and which retelling of it do they recognise as theirs?",
+    owner: "faisalmushtaq",
+    approval_status: "draft",
+    language: "en-GB",
+    estimated_minutes: 12,
+    age_min: 10,
+    age_max: 19,
 
-  stages: [
-    {
-      key: "intro",
-      kind: "introduction",
-      text: "Hi {first_name} — this last part is a short conversation.",
-      lede:
-        "I will ask you a few questions about {topic}, one at a time. There are no right answers and nothing here is marked. Afterwards I will show you a few short write-ups of what you told me, and you can pick the one that fits best — or tell me what is wrong with it.",
-    },
-    {
-      key: "interview",
-      kind: "collect",
-      modelConfigKey: "mc.openai.gpt4o.t07",
-      minChars: 2,
-      maxChars: 2000,
-      maxTurns: 12,
-      fallbackText: "Thank you — that is really helpful.",
-    },
-    { key: "extract", kind: "extract", modelConfigKey: "mc.openai.gpt4o.t07", text: "" },
-    { key: "write", kind: "generate", modelConfigKey: "mc.openai.gpt4o.t07", text: "" },
-    {
-      key: "choose",
-      kind: "select",
-      text: "Here are a few short write-ups of what you told me. Which one fits best?",
-      lede: "None of them will be perfect. Pick the closest and you can fix it next.",
-    },
-    {
-      key: "rate",
-      kind: "rate",
-      text: "How well does that one describe what you told me?",
-      lede: "0 means it is not you at all. 10 means it is exactly right.",
-    },
-    {
-      key: "revise",
-      kind: "adapt",
-      modelConfigKey: "mc.openai.gpt4o.t07",
-      text: "What would you change about it?",
-      lede: "Tell me in your own words and I will rewrite it. What you write here is kept alongside it.",
-      optional: true,
-    },
-    {
-      key: "debrief",
-      kind: "debrief",
-      text: "Thank you, {first_name}. That is everything.",
-      lede:
-        "What you wrote is stored with the rest of your answers under your secret code. If you want it taken out later, that code is how we find it.",
-    },
-  ],
+    permitted_variables: ["first_name", "topic"],
+    permitted_identifiers: [],
+
+    provider: "openai",
+    temperature: 0.7,
+    max_output_tokens: 400,
+    retention_note: "zero-retention endpoint requested",
+    region: "eu",
+
+    max_turns: 12,
+    min_chars: 2,
+
+    select_text: "Here are a few short write-ups of what you told me. Which one fits best?",
+    select_lede: "None of them will be perfect. Pick the closest and you can fix it next.",
+    rate_text: "How well does that one describe what you told me?",
+    rate_lede: "0 means it is not you at all. 10 means it is exactly right.",
+    adapt_text: "What would you change about it?",
+    adapt_lede: "Tell me in your own words and I will rewrite it. What you write here is kept alongside it.",
+    debrief_text: "Thank you, {first_name}. That is everything.",
+    debrief_lede:
+      "What you wrote is stored with the rest of your answers under your secret code. If you want it taken out later, that code is how we find it.",
+    fallback_text: "Thank you — that is really helpful.",
+
+    offline_fallback: "continue_without_model",
+    safeguarding_declaration: microNarrative.safeguardingDeclaration,
+    consent_requirements: microNarrative.consentRequirements,
+    safeguarding: microNarrative.safeguarding,
+  },
 });
+
+export const microNarrativeFull: NarrativeProtocol = protocolFromConfig(microNarrativeFullConfig);
 
 export const protocols: NarrativeProtocol[] = [microNarrativeFull, microNarrative, futureSelf];
