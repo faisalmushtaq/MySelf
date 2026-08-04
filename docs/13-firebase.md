@@ -156,6 +156,11 @@ firebase deploy --only functions:llmRelay --project myself-research
 # prints: https://europe-west2-myself-research.cloudfunctions.net/llmRelay
 ```
 
+**Where the bundle goes.** Into `infra/firebase/functions/`, beside
+`firebase.json`, and gitignored. The CLI refuses a `source` outside the
+directory holding `firebase.json` — "is outside of project directory" — so a
+bundle written next to the TypeScript cannot be deployed however correct it is.
+
 **Why the functions are bundled before deploying.** Firebase uploads the
 functions directory and runs `npm install` inside Google's build environment,
 where our five `workspace:*` dependencies mean nothing — a deploy straight from
