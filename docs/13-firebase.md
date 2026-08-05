@@ -210,7 +210,32 @@ Every import is from a narrow subpath (`firebase-functions/logger`,
 provider including Realtime Database, which drags in `@firebase/database-compat`
 and fails on a missing `@firebase/app` — a package nothing here uses.
 
-### 5.2 Pointing the pages at it
+### 5.2 Two homes for the lab, and why (D-46)
+
+```bash
+cd infra/firebase
+firebase deploy --only hosting --project myself-research
+# https://myself-research.web.app
+```
+
+**GitHub Pages stays the public preview.** Mock-only, no sign-in, works on
+every device, costs nothing and sends nothing anywhere. That is the link for a
+colleague or an ethics committee.
+
+**Firebase Hosting is where signed-in, live calls happen** — and it exists
+because of one specific failure. Firebase sign-in completes by redirecting
+through `<project>.firebaseapp.com` and handing back. On GitHub Pages those are
+different origins, and iOS Safari partitions storage between them, so the
+handler cannot read the state it just wrote:
+
+> Unable to process request due to missing initial state. This may happen if
+> browser sessionStorage is inaccessible or accidentally cleared.
+
+There is no fix on the page for that; the state genuinely cannot cross those
+origins. Served from the project's own hosting there is one origin and nothing
+to partition, and sign-in works on an iPad as it does on a laptop.
+
+### 5.3 Pointing the pages at it
 
 Two build-time values, both public, neither secret:
 
