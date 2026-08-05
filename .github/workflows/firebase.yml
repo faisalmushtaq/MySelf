@@ -1,0 +1,83 @@
+name: Deploy to Firebase
+
+# Firebase Hosting and the functions do not redeploy themselves the way GitHub
+# Pages does, so without this the two halves of the platform drift: the public
+# preview would carry a change and the signed-in site would not, with nothing
+# on screen to say so except a build stamp somebody has to notice.
+#
+# Hosting goes on every push to main — it is static files, and a bad one is
+# undone by the next push. FUNCTIONS ONLY GO WHEN FUNCTION CODE CHANGED. A
+# backend redeploy has a cold-start cost and a window where the relay is
+# replaced, and doing that because somebody edited a document is not free.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      functions:
+        description: "Deploy the functions as well"
+        type: boolean
+        default: false
+
+concurrency:
+  group: firebase-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    # Without the key there is nothing to authenticate with, and a run that
+    # fails for that reason on every push is noise nobody reads.
+    if: github.repository == 'faisalmushtaq/MySelf'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm -r build
+
+      # The same suite that guards the Pages deploy. A backend that fails its
+      # tests should not reach a study.
+      - run: pnpm -r test
+
+      - name: Did anything the functions depend on change?
+        id: changed
+        run: |
+          if [ "${{ inputs.functions }}" = "true" ]; then
+            echo "functions=true" >> "$GITHUB_OUTPUT"
+          elif git diff --name-only HEAD^ HEAD | grep -qE '^(apps/functions/|packages/(llm|narrative|firebase|schema|store)/|releases/|infra/firebase/(firebase\.json|firestore\.rules|storage\.rules))'; then
+            echo "functions=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "functions=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Authenticate
+        run: |
+          printf '%s' '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}' > "$RUNNER_TEMP/sa.json"
+          echo "GOOGLE_APPLICATION_CREDENTIALS=$RUNNER_TEMP/sa.json" >> "$GITHUB_ENV"
+
+      - run: npm i -g firebase-tools@15
+
+      - name: Deploy hosting
+        working-directory: infra/firebase
+        run: firebase deploy --only hosting --project myself-research --non-interactive
+
+      - name: Deploy functions
+        if: steps.changed.outputs.functions == 'true'
+        working-directory: infra/firebase
+        run: firebase deploy --only functions --project myself-research --non-interactive
+
+      # The credential is a key to the whole project and has no business
+      # outliving the job that used it.
+      - name: Shred the credential
+        if: always()
+        run: rm -f "$RUNNER_TEMP/sa.json"

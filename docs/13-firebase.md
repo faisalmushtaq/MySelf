@@ -235,6 +235,39 @@ There is no fix on the page for that; the state genuinely cannot cross those
 origins. Served from the project's own hosting there is one origin and nothing
 to partition, and sign-in works on an iPad as it does on a laptop.
 
+### 5.2.1 Deploying itself (D-47)
+
+`.github/workflows/firebase.yml` deploys on every push to `main`, so the two
+halves of the platform cannot drift — a change reaching the public preview and
+not the signed-in site, with nothing on screen to say so but a build stamp
+somebody has to notice.
+
+**Hosting goes every time.** Static files; a bad one is undone by the next push.
+
+**Functions only go when function code changed** — `apps/functions`, the
+packages they bundle, the release manifests, or the rules. A backend redeploy
+has a cold start and a window where the relay is being replaced, and paying
+that because somebody edited a document is not free. `workflow_dispatch` with
+`functions: true` forces one.
+
+The whole test suite runs first, the same one that guards the Pages deploy: a
+backend that fails its tests should not reach a study.
+
+**One secret to add, once.** Firebase console → Project settings → Service
+accounts → Generate new private key, then GitHub → Settings → Secrets and
+variables → Actions → New repository secret:
+
+    Name:  FIREBASE_SERVICE_ACCOUNT
+    Value: the entire contents of the JSON file
+
+Delete the downloaded file afterwards. The workflow writes it to a temp file,
+uses it, and shreds it in an `always()` step so it does not outlive the job.
+
+If the functions step fails on permissions, the service account needs **Cloud
+Functions Admin**, **Service Account User**, **Cloud Run Admin** and
+**Artifact Registry Writer** — the Firebase Admin SDK account has enough for
+Hosting but not always for a functions deploy.
+
 ### 5.3 Pointing the pages at it
 
 Two build-time values, both public, neither secret:
