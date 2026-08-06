@@ -75,6 +75,20 @@ export interface Screen {
   rating?: { max: number };
   /** Set when quality signals stopped the run before anything was generated. */
   stopped?: { reason: string };
+  /**
+   * Where this screen sits among the ones a participant actually sees.
+   *
+   * Counted over participant-facing stages only: extraction and generation are
+   * model work behind the scenes, and a bar that paused on a step nobody was
+   * shown would be measuring the wrong thing.
+   *
+   * Deliberately not finer than a stage. The interview is the long part and it
+   * would be the useful thing to divide up, but the model decides how many
+   * turns each question takes and may cover two at once, so "question 3 of 5"
+   * would be a guess presented as a fact. A coarse number that is true beats a
+   * precise one that is not.
+   */
+  progress?: { step: number; of: number };
   finished: boolean;
 }
 
@@ -902,10 +916,29 @@ export class NarrativeRunner {
     return raw;
   }
 
+  /**
+   * The stages a participant is ever shown.
+   *
+   * `extract` and `generate` run and hand straight on to the next stage
+   * without a screen, so they are not steps as far as anyone on the other side
+   * of the glass is concerned.
+   */
+  private get shownStages(): NarrativeStage[] {
+    return this.protocol.stages.filter((s) => s.kind !== "extract" && s.kind !== "generate");
+  }
+
+  private progressFor(stage: NarrativeStage): Screen["progress"] {
+    const shown = this.shownStages;
+    const step = shown.findIndex((s) => s.key === stage.key) + 1;
+    // A stage that is not in the list at all should not invent a position.
+    return step > 0 ? { step, of: shown.length } : undefined;
+  }
+
   private screenFor(stage: NarrativeStage, text: string): Screen {
     const lede = stage.lede
       ? resolveText(stage.lede, this.context.variables, this.permittedForDisplay()).text
       : undefined;
+    const progress = this.progressFor(stage);
     return {
       stageKey: stage.key,
       kind: stage.kind,
@@ -914,11 +947,13 @@ export class NarrativeRunner {
       expectsInput: stage.kind === "elicit" || stage.kind === "confirm" || stage.kind === "rate",
       maxTurns: stage.maxTurns,
       optional: stage.optional,
+      ...(progress ? { progress } : {}),
       finished: false,
     };
   }
 
   private finishedScreen(): Screen {
+    const of = this.shownStages.length;
     return {
       stageKey: "__end__",
       kind: "debrief",
@@ -926,6 +961,9 @@ export class NarrativeRunner {
       expectsInput: false,
       maxTurns: 0,
       optional: false,
+      // Full, not one short of it. Ending on "step 5 of 6" reads as something
+      // having gone wrong.
+      ...(of > 0 ? { progress: { step: of, of } } : {}),
       finished: true,
     };
   }

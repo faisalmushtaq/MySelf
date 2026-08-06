@@ -180,6 +180,40 @@ describe("running a protocol", () => {
   });
 });
 
+describe("telling the participant how far along they are", () => {
+  it("counts only the stages somebody is actually shown", () => {
+    const runner = new NarrativeRunner(mocked(microNarrativeFull), context(), gatewayWith(new MockAdapter()));
+    const screen = runner.start();
+    const shown = microNarrativeFull.stages.filter((s) => s.kind !== "extract" && s.kind !== "generate");
+    expect(screen.progress).toEqual({ step: 1, of: shown.length });
+    // The protocol does have hidden stages, or this test proves nothing.
+    expect(shown.length).toBeLessThan(microNarrativeFull.stages.length);
+  });
+
+  it("never goes backwards, and arrives at the end full", async () => {
+    const runner = new NarrativeRunner(mocked(futureSelf), context(), gatewayWith(new MockAdapter()));
+    const seen: number[] = [];
+    const note = (s: { progress?: { step: number; of: number } }) => {
+      if (s.progress) seen.push(s.progress.step);
+    };
+
+    note(runner.start());
+    // Drive it to the end, answering whatever it asks for.
+    let screen = await runner.submit("I hope I am still playing football and doing something I enjoy.");
+    note(screen);
+    for (let guard = 0; guard < 20 && !screen.finished; guard++) {
+      screen = screen.expectsInput ? await runner.submit("That sounds about right to me.") : await runner.next();
+      note(screen);
+    }
+
+    expect(screen.finished).toBe(true);
+    expect(seen.length).toBeGreaterThan(2);
+    for (let i = 1; i < seen.length; i++) expect(seen[i]!).toBeGreaterThanOrEqual(seen[i - 1]!);
+    // Ending one short of the total reads as something having gone wrong.
+    expect(screen.progress).toEqual({ step: screen.progress!.of, of: screen.progress!.of });
+  });
+});
+
 describe("when the model misbehaves", () => {
   it("keeps the words and records the fallback when the call times out", async () => {
     const runner = new NarrativeRunner(mocked(), context(), gatewayWith(new MockAdapter({ fail: { kind: "timeout" } })));

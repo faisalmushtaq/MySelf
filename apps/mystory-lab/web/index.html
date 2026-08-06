@@ -137,6 +137,21 @@
       .hint-right { text-align: right; color: var(--muted); font-size: .78rem; margin: .25rem 0 0; }
       .warn-text { color: var(--warn); }
 
+      /* ── How far along ───────────────────────────────────────────────────
+         A conversation has no scrollbar to judge by and no page count, so
+         without this there is no way to tell a two-minute module from a
+         twenty-minute one from inside it. That matters most at the start,
+         where somebody deciding whether they have time is deciding blind.
+
+         Counted in stages, which is coarse, because it is the finest thing
+         that is actually true — see Screen.progress. */
+      .progress { margin: 0 0 .9rem; }
+      .progress-track { height: 5px; border-radius: 999px; background: var(--hairline); overflow: hidden; }
+      .progress-fill { height: 100%; border-radius: 999px; background: var(--accent);
+                       transition: width .5s cubic-bezier(.4, 0, .2, 1); }
+      .progress-label { margin: .35rem 0 0; font-size: .76rem; color: var(--muted); letter-spacing: .01em; }
+      @media (prefers-reduced-motion: reduce) { .progress-fill { transition: none; } }
+
       /* ── Participant view ────────────────────────────────────────────────
          The conversation on its own, at the size a young person actually
          reads it, with the study's instrumentation out of the way. The lab
@@ -157,11 +172,28 @@
       body.participant-view .scenario-edit { font-size: 1.05rem; }
       body.participant-view .card-choice { font-size: 1.05rem; line-height: 1.6; padding: 1rem 1.1rem; }
       body.participant-view button { min-height: 46px; font-size: 1rem; }
+      /* Sticky, because in this view the whole page scrolls and a conversation
+         gets long. A progress bar that has scrolled off the top is answering
+         the question at the only moment nobody is asking it.
+
+         Sticky goes on the wrapper, not the bar: the bar's own parent is
+         exactly as tall as the bar, and an element cannot stick inside a box
+         it fills. */
+      body.participant-view #progress { position: sticky; top: 0; z-index: 5;
+                                        padding: .75rem 0 .55rem; background: var(--canvas);
+                                        border-bottom: 1px solid var(--hairline); }
+      body.participant-view .progress { margin-bottom: .5rem; }
+      body.participant-view .progress-track { height: 6px; }
+      /* The toggle is fixed to the bottom corner, so without this it sits on
+         top of the last thing said. */
+      body.participant-view .wrap { padding-bottom: 5.5rem; }
+      /* Fixed, so it floats over whatever is beneath it — which on a short
+         page is the view toggle, and a caption that swallows a button's
+         clicks is a caption in the wrong place. It is something to read, not
+         something to press. */
       .build-stamp { position: fixed; left: 1rem; bottom: 1rem; margin: 0; font-size: .72rem;
-                     color: var(--muted); opacity: .65; }
+                     color: var(--muted); opacity: .65; pointer-events: none; }
       body.participant-view .view-toggle { position: fixed; right: 1rem; bottom: 1rem; opacity: .5; }
-      .build-stamp { position: fixed; left: 1rem; bottom: 1rem; margin: 0; font-size: .72rem;
-                     color: var(--muted); opacity: .65; }
       body.participant-view .view-toggle:hover { opacity: 1; }
 
       @media (max-width: 900px) { .wrap { grid-template-columns: 1fr; } }
@@ -208,6 +240,7 @@
 
         <div class="panel">
           <h2>What the participant sees</h2>
+          <div id="progress"></div>
           <div class="thread" id="thread">
             <p class="note">Start a run to see the conversation.</p>
           </div>
