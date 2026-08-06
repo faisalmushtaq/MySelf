@@ -60,9 +60,50 @@ jobs:
             echo "functions=false" >> "$GITHUB_OUTPUT"
           fi
 
+      # The credential arrives through the environment rather than being
+      # substituted into the script text. A JSON blob pasted inside quotes in a
+      # shell line only has to contain one apostrophe to break out of them, and
+      # a key is not a thing to be casual about.
+      #
+      # Checked before use, because the Firebase CLI's own answer to a missing
+      # credential is "have you run firebase login?" — which is true of a laptop
+      # and meaningless on a runner, and sends whoever reads it looking for the
+      # wrong thing entirely.
       - name: Authenticate
+        env:
+          SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
         run: |
-          printf '%s' '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}' > "$RUNNER_TEMP/sa.json"
+          if [ -z "$SERVICE_ACCOUNT" ]; then
+            echo "::error::No FIREBASE_SERVICE_ACCOUNT secret. Firebase console -> Project settings -> Service accounts -> Generate new private key, then paste the whole JSON file into this repository under Settings -> Secrets and variables -> Actions, named FIREBASE_SERVICE_ACCOUNT. Delete the downloaded file afterwards. See docs/13-firebase.md section 5.2.1."
+            exit 1
+          fi
+
+          printf '%s' "$SERVICE_ACCOUNT" > "$RUNNER_TEMP/sa.json"
+
+          # Says which account is being used and for which project. Pasting the
+          # key for the wrong project, or pasting something that is not a
+          # service account key at all, otherwise surfaces much later as a
+          # permission error against a project nobody meant to touch.
+          node -e '
+            const fs = require("node:fs");
+            let key;
+            try {
+              key = JSON.parse(fs.readFileSync(process.env.RUNNER_TEMP + "/sa.json", "utf8"));
+            } catch {
+              console.log("::error::The FIREBASE_SERVICE_ACCOUNT secret is not valid JSON. It should be the entire contents of the downloaded key file, opening brace to closing brace.");
+              process.exit(1);
+            }
+            if (key.type !== "service_account" || !key.client_email) {
+              console.log("::error::The FIREBASE_SERVICE_ACCOUNT secret is JSON, but not a service account key. Generate one under Firebase console -> Project settings -> Service accounts.");
+              process.exit(1);
+            }
+            if (key.project_id !== "myself-research") {
+              console.log(`::error::That key is for ${key.project_id}, and this workflow deploys myself-research. Generate the key from the myself-research project.`);
+              process.exit(1);
+            }
+            console.log(`Deploying to ${key.project_id} as ${key.client_email}`);
+          '
+
           echo "GOOGLE_APPLICATION_CREDENTIALS=$RUNNER_TEMP/sa.json" >> "$GITHUB_ENV"
 
       - run: npm i -g firebase-tools@15

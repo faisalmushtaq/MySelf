@@ -263,6 +263,15 @@ variables → Actions → New repository secret:
 Delete the downloaded file afterwards. The workflow writes it to a temp file,
 uses it, and shreds it in an `always()` step so it does not outlive the job.
 
+The secret is checked before it is used, because the Firebase CLI's own answer
+to a missing credential is `Failed to authenticate, have you run firebase
+login?` — true of a laptop, meaningless on a runner, and it sends whoever reads
+it looking for the wrong thing. The workflow says instead which of the ways to
+get it wrong has happened: not set, not valid JSON, valid JSON but the web app
+config rather than a key, or a key for `myself-identity` instead of
+`myself-research`. On success it prints the project and the service account
+address it is deploying as, which is also the address to grant roles to below.
+
 If the functions step fails on permissions, the service account needs **Cloud
 Functions Admin**, **Service Account User**, **Cloud Run Admin** and
 **Artifact Registry Writer** — the Firebase Admin SDK account has enough for
