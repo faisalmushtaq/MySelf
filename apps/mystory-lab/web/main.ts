@@ -249,13 +249,34 @@ function render(frame: Frame): void {
   $("thread").innerHTML = threadFrom(frame.records) || `<p class="note">Start a run to see the conversation.</p>`;
   scrollThread();
 
+  // How far along. Announced politely rather than assertively: a screen reader
+  // being interrupted to say "step 4 of 6" in the middle of reading the
+  // question is worse than not being told.
+  $("progress").innerHTML = s.progress
+    ? `<div class="progress">
+         <div class="progress-track" role="progressbar" aria-valuenow="${s.progress.step}"
+              aria-valuemin="1" aria-valuemax="${s.progress.of}"
+              aria-label="How far through this part you are">
+           <div class="progress-fill" style="width: ${Math.round((s.progress.step / s.progress.of) * 100)}%"></div>
+         </div>
+         <p class="progress-label" aria-live="polite">${
+           s.finished ? "Finished" : `Step ${s.progress.step} of ${s.progress.of}`
+         }</p>
+       </div>`
+    : "";
+
   /* ── The stage area: what this screen asks the participant to DO ──────── */
 
   const choices = (s.choices ?? [])
     .map(
+      // The persona name is a researcher's key for a prompt — `their_words`,
+      // `feeling` — and is shown only in the lab. A participant choosing
+      // between three retellings should be choosing on what they say; a card
+      // labelled "their words" is advertising itself as the honest one, and
+      // the choice is data we would then have spoiled.
       (c, i) => `<label class="card-choice${i === 0 ? " picked" : ""}">
           <input type="radio" name="choice" value="${c.index}"${i === 0 ? " checked" : ""} />
-          <span class="who">${escapeHtml(c.persona)}</span>
+          <span class="who lab-only">${escapeHtml(c.persona)}</span>
           ${escapeHtml(c.text)}
         </label>`,
     )
