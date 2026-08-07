@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { modelConfig } from "@myself/llm";
 import { protocols } from "@myself/narrative";
 import { releasesByHash } from "./releases.js";
-import { ALLOWED_ORIGIN, configFor, mayCall, relayRequest, type Caller } from "./relay-policy.js";
+import { ALLOWED_ORIGIN, allowedOrigins, configFor, mayCall, relayRequest, type Caller } from "./relay-policy.js";
 
 /**
  * The relay's job is to be the only thing holding a key, and the only thing
@@ -88,6 +88,41 @@ describe("which pages may call it", () => {
     expect(ALLOWED_ORIGIN.test("https://faisalmushtaq.github.io.evil.example")).toBe(false);
     expect(ALLOWED_ORIGIN.test("https://evil.example")).toBe(false);
     expect(ALLOWED_ORIGIN.test("http://faisalmushtaq.github.io")).toBe(false);
+  });
+
+  /**
+   * The signed-in site is served from Firebase Hosting, and leaving those two
+   * origins off the list is invisible from here: no match means no CORS
+   * headers, so the browser refuses the request and the relay never sees it.
+   * It reads on the page as the model being unreachable, which is what it did.
+   */
+  it("allows this project's Hosting, which is where signing in works", () => {
+    const allowed = allowedOrigins("myself-research");
+    expect(allowed.test("https://myself-research.web.app")).toBe(true);
+    expect(allowed.test("https://myself-research.firebaseapp.com")).toBe(true);
+    // Preview channels, so a staging page can be staged against something.
+    expect(allowed.test("https://myself-research--pr-12-a1b2c3.web.app")).toBe(true);
+  });
+
+  it("does not let every Firebase project on the internet spend the budget", () => {
+    const allowed = allowedOrigins("myself-research");
+    expect(allowed.test("https://someone-else.web.app")).toBe(false);
+    expect(allowed.test("https://myself-research.web.app.evil.example")).toBe(false);
+    expect(allowed.test("https://evil-myself-research.web.app")).toBe(false);
+    // The identity project is a different project and has no business here.
+    expect(allowed.test("https://myself-identity.web.app")).toBe(false);
+  });
+
+  it("builds the list from whichever project it is deployed to", () => {
+    const other = allowedOrigins("some-other-study");
+    expect(other.test("https://some-other-study.web.app")).toBe(true);
+    expect(other.test("https://myself-research.web.app")).toBe(false);
+  });
+
+  it("takes extra origins literally, so a dot is not a wildcard", () => {
+    const allowed = allowedOrigins("myself-research", ["https://study.example.ac.uk"]);
+    expect(allowed.test("https://study.example.ac.uk")).toBe(true);
+    expect(allowed.test("https://studyXexample.ac.uk")).toBe(false);
   });
 });
 

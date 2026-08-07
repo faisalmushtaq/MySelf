@@ -121,8 +121,47 @@ export function configFor(key: string, caller: Caller): ModelConfig {
  *
  * A list somebody wrote down, rather than the permissive default: the relay
  * spends money, and an open one is a bill with an API in front of it.
+ *
+ * The list is built from the project rather than typed out, because the two
+ * Hosting origins Firebase gives a project are a function of its name, and the
+ * failure when one is missing is silent from the relay's side: no matching
+ * origin means no CORS headers, which means the browser refuses the request
+ * before it is ever sent. The relay logs nothing, because nothing arrived. On
+ * the page it looks exactly like the model being unreachable — which is how
+ * the Hosting site could sign somebody in perfectly and then fail every call.
+ *
+ * Preview channels are included: they are `<project>--<channel>.web.app`, they
+ * are this project's, and a staging page that cannot call the relay cannot
+ * stage anything worth looking at.
  */
-export const ALLOWED_ORIGIN = /^https:\/\/[a-z0-9-]+\.github\.io$|^http:\/\/localhost:\d+$/;
+export function allowedOrigins(project: string, extra: readonly string[] = []): RegExp {
+  const quoted = project.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(
+    [
+      // This project's Hosting, live and preview channels.
+      `^https://${quoted}\\.web\\.app$`,
+      `^https://${quoted}\\.firebaseapp\\.com$`,
+      `^https://${quoted}--[a-z0-9-]+\\.web\\.app$`,
+      // The public preview on GitHub Pages. Narrowed to the study's own site:
+      // the previous form admitted every github.io page on the internet, and
+      // while a caller still needs a role to spend anything, an allowlist that
+      // admits everybody is not one.
+      `^https://faisalmushtaq\\.github\\.io$`,
+      // A researcher running the page locally while writing prompts.
+      `^http://localhost:\\d+$`,
+      ...extra.map((o) => `^${o.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`),
+    ].join("|"),
+  );
+}
+
+/**
+ * GCLOUD_PROJECT is set by the runtime; the fallback is for tests and for a
+ * local run, where nothing is being spent either way.
+ */
+export const ALLOWED_ORIGIN = allowedOrigins(
+  process.env["GCLOUD_PROJECT"] ?? "myself-research",
+  (process.env["MYSELF_EXTRA_ORIGINS"] ?? "").split(",").filter(Boolean),
+);
 
 /** A spending ceiling per caller per day — a blast radius, not a boundary. */
 export const CALLS_PER_CALLER_PER_DAY = Number(process.env["MYSELF_RELAY_DAILY_LIMIT"] ?? 600);
