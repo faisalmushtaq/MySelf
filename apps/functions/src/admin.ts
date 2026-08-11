@@ -1,8 +1,10 @@
+import { createHash, randomBytes } from "node:crypto";
 import { HttpsError, onCall, type CallableRequest } from "firebase-functions/v2/https";
 import * as logger from "firebase-functions/logger";
 import { FieldValue } from "firebase-admin/firestore";
 import { paths } from "@myself/firebase";
 import { STUDY, auth, research } from "./apps.js";
+import { LINK_CALL_CAP, LINK_DAYS } from "./relay-policy.js";
 
 /**
  * Administration: who may use the platform, and which iPads may post to it.
@@ -136,5 +138,83 @@ export const listPeople = onCall(async (request) => {
         role: ((u.customClaims as { role?: string } | undefined)?.role ?? null) as Role | null,
         lastSignIn: u.metadata.lastSignInTime ?? null,
       })),
+  };
+});
+
+/**
+ * Mint a tester link.
+ *
+ * Somebody trying the module out is not a member of the study. Making them
+ * create an account to answer five questions about their phone loses most of
+ * them before the first screen, and the ones it does not lose are no longer a
+ * fair test of what a participant would do. So the link carries the access.
+ *
+ * The key is generated here, hashed, and only the hash is stored — the same
+ * discipline as device tokens. It is shown to the caller once, because after
+ * this nothing can recover it, which is the property that makes the stored
+ * copy worth nothing to anyone who reads the database.
+ *
+ * It is bounded on three axes rather than trusted, because a URL gets
+ * forwarded: it expires, it can buy a fixed number of model calls and no more,
+ * and `revokeTesterLink` switches it off at once. A leaked link costs a known,
+ * small, already-budgeted amount. It cannot read anybody's answers, administer
+ * anything, or choose a model — the relay gives it only what a published
+ * release froze.
+ */
+export const createTesterLink = onCall(async (request) => {
+  const actor = requireOwner(request);
+  const { label, days, callCap } = (request.data ?? {}) as { label?: string; days?: number; callCap?: number };
+  if (!label || label.trim().length === 0) {
+    throw new HttpsError("invalid-argument", "give the link a label you will recognise when revoking it");
+  }
+
+  const key = randomBytes(24).toString("base64url");
+  const hash = createHash("sha256").update(key).digest("hex");
+  const livesFor = Math.min(Math.max(days ?? LINK_DAYS, 1), 90);
+  const cap = Math.min(Math.max(callCap ?? LINK_CALL_CAP, 1), 5000);
+
+  await research()
+    .doc(`${paths.audit(STUDY)}_testerLinks/${hash}`)
+    .set({
+      label: label.trim(),
+      createdBy: actor,
+      createdAt: FieldValue.serverTimestamp(),
+      expiresAt: Date.now() + livesFor * 24 * 60 * 60 * 1000,
+      callCap: cap,
+      callsUsed: 0,
+      revokedAt: null,
+    });
+  await audit(actor, "testerLink.created", hash.slice(0, 12), { label, days: livesFor, callCap: cap });
+
+  logger.info("tester link created", { label, days: livesFor, callCap: cap });
+  return { key, expiresInDays: livesFor, callCap: cap };
+});
+
+/** Switch a tester link off. The hash is its name; the key is never needed. */
+export const revokeTesterLink = onCall(async (request) => {
+  const actor = requireOwner(request);
+  const { hash } = (request.data ?? {}) as { hash?: string };
+  if (!hash) throw new HttpsError("invalid-argument", "which link? Pass the hash listed against it");
+  await research().doc(`${paths.audit(STUDY)}_testerLinks/${hash}`).update({ revokedAt: FieldValue.serverTimestamp() });
+  await audit(actor, "testerLink.revoked", hash.slice(0, 12), null);
+  return { hash, revoked: true };
+});
+
+/** Every tester link and what is left of it. Never the keys — they are gone. */
+export const listTesterLinks = onCall(async (request) => {
+  requireOwner(request);
+  const snap = await research().collection(`${paths.audit(STUDY)}_testerLinks`).get();
+  return {
+    links: snap.docs.map((d) => {
+      const l = d.data() as { label?: string; expiresAt?: number; callCap?: number; callsUsed?: number; revokedAt?: unknown };
+      return {
+        hash: d.id,
+        label: l.label ?? null,
+        expiresAt: l.expiresAt ?? null,
+        callCap: l.callCap ?? null,
+        callsUsed: l.callsUsed ?? 0,
+        revoked: l.revokedAt !== null && l.revokedAt !== undefined,
+      };
+    }),
   };
 });

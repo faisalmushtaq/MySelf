@@ -165,3 +165,41 @@ export const ALLOWED_ORIGIN = allowedOrigins(
 
 /** A spending ceiling per caller per day — a blast radius, not a boundary. */
 export const CALLS_PER_CALLER_PER_DAY = Number(process.env["MYSELF_RELAY_DAILY_LIMIT"] ?? 600);
+
+/**
+ * A tester link: access carried by the URL, with no account behind it.
+ *
+ * Somebody trying the module out is not a member of the study, and making them
+ * create an account to answer five questions about their phone loses most of
+ * them before the first screen. So the link itself is the credential.
+ *
+ * That is a real key in a URL, and URLs get forwarded, pasted into chats and
+ * kept in browser history — so it is bounded on three axes rather than
+ * trusted. It expires, it has a hard cap on how many model calls it can ever
+ * buy, and it can be switched off at once. A leaked link costs the study a
+ * known, small, already-budgeted amount and nothing else: it cannot read
+ * anybody's answers, cannot administer anything, and cannot choose a model.
+ *
+ * Only the SHA-256 of the key is stored, the same discipline as device
+ * tokens — a dump of the database does not hand anybody a working link.
+ */
+export interface LinkRecord {
+  revokedAt: unknown | null;
+  /** Epoch milliseconds. */
+  expiresAt: number;
+  callCap: number;
+  callsUsed: number;
+}
+
+/** Why this link may not be used, or null if it may. Said, not just refused. */
+export function linkRefusal(link: LinkRecord | null, now: number): string | null {
+  if (!link) return "that link is not one this study issued";
+  if (link.revokedAt) return "that link has been switched off";
+  if (now > link.expiresAt) return "that link has expired";
+  if (link.callsUsed >= link.callCap) return "that link has been used as many times as it was allowed";
+  return null;
+}
+
+/** How long a tester link lives, and how much it may ever spend. */
+export const LINK_DAYS = Number(process.env["MYSELF_LINK_DAYS"] ?? 14);
+export const LINK_CALL_CAP = Number(process.env["MYSELF_LINK_CALL_CAP"] ?? 400);

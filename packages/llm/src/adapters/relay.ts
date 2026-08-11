@@ -18,8 +18,17 @@ import { ModelError, type ModelAdapter, type ModelConfig, type ResolvedPrompt } 
 export interface RelayOptions {
   /** Where the function lives. */
   url: string;
-  /** Bearer token identifying this enrolled device. */
+  /** Bearer token identifying this enrolled device or signed-in person. */
   token?: string | undefined;
+  /**
+   * A tester link key, used instead of a token.
+   *
+   * Sent as `Authorization: Link <key>` so the relay can tell the two apart
+   * without guessing at the shape of the string. Somebody testing the module
+   * has no account and should not need one; the link is the credential, and
+   * the relay bounds what it can cost.
+   */
+  linkKey?: string | undefined;
   /**
    * The provider this relay stands in for. Defaults to OpenAI.
    *
@@ -72,7 +81,14 @@ export class RelayAdapter implements ModelAdapter {
         method: "POST",
         headers: {
           "content-type": "application/json",
-          ...(this.options.token ? { authorization: `Bearer ${this.options.token}` } : {}),
+          // A link key wins when both are present: a page opened from a tester
+          // link is acting as that link, not as whoever happens to be signed
+          // in to Google in the same browser.
+          ...(this.options.linkKey
+            ? { authorization: `Link ${this.options.linkKey}` }
+            : this.options.token
+              ? { authorization: `Bearer ${this.options.token}` }
+              : {}),
         },
         body: JSON.stringify({
           prompt: { system: prompt.system, messages: prompt.messages },
