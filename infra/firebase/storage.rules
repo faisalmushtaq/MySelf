@@ -44,6 +44,11 @@ service firebase.storage {
       allow read, write: if false;
     }
 
+    // The bucket exists as of this commit — Storage was switched on for the
+    // project, which is why these rules can finally be deployed at all. Until
+    // then every recording was transcribed and then dropped, because there was
+    // nowhere to put it.
+
     match /{allPaths=**} {
       allow read, write: if false;
     }
