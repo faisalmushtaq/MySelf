@@ -486,16 +486,17 @@ describe("the full CHI 2025 journey", () => {
     expect(runner.outcome.interviewDone).toBe(true);
   });
 
-  it("does not show a question it is about to end the conversation on", async () => {
+  it("never shows the closing turn, as the original never shows FINISHED", async () => {
     /**
-     * The model may set `interviewDone` in the same turn as another question,
-     * and in a live run it did: the question went up on screen and the
-     * retellings landed underneath it a second later, so the participant had
-     * been asked something and then talked over.
+     * The original ends the interview on the single word FINISHED and never
+     * shows it; the next thing a participant reads is the app's own handover.
+     * Ours ends on a boolean, and whatever the model writes on that turn is
+     * discarded the same way.
      *
-     * The completion is honoured — the researcher's list is covered — but the
-     * dangling question must reach neither the screen nor the transcript that
-     * extraction reads.
+     * Two live failures came from not doing this: a warm goodbye immediately
+     * before three retellings arrived, and a question nobody was allowed to
+     * answer. Both were a model having the last word on a turn whose only job
+     * is to stop.
      */
     class DoneWithAQuestion extends MockAdapter {
       override async generate(
@@ -511,7 +512,7 @@ describe("the full CHI 2025 journey", () => {
         return {
           ...result,
           text: JSON.stringify({
-            reply: answered ? "Is there anything you would not miss at all?" : "What do you use your phone for?",
+            reply: answered ? "Thanks for sharing all this with me. Take care!" : "What do you use your phone for?",
             interviewDone: answered,
             questionsCovered: [1],
           }),
@@ -528,11 +529,11 @@ describe("the full CHI 2025 journey", () => {
     expect(runner.outcome.interviewDone).toBe(true);
     expect(screen.kind).not.toBe("collect");
     const shown = runner.all.filter((r) => r.kind === "model_shown").map((r) => r.text ?? "");
-    expect(shown).not.toContain("Is there anything you would not miss at all?");
+    expect(shown).not.toContain("Thanks for sharing all this with me. Take care!");
     // Recorded, so the run can be read back — just not shown and not asked.
     expect(
       runner.all.some(
-        (r) => (r.data as { replyWithheld?: string } | null)?.replyWithheld === "question_asked_after_completion",
+        (r) => (r.data as { replyWithheld?: string } | null)?.replyWithheld === "interview_complete",
       ),
     ).toBe(true);
   });

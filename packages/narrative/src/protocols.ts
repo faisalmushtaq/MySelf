@@ -277,9 +277,31 @@ export const microNarrativeFullConfig: ProtocolConfig = protocolConfig.parse({
       what_changed: "What did they say has changed since, if anything?",
     },
     personas: {
-      plain: "You write plainly and briefly, telling it in the order it happened.",
-      feeling: "You lead with how it felt, and keep the events light.",
-      their_words: "You keep the young person's own turns of phrase wherever you can.",
+      // The same three the published studies settled on, in their shape:
+      // identity, then the task in this study's terms, then a tone. See the
+      // note on the phone protocol's personas below for why they are these
+      // three and why the versions are meant to read alike.
+      friend: [
+        "You're a 23-year-old friend of this young person.",
+        "",
+        "Create a short narrative that captures the experience they described.",
+        "",
+        "Keep the tone warm, everyday and conversational.",
+      ].join("\n"),
+      sibling: [
+        "You're a 14-year-old.",
+        "",
+        "Create a narrative using natural language that sounds like a teenager describing their own experience.",
+        "",
+        "Keep the tone casual and authentic.",
+      ].join("\n"),
+      psychologist: [
+        "You're an expert developmental psychologist.",
+        "",
+        "Write a balanced, thoughtful account of the experience this young person described.",
+        "",
+        "Use professional but accessible language.",
+      ].join("\n"),
     },
   },
 
@@ -341,9 +363,9 @@ export const microNarrativeFullConfig: ProtocolConfig = protocolConfig.parse({
     max_turns: 12,
     min_chars: 2,
 
-    select_text: "Here are three short stories about what you told me. Which one fits best?",
+    select_text: "Seems I have everything! Let me try to summarise what you said in three scenarios. See if you like any of these!",
     select_lede: "None of them will be perfect. Pick the closest and you can fix it next.",
-    rate_text: "How well does that one describe what you told me?",
+    rate_text: "How close is this to what I want to say?",
     rate_lede: "0 means it is not you at all. 10 means it is exactly right.",
     adapt_text: "What would you change about it?",
     adapt_lede: "Tell me in your own words and I will rewrite it. What you write here is kept alongside it.",
@@ -454,38 +476,56 @@ export const phoneWellbeingConfig: ProtocolConfig = protocolConfig.parse({
      * codebase without one overruling the other.
      */
     /**
-     * Three retellings a participant can actually tell apart.
+     * The three voices, as the published studies landed on them.
      *
-     * The first versions of these were one-line nudges about tone — "plainly
-     * and briefly", "lead with how it felt" — and they produced three
-     * paragraphs that differed by a few words. That is not a choice; it is a
-     * coin flip wearing three coats, and which one somebody picks is the
-     * measurement this whole component exists to take.
+     * WHAT THE PAPERS ACTUALLY SAY. The CHI paper is explicit that the three
+     * versions "should differ only in the tone of the 'connective text' that
+     * the LLM inserts when connecting the user's answers into a coherent
+     * story" — the participant's own fragments appear in all three, and what
+     * varies is the tissue between them. So three retellings that read alike
+     * apart from wording are the method working, not a fault in it. An earlier
+     * version of this file tried to "fix" that by having each persona select
+     * different material — one omitting feelings entirely, one made mostly of
+     * them — which would have changed what the participant was choosing
+     * between and broken the measurement.
      *
-     * The fix is to make them differ in WHAT THEY INCLUDE rather than how they
-     * sound. One names no feelings at all. One is almost entirely feelings.
-     * One is their own phrasing kept as they said it. Given the same four
-     * facts those cannot converge, because they are not selecting the same
-     * material.
+     * WHICH THREE. Pilot #1 ran sibling-25, sibling-14, psychologist and goth.
+     * The goth was called "gimmicky" and "turned the situation into a joke";
+     * sibling-25 read as "superficial" and "stereotypical". Both went. The set
+     * carried into the comparative study, and named in the social-media harms
+     * paper, is FRIEND, YOUNGER SIBLING and CLINICAL PSYCHOLOGIST.
      *
-     * All three stay in the first person, which costs the axis the CHI
-     * protocol used — its personas were different NARRATORS, and a narrator is
-     * the strongest way to make retellings diverge. That trade is deliberate:
-     * "is this you?" is a question a young person answers about "I", and reads
-     * as a case note about "they".
+     * THE SHAPE IS THEIRS TOO: an identity, then the task in this study's
+     * terms, then a tone. Straight out of their config files.
+     *
+     * The retelling stays in the first person. That is not a departure — their
+     * own one-shot example is written as "I think discussions about
+     * over-diagnosis are complicated…", and the persona sets the register the
+     * story is written in rather than who is speaking. An earlier comment here
+     * claimed the CHI protocol retells in the third person. It does not.
      */
     personas: {
-      plain:
-        "You write it as short and matter-of-fact as you can, in the first person as 'I': what happens, in the " +
-        "order they said it, in three or four sentences. You never name a feeling and never say what anything " +
-        "meant to you.",
-      feeling:
-        "You write mostly about how it leaves you feeling, in the first person as 'I'. Feelings come first and " +
-        "get the most words; you mention what actually happened only where it is needed to explain one of them.",
-      their_words:
-        "You build it out of the young person's own phrases, in the first person as 'I', kept exactly as they " +
-        "said them even where they are rough or unfinished. You add as few words of your own as it takes to join " +
-        "them up, and you never smooth their wording into better English.",
+      friend: [
+        "You're a 23-year-old friend of this young person.",
+        "",
+        "Create a short narrative that captures what they said about their phone and how it fits into their life.",
+        "",
+        "Keep the tone warm, everyday and conversational.",
+      ].join("\n"),
+      sibling: [
+        "You're a 14-year-old.",
+        "",
+        "Create a narrative using natural language that sounds like a teenager describing their own experience.",
+        "",
+        "Keep the tone casual and authentic.",
+      ].join("\n"),
+      psychologist: [
+        "You're an expert developmental psychologist.",
+        "",
+        "Write a balanced, thoughtful account of what this young person described about their phone and how it affects the way they feel.",
+        "",
+        "Use professional but accessible language.",
+      ].join("\n"),
     },
   },
 
@@ -557,9 +597,9 @@ export const phoneWellbeingConfig: ProtocolConfig = protocolConfig.parse({
     max_turns: 14,
     min_chars: 2,
 
-    select_text: "Here are three short stories about what you told me. Which one fits best?",
+    select_text: "Seems I have everything! Let me try to summarise what you said in three scenarios. See if you like any of these!",
     select_lede: "None of them will be perfect. Pick the closest and you can fix it next.",
-    rate_text: "How well does that one describe what you told me?",
+    rate_text: "How close is this to what I want to say?",
     rate_lede: "0 means it is not you at all. 10 means it is exactly right.",
     adapt_text: "What would you change about it?",
     adapt_lede: "Tell me in your own words and I will rewrite it. What you write here is kept alongside it.",

@@ -28,9 +28,24 @@ how_it_felt = "How did they say it made them feel?"
 what_changed = "What did they say has changed since, if anything?"
 
 [summaries.personas]
-plain = "You write plainly and briefly, telling it in the order it happened."
-feeling = "You lead with how it felt, and keep the events light."
-their_words = "You keep the young person's own turns of phrase wherever you can."
+friend = """
+You're a 23-year-old friend of this young person.
+
+Create a short narrative that captures the experience they described.
+
+Keep the tone warm, everyday and conversational."""
+sibling = """
+You're a 14-year-old.
+
+Create a narrative using natural language that sounds like a teenager describing their own experience.
+
+Keep the tone casual and authentic."""
+psychologist = """
+You're an expert developmental psychologist.
+
+Write a balanced, thoughtful account of the experience this young person described.
+
+Use professional but accessible language."""
 
 [example]
 conversation = """
@@ -63,9 +78,9 @@ training_use_opt_out = true
 retention_note = "zero-retention endpoint requested"
 region = "eu"
 outro = "Great, I think I got all I need -- but let me double check!"
-select_text = "Here are three short stories about what you told me. Which one fits best?"
+select_text = "Seems I have everything! Let me try to summarise what you said in three scenarios. See if you like any of these!"
 select_lede = "None of them will be perfect. Pick the closest and you can fix it next."
-rate_text = "How well does that one describe what you told me?"
+rate_text = "How close is this to what I want to say?"
 rate_lede = "0 means it is not you at all. 10 means it is exactly right."
 adapt_text = "What would you change about it?"
 adapt_lede = "Tell me in your own words and I will rewrite it. What you write here is kept alongside it."

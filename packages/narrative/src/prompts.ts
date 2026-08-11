@@ -42,9 +42,8 @@ export const INTERVIEWER_SCHEMA = {
         "What to say next, as a message in a chat. React briefly to what they just said first — a few words, warm and " +
         "specific to their answer, never a compliment on the answer itself — and then ask. If their last answer was " +
         "one or two words, do not move on: ask them to say a bit more about that same thing. Never advice, never a " +
-        "diagnosis, never a summary of what they have told you so far. When interviewDone is true this must be a " +
-        "brief thank-you AND a handover to what comes next — a few short write-ups to pick from — and must NOT ask " +
-        "anything and must NOT say goodbye. Nobody will be able to reply to it, and more of the conversation follows.",
+        "diagnosis, never a summary of what they have told you so far. When interviewDone is true this field is " +
+        "discarded without being shown, so nothing written there reaches anybody.",
     },
     interviewDone: {
       type: "boolean",
@@ -131,17 +130,20 @@ export const INTERVIEWER_SYSTEM = [
   "Never answer for the human. If you are unsure what the human meant, ask again.",
   "{topic_restriction}",
   /**
-   * The last thing it says is a HANDOVER, not a goodbye.
+   * The original writes the single word "FINISHED" here and never shows it.
    *
-   * "Close warmly" produced exactly what it asked for and exactly the wrong
-   * thing: "Thanks for sharing all this with me. Take care!" — immediately
-   * before three retellings arrived. A participant told the conversation is
-   * over and then shown more of it has been misled about where they are, at
-   * the point where the method needs them still paying attention.
+   * We replaced that sentinel with a boolean, because a participant could type
+   * FINISHED and end their own interview — but then asked the model to "close
+   * warmly instead", and it did: "Thanks for sharing all this with me. Take
+   * care!", immediately before three retellings arrived. That goodbye was
+   * ours, not theirs.
+   *
+   * The reply on the closing turn is now DISCARDED by the runner, exactly as
+   * the original discards FINISHED, and the handover is the app's own line —
+   * a fixed sentence that cannot wander off and say goodbye.
    */
-  "{collection_complete}, set interviewDone to true. Do not say so out loud. Do not say goodbye and do not wish " +
-    "them well — the conversation is not over. Thank them briefly and say that you are about to show them a few " +
-    "short write-ups of what they told you, for them to pick from.",
+  "{collection_complete}, set interviewDone to true. Whatever you write in reply on that turn is discarded and " +
+    "never shown, so do not try to close the conversation: it is closed by the app, which says what happens next.",
 ].join("\n");
 
 /** "Once you have collected answers to all N questions", as the original phrases it. */
@@ -181,23 +183,28 @@ export const EXTRACTION_SYSTEM = [
  * keep the model honest; §8.3 notes it has no other guard, and a retelling
  * that invents a motive for a child is a finding about nobody.
  */
-export const SCENARIO_SYSTEM = [
-  "{persona}",
-  "{one_shot}",
-  "Your task:",
-  "Create a scenario based on the answers that follow.",
-  "",
-  "Use only what this person said. Add nothing they did not say: no motives, no diagnosis, and no",
-  "resolution they did not describe. If their account is thin, write a short scenario and say so in the",
-  "confidence field rather than inventing enough material to fill a paragraph.",
-  // The example above is one worked case, and a model handed a worked case
-  // copies its VOICE — which is how three personas produced three paragraphs
-  // that differed by a few words. It is there to show scope and length. The
-  // persona, and only the persona, decides how this one sounds and what it
-  // leaves out.
-  "The example shows how much to include and how long to be. It does not show how to sound: the instruction at",
-  "the top of this prompt decides that, and you follow it even where it makes this read nothing like the example.",
-].join("\n");
+/**
+ * The retelling, from `generate_scenario_prompt_template` — and only from it.
+ *
+ * This had grown three lines that are not in the original: an instruction to
+ * add nothing the participant did not say, and a note about the confidence
+ * field. They were added in good faith and they were a mistake, because the
+ * original puts that constraint in the EXTRACTION step ("use only the words
+ * and phrases that the text contains") and then hands the extracted fragments
+ * here with nothing but the persona and a worked example. Constraining this
+ * step as well pushes all three personas towards the same cautious middle,
+ * which is the opposite of what the three are for.
+ *
+ * The task line is theirs verbatim. The closing "Create a scenario based on
+ * these responses." sits after the answers, as it does in their template,
+ * which is why the runner appends it rather than it living here.
+ */
+export const SCENARIO_SYSTEM = ["{persona}", "{one_shot}", "Your task:", "Create a scenario based on the following answers:"].join(
+  "\n",
+);
+
+/** Closes the scenario prompt, after the Q&A — `generate_scenario_prompt_template`. */
+export const SCENARIO_CLOSE = "Create a scenario based on these responses.";
 
 /**
  * Adaptation, from `generate_adaptation_prompt_template`.
