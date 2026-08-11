@@ -132,7 +132,11 @@ jobs:
       - name: Deploy Firestore rules
         if: steps.changed.outputs.rules == 'true'
         working-directory: infra/firebase
-        run: firebase deploy --only firestore:rules,firestore:indexes --project myself-research --non-interactive
+        run: |
+          if ! firebase deploy --only firestore:rules,firestore:indexes --project myself-research --non-interactive; then
+            echo "::error::Firestore rules could not be deployed. A 403 from firebaserules.googleapis.com means the deploy service account is missing the Firebase Rules Admin role (roles/firebaserules.admin) — grant it in the Google Cloud console under IAM and Admin -> IAM, on the principal this workflow authenticates as."
+            exit 1
+          fi
 
       # Its own step, because Storage is the one product here that has to be
       # switched on by hand before anything can be deployed to it — and when it
@@ -141,16 +145,23 @@ jobs:
       # never created. Bundled with Firestore, that failure took the rules that
       # WOULD have deployed down with it.
       - name: Deploy Storage rules
-        if: steps.changed.outputs.rules == 'true'
+        if: always() && steps.changed.outputs.rules == 'true'
         working-directory: infra/firebase
         run: |
           if ! firebase deploy --only storage --project myself-research --non-interactive; then
-            echo "::error::Storage rules could not be deployed. If the log above says firebasestorage.googleapis.com is missing, the project has no Storage bucket yet: Firebase console -> Build -> Storage -> Get started, choose europe-west2, and re-run this job. Until then the voice recordings are transcribed but NOT saved."
+            echo "::error::Storage rules could not be deployed. A 403 from firebaserules.googleapis.com means the deploy service account is missing the Firebase Rules Admin role — grant it in the Google Cloud console under IAM. If instead the log says firebasestorage.googleapis.com is missing, the project has no Storage bucket yet: Firebase console -> Build -> Storage -> Get started, europe-west2."
             exit 1
           fi
 
+      # `always()`, so a rules problem does not hold back a code fix.
+      #
+      # Rules still go first, and the job still fails when they fail — but the
+      # first time they failed they took the functions deploy down with them,
+      # and the change being blocked was the one that fixed where recordings
+      # are written. A permission missing on one API is no reason to stop
+      # shipping the other half.
       - name: Deploy functions
-        if: steps.changed.outputs.functions == 'true'
+        if: always() && steps.changed.outputs.functions == 'true'
         working-directory: infra/firebase
         run: firebase deploy --only functions --project myself-research --non-interactive
 
