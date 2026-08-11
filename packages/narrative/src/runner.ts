@@ -1062,6 +1062,16 @@ export class NarrativeRunner {
       expectsInput: false,
       maxTurns: 0,
       optional: false,
+      /**
+       * The story they settled on, shown back at the end.
+       *
+       * The original's completion page does this — ":tada: Yay! :tada:", a
+       * line saying they have finished, and then the final scenario in green.
+       * It is the right last thing to see: the participant spent the whole
+       * interaction shaping one paragraph, and ending on a receipt for it
+       * rather than on a status line is what makes the work feel like theirs.
+       */
+      ...(this.finalScenario ? { scenario: this.finalScenario } : {}),
       // Full, not one short of it. Ending on "step 5 of 6" reads as something
       // having gone wrong.
       ...(of > 0 ? { progress: { step: of, of } } : {}),
