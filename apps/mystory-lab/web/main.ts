@@ -312,6 +312,60 @@ function scrollThread(): void {
 
 /** Wire whatever controls this stage put on screen. */
 function wireStageControls(): void {
+  /**
+   * Press and hold a retelling to choose it.
+   *
+   * The gesture a young person already has for "this one" is holding a message
+   * down and putting a thumb on it, so that is the gesture — and the thumb
+   * lands on the bubble before the page moves on, because a choice that
+   * vanishes the instant you make it does not feel like a choice.
+   *
+   * Tap and Enter do the same thing. Long-press is what the hint teaches, not
+   * the only way in: nobody on a laptop, a keyboard or a switch should be
+   * stranded at the one screen the whole method turns on.
+   */
+  for (const el of document.querySelectorAll<HTMLElement>(".choice-bubble")) {
+    let held: ReturnType<typeof setTimeout> | null = null;
+    let fired = false;
+
+    const choose = () => {
+      if (busy) return;
+      fired = true;
+      el.classList.add("chosen");
+      el.classList.remove("holding");
+      // Long enough to see the thumb land, short enough not to feel stuck.
+      setTimeout(() => void turn({ action: "submit", input: el.dataset["choice"] ?? "" }), 320);
+    };
+    const cancel = () => {
+      if (held) clearTimeout(held);
+      held = null;
+      el.classList.remove("holding");
+    };
+
+    el.addEventListener("pointerdown", () => {
+      if (fired) return;
+      el.classList.add("holding");
+      held = setTimeout(choose, 420);
+    });
+    el.addEventListener("pointerup", () => {
+      const wasHolding = held !== null;
+      cancel();
+      // A tap counts as well, so the hint is guidance rather than a gate.
+      if (wasHolding && !fired) choose();
+    });
+    el.addEventListener("pointerleave", cancel);
+    el.addEventListener("pointercancel", cancel);
+    // Holding a bubble on iOS otherwise raises the text-selection callout.
+    el.addEventListener("contextmenu", (event) => event.preventDefault());
+    el.addEventListener("keydown", (event) => {
+      if (fired) return;
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        choose();
+      }
+    });
+  }
+
   const submit = () => {
     const picked = document.querySelector<HTMLInputElement>('input[name="choice"]:checked');
     const range = document.getElementById("ratingRange") as HTMLInputElement | null;
@@ -410,18 +464,32 @@ function render(frame: Frame): void {
 
   /* ── The stage area: what this screen asks the participant to DO ──────── */
 
+  /**
+   * The three retellings arrive as messages, and you react to one.
+   *
+   * They were radio cards, which is a form. In a chat you hold a message down
+   * and put a thumb on it, so that is what this is: three bubbles from the
+   * other side, press and hold to pick. The gesture is the one they already
+   * use every day, and it is told to them in words above, because a gesture
+   * nobody mentions is a gesture half of them will not find.
+   *
+   * A plain tap and the keyboard both work too. Long-press is the taught
+   * gesture, not the only one — somebody on a laptop, or using a switch, must
+   * not be stranded at the one screen the whole method turns on.
+   *
+   * The persona key is still lab-only: a card labelled "their words"
+   * advertises itself as the honest one, and which they choose is the data.
+   */
   const choices = (s.choices ?? [])
     .map(
-      // The persona name is a researcher's key for a prompt — `their_words`,
-      // `feeling` — and is shown only in the lab. A participant choosing
-      // between three retellings should be choosing on what they say; a card
-      // labelled "their words" is advertising itself as the honest one, and
-      // the choice is data we would then have spoiled.
-      (c, i) => `<label class="card-choice${i === 0 ? " picked" : ""}">
-          <input type="radio" name="choice" value="${c.index}"${i === 0 ? " checked" : ""} />
-          <span class="who lab-only">${escapeHtml(c.persona)}</span>
-          ${escapeHtml(c.text)}
-        </label>`,
+      (c) => `<div class="msg from-them turn choice-msg">
+          <div class="bubble choice-bubble" role="button" tabindex="0" data-choice="${c.index}"
+               aria-label="Retelling. Press and hold, or press Enter, to choose this one.">
+            <span class="who lab-only">${escapeHtml(c.persona)}</span>
+            ${escapeHtml(c.text)}
+            <span class="reaction" aria-hidden="true">\u{1F44D}</span>
+          </div>
+        </div>`,
     )
     .join("");
 
@@ -463,7 +531,7 @@ function render(frame: Frame): void {
          }
          <div class="composer">
            <textarea id="input" rows="1" placeholder="Describe what you&rsquo;d like to change\u2026"></textarea>
-           <button class="primary send-round" id="send" title="Ask for a rewrite">\u2191</button>
+           <button class="primary send-round" id="send" title="Ask for a rewrite"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M2.5 20.5 21 12 2.5 3.5v6.6L15 12 2.5 13.9z"/></svg></button>
          </div>
        </div>`
     : "";
@@ -475,7 +543,7 @@ function render(frame: Frame): void {
     s.expectsInput && !choices && !rating && !s.editable
       ? `<div class="composer">
            <textarea id="input" rows="1" placeholder="Type your answer\u2026"></textarea>
-           <button class="primary send-round" id="send" title="Send">\u2191</button>
+           <button class="primary send-round" id="send" title="Send"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M2.5 20.5 21 12 2.5 3.5v6.6L15 12 2.5 13.9z"/></svg></button>
          </div>`
       : "";
 
@@ -514,7 +582,7 @@ function render(frame: Frame): void {
            ${s.optional ? '<button class="secondary" id="skip">Leave it as it is</button>' : ""}
          </div>`;
 
-  $("stageArea").innerHTML = `${quoted}${choices ? `<div class="cards">${choices}</div>` : ""}${rating}${adapt}${composer}${advance}`;
+  $("stageArea").innerHTML = `${quoted}${choices ? `<p class="choose-hint">Press and hold the one that fits best, and give it a \u{1F44D}</p><div class="choice-list">${choices}</div>` : ""}${rating}${adapt}${composer}${advance}`;
 
   $("fallbackNote").innerHTML = s.fallback
     ? `<div class="alert"><strong>Fallback applied:</strong> ${escapeHtml(s.fallback.reason)} \u2192

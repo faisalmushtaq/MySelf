@@ -308,6 +308,18 @@ export class NarrativeRunner {
    * something submitting empty text happens to do.
    */
   next(): Promise<Screen> {
+    /**
+     * Not a way out of the interview.
+     *
+     * The interview ends when the model says every question is covered or the
+     * turn limit is reached — never because a button was pressed. It should
+     * not be reachable from the page at all during `collect`, and it was:
+     * belt and braces, because the cost of being wrong is a run with no
+     * answers in it that still looks complete.
+     */
+    if (this.stage?.kind === "collect" && !this.interviewDone) {
+      return Promise.resolve({ ...this.screenFor(this.stage, "Could you say a little more?"), expectsInput: true });
+    }
     return this.advance();
   }
 
@@ -522,7 +534,18 @@ export class NarrativeRunner {
       this.append(stage.key, "system", "validation_result", {
         data: { ok: false, reason: "too_short", minChars: stage.minChars },
       });
-      return this.screenFor(stage, "Could you say a little more?");
+      /**
+       * Still expecting an answer.
+       *
+       * `screenFor` decides `expectsInput` from the stage kind, and `collect`
+       * is not one of the kinds it says yes to — so a re-ask came back with no
+       * composer, the page drew a Continue button in its place, and pressing
+       * that ran `next()` and walked straight out of the interview. Somebody
+       * who submitted nothing was taken to the retellings, which were then
+       * built from an empty extraction: "There is no information available
+       * from their answers."
+       */
+      return { ...this.screenFor(stage, "Could you say a little more?"), expectsInput: true };
     }
 
     this.append(stage.key, "participant", "participant_original", { text: said.slice(0, stage.maxChars) });
@@ -682,7 +705,24 @@ export class NarrativeRunner {
       this.append(stage.key, "model", "model_validated", {
         data: { ...(result.output as unknown as Record<string, unknown>), persona: persona.key, index },
       });
-      produced.push({ index, persona: persona.key, text: result.output.scenario });
+      /**
+       * A blank retelling is not a retelling.
+       *
+       * One came back empty and was shown as a card with nothing in it, next
+       * to another that said "There is no information available from their
+       * answers to create a scenario" — the model doing its best with an
+       * empty extraction. Both are the absence of a retelling, and the
+       * participant should be offered neither: absent is recorded honestly by
+       * the fallback below, an empty card is just broken.
+       */
+      const written = result.output.scenario.trim();
+      if (written.length === 0) {
+        this.append(stage.key, "system", "fallback_applied", {
+          data: { persona: persona.key, index, reason: "the model returned an empty scenario" },
+        });
+        continue;
+      }
+      produced.push({ index, persona: persona.key, text: written });
     }
 
     if (produced.length === 0) return this.applyFallback(stage, "no retelling could be generated");
