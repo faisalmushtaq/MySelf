@@ -42,11 +42,14 @@ export const INTERVIEWER_SCHEMA = {
         "What to say next, as a message in a chat. React briefly to what they just said first — a few words, warm and " +
         "specific to their answer, never a compliment on the answer itself — and then ask. If their last answer was " +
         "one or two words, do not move on: ask them to say a bit more about that same thing. Never advice, never a " +
-        "diagnosis, never a summary of what they have told you so far.",
+        "diagnosis, never a summary of what they have told you so far. When interviewDone is true this must be a " +
+        "short warm sign-off and must NOT ask anything — the conversation ends on it and nobody will be able to reply.",
     },
     interviewDone: {
       type: "boolean",
-      description: "True only when every question on the list has been genuinely answered.",
+      description:
+        "True only when every question on the list has been genuinely answered. Setting this true ends the " +
+        "conversation immediately, so do not set it in the same turn as a question you want answered.",
     },
     questionsCovered: {
       type: "array",

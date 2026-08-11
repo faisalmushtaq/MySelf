@@ -501,9 +501,38 @@ export class NarrativeRunner {
       const validated = this.append(stage.key, "model", "model_validated", {
         data: result.output as unknown as Record<string, unknown>,
       });
-      this.append(stage.key, "system", "model_shown", { text: result.output.reply, refersTo: validated.recordId });
-      this.transcript.push({ role: "assistant", content: result.output.reply });
-      return { reply: result.output.reply, done: result.output.interviewDone === true };
+
+      const reply = result.output.reply;
+      const done = result.output.interviewDone === true;
+
+      /**
+       * A question nobody will be allowed to answer is not shown.
+       *
+       * `interviewDone` ends the interview on the spot, and the model can set
+       * it in the same turn as another question — the prompt asks it not to,
+       * and in a live run it did anyway: "Is there anything you wouldn't miss
+       * at all about your phone?" went up on screen and the retellings landed
+       * underneath it a second later. From the participant's side they had
+       * been asked something and then talked over.
+       *
+       * So the flag is honoured — the researcher's question list is covered
+       * and the protocol says stop — but the dangling question is withheld
+       * rather than displayed, and kept out of the transcript too: extraction
+       * reads that transcript, and a question the participant never saw is not
+       * part of the conversation they had.
+       *
+       * Never on the opening turn, where there is nothing to be done with yet.
+       */
+      if (done && this.transcript.length > 0 && /\?\s*$/.test(reply.trim())) {
+        this.append(stage.key, "system", "validation_result", {
+          data: { replyWithheld: "question_asked_after_completion", text: reply },
+        });
+        return { reply: "", done: true };
+      }
+
+      this.append(stage.key, "system", "model_shown", { text: reply, refersTo: validated.recordId });
+      this.transcript.push({ role: "assistant", content: reply });
+      return { reply, done };
     } catch {
       return null;
     }
@@ -515,6 +544,9 @@ export class NarrativeRunner {
     }
     const turn = await this.interviewerTurn(stage);
     if (!turn) return this.applyFallback(stage, "the interviewer could not be reached");
+    // Nothing to open with. Only reachable if the model declared the interview
+    // over before it began, which is not an interview.
+    if (!turn.reply) return this.applyFallback(stage, "the interviewer had nothing to ask");
     return { ...this.screenFor(stage, turn.reply), expectsInput: true };
   }
 

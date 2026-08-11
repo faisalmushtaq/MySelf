@@ -118,8 +118,12 @@
        * single-weight outlines, scattered, low contrast — tiled as one small
        * SVG so it costs a couple of hundred bytes and no request.
        */
+      /* No `scroll-behavior: smooth`. The thread is rebuilt and then scrolled to
+         the bottom on every turn, and animating that jump made each reply slide
+         the whole conversation past — motion the participant reads as the page
+         shifting under them rather than as a new message. */
       .thread { display: flex; flex-direction: column; gap: 2px; max-height: 26rem; overflow-y: auto;
-                padding: .6rem .5rem; scroll-behavior: smooth; font-family: var(--wa);
+                overscroll-behavior: contain; padding: .6rem .5rem; font-family: var(--wa);
                 background-color: var(--wa-bg); background-image: var(--wa-paper);
                 background-size: 168px 168px; border-radius: 8px; }
       .msg { display: flex; max-width: 80%; }
@@ -178,41 +182,117 @@
       /* The header, as WhatsApp has it: who you are talking to, and nothing
          else. It is what tells somebody at a glance that this is a
          conversation rather than a questionnaire wearing bubbles. */
-      /* No header and no progress bar. Safari already shows the address bar
-         above this, so a second header stacked under it read as chrome on
-         chrome — and a progress bar is the one thing a chat does not have. */
-      .chat-header { display: none; }
-      .chat-header .who-avatar { flex: 0 0 34px; height: 34px; border-radius: 50%; overflow: hidden; }
-      .chat-header .who-avatar svg { display: block; width: 34px; height: 34px; }
-      .chat-header .who-name { font-size: 16px; font-weight: 600; color: #111B21; }
-      .chat-header .who-sub { font-size: 12px; color: #667781; }
+      /* ── The header ──────────────────────────────────────────────────────
+         WhatsApp's: a back chevron, a round avatar, the name with a status
+         line under it, then the video and voice call buttons hard against the
+         right edge. It sits on its own light bar with a hairline under it, and
+         it does not scroll with the conversation.
 
-      /* The composer. WhatsApp's is a white pill on the cream ground with a
-         round green send button beside it. */
-      /* The composer as WhatsApp draws it: a white pill that grows with the
-         text, and a filled green circle with a paper plane beside it. */
-      .composer { display: flex; gap: 8px; align-items: flex-end; margin-top: .6rem; }
-      .composer textarea { flex: 1; min-height: 40px; max-height: 9rem; padding: 10px 16px;
-                           border-radius: 20px; resize: none; font-family: var(--wa);
-                           font-size: 16.5px; line-height: 20px; border: 1px solid rgba(0,0,0,.08);
-                           background: #fff; box-shadow: 0 1px .5px rgba(11,20,26,.08); }
-      .composer textarea::placeholder { color: #9AA3A8; }
-      /* A green ring rather than the browser's black one, which on the cream
-         ground reads as an error state. Still clearly visible: this is the
-         control somebody is typing into. */
-      .composer textarea:focus-visible,
-      .scenario-edit:focus-visible { outline: 2px solid #00A884; outline-offset: 1px; border-color: #00A884; }
-      .send-round { flex: 0 0 auto; width: 40px; height: 40px; border-radius: 50%; padding: 0;
+         Hidden in the lab, where the panel heading already says what this is. */
+      .chat-header { display: none; align-items: center; gap: 8px;
+                     padding: 6px 6px 6px 2px; background: #F6F6F6;
+                     border-bottom: 1px solid rgba(0,0,0,.09); font-family: var(--wa); }
+      .chat-header .who-avatar { flex: 0 0 38px; height: 38px; border-radius: 50%; overflow: hidden; }
+      .chat-header .who-avatar svg { display: block; width: 38px; height: 38px; }
+      .chat-header .who-text { flex: 1 1 auto; min-width: 0; line-height: 1.15; }
+      .chat-header .who-name { font-size: 16.5px; font-weight: 600; color: #111B21;
+                               white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .chat-header .who-sub { font-size: 12.5px; color: #667781; margin-top: 1px; }
+      .header-back, .header-action {
+        flex: 0 0 auto; background: none; border: 0; padding: 0; min-height: 0;
+        display: grid; place-items: center; color: #007AFF; cursor: pointer; }
+      .header-back { width: 26px; height: 40px; }
+      .header-back svg { width: 20px; height: 20px; }
+      .header-action { width: 38px; height: 40px; }
+      .header-action svg { width: 23px; height: 23px; }
+      .header-back:disabled, .header-action:disabled { opacity: 1; }
+      /* What a call button says. A line under the header rather than an alert
+         box: it is an answer to a tap, not an error. */
+      .header-note { display: none; font-family: var(--wa); font-size: 13px; color: #54656F;
+                     background: #FFF6D8; border-bottom: 1px solid rgba(0,0,0,.07);
+                     padding: 8px 12px; text-align: center; }
+      .header-note[hidden] { display: none; }
+
+      /* ── The composer ────────────────────────────────────────────────────
+         WhatsApp's is a bar, not a text box: a strip across the foot of the
+         screen holding a grey plus, a white pill with the placeholder and a
+         sticker glyph inside it, and a filled green circle with a paper plane.
+         Built as a bar so the bottom of the screen has the right silhouette,
+         which is most of what makes it recognisable.
+
+         Nothing in here changes size on focus. A ring drawn with `outline`
+         costs no layout, and the border colour stays put — the composer
+         growing by a couple of pixels when the keyboard opened was half of
+         why the conversation looked like it was shuffling. */
+      .composer-bar { display: flex; gap: 6px; align-items: flex-end;
+                      padding: 6px 8px calc(6px + env(safe-area-inset-bottom, 0px));
+                      background: var(--wa-bg); }
+      .composer-bar[hidden] { display: none; }
+      .composer-plus { flex: 0 0 auto; width: 34px; height: 40px; display: grid; place-items: center;
+                       color: #54656F; opacity: .85; }
+      .composer-plus svg { width: 26px; height: 26px; display: block; }
+      .composer-pill { flex: 1 1 auto; display: flex; align-items: flex-end; gap: 6px;
+                       min-width: 0; background: #fff; border-radius: 21px;
+                       border: 1px solid rgba(0,0,0,.06); padding: 0 10px 0 4px;
+                       box-shadow: 0 1px .5px rgba(11,20,26,.08); }
+      .composer-sticker { flex: 0 0 auto; align-self: flex-end; width: 24px; height: 40px;
+                          display: grid; place-items: center; color: #8696A0; }
+      .composer-sticker svg { width: 21px; height: 21px; display: block; }
+      .composer-bar textarea, .composer textarea {
+        flex: 1 1 auto; min-width: 0; min-height: 40px; max-height: 7.5rem; padding: 9px 6px 9px 12px;
+        border: 0; background: transparent; box-shadow: none; border-radius: 0; resize: none;
+        font-family: var(--wa); font-size: 16.5px; line-height: 22px; color: #111B21; }
+      .composer-bar textarea::placeholder, .composer textarea::placeholder { color: #8696A0; }
+      .composer-bar textarea:focus, .composer-bar textarea:focus-visible { outline: none; }
+      /* The pill carries the focus indication, so the whole control reads as
+         active and nothing moves. Grey rather than green: WhatsApp's pill does
+         not change colour, and a bright ring around the box is the loudest
+         thing on a screen whose subject is what somebody is about to say. */
+      .composer-pill:focus-within { border-color: #9AA3A8; }
+      .scenario-edit:focus-visible { outline: 2px solid #00A884; outline-offset: 1px; }
+      .send-round[hidden] { display: none; }
+      .send-round { flex: 0 0 auto; width: 42px; height: 42px; border-radius: 50%; padding: 0;
                     display: grid; place-items: center; min-height: 0;
                     background: #00A884; border: 0; color: #fff; }
-      .send-round svg { width: 20px; height: 20px; display: block; }
+      .send-round svg { width: 21px; height: 21px; display: block; margin-left: 1px; }
+      /* Speaking instead of typing. Grey until it is listening, then the same
+         green as send, so "it is on" is unmistakable. */
+      .mic-round { flex: 0 0 auto; width: 42px; height: 42px; border-radius: 50%; padding: 0;
+                   display: grid; place-items: center; min-height: 0;
+                   background: none; border: 0; color: #54656F; }
+      .mic-round[hidden] { display: none; }
+      .mic-round svg { width: 24px; height: 24px; display: block; }
+      .mic-round.listening { background: #E8453C; color: #fff; animation: pulse 1.4s ease-in-out infinite; }
+      @keyframes pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(232,69,60,.45); }
+                         50% { box-shadow: 0 0 0 7px rgba(232,69,60,0); } }
+      /* Uploading and being written down. Not a spinner elsewhere on the page:
+         the wait belongs on the control that started it. */
+      .mic-round.writing { background: #8696A0; color: #fff; animation: none; }
+      .mic-round.writing svg { animation: fade 1s ease-in-out infinite; }
+      @keyframes fade { 0%, 100% { opacity: 1 } 50% { opacity: .35 } }
+      @media (prefers-reduced-motion: reduce) {
+        .mic-round.listening, .mic-round.writing svg { animation: none; }
+      }
+      /* The lab's rewrite box keeps the older inline shape. */
+      .composer { display: flex; gap: 8px; align-items: flex-end; margin-top: .6rem; }
+      .composer textarea { border: 1px solid rgba(0,0,0,.08); background: #fff; border-radius: 20px;
+                           padding: 10px 16px; }
+      .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+                 overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 
       /* The three retellings, as messages you react to.
          The thumb is invisible until it is chosen, then it sits on the corner
-         of the bubble the way a WhatsApp reaction does. */
-      .choose-hint { font-family: var(--wa); font-size: 13px; color: #667781; text-align: center;
-                     margin: .6rem 0 .5rem; }
-      .choice-list { display: flex; flex-direction: column; gap: 8px; }
+         of the bubble the way a WhatsApp reaction does.
+
+         They live IN the thread, not in a panel under it. Underneath, they sat
+         in a second scrolling box stacked below the first, and the two scrolled
+         independently: a retelling could be cut off mid-sentence at a boundary
+         with nothing to say it was cut, which is what "the three boxes got
+         distorted" was. One conversation, one scroll. */
+      .choice-msg { animation: land .26s cubic-bezier(.2,.8,.3,1) both; }
+      @keyframes land { from { opacity: 0; transform: translateY(9px) scale(.985); }
+                        to   { opacity: 1; transform: none; } }
+      @media (prefers-reduced-motion: reduce) { .choice-msg { animation: none; } }
       .choice-bubble { cursor: pointer; user-select: none; -webkit-user-select: none;
                        -webkit-touch-callout: none; transition: transform .12s ease; }
       .choice-bubble:focus-visible { outline: 2px solid #00A884; outline-offset: 2px; }
@@ -331,8 +411,15 @@
          At the choosing stage three retellings would otherwise push it down to
          a sliver, and the point of a thread is that what was said is still
          there while you decide. */
+      body.participant-view .chat-header { display: flex; }
+      /* The inset the bubbles sit at.
+         The tail is drawn 8px outside the bubble, so a 9px padding left barely
+         a pixel of ground between the tail and the screen edge and the whole
+         conversation looked shoved against the left. The padding now carries
+         the tail AND the gap WhatsApp leaves beside it. */
       body.participant-view .thread { flex: 1 1 auto; max-height: none; min-height: 26dvh;
-                                      overflow-y: auto; border-radius: 0; padding: .6rem .6rem 1rem; }
+                                      overflow-y: auto; border-radius: 0;
+                                      padding: .55rem 1.05rem 1rem; }
       /* Cream all the way down, so nothing below the last control shows the
          page underneath — an empty control row was leaving a white band. */
       body.participant-view .panel { background: var(--wa-bg); }
@@ -344,6 +431,10 @@
          rather than squeezing the conversation out of the frame. */
       body.participant-view #stageArea { flex: 0 1 auto; max-height: 62dvh; overflow-y: auto;
                                          padding: 0 .6rem .6rem; background: var(--wa-bg); }
+      /* An empty stage area still drew its padding as a cream band between the
+         conversation and the composer, which made the composer look detached
+         from the bar it sits on. */
+      body.participant-view #stageArea:empty { display: none; padding: 0; }
       body.participant-view .stem { font-size: 1.15rem; }
       body.participant-view .card-choice { font-size: 16.5px; line-height: 21px; padding: .9rem 1rem; }
       /* iOS controls, not the workbench's. The lab keeps its green; the page a
@@ -439,18 +530,58 @@
           <h2>What the participant sees</h2>
           <!-- WhatsApp's header: who you are talking to and nothing else.
                Hidden in the lab, where the panel heading already says it. -->
+          <!--
+            Alex Ingram — initials AI, which is the disclosure doing double
+            duty as a name. The subtitle says what it is in words as well,
+            because a profile picture and a first name are exactly the things
+            that make somebody assume a person is on the other end, and a
+            young person agreeing to talk should not have to work that out.
+          -->
           <div class="chat-header">
+            <!-- The back chevron, because a WhatsApp header without one does
+                 not read as WhatsApp. It says there is nowhere to go rather
+                 than doing nothing, which is what a dead control does. -->
+            <button type="button" class="header-back" id="chatBack" aria-label="Back">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" d="M15 4.5 7.5 12 15 19.5"/></svg>
+            </button>
             <div class="who-avatar" aria-hidden="true">
-              <svg viewBox="0 0 34 34"><circle cx="17" cy="17" r="17" fill="#00A884"/>
-                <rect x="9" y="11" width="16" height="13" rx="4" fill="#fff"/>
-                <circle cx="13.6" cy="17.5" r="2" fill="#00A884"/><circle cx="20.4" cy="17.5" r="2" fill="#00A884"/>
-                <rect x="16.3" y="6" width="1.4" height="4" rx=".7" fill="#fff"/></svg>
+              <svg viewBox="0 0 40 40">
+                <defs><clipPath id="avatarClip"><circle cx="20" cy="20" r="20"/></clipPath></defs>
+                <g clip-path="url(#avatarClip)">
+                  <rect width="40" height="40" fill="#B8D9CE"/>
+                  <circle cx="20" cy="16.5" r="7.4" fill="#F2C9A8"/>
+                  <path d="M12.6 14.2c0-4.6 3.4-7.3 7.4-7.3s7.4 2.7 7.4 7.3c0 .9-.2 1.6-.4 1.6-.5 0-.6-2.2-2.2-3.2-1.5-1-3.2-.5-4.8-1.3-1-.5-1.4-1.2-1.6-1.2-.5 0-.7 1.4-2 2.5-1.2 1-2.6 1.1-3.2 2-.3.5-.3 1.2-.6 1.2s-.4-.7-.4-1.6Z" fill="#4A3B33"/>
+                  <circle cx="17.1" cy="16.6" r="1.05" fill="#3B2F2A"/>
+                  <circle cx="22.9" cy="16.6" r="1.05" fill="#3B2F2A"/>
+                  <path d="M17.4 20.2c1.6 1.3 3.6 1.3 5.2 0" stroke="#B97A56" stroke-width="1.1" fill="none" stroke-linecap="round"/>
+                  <path d="M20 25.4c6.6 0 11.4 3.9 12.4 9.4l.5 5.2H7.1l.5-5.2c1-5.5 5.8-9.4 12.4-9.4Z" fill="#2F6F62"/>
+                  <path d="M16.9 25.9 20 30l3.1-4.1c-1-.3-2-.5-3.1-.5s-2.1.2-3.1.5Z" fill="#E8EDEA"/>
+                </g>
+              </svg>
             </div>
-            <div>
-              <div class="who-name">MyStory</div>
-              <div class="who-sub">a short conversation for research</div>
+            <!-- "online" and "typing…", as the real header shows. The
+                 disclosure rides in the name — the initials are the point —
+                 and every one of these buttons says it in full when pressed. -->
+            <div class="who-text">
+              <div class="who-name">Alex Ingram (AI)</div>
+              <div class="who-sub" id="whoSub">online</div>
             </div>
+            <!--
+              The call buttons are real buttons that decline. WhatsApp's header
+              has them and their absence is noticeable; what is behind them is
+              a plain sentence saying this chat is text only, which is true and
+              is better than a dead icon.
+            -->
+            <button type="button" class="header-action" id="videoCall" aria-label="Video call">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M4 6.5h9.5A2.5 2.5 0 0 1 16 9v6a2.5 2.5 0 0 1-2.5 2.5H4A2.5 2.5 0 0 1 1.5 15V9A2.5 2.5 0 0 1 4 6.5Zm13.6 3.4 3.4-2.2c.6-.4 1.5 0 1.5.8v7c0 .8-.9 1.2-1.5.8l-3.4-2.2V9.9Z"/></svg>
+            </button>
+            <button type="button" class="header-action" id="voiceCall" aria-label="Voice call">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M6.6 3.2c.6-.3 1.4-.1 1.8.5l1.9 3a1.4 1.4 0 0 1-.2 1.8l-1.2 1a11 11 0 0 0 4.6 4.6l1-1.2a1.4 1.4 0 0 1 1.8-.2l3 1.9c.6.4.8 1.2.5 1.8l-.9 1.7a2.2 2.2 0 0 1-2.4 1.1C11 18.4 5.6 13 4.4 6.5A2.2 2.2 0 0 1 5.5 4.1l1.1-.9Z"/></svg>
+            </button>
           </div>
+          <!-- What the call buttons say. Announced, so it is not silent to a
+               screen reader, and dismissed by tapping anywhere. -->
+          <div id="headerNote" class="header-note" role="status" hidden></div>
           <!-- Deliberately NOT inside a lab-only panel. Once the mock was
                removed this became the only way the page can say "sign in
                first" or "there is nothing to run" — and a participant who
@@ -461,6 +592,54 @@
             <p class="note">Start a run to see the conversation.</p>
           </div>
           <div id="stageArea"></div>
+          <!--
+            The composer is written once here and never rebuilt.
+
+            It used to be part of the HTML the stage area regenerates every
+            turn, which meant the text box a participant was typing into was
+            destroyed and recreated on each reply. On iOS that dismissed the
+            keyboard, the viewport grew back, `100dvh` recalculated, and the
+            whole conversation jumped — the small shifts that made this feel
+            unlike a chat. A persistent element keeps focus, keeps the
+            keyboard up, and keeps the frame still.
+          -->
+          <div id="composerBar" class="composer-bar" hidden>
+            <!-- WhatsApp's attachment plus. Inert: this study takes no
+                 attachments, and it is here because the composer's silhouette
+                 is not WhatsApp's without it. -->
+            <span class="composer-plus" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M12 5.5v13M5.5 12h13"/></svg>
+            </span>
+            <div class="composer-pill">
+              <label class="sr-only" for="input">Your message</label>
+              <textarea id="input" rows="1" placeholder="Message"></textarea>
+              <span class="composer-sticker" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+                  <path d="M20 12a8 8 0 1 1-8-8c1 0 2 .2 2.9.5"/>
+                  <path d="M13 20.9V17a2 2 0 0 1 2-2h3.9"/>
+                  <circle cx="9.2" cy="10" r=".9" fill="currentColor" stroke="none"/>
+                  <circle cx="14.8" cy="9.4" r=".9" fill="currentColor" stroke="none"/>
+                  <path d="M9 14c1.4 1.2 3 1.3 4.6.3"/>
+                </svg>
+              </span>
+            </div>
+            <!--
+              Speaking instead of typing.
+
+              The browser turns speech into text and the text goes into the box,
+              where it can be read and edited before it is sent. No audio is
+              recorded, uploaded by this page, or stored anywhere: what the
+              study keeps is the same sentence it would have kept if it had been
+              typed. Hidden entirely where the browser has no recogniser, so
+              nobody is offered a button that cannot work.
+            -->
+            <button class="mic-round" id="micBtn" type="button" aria-label="Speak your answer" hidden>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 14.5a3.2 3.2 0 0 0 3.2-3.2V5.7a3.2 3.2 0 1 0-6.4 0v5.6a3.2 3.2 0 0 0 3.2 3.2Zm5.6-3.4a.9.9 0 0 0-1.8 0 3.8 3.8 0 0 1-7.6 0 .9.9 0 1 0-1.8 0 5.6 5.6 0 0 0 4.7 5.5v2.2H9.4a.9.9 0 1 0 0 1.8h5.2a.9.9 0 1 0 0-1.8h-1.7v-2.2a5.6 5.6 0 0 0 4.7-5.5Z"/></svg>
+            </button>
+            <button class="send-round" id="sendMsg" type="button" aria-label="Send" hidden>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M3.4 20.4 21.8 12 3.4 3.6 3.4 10.1 16.5 12 3.4 13.9z"/></svg>
+            </button>
+          </div>
           <div id="fallbackNote" class="lab-only"></div>
           <div class="row" id="controls"></div>
         </div>
