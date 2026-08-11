@@ -129,10 +129,25 @@ jobs:
       # Before the functions, deliberately: if a new function reads or writes
       # something the rules must permit, the permission should already be in
       # place when it starts serving.
-      - name: Deploy rules
+      - name: Deploy Firestore rules
         if: steps.changed.outputs.rules == 'true'
         working-directory: infra/firebase
-        run: firebase deploy --only firestore:rules,firestore:indexes,storage --project myself-research --non-interactive
+        run: firebase deploy --only firestore:rules,firestore:indexes --project myself-research --non-interactive
+
+      # Its own step, because Storage is the one product here that has to be
+      # switched on by hand before anything can be deployed to it — and when it
+      # has not been, the CLI's answer is a permissions error about an API,
+      # which reads like a broken service account rather than a bucket that was
+      # never created. Bundled with Firestore, that failure took the rules that
+      # WOULD have deployed down with it.
+      - name: Deploy Storage rules
+        if: steps.changed.outputs.rules == 'true'
+        working-directory: infra/firebase
+        run: |
+          if ! firebase deploy --only storage --project myself-research --non-interactive; then
+            echo "::error::Storage rules could not be deployed. If the log above says firebasestorage.googleapis.com is missing, the project has no Storage bucket yet: Firebase console -> Build -> Storage -> Get started, choose europe-west2, and re-run this job. Until then the voice recordings are transcribed but NOT saved."
+            exit 1
+          fi
 
       - name: Deploy functions
         if: steps.changed.outputs.functions == 'true'
