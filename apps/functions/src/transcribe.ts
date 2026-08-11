@@ -1,4 +1,6 @@
+import { randomUUID } from "node:crypto";
 import { FieldValue } from "firebase-admin/firestore";
+import { getStorage } from "firebase-admin/storage";
 import * as logger from "firebase-functions/logger";
 import { defineSecret } from "firebase-functions/params";
 import { onRequest } from "firebase-functions/v2/https";
@@ -24,13 +26,24 @@ import { authenticate, cors, meter } from "./relay.js";
  * already holds the key in Secret Manager. The audio goes there and nowhere
  * else.
  *
- * WHAT IS KEPT. The text. That is the whole answer. The audio is held in this
- * function's memory for the length of one request, sent to the provider, and
- * dropped — it is never written to Firestore, never written to Storage, never
- * logged. A recording of a child's voice is biometric data of the most
- * identifiable kind, and the safest place for it is nowhere. What ends up in
- * the record is the same sentence that would have been there if they had typed
- * it, and it is marked as spoken so an analyst knows how it arrived.
+ * WHAT IS KEPT. The recording and the text, both, on the researcher's
+ * instruction and under their REC approval. The first version of this kept
+ * only the text; the study needs the audio — for checking a transcript against
+ * what was actually said, and because how something is said is data a
+ * transcript throws away.
+ *
+ * That makes this the most sensitive thing the platform stores. A child's
+ * voice identifies them in a way no answer does, so the clip is written to a
+ * bucket path NO CLIENT CAN READ: Storage rules refuse every read and write on
+ * it, and the only way in is a researcher through the admin SDK. It is laid
+ * out one prefix per session so a participant's audio can be listened to,
+ * exported and — the operation that actually matters — deleted as one thing.
+ *
+ * THE TWO HALVES RUN AT ONCE. The bytes are already in memory, so the upload
+ * and the transcription start together rather than one after the other: the
+ * participant waits for the slower of the two, not the sum. If transcription
+ * fails, the recording is still saved and the failure is reported, because
+ * losing what somebody said is worse than making them type it again.
  */
 
 const OPENAI_API_KEY = defineSecret("OPENAI_API_KEY");
@@ -61,11 +74,13 @@ const LANGUAGE = "en";
  */
 const MAX_BYTES = 4_000_000;
 
-/** What the page sends: one clip, and what container it is in. */
+/** What the page sends: one clip, what container it is in, and whose run. */
 const request = z.object({
   audio: z.string().min(32).max(Math.ceil(MAX_BYTES * 1.4)),
   mimeType: z.string().min(4).max(80),
   protocolKey: z.string().min(1).max(120),
+  sessionId: z.string().min(1).max(120),
+  seconds: z.number().min(0).max(600).optional(),
 });
 
 /**
@@ -108,7 +123,7 @@ export function extensionFor(mimeType: string): string {
  */
 async function recordTranscription(
   caller: Caller,
-  fields: { bytes: number; ms: number; ok: boolean; characters: number },
+  fields: { bytes: number; ms: number; ok: boolean; characters: number; path?: string },
 ): Promise<void> {
   try {
     await research()
@@ -123,6 +138,62 @@ async function recordTranscription(
   } catch (error) {
     logger.error("transcribe: could not write the provenance row", error);
   }
+}
+
+/**
+ * The recording, in the bucket.
+ *
+ * Written with the admin SDK, which Storage rules do not apply to — and the
+ * rules refuse every client read and write on this prefix, so a researcher
+ * going through the console or a signed export is the only way back to it. The
+ * clip id is a UUID rather than a counter: a guessable object name is a
+ * guessable object name even behind rules.
+ */
+async function keepRecording(
+  sessionId: string,
+  clipId: string,
+  extension: string,
+  mimeType: string,
+  audio: Buffer,
+  caller: Caller,
+): Promise<string> {
+  const path = paths.voiceNote(STUDY, sessionId, clipId, extension);
+  await getStorage()
+    .bucket()
+    .file(path)
+    .save(audio, {
+      contentType: mimeType,
+      resumable: false,
+      metadata: {
+        // Enough to know whose run it belongs to and how it got here, without
+        // putting a word of what was said on the object.
+        metadata: { study: STUDY, sessionId, uid: caller.uid, clipId },
+      },
+    });
+  return path;
+}
+
+/** The provider's own transcription of one clip. */
+async function transcribeClip(audio: Buffer, mimeType: string, extension: string): Promise<string> {
+  const form = new FormData();
+  form.append("file", new Blob([audio], { type: mimeType }), `speech.${extension}`);
+  form.append("model", MODEL);
+  form.append("language", LANGUAGE);
+  form.append("response_format", "json");
+
+  const response = await fetch("https://api.openai.com/v1/audio/transcriptions", {
+    method: "POST",
+    headers: { authorization: `Bearer ${OPENAI_API_KEY.value()}` },
+    body: form,
+  });
+  if (!response.ok) {
+    // The provider's own message is not passed to the page: it can quote
+    // request content back, and this request's content is a child's voice.
+    logger.error("transcribe: the provider refused", { status: response.status });
+    throw new RelayError(502, "unknown", "that could not be written down just now", true);
+  }
+  const { text } = (await response.json()) as { text?: string };
+  return (text ?? "").trim();
 }
 
 export const transcribe = onRequest(
@@ -153,29 +224,46 @@ export const transcribe = onRequest(
       if (bytes === 0) throw new RelayError(400, "unknown", "that recording was empty");
       if (bytes > MAX_BYTES) throw new RelayError(413, "unknown", "that recording is longer than this accepts");
 
-      const form = new FormData();
-      form.append("file", new Blob([audio], { type: parsed.data.mimeType }), `speech.${extension}`);
-      form.append("model", MODEL);
-      form.append("language", LANGUAGE);
-      form.append("response_format", "json");
+      /**
+       * Both at once.
+       *
+       * The bytes are in memory either way, so keeping the recording and
+       * writing it down are started together and the participant waits for the
+       * slower of the two rather than for their sum. `allSettled`, not `all`,
+       * because these two must not be able to take each other down: a
+       * transcription the provider refused should still leave the recording
+       * saved, and a bucket that would not accept the file should still return
+       * the words so the conversation can go on.
+       */
+      const clipId = randomUUID();
+      const [kept, written] = await Promise.allSettled([
+        keepRecording(parsed.data.sessionId, clipId, extension, parsed.data.mimeType, audio, caller),
+        transcribeClip(audio, parsed.data.mimeType, extension),
+      ]);
 
-      const response = await fetch("https://api.openai.com/v1/audio/transcriptions", {
-        method: "POST",
-        headers: { authorization: `Bearer ${OPENAI_API_KEY.value()}` },
-        body: form,
+      if (kept.status === "rejected") logger.error("transcribe: the recording could not be kept", kept.reason);
+      const path = kept.status === "fulfilled" ? kept.value : null;
+      const said = written.status === "fulfilled" ? written.value : null;
+
+      await recordTranscription(caller, {
+        bytes,
+        ms: Date.now() - started,
+        ok: said !== null,
+        characters: said?.length ?? 0,
+        ...(path ? { path } : {}),
       });
 
-      if (!response.ok) {
-        // The provider's own message is not passed to the page: it can quote
-        // request content back, and this request's content is a child's voice.
-        logger.error("transcribe: the provider refused", { status: response.status });
-        throw new RelayError(502, "unknown", "that could not be written down just now", true);
+      if (said === null) {
+        // The recording is safe; only the words are missing. Said plainly, so
+        // the page can offer typing without implying the answer was lost.
+        res.status(502).json({
+          error: { kind: "unknown", message: "that was saved, but could not be written down. You can type it instead.", retryable: true },
+          ...(path ? { clipId, seconds: parsed.data.seconds ?? null, kept: true } : {}),
+        });
+        return;
       }
 
-      const { text } = (await response.json()) as { text?: string };
-      const said = (text ?? "").trim();
-      await recordTranscription(caller, { bytes, ms: Date.now() - started, ok: true, characters: said.length });
-      res.status(200).json({ text: said });
+      res.status(200).json({ text: said, clipId, kept: path !== null, seconds: parsed.data.seconds ?? null });
     } catch (error) {
       if (caller) void recordTranscription(caller, { bytes, ms: Date.now() - started, ok: false, characters: 0 });
       if (error instanceof RelayError) {

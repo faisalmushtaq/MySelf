@@ -16,6 +16,24 @@ service firebase.storage {
         && request.auth.token.get('role', '') in ['owner', 'researcher', 'analyst'];
       allow write: if false;
     }
+    /**
+     * Spoken answers.
+     *
+     * The most sensitive thing this platform holds: a child's voice identifies
+     * them in a way none of their answers do. Written only by a Cloud Function
+     * through the admin SDK, which these rules do not apply to, and readable by
+     * NOBODY through the client SDK — not even a signed-in owner.
+     *
+     * Deliberately stricter than `exports`, which researchers can read. There
+     * is no page that plays these back, so there is no rule that would let one:
+     * listening happens through the console or a signed URL an owner mints
+     * deliberately, which is a decision with a person attached to it rather
+     * than a permission sitting open.
+     */
+    match /studies/{study}/voice/{allPaths=**} {
+      allow read, write: if false;
+    }
+
     match /{allPaths=**} {
       allow read, write: if false;
     }

@@ -261,31 +261,37 @@ const bubble = (who: Who, html: string, at?: string): string =>
  */
 function threadFrom(records: Frame["records"]): string {
   const parts: string[] = [];
+  /** The record each bubble came from, so voice notes can be re-seated. */
+  const seqs: number[] = [];
+  const push = (html: string, seq: number) => {
+    parts.push(html);
+    seqs.push(seq);
+  };
   for (const r of records) {
     const data = (r.data ?? {}) as Record<string, unknown>;
 
     if (r.kind === "request_shown" || r.kind === "clarification_request") {
-      if (r.text) parts.push(bubble("them", escapeHtml(r.text)));
+      if (r.text) push(bubble("them", escapeHtml(r.text)), r.seq);
     } else if (r.kind === "model_shown") {
       // A candidate retelling: it belongs in the cards, not in the thread.
       if (typeof data["index"] === "number") continue;
-      if (r.text) parts.push(bubble("them", escapeHtml(r.text)));
+      if (r.text) push(bubble("them", escapeHtml(r.text)), r.seq);
     } else if (r.kind === "participant_original" || r.kind === "participant_clarification") {
-      if (r.text) parts.push(bubble("me", escapeHtml(r.text)));
+      if (r.text) push(bubble("me", escapeHtml(r.text)), r.seq);
     } else if (r.kind === "participant_correction") {
-      if (r.text) parts.push(bubble("me", escapeHtml(r.text)));
+      if (r.text) push(bubble("me", escapeHtml(r.text)), r.seq);
     } else if (r.kind === "participant_reaction" && typeof data["persona"] === "string") {
       // Which one they picked, said as a person would say it. The retelling
       // itself is on screen; repeating it here is noise.
-      parts.push(bubble("me", `I&rsquo;ll take the <em>${escapeHtml(data["persona"])}</em> one.`));
+      push(bubble("me", `I&rsquo;ll take the <em>${escapeHtml(data["persona"])}</em> one.`), r.seq);
     } else if (r.kind === "participant_rating") {
-      parts.push(bubble("me", `${escapeHtml(data["rating"])} out of ${escapeHtml(data["max"])}`));
+      push(bubble("me", `${escapeHtml(data["rating"])} out of ${escapeHtml(data["max"])}`), r.seq);
     } else if (r.kind === "participant_edit") {
-      parts.push(bubble("system", "They rewrote the write-up in their own words."));
+      push(bubble("system", "They rewrote the write-up in their own words."), r.seq);
     } else if (r.kind === "participant_reaction" && typeof data["restored"] === "string") {
-      parts.push(bubble("system", "They put the previous version back."));
+      push(bubble("system", "They put the previous version back."), r.seq);
     } else if (r.kind === "fallback_applied" && typeof data["reason"] === "string" && !data["persona"]) {
-      parts.push(bubble("system", `The model could not be reached: ${escapeHtml(data["reason"])}.`));
+      push(bubble("system", `The model could not be reached: ${escapeHtml(data["reason"])}.`), r.seq);
     }
   }
   /**
@@ -300,7 +306,8 @@ function threadFrom(records: Frame["records"]): string {
     .map((html, i) => {
       const mine = html.includes("from-me");
       const firstOfRun = i === 0 || parts[i - 1]!.includes("from-me") !== mine;
-      return firstOfRun ? html.replace('class="msg ', 'class="msg turn ') : html;
+      const marked = firstOfRun ? html.replace('class="msg ', 'class="msg turn ') : html;
+      return marked.replace("<div class=\"msg", `<div data-seq="${seqs[i]}" class="msg`);
     })
     .join("");
 }
@@ -523,6 +530,18 @@ function wireComposer(): void {
 
 /* ── The header, and the things it declines to do ────────────────────────── */
 
+/**
+ * Trouble with the microphone, said in both places.
+ *
+ * The banner is what somebody notices; the thread copy is what survives long
+ * enough to be read, scrolled back to, and screenshotted to me. A fault
+ * reported as "nothing happens" is a fault with nowhere to be seen.
+ */
+function micTrouble(text: string): void {
+  headerNote(text);
+  troubleInThread(text);
+}
+
 /** A line under the header, said once and cleared. */
 let noteTimer: ReturnType<typeof setTimeout> | null = null;
 function headerNote(text: string): void {
@@ -570,6 +589,107 @@ function wireHeader(): void {
 }
 
 /* ── Speaking instead of typing ──────────────────────────────────────────── */
+
+/**
+ * The recordings made in this run, as WhatsApp shows them.
+ *
+ * Kept in the page as well as in the bucket, because the bucket copy is
+ * deliberately unreadable by any client — so the only way a participant can
+ * hear back what they just said is the blob their own device still holds.
+ * Cleared when the tab goes, which is the right lifetime for a playback aid.
+ */
+const voiceNotes: { url: string; seconds: number; kept: boolean; claimedBy: number | null }[] = [];
+/** Faults, kept so a re-render does not wipe the thing somebody is reading. */
+const troubles: string[] = [];
+
+/**
+ * Tie any loose recordings to the answer just sent.
+ *
+ * A clip is made before the message goes, so at the moment of sending, every
+ * unclaimed note belongs to that message and should sit directly above it.
+ */
+function claimVoiceNotes(seq: number): void {
+  for (const note of voiceNotes) if (note.claimedBy === null) note.claimedBy = seq;
+}
+
+/**
+ * The sequence the answer about to be sent will be recorded under.
+ *
+ * The record does not exist yet — the runner appends it — so this is the next
+ * one it will use. If it turns out to be wrong the note simply falls to the
+ * bottom of the thread rather than sitting above its answer, which is a
+ * cosmetic miss and not a lost recording.
+ */
+function nextRecordSeq(): number {
+  const records = localRunner?.all ?? [];
+  return (records[records.length - 1]?.seq ?? 0) + 1;
+}
+
+const mmss = (seconds: number) => `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
+
+/**
+ * A voice note bubble, on the participant's side.
+ *
+ * Rendered outside the record-driven thread and re-appended after each render,
+ * because the records hold the transcript — the words — and the audio is a
+ * separate thing living only on this device. Trying to drive it from the
+ * records would mean putting a blob URL in a research record, which is a URL
+ * that means nothing five minutes later and nothing at all to an analyst.
+ */
+function renderVoiceNotes(): void {
+  const thread = $("thread");
+  for (const existing of thread.querySelectorAll(".voice-note")) existing.remove();
+  for (const existing of thread.querySelectorAll(".trouble")) existing.remove();
+  for (const note of voiceNotes) {
+    const el = document.createElement("div");
+    el.className = "msg from-me turn voice-note";
+    el.innerHTML = `<div class="bubble">
+        <audio src="${note.url}" preload="metadata"></audio>
+        <button type="button" class="vn-play" aria-label="Play what you said">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M8 5.5v13l11-6.5z"/></svg>
+        </button>
+        <span class="vn-wave" aria-hidden="true">${"<i></i>".repeat(22)}</span>
+        <span class="vn-time">${mmss(note.seconds)}</span>
+        <span class="meta">${clock()}${TICKS}</span>
+      </div>`;
+    const audio = el.querySelector("audio")!;
+    const play = el.querySelector<HTMLButtonElement>(".vn-play")!;
+    play.addEventListener("click", () => {
+      if (audio.paused) {
+        void audio.play();
+        el.classList.add("playing");
+      } else {
+        audio.pause();
+        el.classList.remove("playing");
+      }
+    });
+    audio.addEventListener("ended", () => el.classList.remove("playing"));
+    const anchor = note.claimedBy === null ? null : thread.querySelector(`[data-seq="${note.claimedBy}"]`);
+    if (anchor) anchor.before(el);
+    else thread.append(el);
+  }
+  for (const text of troubles) {
+    const el = document.createElement("div");
+    el.className = "msg system-msg turn trouble";
+    el.innerHTML = `<div class="bubble system">${escapeHtml(text)}</div>`;
+    thread.append(el);
+  }
+  if (voiceNotes.length > 0 || troubles.length > 0) scrollThread();
+}
+
+/**
+ * Something that went wrong, said in the conversation and left there.
+ *
+ * The banner under the header clears itself after a few seconds, which is fine
+ * for "Alex can't take calls" and useless for a fault somebody is trying to
+ * report to me. This puts it in the thread, where it stays, scrolls with
+ * everything else and survives being screenshotted.
+ */
+function troubleInThread(text: string): void {
+  troubles.push(text);
+  renderVoiceNotes();
+}
+
 
 /**
  * Talking to it, and getting back text you can edit.
@@ -652,6 +772,8 @@ function wireMic(): void {
   let discarding = false;
   /** What the recorder actually chose, which is not always what was asked. */
   let recordedAs = "";
+  /** When this clip began, for the length shown on the voice note. */
+  let startedAt = 0;
 
   const release = () => {
     if (capping) clearTimeout(capping);
@@ -680,20 +802,21 @@ function wireMic(): void {
   };
 
   const send = async (clip: Blob) => {
+    const seconds = Math.max(1, Math.round((Date.now() - startedAt) / 1000));
     if (clip.size === 0) {
       release();
-      headerNote("No sound was recorded. Check the microphone is not muted, or type your answer instead.");
+      micTrouble("No sound was recorded. Check the microphone is not muted, or type your answer instead.");
       return;
     }
     if (!relay) {
       release();
-      headerNote("There is nowhere to send that recording from this build.");
+      micTrouble("There is nowhere to send that recording from this build.");
       return;
     }
     const credential = linkKey ? `Link ${linkKey}` : await session.token().then((t) => (t ? `Bearer ${t}` : null));
     if (!credential) {
       release();
-      headerNote("That could not be written down — this page is not signed in.");
+      micTrouble("That could not be written down — this page is not signed in.");
       return;
     }
     button.classList.add("writing");
@@ -705,27 +828,50 @@ function wireMic(): void {
           audio: await base64Of(clip),
           mimeType: clip.type || recordedAs,
           protocolKey: ($("protocol") as HTMLSelectElement | null)?.value ?? "unknown",
+          sessionId: sessionId ?? "unknown",
+          seconds: Math.round((Date.now() - startedAt) / 1000),
         }),
       });
-      const body = (await res.json()) as { text?: string; error?: { message?: string } };
+      const body = (await res.json()) as {
+        text?: string;
+        kept?: boolean;
+        error?: { message?: string };
+      };
       if (!res.ok || typeof body.text !== "string") {
-        headerNote(body.error?.message ?? "That could not be written down. You can type your answer instead.");
+        // The recording may still have been saved even though the words were
+        // not. Show it, so nobody is told to say it all again.
+        if (body.kept === true) {
+          voiceNotes.push({ url: URL.createObjectURL(clip), seconds, kept: true, claimedBy: null });
+          renderVoiceNotes();
+        }
+        micTrouble(body.error?.message ?? "That could not be written down. You can type your answer instead.");
         return;
       }
       if (!body.text) {
-        headerNote("Nothing came through on that one. Try again, or type your answer.");
+        micTrouble("Nothing came through on that one. Try again, or type your answer.");
         return;
       }
+      /**
+       * The recording, in the conversation.
+       *
+       * Shown from the local blob rather than from the bucket: the bucket copy
+       * is not readable by any page by design, and re-downloading a file the
+       * device already has to play it back would be daft. It lives for as long
+       * as the tab does, which is exactly as long as anybody would want to
+       * replay it.
+       */
+      voiceNotes.push({ url: URL.createObjectURL(clip), seconds, kept: body.kept === true, claimedBy: null });
       // Added to whatever was already typed rather than replacing it.
       const box = messageBox();
       const had = box.value.replace(/\s+$/, "");
       box.value = had ? `${had} ${body.text}` : body.text;
       sizeMessageBox();
       box.focus();
+      renderVoiceNotes();
     } catch (error) {
       // The real reason, not a shrug. A microphone that fails silently is the
       // bug this whole path already had once.
-      headerNote(`That could not be written down (${String((error as Error).message ?? error)}).`);
+      micTrouble(`That could not be written down (${String((error as Error).message ?? error)}).`);
     } finally {
       button.classList.remove("writing");
       release();
@@ -743,7 +889,7 @@ function wireMic(): void {
         stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       } catch (error) {
         const denied = (error as { name?: string }).name === "NotAllowedError";
-        headerNote(
+        micTrouble(
           denied
             ? "Your phone did not allow the microphone. You can turn it on in Settings, or type your answer instead."
             : `The microphone could not be opened (${String((error as Error).message ?? error)}).`,
@@ -754,7 +900,7 @@ function wireMic(): void {
       const rec = makeRecorder(stream);
       if (!rec) {
         stream.getTracks().forEach((t) => t.stop());
-        headerNote("This browser will not record audio. You can type your answer instead.");
+        micTrouble("This browser will not record audio. You can type your answer instead.");
         return;
       }
       recordedAs = rec.mimeType || "";
@@ -764,7 +910,7 @@ function wireMic(): void {
         if (e.data.size > 0) parts.push(e.data);
       };
       rec.onerror = () => {
-        headerNote("The recording stopped unexpectedly. You can try again, or type your answer instead.");
+        micTrouble("The recording stopped unexpectedly. You can try again, or type your answer instead.");
         release();
       };
       rec.onstop = () => {
@@ -791,10 +937,11 @@ function wireMic(): void {
         rec.start();
       } catch (error) {
         stream.getTracks().forEach((t) => t.stop());
-        headerNote(`The recording would not start (${String((error as Error).message ?? error)}).`);
+        micTrouble(`The recording would not start (${String((error as Error).message ?? error)}).`);
         return;
       }
       recorder = rec;
+      startedAt = Date.now();
       capping = setTimeout(finish, MAX_CLIP_MS);
       button.classList.add("listening");
       button.setAttribute("aria-label", "Stop and write it down");
@@ -891,6 +1038,9 @@ function render(frame: Frame): void {
     : "";
   $("thread").innerHTML =
     (threadFrom(frame.records) || `<p class="note">Start a run to see the conversation.</p>`) + hint + choices;
+  // The audio and any faults live outside the records, so they are put back
+  // after every rebuild rather than being lost with the innerHTML.
+  renderVoiceNotes();
   scrollThread();
 
   // A slider with named ends, as the original has it: "needs a lot of work"
@@ -1178,6 +1328,8 @@ async function turn(payload: { action: string; input?: string; echo?: boolean })
    */
   const said = payload.echo === true ? payload.input?.trim() : undefined;
   if (said) {
+    // Whatever was recorded for this answer belongs above it.
+    claimVoiceNotes(nextRecordSeq());
     $("thread").insertAdjacentHTML("beforeend", bubble("me", escapeHtml(said)));
     scrollThread();
   }
@@ -1288,9 +1440,10 @@ $("start").addEventListener("click", () => {
         else localCalls.push(call);
       },
     });
+    sessionId = `lab_${Date.now().toString(36)}`;
     localRunner = new NarrativeRunner(
       protocols.find((p) => p.key === key)!,
-      { sessionId: `lab_${Date.now().toString(36)}`, variables: { first_name: firstName, topic }, online },
+      { sessionId, variables: { first_name: firstName, topic }, online },
       gateway,
     );
     $("providerBadge").textContent = "provider: relay (the key stays on the server)";
