@@ -40,6 +40,8 @@
       .scenario-edit { width: 100%; min-height: 8rem; padding: .6rem .7rem; border: 1px solid rgba(0,0,0,.34);
         border-radius: 8px; font: inherit; line-height: 1.5; resize: vertical; }
       .warn-text { color: #a33b00; }
+      /* The participant's sentence, quoted back at whoever is writing it. */
+      .preview-line { font-style: italic; border-left: 2px solid var(--hairline); padding-left: .6rem; }
       .row { display: flex; flex-wrap: wrap; gap: .6rem; margin-top: .9rem; align-items: center; }
       .screen { border: 1px solid var(--hairline); border-radius: 10px; padding: 1.1rem 1.2rem; background: var(--paper); }
       .stem { font-size: 1.25rem; font-weight: 600; letter-spacing: -.01em; line-height: 1.35; }
@@ -223,6 +225,7 @@
           <input id="firstName" value="Amara" placeholder="leave blank to see it read correctly without one" />
           <label for="topic">Topic</label>
           <input id="topic" value="how school has been this term" />
+          <div id="topicPreview"></div>
           <label for="provider">Provider</label>
           <select id="provider">
             <option value="mock">Deterministic mock — no key, no cost, repeatable</option>
