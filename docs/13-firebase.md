@@ -277,6 +277,20 @@ Functions Admin**, **Service Account User**, **Cloud Run Admin** and
 **Artifact Registry Writer** — the Firebase Admin SDK account has enough for
 Hosting but not always for a functions deploy.
 
+Those four get the deploy as far as the secret. `llmRelay` declares
+`secrets: [OPENAI_API_KEY]`, and deploying a function that names a secret
+reads the secret's metadata and binds the runtime service account to it, so
+the deployer also needs **Secret Manager Admin** — `secretmanager.secrets.get`
+plus `setIamPolicy`, which neither Viewer nor Secret Accessor covers between
+them. Grant it **on the `OPENAI_API_KEY` secret rather than the project**:
+Secret Manager → `OPENAI_API_KEY` → Permissions → Grant access. Project-wide
+would let the deployer read every secret the study ever holds, which is a
+larger grant than a deploy needs.
+
+The failure arrives late and reads as though the secret is missing —
+"Permission 'secretmanager.secrets.get' denied on resource (or it may not
+exist)" — when in fact the secret exists and the caller cannot see it.
+
 ### 5.3 Pointing the pages at it
 
 Two build-time values, both public, neither secret:
