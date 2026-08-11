@@ -284,13 +284,14 @@
       .composer-plus { flex: 0 0 auto; width: 34px; height: 40px; display: grid; place-items: center;
                        color: #54656F; opacity: .85; }
       .composer-plus svg { width: 26px; height: 26px; display: block; }
+      /* No sticker glyph. It sat half off the pill's edge, and the keyboard
+         already carries emoji — a control that duplicates the keyboard AND
+         does not work is two reasons to remove it. The padding closes up
+         behind it. */
       .composer-pill { flex: 1 1 auto; display: flex; align-items: flex-end; gap: 6px;
                        min-width: 0; background: #fff; border-radius: 21px;
-                       border: 1px solid rgba(0,0,0,.06); padding: 0 10px 0 4px;
+                       border: 1px solid rgba(0,0,0,.06); padding: 0 6px 0 4px;
                        box-shadow: 0 1px .5px rgba(11,20,26,.08); }
-      .composer-sticker { flex: 0 0 auto; align-self: flex-end; width: 24px; height: 40px;
-                          display: grid; place-items: center; color: #8696A0; }
-      .composer-sticker svg { width: 21px; height: 21px; display: block; }
       .composer-bar textarea, .composer textarea {
         flex: 1 1 auto; min-width: 0; min-height: 40px; max-height: max(7.5rem, 40dvh); padding: 9px 6px 9px 12px;
         border: 0; background: transparent; box-shadow: none; border-radius: 0; resize: none;
@@ -707,11 +708,13 @@
           <!-- WhatsApp's header: who you are talking to and nothing else.
                Hidden in the lab, where the panel heading already says it. -->
           <!--
-            Alex Ingram — initials AI, which is the disclosure doing double
-            duty as a name. The subtitle says what it is in words as well,
-            because a profile picture and a first name are exactly the things
-            that make somebody assume a person is on the other end, and a
-            young person agreeing to talk should not have to work that out.
+            The character is set per study — see `[myself.character]` in the
+            protocol's own file. The name and face are filled in at run time,
+            because a ten-year-old and a sixteen-year-old need different
+            answers to "what is this" and the honest answer is the same for
+            both. A profile picture and a first name are exactly what make
+            somebody assume a person is on the other end, which is why the
+            profile behind this header leads with what it actually is.
           -->
           <div class="chat-header">
             <!-- The back chevron, because a WhatsApp header without one does
@@ -853,15 +856,6 @@
             <div class="composer-pill">
               <label class="sr-only" for="input">Your message</label>
               <textarea id="input" rows="1" placeholder="Message"></textarea>
-              <span class="composer-sticker" aria-hidden="true">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
-                  <path d="M20 12a8 8 0 1 1-8-8c1 0 2 .2 2.9.5"/>
-                  <path d="M13 20.9V17a2 2 0 0 1 2-2h3.9"/>
-                  <circle cx="9.2" cy="10" r=".9" fill="currentColor" stroke="none"/>
-                  <circle cx="14.8" cy="9.4" r=".9" fill="currentColor" stroke="none"/>
-                  <path d="M9 14c1.4 1.2 3 1.3 4.6.3"/>
-                </svg>
-              </span>
             </div>
             <!--
               Speaking instead of typing.

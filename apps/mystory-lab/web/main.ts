@@ -772,12 +772,14 @@ function wireHeader(): void {
   document
     .getElementById("videoCall")
     ?.addEventListener("click", () =>
-      headerNote("Alex can’t do video calls — Alex is an AI, and this chat is writing only."),
+      headerNote(`${character.name} can’t do video calls — ${character.name} is an AI, and this chat is writing only.`),
     );
   document
     .getElementById("voiceCall")
     ?.addEventListener("click", () =>
-      headerNote("Alex can’t take calls — Alex is an AI. You can talk to it though: tap the microphone by the message box."),
+      headerNote(
+        `${character.name} can’t take calls — ${character.name} is an AI. You can talk to it though: tap the microphone by the message box.`,
+      ),
     );
   document
     .getElementById("chatBack")
@@ -957,7 +959,7 @@ function renderVoiceNotes(): void {
  * Something that went wrong, said in the conversation and left there.
  *
  * The banner under the header clears itself after a few seconds, which is fine
- * for "Alex can't take calls" and useless for a fault somebody is trying to
+ * for a call button's refusal and useless for a fault somebody is trying to
  * report to me. This puts it in the thread, where it stays, scrolls with
  * everything else and survives being screenshotted.
  */
