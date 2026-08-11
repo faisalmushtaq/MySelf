@@ -468,8 +468,33 @@ const messageBox = () => document.getElementById("input") as HTMLTextAreaElement
 /** Height that matches the text, in the same beat WhatsApp's box grows in. */
 function sizeMessageBox(): void {
   const box = messageBox();
+  /**
+   * A hidden box measures zero.
+   *
+   * `scrollHeight` on a `display: none` element is 0, so sizing the box while
+   * the recording strip has it hidden set an inline `height: 0px` that stayed
+   * there when the pill came back — and a transcript longer than one line then
+   * had nowhere to go. Measuring is only meaningful once it is on screen, so
+   * this defers and `showStrip(false)` does it after unhiding.
+   */
+  if (box.offsetParent === null && box.getClientRects().length === 0) return;
+  /**
+   * How tall the box may get.
+   *
+   * Four lines was the old ceiling and it is the wrong one for a spoken
+   * answer: somebody who talks says considerably more than somebody who
+   * types, and the whole point of showing the transcript is that they can
+   * read it and correct it before it is sent. Reading it through a letterbox
+   * is not that.
+   *
+   * Two-fifths of the viewport, which is roughly where WhatsApp's own box
+   * stops. Past that it scrolls inside itself rather than pushing the
+   * conversation off the screen — the thread has to stay visible, because the
+   * question being answered is in it.
+   */
+  const ceiling = Math.max(120, Math.round(window.innerHeight * 0.4));
   box.style.height = "auto";
-  box.style.height = `${Math.min(box.scrollHeight, 120)}px`;
+  box.style.height = `${Math.min(box.scrollHeight, ceiling)}px`;
   showRightButton();
 }
 
@@ -791,7 +816,12 @@ function wireMic(): void {
   const showStrip = (on: boolean) => {
     strip().hidden = !on;
     for (const el of bar().querySelectorAll<HTMLElement>(".composer-pill, .composer-plus")) el.hidden = on;
-    if (!on) bar().classList.remove("writing");
+    if (!on) {
+      bar().classList.remove("writing");
+      // Now that the box can be measured, give it the height its contents
+      // need — which is where a multi-line transcript gets its room.
+      sizeMessageBox();
+    }
   };
 
   const tick = () => {
