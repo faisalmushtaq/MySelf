@@ -193,10 +193,19 @@ export interface LinkRecord {
 
 /** Why this link may not be used, or null if it may. Said, not just refused. */
 export function linkRefusal(link: LinkRecord | null, now: number): string | null {
-  if (!link) return "that link is not one this study issued";
-  if (link.revokedAt) return "that link has been switched off";
-  if (now > link.expiresAt) return "that link has expired";
-  if (link.callsUsed >= link.callCap) return "that link has been used as many times as it was allowed";
+  /**
+   * Written to be read by whoever is holding the link, which on a pilot is a
+   * person who was sent it and has done nothing wrong. Each one says what
+   * happened and what to do about it, and none of them says "relay",
+   * "credential" or "caller" — a refusal a participant cannot act on is just
+   * a closed door with jargon on it.
+   */
+  if (!link) return "This link is not one this study gave out. Do check you have the whole of it.";
+  if (link.revokedAt) return "This link has been switched off. Ask whoever sent it to you for a new one.";
+  if (now > link.expiresAt) return "This link has run out. Ask whoever sent it to you for a new one.";
+  if (link.callsUsed >= link.callCap) {
+    return "This link has been used as many times as it was set up for. Ask whoever sent it to you for a new one.";
+  }
   return null;
 }
 

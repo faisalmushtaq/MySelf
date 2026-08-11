@@ -374,6 +374,12 @@
       /* A fault, left in the conversation so it can be read and screenshotted
          rather than clearing itself before anybody looks. */
       .trouble .bubble { background: #FFF6D8; box-shadow: var(--wa-shadow); color: #6B5B2E; }
+      /* The exception text, for the workbench only. A participant gets the
+         sentence they can act on; the researcher gets the reason underneath
+         it. Showing both to a child is how "that is not a recording this relay
+         understands" ended up in somebody's conversation. */
+      .trouble-detail { display: block; margin-top: .3rem; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+                        font-size: 11px; color: #8A7A4E; word-break: break-word; }
 
       /* The three retellings, as messages you react to.
          The thumb is invisible until it is chosen, then it sits on the corner
