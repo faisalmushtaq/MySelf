@@ -161,8 +161,24 @@ async function keepRecording(
   caller: Caller,
 ): Promise<string> {
   const path = paths.voiceNote(STUDY, sessionId, clipId, extension);
-  await getStorage()
-    .bucket()
+  /**
+   * Which bucket, said out loud.
+   *
+   * `.bucket()` with no argument takes the default out of the environment, and
+   * on a project whose Storage was switched on recently that default can be
+   * the name Firebase used to use — `<project>.appspot.com` — while the bucket
+   * that actually exists is `<project>.firebasestorage.app`. The write then
+   * fails with "bucket does not exist" naming a bucket nobody chose, and since
+   * this half is deliberately allowed to fail without taking the transcript
+   * with it, the only sign would be a missing `path` in an audit row.
+   *
+   * So the name is resolved here, overridable, and logged when the write
+   * fails. Guessing between the two would be worse than either: a study's
+   * audio must land where the researcher thinks it is landing.
+   */
+  const bucket = process.env["MYSELF_VOICE_BUCKET"];
+  const target = bucket ? getStorage().bucket(bucket) : getStorage().bucket();
+  await target
     .file(path)
     .save(audio, {
       contentType: mimeType,
@@ -256,7 +272,15 @@ export const transcribe = onRequest(
         transcribeClip(audio, parsed.data.mimeType, extension),
       ]);
 
-      if (kept.status === "rejected") logger.error("transcribe: the recording could not be kept", kept.reason);
+      if (kept.status === "rejected") {
+        // The bucket name is in here because the usual cause is the wrong one
+        // being defaulted to, and the provider's error names it without
+        // saying that is what went wrong.
+        logger.error("transcribe: the recording could not be kept", {
+          bucket: process.env["MYSELF_VOICE_BUCKET"] ?? process.env["STORAGE_BUCKET"] ?? "(default)",
+          reason: String((kept.reason as Error | undefined)?.message ?? kept.reason),
+        });
+      }
       const path = kept.status === "fulfilled" ? kept.value : null;
       const said = written.status === "fulfilled" ? written.value : null;
 
