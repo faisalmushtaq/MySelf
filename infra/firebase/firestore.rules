@@ -138,6 +138,24 @@ service cloud.firestore {
         allow create: if signedIn();
         allow update, delete: if false;
       }
+
+      /**
+       * Narrative runs — a young person's own words about their experience.
+       *
+       * NO CLIENT MAY WRITE ONE. They arrive through the saveNarrative
+       * function, which uses the Admin SDK and so passes these rules by; that
+       * is the point. A tester holding a link key is not signed in at all and
+       * could not write here under any rule, and a device that could write
+       * directly could also overwrite somebody else's run.
+       *
+       * Reading is for people, not devices: an iPad that has finished a
+       * sitting has no business reading back what any child has said,
+       * including the one in front of it.
+       */
+      match /narratives/{sessionId} {
+        allow read: if isPerson();
+        allow write: if false;
+      }
     }
 
     // Anything not named above is closed. Firestore's default is already deny,

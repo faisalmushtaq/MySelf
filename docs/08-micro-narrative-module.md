@@ -407,9 +407,42 @@ young person sees and nothing about how it is built.
 
     https://faisalmushtaq.github.io/MySelf/mystory/?view=participant
 
-### 10.10 Still to do
+### 10.10 Storing a run (D-48)
 
-The relay's other end: the Cloud Function that holds the key, checks the
-requested config against the frozen release, and makes the call. And narrative
-records syncing to their own Firestore document (§9.3). Everything up to the
-network is built and tested.
+Built to §9.3. Every run is written to `studies/{study}/narratives/{sessionId}`
+by the `saveNarrative` function — its own document, not a field on the sitting.
+
+**Sent after every turn, not at the end.** Most of what a test tells you is in
+the runs that did not finish: somebody who gave up at the rating screen has
+said something, and an end-of-run save loses exactly those. The whole record log
+goes each time, so one `set` is idempotent, a retry cannot interleave, and the
+next successful write repairs any that were missed.
+
+**Failing to store never interrupts the conversation.** A participant can do
+nothing about a failed write, and stopping them mid-sentence to say so costs the
+answer as well as the record.
+
+**Three things the original did that this does not.** One copy of the
+conversation, not `chat_history` and `chat_history_single_string` both — the same
+content twice and two things that can disagree; the flattened form is derived on
+read. No DynamoDB type wrappers, which described where the data had been rather
+than what it means. And a generation failure stays an absence carrying
+`fallback_applied`, rather than an apology string written into the scenario slot,
+which is what left one run in 27 looking like a participant who said nothing.
+
+**Test runs are marked, from how the caller authenticated.** A tester holding a
+link key is not a consented participant, so their run is stored with
+`provenance: "test"` and is excluded from the research dataset. The marking comes
+from the credential rather than from a field in the request, because a page can
+set a field and cannot forge a credential.
+
+**No client may write one.** The rules refuse every browser write to
+`narratives`; the function uses the Admin SDK and passes them by. Reading is for
+people, not devices — an iPad that has finished a sitting has no business reading
+back what any child said, including the child in front of it.
+
+### 10.11 Still to do
+
+Wiring the narrative section into the participant app's own sync path, so a run
+inside the survey travels with the sitting rather than through the relay's
+endpoint. And the researcher view reading `narratives` back for a transcript.

@@ -13,6 +13,7 @@ import {
   relayRequest,
   type Caller,
 } from "./relay-policy.js";
+import { narrativeSave, provenanceOf } from "./narratives.js";
 
 /**
  * The relay's job is to be the only thing holding a key, and the only thing
@@ -200,5 +201,68 @@ describe("a tester link, which stands in for signing in", () => {
     expect(LINK_CALL_CAP).toBeGreaterThan(0);
     expect(Number.isFinite(LINK_DAYS)).toBe(true);
     expect(LINK_DAYS).toBeGreaterThan(0);
+  });
+});
+
+describe("storing a narrative run", () => {
+  const base = {
+    sessionId: "lab_abc",
+    protocolKey: "np.phone_wellbeing",
+    protocolVersion: "0.1.0",
+    records: [
+      {
+        recordId: "nr_1",
+        sessionId: "lab_abc",
+        protocolKey: "np.phone_wellbeing",
+        protocolVersion: "0.1.0",
+        stageKey: "consent",
+        seq: 0,
+        source: "system" as const,
+        kind: "request_shown",
+        text: "Hi — this last bit is a short chat about your phone.",
+        data: null,
+        refersTo: null,
+        modelCallId: null,
+        at: new Date().toISOString(),
+      },
+    ],
+  };
+
+  it("accepts a run as the runner produces it", () => {
+    const parsed = narrativeSave.safeParse(base);
+    expect(parsed.success).toBe(true);
+    // Unfinished unless it says so: most test runs are abandoned partway, and
+    // treating silence as "finished" would overstate every one of them.
+    expect(parsed.success && parsed.data.finished).toBe(false);
+  });
+
+  it("refuses a run with nothing identifying it", () => {
+    expect(narrativeSave.safeParse({ ...base, sessionId: "" }).success).toBe(false);
+    expect(narrativeSave.safeParse({ ...base, protocolKey: "" }).success).toBe(false);
+  });
+
+  it("takes a partial run, because a partial run is the interesting one", () => {
+    expect(narrativeSave.safeParse({ ...base, records: [] }).success).toBe(true);
+  });
+
+  /**
+   * The line between a test and a study. A tester following a link is not a
+   * consented participant and must never land in the research dataset by
+   * accident — so the marking comes from HOW THEY AUTHENTICATED, which no page
+   * can lie about, rather than from a field in the request, which any page
+   * could set.
+   */
+  it("marks a link-holder's run as a test, whatever the page says", () => {
+    expect(provenanceOf({ uid: "link_abc123", device: true })).toBe("test");
+    expect(provenanceOf({ uid: "dev_ipad_4", device: true })).toBe("study");
+    expect(provenanceOf({ uid: "user_faisal", device: false })).toBe("study");
+  });
+
+  it("keeps one copy of the conversation, not two", () => {
+    // The original exported chat_history AND chat_history_single_string — the
+    // same content twice, and two things that can disagree.
+    const parsed = narrativeSave.parse(base);
+    expect(Object.keys(parsed)).not.toContain("chat_history_single_string");
+    expect(parsed.records[0]!.text).toContain("short chat about your phone");
   });
 });

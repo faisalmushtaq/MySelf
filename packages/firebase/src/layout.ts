@@ -51,6 +51,18 @@ export const paths = {
   quarantine: (study: string) => `studies/${study}/quarantine`,
   audit: (study: string) => `studies/${study}/audit`,
 
+  /**
+   * Narrative runs, one document each — docs/08 §9.3.
+   *
+   * Their own collection rather than a field on the sitting. They arrive later
+   * and only where there is connectivity, so attaching one must not mean
+   * re-uploading 54 kB of survey log over a school wifi, and an analysis that
+   * does not want narratives never pays to read them. A measured run is 12.3 kB
+   * median, 20.1 kB at the largest, so one document is never near the limit.
+   */
+  narratives: (study: string) => `studies/${study}/narratives`,
+  narrative: (study: string, sessionId: string) => `studies/${study}/narratives/${sessionId}`,
+
   /** identity project — a different Firebase project entirely */
   participants: (study: string) => `studies/${study}/participants`,
   participant: (study: string, code: string) => `studies/${study}/participants/${code}`,
