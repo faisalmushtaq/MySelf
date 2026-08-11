@@ -1,5 +1,15 @@
 rules_version = '2';
 
+/*
+ * Deployed by CI, since this commit.
+ *
+ * These rules were watched by the workflow's path filter but never handed to a
+ * deploy: an edit landed on main, the run went green, and the project kept the
+ * old rules. A rules file that is not deployed is a control that exists only in
+ * the repository — and the gap is invisible exactly because the run passes.
+ * `.github/workflows/firebase.yml` now ships them when they change.
+ */
+
 /**
  * Exports bucket.
  *
