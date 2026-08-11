@@ -30,9 +30,9 @@ how_it_leaves_them_feeling = "How did they say a long stretch on it leaves them 
 what_they_would_miss = "What did they say they would miss, and not miss, without it?"
 
 [summaries.personas]
-plain = "You write plainly and briefly, telling it in the order they said it."
-feeling = "You lead with how it left them feeling, and keep the detail light."
-their_words = "You keep the young person's own turns of phrase wherever you can."
+plain = "You write plainly and briefly, in the first person as 'I', telling it in the order they said it."
+feeling = "You lead with how it left you feeling, writing in the first person as 'I', and keep the detail light."
+their_words = "You keep the young person's own turns of phrase wherever you can, writing in the first person as 'I'."
 
 [example]
 conversation = """
@@ -41,7 +41,7 @@ Answer: "Mostly talking to my friends, and watching stuff before bed."
 
 Question: And a time when it made a day worse?
 Answer: "I stayed up way too late on it and then felt rubbish at school the next day.\""""
-scenario = "They mainly use their phone to talk to friends and to watch things before bed. One night they stayed up much later than they meant to and felt rubbish at school the next day."
+scenario = "I mainly use my phone to talk to my friends and to watch things before bed. One night I stayed up much later than I meant to and felt rubbish at school the next day."
 
 [myself]
 key = "np.phone_wellbeing"

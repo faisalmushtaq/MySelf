@@ -114,7 +114,22 @@ export function resolveText(
     used.push(name);
     return value;
   });
-  return { text: text.replace(/\s+([,.!?])/g, "$1").replace(/[ \t]{2,}/g, " ").trim(), used };
+  return {
+    text: text
+      // "Hi , this is" -> "Hi, this is"
+      .replace(/\s+([,.!?])/g, "$1")
+      // "Thank you, . That is everything." -> "Thank you. That is everything."
+      // A dropped name between a comma and a full stop leaves both, and the
+      // rule above only closes the gap: it produced "Thank you,." on a real
+      // run, which is a participant reading a bug in the last thing we say to
+      // them.
+      .replace(/,+(?=[.!?])/g, "")
+      // "Hi , — this" and other leftovers around a dash.
+      .replace(/([,:;])\s*(—|–)/g, " $2")
+      .replace(/[ \t]{2,}/g, " ")
+      .trim(),
+    used,
+  };
 }
 
 export class NarrativeRunner {

@@ -421,10 +421,21 @@ export const phoneWellbeingConfig: ProtocolConfig = protocolConfig.parse({
       how_it_leaves_them_feeling: "How did they say a long stretch on it leaves them feeling?",
       what_they_would_miss: "What did they say they would miss, and not miss, without it?",
     },
+    /**
+     * FIRST PERSON. The retelling is offered back as "is this you?", and a
+     * young person answers that question about "I mainly use my phone…" far
+     * more readily than about "they mainly use their phone…", which reads as a
+     * case note somebody has written about them.
+     *
+     * The voice is set here and in the worked example rather than in the
+     * module's prompts, because it is a study decision: the CHI protocol
+     * retells in the third person deliberately, and both live in the same
+     * codebase without one overruling the other.
+     */
     personas: {
-      plain: "You write plainly and briefly, telling it in the order they said it.",
-      feeling: "You lead with how it left them feeling, and keep the detail light.",
-      their_words: "You keep the young person's own turns of phrase wherever you can.",
+      plain: "You write plainly and briefly, in the first person as 'I', telling it in the order they said it.",
+      feeling: "You lead with how it left you feeling, writing in the first person as 'I', and keep the detail light.",
+      their_words: "You keep the young person's own turns of phrase wherever you can, writing in the first person as 'I'.",
     },
   },
 
@@ -436,8 +447,9 @@ export const phoneWellbeingConfig: ProtocolConfig = protocolConfig.parse({
       "Question: And a time when it made a day worse?",
       'Answer: "I stayed up way too late on it and then felt rubbish at school the next day."',
     ].join("\n"),
+    // The example is what the model actually copies, so it carries the voice.
     scenario:
-      "They mainly use their phone to talk to friends and to watch things before bed. One night they stayed up much later than they meant to and felt rubbish at school the next day.",
+      "I mainly use my phone to talk to my friends and to watch things before bed. One night I stayed up much later than I meant to and felt rubbish at school the next day.",
   },
 
   myself: {
