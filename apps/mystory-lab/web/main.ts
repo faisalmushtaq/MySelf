@@ -150,6 +150,12 @@ const showTopic = () => {
   // opening differently is previewed correctly.
   const spoken = protocol.stages.find((s) => !s.modelConfigKey && s.text?.includes("{topic}"));
 
+  // Whether this protocol has a topic at all is a property of the protocol,
+  // not of the run. `np.phone_wellbeing` asks about one subject and its
+  // questions are written for it; there is nothing here for anybody to set.
+  const usesTopic = protocol.permittedVariables.includes("topic");
+  ($("topicField") as HTMLDivElement).hidden = !usesTopic;
+
   if (!spoken || topic === "") {
     $("topicPreview").innerHTML = "";
     return;

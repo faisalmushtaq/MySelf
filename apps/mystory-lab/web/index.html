@@ -229,9 +229,15 @@
           <select id="protocol"></select>
           <label for="firstName">First name (piped into what the participant reads)</label>
           <input id="firstName" value="Amara" placeholder="leave blank to see it read correctly without one" />
-          <label for="topic">Topic</label>
-          <input id="topic" value="how school has been this term" />
-          <div id="topicPreview"></div>
+          <!-- Shown only for protocols that actually pipe {topic} into their
+               questions. A box that changes nothing is worse than no box: it
+               invites somebody to set it and then wonder why the conversation
+               ignored them. -->
+          <div id="topicField" hidden>
+            <label for="topic">Topic</label>
+            <input id="topic" value="how school has been this term" />
+            <div id="topicPreview"></div>
+          </div>
           <div class="row">
             <label style="margin: 0; display: flex; gap: .4rem; align-items: center; font-weight: 400;">
               <input type="checkbox" id="online" checked style="width: auto;" /> online
