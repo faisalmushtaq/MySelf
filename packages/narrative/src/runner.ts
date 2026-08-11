@@ -121,7 +121,20 @@ export class NarrativeRunner {
   private records: NarrativeRecord[] = [];
   private stageIndex = 0;
   private seq = 0;
-  /** The guided interview's transcript, oldest first. */
+  /**
+   * The guided interview's transcript, oldest first.
+   *
+   * EVERYTHING PUT HERE GOES TO THE PROVIDER. It is sent on every interview
+   * turn and again at extraction, so anything added is sent whatever
+   * `permittedIdentifiers` says — the check happens on prompt templates, not
+   * on this.
+   *
+   * Which rules out one obvious-looking idea: asking a standalone participant
+   * their name by adding a question to the interview. Their answer would be a
+   * transcript turn and would reach OpenAI. If a protocol ever needs to
+   * collect something the participant reads back, it has to be a stage of its
+   * own that writes to `context.variables` and never touches this array.
+   */
   private transcript: { role: "assistant" | "user"; content: string }[] = [];
   private interviewTurns = 0;
   private interviewDone = false;
