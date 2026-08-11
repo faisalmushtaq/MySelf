@@ -208,9 +208,14 @@
       .header-back:disabled, .header-action:disabled { opacity: 1; }
       /* What a call button says. A line under the header rather than an alert
          box: it is an answer to a tap, not an error. */
-      .header-note { display: none; font-family: var(--wa); font-size: 13px; color: #54656F;
+      /* Shown by clearing `hidden`, so `display` must NOT be none in the base
+         rule — it was, which meant every message this element carries was set
+         and never seen. The microphone's failures were among them, so a
+         recording that could not be uploaded looked exactly like a button that
+         did nothing. */
+      .header-note { display: block; font-family: var(--wa); font-size: 13px; color: #54656F;
                      background: #FFF6D8; border-bottom: 1px solid rgba(0,0,0,.07);
-                     padding: 8px 12px; text-align: center; }
+                     padding: 8px 12px; text-align: center; line-height: 1.4; }
       .header-note[hidden] { display: none; }
 
       /* ── The composer ────────────────────────────────────────────────────
