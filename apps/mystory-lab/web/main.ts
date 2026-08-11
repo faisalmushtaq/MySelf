@@ -774,14 +774,41 @@ function wireMic(): void {
   let recordedAs = "";
   /** When this clip began, for the length shown on the voice note. */
   let startedAt = 0;
+  /** The counter, ticking in real seconds. */
+  let ticking: ReturnType<typeof setInterval> | null = null;
+
+  const bar = () => composerBar();
+  const strip = () => $("recordingStrip");
+  const timeLabel = () => $("recTime");
+
+  /**
+   * Show the recording strip in place of the message box.
+   *
+   * WhatsApp removes the pill entirely while you talk, and that removal is
+   * half of what makes the state legible: there is nothing to type into
+   * because the phone is listening. The counter is the other half.
+   */
+  const showStrip = (on: boolean) => {
+    strip().hidden = !on;
+    for (const el of bar().querySelectorAll<HTMLElement>(".composer-pill, .composer-plus")) el.hidden = on;
+    if (!on) bar().classList.remove("writing");
+  };
+
+  const tick = () => {
+    const seconds = Math.floor((Date.now() - startedAt) / 1000);
+    timeLabel().textContent = `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
+  };
 
   const release = () => {
     if (capping) clearTimeout(capping);
     capping = null;
+    if (ticking) clearInterval(ticking);
+    ticking = null;
     recorder?.stream.getTracks().forEach((t) => t.stop());
     recorder = null;
     button.classList.remove("listening");
     button.setAttribute("aria-label", "Speak your answer");
+    showStrip(false);
     showRightButton();
   };
   /** Stop and write it down — the microphone button, and the length cap. */
@@ -819,7 +846,22 @@ function wireMic(): void {
       micTrouble("That could not be written down — this page is not signed in.");
       return;
     }
+    // The bubble first, the words after. Their own recording is a thing that
+    // exists the instant they stop talking, and showing it then is what makes
+    // the transcription feel like it is happening TO something rather than
+    // being a gap with nothing on screen.
+    const note = { url: URL.createObjectURL(clip), seconds, kept: false, claimedBy: null };
+    voiceNotes.push(note);
+    renderVoiceNotes();
     button.classList.add("writing");
+    bar().classList.add("writing");
+    // Only the control that is doing something. Send sitting beside a
+    // greyed-out microphone invites a press that would do nothing.
+    const sendButton = document.getElementById("sendMsg") as HTMLButtonElement | null;
+    if (sendButton) sendButton.hidden = true;
+    if (ticking) clearInterval(ticking);
+    ticking = null;
+    timeLabel().textContent = "Writing it down\u2026";
     try {
       const res = await fetch(`${relay.replace(/\/llmRelay$/, "")}/transcribe`, {
         method: "POST",
@@ -840,10 +882,7 @@ function wireMic(): void {
       if (!res.ok || typeof body.text !== "string") {
         // The recording may still have been saved even though the words were
         // not. Show it, so nobody is told to say it all again.
-        if (body.kept === true) {
-          voiceNotes.push({ url: URL.createObjectURL(clip), seconds, kept: true, claimedBy: null });
-          renderVoiceNotes();
-        }
+        note.kept = body.kept === true;
         micTrouble(body.error?.message ?? "That could not be written down. You can type your answer instead.");
         return;
       }
@@ -860,14 +899,17 @@ function wireMic(): void {
        * as the tab does, which is exactly as long as anybody would want to
        * replay it.
        */
-      voiceNotes.push({ url: URL.createObjectURL(clip), seconds, kept: body.kept === true, claimedBy: null });
+      note.kept = body.kept === true;
       // Added to whatever was already typed rather than replacing it.
       const box = messageBox();
       const had = box.value.replace(/\s+$/, "");
       box.value = had ? `${had} ${body.text}` : body.text;
       sizeMessageBox();
       box.focus();
-      renderVoiceNotes();
+      // The words arriving in the box is the last beat, and it is easy to
+      // miss on a phone. A brief highlight says where to look.
+      box.classList.add("just-heard");
+      setTimeout(() => box.classList.remove("just-heard"), 1400);
     } catch (error) {
       // The real reason, not a shrug. A microphone that fails silently is the
       // bug this whole path already had once.
@@ -877,6 +919,13 @@ function wireMic(): void {
       release();
     }
   };
+
+  document.getElementById("recCancel")?.addEventListener("click", () => {
+    if (!recorder) return;
+    // Thrown away without a word: cancelling is a decision, not a fault, and
+    // does not deserve a message telling somebody what they already did.
+    stopListening?.();
+  });
 
   button.addEventListener("click", () => {
     if (recorder) {
@@ -945,6 +994,11 @@ function wireMic(): void {
       capping = setTimeout(finish, MAX_CLIP_MS);
       button.classList.add("listening");
       button.setAttribute("aria-label", "Stop and write it down");
+      // The counter starts at 0:00 immediately rather than a second later:
+      // a beat of blank where the number should be reads as a stall.
+      timeLabel().textContent = "0:00";
+      showStrip(true);
+      ticking = setInterval(tick, 200);
       showRightButton();
     })();
   });
