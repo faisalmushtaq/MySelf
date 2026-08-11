@@ -1731,13 +1731,27 @@ function render(frame: Frame): void {
    * only for http(s) — an unchecked URL here would accept `javascript:` and
    * turn the last screen of a study into a script somebody else wrote.
    */
+  /**
+   * The end, and the story they made, shown back.
+   *
+   * The original's completion page is ":tada: Yay! :tada:", a line saying they
+   * have finished, and then their final scenario. Ending on the paragraph they
+   * spent the whole interaction shaping — rather than on a status line about
+   * saving — is what makes it read as something they made rather than
+   * something that was taken.
+   *
+   * The goodbye lives HERE and only here. It used to be said by the
+   * interviewer just before three retellings arrived, which told somebody the
+   * conversation was over while it was still going.
+   */
   const advance = s.finished
     ? `<div class="ending">
-         <p class="ending-title">That is everything — thank you.</p>
+         <p class="ending-title">${s.stopped ? "Thank you — that is everything." : "That is your story. Thank you."}</p>
+         ${s.scenario && !s.stopped ? `<blockquote class="final-story">${escapeHtml(s.scenario)}</blockquote>` : ""}
          <p class="note">${
            s.stopped
              ? escapeHtml(`We stopped early: ${s.stopped.reason}. Nothing you wrote has been lost.`)
-             : "Your answers have been saved. You can close this page now."
+             : "It has been saved with the rest of your answers. You can close this page now."
          }</p>
          ${returnLink ? `<div class="row"><a class="secondary button-link" href="${escapeHtml(returnLink)}">Back to the website</a></div>` : ""}
        </div>`
