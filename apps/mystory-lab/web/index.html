@@ -14,6 +14,18 @@
         --ui: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
       }
       * { box-sizing: border-box; }
+      /**
+       * `hidden` means hidden, whatever else a rule says.
+       *
+       * The browser's own `[hidden]` rule is `display: none` at author-origin
+       * strength, so ANY class rule setting `display` beats it — and this file
+       * is full of them. That has now caused the same bug three times: the
+       * header note that carried every microphone error was `display: none` at
+       * base and never appeared, and the composer pill stayed visible over the
+       * recording strip and swallowed its buttons. Both looked like dead
+       * controls. One rule, at the top, so it cannot happen a fourth time.
+       */
+      [hidden] { display: none !important; }
       body { margin: 0; background: var(--canvas); color: var(--text); font-family: var(--ui); font-size: 15px; }
       .wrap { display: grid; grid-template-columns: minmax(340px, 1fr) minmax(380px, 1fr); gap: 1.5rem;
               max-width: 1500px; margin: 0 auto; padding: 1.25rem 1.5rem 4rem; }
@@ -254,12 +266,42 @@
          not change colour, and a bright ring around the box is the loudest
          thing on a screen whose subject is what somebody is about to say. */
       .composer-pill:focus-within { border-color: #9AA3A8; }
+      /* Where to look when the words land. The transcript arriving in the box
+         is the last beat of the whole gesture and the easiest to miss on a
+         phone, so the box says so for a second. */
+      .composer-bar textarea.just-heard { animation: heard 1.4s ease-out 1; }
+      @keyframes heard { 0% { background: #D9FDD3 } 100% { background: transparent } }
+      @media (prefers-reduced-motion: reduce) { .composer-bar textarea.just-heard { animation: none } }
       .scenario-edit:focus-visible { outline: 2px solid #00A884; outline-offset: 1px; }
       .send-round[hidden] { display: none; }
       .send-round { flex: 0 0 auto; width: 42px; height: 42px; border-radius: 50%; padding: 0;
                     display: grid; place-items: center; min-height: 0;
                     background: #00A884; border: 0; color: #fff; }
       .send-round svg { width: 21px; height: 21px; display: block; margin-left: 1px; }
+      /* ── While somebody is talking ───────────────────────────────────────
+         The pill goes and this takes its place, which is what WhatsApp does.
+         A red microphone blinking on and off, and a counter running in real
+         seconds — that counter is the feedback. A button that changes colour
+         says something was pressed; a number going up says you are being
+         heard. */
+      .recording-strip { flex: 1 1 auto; display: flex; align-items: center; gap: 10px;
+                         min-width: 0; height: 42px; padding: 0 4px 0 8px; }
+      .recording-strip[hidden] { display: none; }
+      .rec-dot { flex: 0 0 auto; width: 22px; height: 22px; color: #E8453C; display: grid;
+                 place-items: center; animation: recblink 1.6s ease-in-out infinite; }
+      .rec-dot svg { width: 20px; height: 20px; display: block; }
+      @keyframes recblink { 0%, 100% { opacity: 1 } 50% { opacity: .2 } }
+      .rec-time { flex: 0 0 auto; font-family: var(--wa); font-size: 16px; color: #3B4A54;
+                  font-variant-numeric: tabular-nums; min-width: 3.2em; }
+      /* WhatsApp says "slide to cancel" because it is a hold gesture. This is
+         tap-to-start and tap-to-stop — a child who lifts a finger early should
+         not lose the answer — so the way out is a word you can press. */
+      .rec-cancel { flex: 1 1 auto; text-align: right; background: none; border: 0; padding: 0 6px 0 0;
+                    min-height: 0; font-family: var(--wa); font-size: 15px; color: #667781; }
+      /* Uploading and being written down, said where the counter was. */
+      .composer-bar.writing .rec-dot { animation: none; color: #8696A0; }
+      .composer-bar.writing .rec-cancel { visibility: hidden; }
+
       /* Speaking instead of typing. Grey until it is listening, then the same
          green as send, so "it is on" is unmistakable. */
       .mic-round { flex: 0 0 auto; width: 42px; height: 42px; border-radius: 50%; padding: 0;
@@ -642,6 +684,22 @@
             <span class="composer-plus" aria-hidden="true">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M12 5.5v13M5.5 12h13"/></svg>
             </span>
+            <!--
+              What replaces the message box while somebody is talking.
+
+              WhatsApp takes the pill away entirely and puts this in its place:
+              a blinking red microphone, a counter running in real seconds, and
+              a way out. That counter is the whole of the feedback — it is what
+              tells you the phone is hearing you, and without it a red button
+              is just a red button.
+            -->
+            <div class="recording-strip" id="recordingStrip" hidden>
+              <span class="rec-dot" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><path fill="currentColor" d="M12 14.5a3.2 3.2 0 0 0 3.2-3.2V5.7a3.2 3.2 0 1 0-6.4 0v5.6a3.2 3.2 0 0 0 3.2 3.2Zm5.6-3.4a.9.9 0 0 0-1.8 0 3.8 3.8 0 0 1-7.6 0 .9.9 0 1 0-1.8 0 5.6 5.6 0 0 0 4.7 5.5v2.2H9.4a.9.9 0 1 0 0 1.8h5.2a.9.9 0 1 0 0-1.8h-1.7v-2.2a5.6 5.6 0 0 0 4.7-5.5Z"/></svg>
+              </span>
+              <span class="rec-time" id="recTime" role="timer" aria-live="off">0:00</span>
+              <button type="button" class="rec-cancel" id="recCancel">Cancel</button>
+            </div>
             <div class="composer-pill">
               <label class="sr-only" for="input">Your message</label>
               <textarea id="input" rows="1" placeholder="Message"></textarea>
