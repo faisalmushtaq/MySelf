@@ -195,8 +195,14 @@
          something to press. */
       .build-stamp { position: fixed; left: 1rem; bottom: 1rem; margin: 0; font-size: .72rem;
                      color: var(--muted); opacity: .65; pointer-events: none; }
-      body.participant-view .view-toggle { position: fixed; right: 1rem; bottom: 1rem; opacity: .5; }
-      body.participant-view .view-toggle:hover { opacity: 1; }
+      /* Quiet by colour rather than by opacity. It floats over a scrolling
+         conversation, and a translucent button lets the sentence underneath
+         read straight through it — which looks like a rendering fault, not
+         like restraint. */
+      body.participant-view .view-toggle { position: fixed; right: 1rem; bottom: 1rem;
+                                           background: var(--paper); color: var(--muted);
+                                           border-color: var(--hairline); }
+      body.participant-view .view-toggle:hover { color: var(--text); border-color: var(--strong); }
 
       @media (max-width: 900px) { .wrap { grid-template-columns: 1fr; } }
     </style>

@@ -11,8 +11,8 @@ import {
   stringifyToml,
   TomlError,
 } from "./index.js";
-import { checkProtocol } from "./protocol.js";
-import { futureSelf, microNarrativeFull, microNarrativeFullConfig } from "./protocols.js";
+import { checkProtocol, type NarrativeProtocol } from "./protocol.js";
+import { futureSelf, microNarrativeFull, microNarrativeFullConfig, phoneWellbeing } from "./protocols.js";
 
 /**
  * The fixtures are the real thing.
@@ -146,6 +146,27 @@ describe("writing a configuration file back out", () => {
   it("survives the trip through TOML", () => {
     const rebuilt = parseProtocolFile(protocolToToml(microNarrativeFull), "micro_narrative_full.toml");
     expect(rebuilt).toEqual(microNarrativeFull);
+  });
+
+  /**
+   * The files in `protocols/` are what a researcher copies and edits, and
+   * nothing generates them at build time — so they can quietly drift from the
+   * protocol that actually ships. Somebody would then edit a file believing it
+   * to be the thing they had just run, and be debugging a difference that
+   * exists only on disk.
+   *
+   * Checked by parsing the committed file rather than by comparing text, so
+   * reformatting is allowed and a change in meaning is not.
+   */
+  it("keeps the committed protocol files in step with what ships", () => {
+    const shipped: [string, NarrativeProtocol][] = [
+      ["micro_narrative_full.toml", microNarrativeFull],
+      ["phone_wellbeing.toml", phoneWellbeing],
+    ];
+    for (const [file, protocol] of shipped) {
+      const onDisk = readFileSync(new URL(`../../../protocols/${file}`, import.meta.url), "utf8");
+      expect(parseProtocolFile(onDisk, file), `${file} has drifted from the shipped protocol`).toEqual(protocol);
+    }
   });
 
   it("round-trips a real study file, so an edited one can go back to the original app", () => {
