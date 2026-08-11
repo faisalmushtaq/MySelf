@@ -80,6 +80,23 @@ describe("the participant's name", () => {
     expect(runner.start().text).toBe("Hi Amara — this last part is a short conversation.");
   });
 
+  it("does not leave the punctuation of a name that is not there", () => {
+    // Seen on a real run: the debrief reads "Thank you, {first_name}." and a
+    // participant with no name was told "Thank you,. That is everything." The
+    // last thing said to them was a typo.
+    const permitted = new Set(["first_name"]);
+    expect(resolveText("Thank you, {first_name}. That is everything.", { first_name: "" }, permitted).text).toBe(
+      "Thank you. That is everything.",
+    );
+    expect(resolveText("Thank you, {first_name}. That is everything.", { first_name: "Priya" }, permitted).text).toBe(
+      "Thank you, Priya. That is everything.",
+    );
+    expect(resolveText("Hi {first_name} — this last bit.", { first_name: "" }, permitted).text).toBe(
+      "Hi — this last bit.",
+    );
+    expect(resolveText("Hi {first_name}, how are you?", { first_name: "" }, permitted).text).toBe("Hi, how are you?");
+  });
+
   it("reads properly when there is no name to use", () => {
     // A missing name must never render as "Hi {first_name}" or "Hi , ...".
     const runner = new NarrativeRunner(mocked(), context({ first_name: "" }), gatewayWith(new MockAdapter()));
