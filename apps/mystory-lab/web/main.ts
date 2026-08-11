@@ -927,79 +927,197 @@ function wireMic(): void {
     stopListening?.();
   });
 
-  button.addEventListener("click", () => {
+  /**
+   * Start listening. Shared by the hold gesture and the tap.
+   */
+  const begin = async (): Promise<boolean> => {
+    let stream: MediaStream;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch (error) {
+      const denied = (error as { name?: string }).name === "NotAllowedError";
+      micTrouble(
+        denied
+          ? "Your phone did not allow the microphone. You can turn it on in Settings, or type your answer instead."
+          : `The microphone could not be opened (${String((error as Error).message ?? error)}).`,
+      );
+      return false;
+    }
+
+    const rec = makeRecorder(stream);
+    if (!rec) {
+      stream.getTracks().forEach((t) => t.stop());
+      micTrouble("This browser will not record audio. You can type your answer instead.");
+      return false;
+    }
+    recordedAs = rec.mimeType || "";
+
+    const parts: Blob[] = [];
+    rec.ondataavailable = (e) => {
+      if (e.data.size > 0) parts.push(e.data);
+    };
+    rec.onerror = () => {
+      micTrouble("The recording stopped unexpectedly. You can try again, or type your answer instead.");
+      release();
+    };
+    rec.onstop = () => {
+      // The tracks stop here rather than after the upload, as Bolo does it:
+      // otherwise iOS keeps the orange recording dot lit for the seconds the
+      // transcription takes, which looks like it is still listening.
+      stream.getTracks().forEach((t) => t.stop());
+      if (discarding) {
+        release();
+        return;
+      }
+      void send(recordedAs ? new Blob(parts, { type: recordedAs }) : new Blob(parts));
+    };
+    try {
+      /**
+       * No timeslice. This is the one line copied deliberately from Bolo,
+       * which records on these same phones and works.
+       *
+       * `start(1000)` seemed the safer choice and is the opposite on iOS:
+       * asking Safari for periodic chunks makes it emit FRAGMENTED MP4, and
+       * the concatenation of those fragments is not a file a decoder will
+       * open. One blob at the end is one valid file.
+       */
+      rec.start();
+    } catch (error) {
+      stream.getTracks().forEach((t) => t.stop());
+      micTrouble(`The recording would not start (${String((error as Error).message ?? error)}).`);
+      return false;
+    }
+    recorder = rec;
+    startedAt = Date.now();
+    capping = setTimeout(finish, MAX_CLIP_MS);
+    button.classList.add("listening");
+    button.setAttribute("aria-label", "Stop and write it down");
+    // The counter starts at 0:00 immediately rather than a second later:
+    // a beat of blank where the number should be reads as a stall.
+    timeLabel().textContent = "0:00";
+    showStrip(true);
+    ticking = setInterval(tick, 200);
+    showRightButton();
+    return true;
+  };
+
+  /**
+   * Hold to talk, slide to cancel, slide up to lock — and tap as the way in
+   * for anybody the gesture does not suit.
+   *
+   * WhatsApp's gesture is the one a young person already has, and its two
+   * escapes are the reason it works: you can back out of a recording without
+   * sending it, and you can stop holding without losing it. Both are built
+   * here. What is NOT copied is making the hold the only way: a child with a
+   * tremor, somebody on a laptop, and anybody using a switch all need a press
+   * that does not have to be maintained, so a quick tap starts a locked
+   * recording and a second tap sends it.
+   */
+  const SLIDE_TO_CANCEL = 70;
+  const SLIDE_TO_LOCK = 55;
+  /** Under this, the press was a tap and the recording stays on by itself. */
+  const TAP_MS = 350;
+
+  let pressId: number | null = null;
+  let pressAt = 0;
+  let from = { x: 0, y: 0 };
+  let locked = false;
+  let cancelling = false;
+
+  const setCancelling = (on: boolean) => {
+    cancelling = on;
+    strip().classList.toggle("cancelling", on);
+  };
+
+  const lock = () => {
+    locked = true;
+    pressId = null;
+    strip().classList.remove("held");
+    strip().classList.add("locked");
+    setCancelling(false);
+  };
+
+  button.addEventListener("pointerdown", (event) => {
+    // A press while locked is the stop button.
+    if (recorder) {
+      finish();
+      return;
+    }
+    if (busy) return;
+    pressId = event.pointerId;
+    pressAt = Date.now();
+    from = { x: event.clientX, y: event.clientY };
+    locked = false;
+    setCancelling(false);
+    button.setPointerCapture?.(event.pointerId);
+    void (async () => {
+      const started = await begin();
+      // Let go before the microphone opened: do not leave it running.
+      if (!started) {
+        pressId = null;
+        return;
+      }
+      // The finger may already be gone: opening a microphone takes long enough
+      // for a quick tap to have finished before this resolves. Let go with
+      // nothing locked and there is nothing to keep; let go into a lock and the
+      // strip is already in its locked state and must not be dressed as held.
+      if (pressId === null) {
+        if (!locked) stopListening?.();
+        return;
+      }
+      strip().classList.add("held");
+    })();
+  });
+
+  button.addEventListener("pointermove", (event) => {
+    if (pressId !== event.pointerId || locked || !recorder) return;
+    const left = from.x - event.clientX;
+    const up = from.y - event.clientY;
+    if (up > SLIDE_TO_LOCK && up > left) {
+      lock();
+      return;
+    }
+    setCancelling(left > SLIDE_TO_CANCEL);
+    // The strip follows the finger, which is what tells you the slide is
+    // doing something before you have gone far enough for it to.
+    strip().style.setProperty("--slide", `${Math.min(left, 120)}px`);
+  });
+
+  const letGo = (event: PointerEvent) => {
+    if (pressId !== event.pointerId) return;
+    pressId = null;
+    strip().classList.remove("held");
+    strip().style.removeProperty("--slide");
+    if (locked) return;
+
+    // A tap, not a hold. The recording carries on by itself and the next tap
+    // sends it — the forgiving path, and the only one a keyboard has.
+    if (Date.now() - pressAt < TAP_MS && !cancelling) {
+      lock();
+      return;
+    }
+    if (cancelling) {
+      setCancelling(false);
+      stopListening?.();
+      return;
+    }
+    finish();
+  };
+  button.addEventListener("pointerup", letGo);
+  button.addEventListener("pointercancel", letGo);
+  // Holding a button on iOS otherwise raises the selection callout.
+  button.addEventListener("contextmenu", (event) => event.preventDefault());
+
+  // The keyboard has no hold. Space and Enter start and stop.
+  button.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    event.preventDefault();
     if (recorder) {
       finish();
       return;
     }
     void (async () => {
-      let stream: MediaStream;
-      try {
-        stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      } catch (error) {
-        const denied = (error as { name?: string }).name === "NotAllowedError";
-        micTrouble(
-          denied
-            ? "Your phone did not allow the microphone. You can turn it on in Settings, or type your answer instead."
-            : `The microphone could not be opened (${String((error as Error).message ?? error)}).`,
-        );
-        return;
-      }
-
-      const rec = makeRecorder(stream);
-      if (!rec) {
-        stream.getTracks().forEach((t) => t.stop());
-        micTrouble("This browser will not record audio. You can type your answer instead.");
-        return;
-      }
-      recordedAs = rec.mimeType || "";
-
-      const parts: Blob[] = [];
-      rec.ondataavailable = (e) => {
-        if (e.data.size > 0) parts.push(e.data);
-      };
-      rec.onerror = () => {
-        micTrouble("The recording stopped unexpectedly. You can try again, or type your answer instead.");
-        release();
-      };
-      rec.onstop = () => {
-        // The tracks stop here rather than after the upload, as Bolo does it:
-        // otherwise iOS keeps the orange recording dot lit for the seconds the
-        // transcription takes, which looks like it is still listening.
-        stream.getTracks().forEach((t) => t.stop());
-        if (discarding) {
-          release();
-          return;
-        }
-        void send(recordedAs ? new Blob(parts, { type: recordedAs }) : new Blob(parts));
-      };
-      try {
-        /**
-         * No timeslice. This is the one line copied deliberately from Bolo,
-         * which records on these same phones and works.
-         *
-         * `start(1000)` seemed the safer choice and is the opposite on iOS:
-         * asking Safari for periodic chunks makes it emit FRAGMENTED MP4, and
-         * the concatenation of those fragments is not a file a decoder will
-         * open. One blob at the end is one valid file.
-         */
-        rec.start();
-      } catch (error) {
-        stream.getTracks().forEach((t) => t.stop());
-        micTrouble(`The recording would not start (${String((error as Error).message ?? error)}).`);
-        return;
-      }
-      recorder = rec;
-      startedAt = Date.now();
-      capping = setTimeout(finish, MAX_CLIP_MS);
-      button.classList.add("listening");
-      button.setAttribute("aria-label", "Stop and write it down");
-      // The counter starts at 0:00 immediately rather than a second later:
-      // a beat of blank where the number should be reads as a stall.
-      timeLabel().textContent = "0:00";
-      showStrip(true);
-      ticking = setInterval(tick, 200);
-      showRightButton();
+      if (await begin()) lock();
     })();
   });
 }

@@ -298,6 +298,27 @@
          not lose the answer — so the way out is a word you can press. */
       .rec-cancel { flex: 1 1 auto; text-align: right; background: none; border: 0; padding: 0 6px 0 0;
                     min-height: 0; font-family: var(--wa); font-size: 15px; color: #667781; }
+      /* Held: WhatsApp's wording, moving with the finger, so the slide is
+         visibly doing something before it has gone far enough to do it. */
+      .rec-slide { flex: 1 1 auto; display: none; align-items: center; justify-content: flex-end; gap: 4px;
+                   font-family: var(--wa); font-size: 15px; color: #667781; padding-right: 6px;
+                   transform: translateX(calc(-1 * var(--slide, 0px))); }
+      .rec-slide svg { width: 15px; height: 15px; flex: 0 0 auto; }
+      .rec-release-word { display: none; }
+      .recording-strip.held .rec-slide { display: flex; }
+      .recording-strip.held .rec-cancel { display: none; }
+      /* Far enough. The whole strip commits to the cancel, so letting go is
+         not a guess about whether it went far enough. */
+      .recording-strip.cancelling .rec-slide { color: #E8453C; transform: none; }
+      .recording-strip.cancelling .rec-slide svg { display: none; }
+      .recording-strip.cancelling .rec-slide-word { display: none; }
+      .recording-strip.cancelling .rec-release-word { display: inline; font-weight: 600; }
+      .recording-strip.cancelling .rec-time { color: #E8453C; }
+      /* Locked: the finger has gone, so the way out has to be pressable. */
+      .recording-strip.locked .rec-slide { display: none; }
+      /* The gesture needs the page to stop scrolling underneath it. */
+      .mic-round { touch-action: none; }
+      .mic-round.listening svg { transform: scale(1.06); }
       /* Uploading and being written down, said where the counter was. */
       .composer-bar.writing .rec-dot { animation: none; color: #8696A0; }
       .composer-bar.writing .rec-cancel { visibility: hidden; }
@@ -698,6 +719,14 @@
                 <svg viewBox="0 0 24 24"><path fill="currentColor" d="M12 14.5a3.2 3.2 0 0 0 3.2-3.2V5.7a3.2 3.2 0 1 0-6.4 0v5.6a3.2 3.2 0 0 0 3.2 3.2Zm5.6-3.4a.9.9 0 0 0-1.8 0 3.8 3.8 0 0 1-7.6 0 .9.9 0 1 0-1.8 0 5.6 5.6 0 0 0 4.7 5.5v2.2H9.4a.9.9 0 1 0 0 1.8h5.2a.9.9 0 1 0 0-1.8h-1.7v-2.2a5.6 5.6 0 0 0 4.7-5.5Z"/></svg>
               </span>
               <span class="rec-time" id="recTime" role="timer" aria-live="off">0:00</span>
+              <!-- While the finger is down: WhatsApp's own words, sliding with
+                   it. Replaced by a pressable Cancel once the recording is
+                   locked and there is no finger to slide. -->
+              <span class="rec-slide" aria-hidden="true">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M14 5.5 7.5 12l6.5 6.5"/></svg>
+                <span class="rec-slide-word">slide to cancel</span>
+                <span class="rec-release-word">release to cancel</span>
+              </span>
               <button type="button" class="rec-cancel" id="recCancel">Cancel</button>
             </div>
             <div class="composer-pill">
