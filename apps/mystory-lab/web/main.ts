@@ -1404,14 +1404,51 @@ function render(frame: Frame): void {
 const THINKS = new Set(["introduction", "collect", "extract", "generate", "adapt", "follow_up", "interpret"]);
 
 /**
- * How long the dots stay up at the least.
+ * How long the dots stay up, and why it depends on what is coming.
  *
  * A reply that lands in 200ms flashes the dots for a frame, which reads as a
- * glitch rather than as an answer. Messages has the same beat because a person
- * is typing on the other end; keeping it makes a fast reply feel composed
- * rather than canned, and costs a fifth of a second nobody is waiting on.
+ * glitch. But a FIXED floor has the opposite problem at the other end: the
+ * introduction is a ninety-word paragraph, and ninety words arriving whole
+ * two-thirds of a second after a tap is the clearest possible tell that
+ * nothing typed them. The illusion breaks before the conversation starts.
+ *
+ * So the wait is proportional to the message: roughly nine milliseconds a
+ * character over a half-second floor, ceilinged just under four seconds so the
+ * longest thing in the protocol does not become a wait. Nobody types 450
+ * characters instantly, and nobody takes a real minute either — this is
+ * imitating somebody composing on a phone, not a transcriptionist.
+ *
+ * Short replies barely change: a twelve-word question still lands in about a
+ * second. It is the paragraph that now takes its time.
  */
-const DOTS_AT_LEAST_MS = 650;
+const DOTS_FLOOR_MS = 500;
+const DOTS_CEILING_MS = 3800;
+const MS_PER_CHARACTER = 9;
+
+export function typingPause(text: string | null | undefined): number {
+  const characters = (text ?? "").trim().length;
+  return Math.min(DOTS_CEILING_MS, DOTS_FLOOR_MS + characters * MS_PER_CHARACTER);
+}
+
+/**
+ * What the pause is measured against — and the one screen it is not.
+ *
+ * Everywhere else the rule is "as long as it would take to type this". The
+ * retellings are the deliberate exception: three paragraphs landing together
+ * are not somebody typing, they are a set of options being put in front of
+ * you, and pausing for the length of all three would be ten seconds of wait
+ * dressed as courtesy. That stage has also just made several real model calls,
+ * so the participant has already done the waiting that counts.
+ *
+ * The retellings live in `choices` rather than `text`, so they were never
+ * measured — but this says so, rather than leaving it true by accident until
+ * somebody moves a field.
+ */
+function pauseFor(screen: Screen): string | null {
+  if ((screen.choices ?? []).length > 0) return null;
+  return screen.text ?? null;
+}
+
 let dotsShownAt = 0;
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -1424,10 +1461,14 @@ const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
  * busy after the answer was already on screen — which is a pause with nothing
  * to look at, the opposite of the intent.
  */
-async function settle(): Promise<void> {
+async function settle(coming?: string | null): Promise<void> {
   if (dotsShownAt === 0) return;
   const shown = Date.now() - dotsShownAt;
-  if (shown < DOTS_AT_LEAST_MS) await wait(DOTS_AT_LEAST_MS - shown);
+  // The model's own latency counts towards it. A call that took two seconds
+  // has already spent two seconds of somebody's patience, and adding a full
+  // typing pause on top would be theatre charged for twice.
+  const wanted = typingPause(coming);
+  if (shown < wanted) await wait(wanted - shown);
   dotsShownAt = 0;
 }
 
@@ -1565,13 +1606,13 @@ async function turn(payload: { action: string; input?: string; echo?: boolean })
               : payload.action === "revert"
                 ? localRunner.revertScenario()
                 : await localRunner.submit(payload.input ?? "");
-      await settle();
+      await settle(pauseFor(screen));
       render({ screen, records: localRunner.all, calls: localCalls });
       void store(localRunner, screen.finished);
       return;
     }
     const frame = await api<Frame>("/api/turn", { sessionId, ...payload });
-    await settle();
+    await settle(pauseFor(frame.screen));
     render(frame);
   } catch (error) {
     // A failed turn must not leave the page disabled and silent.
