@@ -217,35 +217,34 @@ interface Frame {
 type Who = "them" | "me" | "system";
 
 /**
- * The two avatars.
+ * A message.
  *
- * The participant's is a plain silhouette, drawn rather than an emoji: every
- * person emoji picks a skin tone, a hair colour and usually an age, and
- * showing a young person a face that is not theirs — and might be pointedly
- * not theirs — is a small act of misidentification for no gain.
+ * No avatar. A one-to-one WhatsApp chat shows none beside the bubbles — only
+ * the header says who you are talking to — which is both what the real thing
+ * looks like and the cleanest answer to not wanting to put a face on a young
+ * person who has not given us one.
  *
- * Drawn as SVG so it renders identically everywhere, which emoji does not.
+ * The time and, on their own messages, the ticks live INSIDE the bubble and
+ * are floated, so a short message sits on one line with the time beside it and
+ * a long one wraps above it. That float is the whole trick to why WhatsApp
+ * bubbles look the way they do.
  */
-const AVATAR = {
-  them: `<div class="avatar" aria-hidden="true" style="background:#8E8E93">
-      <svg viewBox="0 0 26 26" fill="none"><circle cx="13" cy="13" r="13" fill="#8E8E93"/>
-        <rect x="7" y="8" width="12" height="10" rx="3" fill="#fff"/>
-        <circle cx="10.5" cy="13" r="1.6" fill="#8E8E93"/><circle cx="15.5" cy="13" r="1.6" fill="#8E8E93"/>
-        <rect x="12.3" y="4.5" width="1.4" height="3" rx=".7" fill="#fff"/></svg>
-    </div>`,
-  me: `<div class="avatar" aria-hidden="true">
-      <svg viewBox="0 0 26 26"><circle cx="13" cy="13" r="13" fill="#C7C7CC"/>
-        <circle cx="13" cy="10" r="4.2" fill="#fff"/>
-        <path d="M4.8 23a8.2 8.2 0 0 1 16.4 0Z" fill="#fff"/></svg>
-    </div>`,
+const TICKS = `<span class="ticks" aria-hidden="true"><svg viewBox="0 0 16 11">
+    <path d="M11.07.65a.5.5 0 0 0-.71.02L5.2 6.2 3.3 4.2a.5.5 0 1 0-.72.7l2.26 2.38a.5.5 0 0 0 .72 0l5.53-5.92a.5.5 0 0 0-.02-.71Z"/>
+    <path d="M15.07.65a.5.5 0 0 0-.71.02L9.2 6.2 8.6 5.56l-.7.75.94.99a.5.5 0 0 0 .72 0l5.53-5.92a.5.5 0 0 0-.02-.73Z"/>
+  </svg></span>`;
+
+/** hh:mm, as a chat shows it. */
+const clock = (at?: string): string => {
+  const d = at ? new Date(at) : new Date();
+  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 };
 
-const bubble = (who: Who, html: string): string =>
+const bubble = (who: Who, html: string, at?: string): string =>
   who === "system"
-    ? `<div class="msg from-them turn"><div class="bubble system">${html}</div></div>`
+    ? `<div class="msg system-msg turn"><div class="bubble system">${html}</div></div>`
     : `<div class="msg from-${who}">
-         ${who === "them" ? AVATAR.them : AVATAR.me}
-         <div class="bubble">${html}</div>
+         <div class="bubble">${html}<span class="meta">${clock(at)}${who === "me" ? TICKS : ""}</span></div>
        </div>`;
 
 /**
@@ -290,20 +289,18 @@ function threadFrom(records: Frame["records"]): string {
     }
   }
   /**
-   * Group the run and put a tail on the last of each.
+   * Mark the first bubble of each run.
    *
-   * Messages does this and it carries real information: a tail marks where one
-   * person stopped and the other started, so a wall of grey bubbles reads as
-   * one turn rather than five. Applied here, after the fact, because the
-   * records do not know what follows them.
+   * WhatsApp puts the tail on the first message a speaker sends and opens the
+   * spacing there, so five bubbles from one side read as a single turn rather
+   * than five interruptions. Applied here rather than while building, because
+   * a record does not know what follows it.
    */
   return parts
     .map((html, i) => {
       const mine = html.includes("from-me");
-      const lastOfRun = i === parts.length - 1 || parts[i + 1]!.includes("from-me") !== mine;
       const firstOfRun = i === 0 || parts[i - 1]!.includes("from-me") !== mine;
-      const classes = [lastOfRun ? "tail" : "", firstOfRun ? "turn" : ""].filter(Boolean).join(" ");
-      return classes ? html.replace('class="msg ', `class="msg ${classes} `) : html;
+      return firstOfRun ? html.replace('class="msg ', 'class="msg turn ') : html;
     })
     .join("");
 }
@@ -621,9 +618,8 @@ function setBusy(stageKind: string | null): void {
   // wait read as someone composing an answer rather than as a stall.
   const node = document.createElement("div");
   node.id = "thinking";
-  node.className = "msg from-them tail turn";
-  node.innerHTML = `${AVATAR.them}
-    <div class="bubble"><span class="dots"><span></span><span></span><span></span></span></div>`;
+  node.className = "msg from-them turn";
+  node.innerHTML = `<div class="bubble"><span class="dots"><span></span><span></span><span></span></span></div>`;
   $("thread").append(node);
   dotsShownAt = Date.now();
   scrollThread();
@@ -655,7 +651,7 @@ async function store(runner: NarrativeRunner, finished: boolean): Promise<void> 
   if (records.length === 0) return;
 
   try {
-    await fetch(`${relay.replace(/\/llmRelay$/, "")}/saveNarrative`, {
+    const res = await fetch(`${relay.replace(/\/llmRelay$/, "")}/saveNarrative`, {
       method: "POST",
       headers: { "content-type": "application/json", authorization: credential },
       body: JSON.stringify({
@@ -667,6 +663,16 @@ async function store(runner: NarrativeRunner, finished: boolean): Promise<void> 
         elapsedSeconds: runStartedAt ? Math.round((Date.now() - runStartedAt) / 1000) : 0,
       }),
     });
+    /**
+     * Blue ticks mean it is stored, and only that.
+     *
+     * WhatsApp's blue ticks mean read, and borrowing them for decoration would
+     * be a small lie in the one part of the screen that is about whether their
+     * words survived. Here they say the run reached the study — which is the
+     * honest equivalent, and the thing a participant would actually want to
+     * know.
+     */
+    document.body.classList.toggle("saved", res.ok);
   } catch {
     // Deliberately silent — see above.
   }
