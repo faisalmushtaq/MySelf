@@ -434,6 +434,16 @@
       .card-choice .who { color: var(--muted); font-size: .78rem; text-transform: lowercase;
                           letter-spacing: .02em; display: block; margin-bottom: .3rem; }
 
+      .confirm-row { margin-top: .6rem; text-align: center; }
+      .confirm-hint { font-family: var(--wa); font-size: 13px; color: #667781; margin: 0 0 .5rem; }
+      .confirm-row button[hidden] { display: none !important; }
+      /* The one that has been tapped, before it is confirmed. Outlined rather
+         than filled: it is a selection, not yet an answer. */
+      .choice-bubble.picked { box-shadow: 0 0 0 2px #00A884, var(--wa-shadow); }
+      .choice-bubble.picked .reaction { opacity: .45; transform: scale(.85); }
+
+      .slider-ask { font-family: var(--wa); font-size: 15px; color: #3B4A54; margin: 0 0 .6rem;
+                    text-align: center; }
       .slider-wrap { margin-top: 1rem; }
       .slider-ends { display: flex; justify-content: space-between; font-size: .85rem; font-weight: 500; }
       .slider-ends .low { color: #c0392b; }
@@ -518,7 +528,10 @@
          a pixel of ground between the tail and the screen edge and the whole
          conversation looked shoved against the left. The padding now carries
          the tail AND the gap WhatsApp leaves beside it. */
-      body.participant-view .thread { flex: 1 1 auto; max-height: none; min-height: 26dvh;
+      /* `min-height: 0` rather than a floor in dvh: a flex child will not
+         shrink below its content without it, which is what let the thread
+         push the stage area off the screen instead of scrolling itself. */
+      body.participant-view .thread { flex: 1 1 auto; max-height: none; min-height: 0;
                                       overflow-y: auto; border-radius: 0;
                                       padding: .55rem 1.05rem 1rem; }
       /* Cream all the way down, so nothing below the last control shows the
@@ -530,7 +543,17 @@
       body.participant-view .msg { max-width: 80%; }
       /* Tall stages — three retellings, the edit box — scroll on their own
          rather than squeezing the conversation out of the frame. */
-      body.participant-view #stageArea { flex: 0 1 auto; max-height: 62dvh; overflow-y: auto;
+      /**
+       * The stage area takes what it needs; the conversation yields.
+       *
+       * It was `flex: 0 1 auto`, which let it be SHRUNK by a long thread — and
+       * that is how a rating slider ended up off the bottom of the screen
+       * while the button that submits it stayed reachable. Whatever this holds
+       * is the thing the participant is being asked to do, so it gets its
+       * height first and the thread gives way. It still caps and scrolls
+       * internally, so a long edit box cannot swallow the chat entirely.
+       */
+      body.participant-view #stageArea { flex: 0 0 auto; max-height: 58dvh; overflow-y: auto;
                                          padding: 0 .6rem .6rem; background: var(--wa-bg); }
       /* An empty stage area still drew its padding as a cream band between the
          conversation and the composer, which made the composer look detached
