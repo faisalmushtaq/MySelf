@@ -369,13 +369,11 @@ function wireStageControls(): void {
   const submit = () => {
     const picked = document.querySelector<HTMLInputElement>('input[name="choice"]:checked');
     const range = document.getElementById("ratingRange") as HTMLInputElement | null;
-    const typed = document.getElementById("input") as HTMLTextAreaElement | null;
     // `echo` only when the value is something they wrote. A choice sends an
     // index and a rating sends a number, and neither is a sentence anybody
     // said — the thread renders those as "I'll take the plain one" and
     // "7 out of 10" once recorded, which is what should appear.
-    const wrote = picked === null && range === null && typed !== null;
-    void turn({ action: "submit", input: picked?.value ?? range?.value ?? typed?.value ?? "", echo: wrote });
+    void turn({ action: "submit", input: picked?.value ?? range?.value ?? "", echo: false });
   };
 
   document.getElementById("send")?.addEventListener("click", submit);
@@ -387,19 +385,23 @@ function wireStageControls(): void {
     void turn({ action: "keep", input: edited });
   });
 
-  // Enter sends; Shift+Enter is a new line. What a message box does.
-  const input = document.getElementById("input") as HTMLTextAreaElement | null;
-  input?.addEventListener("keydown", (e) => {
+  // The rewrite request at the adapt stage. Its own box rather than the message
+  // bar: "describe what to change" is an instruction about a text, not a reply
+  // in the conversation, and it sits beside the text it is about.
+  const rewrite = document.getElementById("rewrite") as HTMLTextAreaElement | null;
+  const askRewrite = () => {
+    const said = rewrite?.value ?? "";
+    if (!said.trim()) return;
+    if (rewrite) rewrite.value = "";
+    void turn({ action: "submit", input: said, echo: true });
+  };
+  document.getElementById("sendRewrite")?.addEventListener("click", askRewrite);
+  rewrite?.addEventListener("keydown", (e) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
-      submit();
+      askRewrite();
     }
   });
-  input?.addEventListener("input", () => {
-    input.style.height = "auto";
-    input.style.height = `${Math.min(input.scrollHeight, 144)}px`;
-  });
-  input?.focus();
 
   // Cmd/Ctrl+Enter keeps an edited write-up, as the original does.
   /**
@@ -441,12 +443,242 @@ function wireStageControls(): void {
   });
 }
 
+/* ── The message bar, wired once ─────────────────────────────────────────── */
+
+/**
+ * The composer is never rebuilt, so it is never rewired.
+ *
+ * It used to be regenerated with the rest of the stage on every turn. On iOS
+ * that destroyed the element the keyboard was attached to: the keyboard closed,
+ * the visual viewport grew, `100dvh` recomputed, the frame resized, and then
+ * the new box was focused and the whole thing happened in reverse. That is the
+ * "small shifts" — the conversation was being measured against a viewport that
+ * changed height twice per message.
+ */
+const composerBar = () => $("composerBar") as HTMLElement;
+const messageBox = () => document.getElementById("input") as HTMLTextAreaElement;
+
+/** Height that matches the text, in the same beat WhatsApp's box grows in. */
+function sizeMessageBox(): void {
+  const box = messageBox();
+  box.style.height = "auto";
+  box.style.height = `${Math.min(box.scrollHeight, 120)}px`;
+  showRightButton();
+}
+
+/**
+ * The microphone or the send button, never both.
+ *
+ * WhatsApp swaps one for the other as soon as there is something to send, and
+ * two buttons sitting side by side is the tell that this is an imitation. The
+ * microphone stays while it is listening, because hiding the control that
+ * stops it would be a trap.
+ */
+function showRightButton(): void {
+  const mic = document.getElementById("micBtn") as HTMLButtonElement | null;
+  const send = document.getElementById("sendMsg") as HTMLButtonElement | null;
+  const empty = messageBox().value.trim().length === 0;
+  const listening = mic?.classList.contains("listening") === true;
+  // Send hides only when a microphone is there to take its place. A browser
+  // with no recogniser would otherwise show an empty box and no button at all.
+  if (send) send.hidden = empty && micAvailable && !listening;
+  if (mic && micAvailable) mic.hidden = !(empty || listening);
+}
+/** Set by `wireMic` once it knows whether this browser has a recogniser. */
+let micAvailable = false;
+
+/** Set by `wireMic`, so sending can stop the microphone still writing. */
+let stopListening: (() => void) | null = null;
+
+function sendMessage(): void {
+  const box = messageBox();
+  const said = box.value;
+  if (!said.trim() || busy) return;
+  stopListening?.();
+  // Cleared the instant it is sent, as a message box is. The bubble is already
+  // on screen by the time the box is empty — see the echo in `turn`.
+  box.value = "";
+  sizeMessageBox();
+  void turn({ action: "submit", input: said, echo: true });
+}
+
+function wireComposer(): void {
+  const box = messageBox();
+  document.getElementById("sendMsg")?.addEventListener("click", sendMessage);
+  box.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
+  });
+  box.addEventListener("input", sizeMessageBox);
+}
+
+/* ── The header, and the things it declines to do ────────────────────────── */
+
+/** A line under the header, said once and cleared. */
+let noteTimer: ReturnType<typeof setTimeout> | null = null;
+function headerNote(text: string): void {
+  const note = $("headerNote");
+  note.textContent = text;
+  note.hidden = false;
+  if (noteTimer) clearTimeout(noteTimer);
+  noteTimer = setTimeout(() => {
+    note.hidden = true;
+  }, 5000);
+}
+
+/**
+ * "online" and "typing…", as WhatsApp shows them.
+ *
+ * Tied to the dots, so the header and the thread never disagree about whether
+ * anything is happening.
+ */
+function setStatus(typing: boolean): void {
+  const sub = document.getElementById("whoSub");
+  if (sub) sub.textContent = typing ? "typing…" : "online";
+}
+
+function wireHeader(): void {
+  /**
+   * The call buttons decline, in words.
+   *
+   * They are in the header because WhatsApp's header has them and its shape is
+   * wrong without them. What is behind them is the truth: this is an AI and it
+   * only reads and writes. A dead icon would leave somebody tapping it.
+   */
+  document
+    .getElementById("videoCall")
+    ?.addEventListener("click", () =>
+      headerNote("Alex can’t do video calls — Alex is an AI, and this chat is writing only."),
+    );
+  document
+    .getElementById("voiceCall")
+    ?.addEventListener("click", () =>
+      headerNote("Alex can’t take calls — Alex is an AI. You can talk to it though: tap the microphone by the message box."),
+    );
+  document
+    .getElementById("chatBack")
+    ?.addEventListener("click", () => headerNote("This is the only chat here — there’s nothing behind it."));
+}
+
+/* ── Speaking instead of typing ──────────────────────────────────────────── */
+
+/**
+ * Dictation, where the browser has it.
+ *
+ * The recogniser is the browser's own — Safari's and Chrome's both send audio
+ * to their vendor to transcribe it, which is the same path as the dictation key
+ * on the keyboard a participant already has. THIS PAGE RECORDS NOTHING: no
+ * audio is captured by us, uploaded by us or stored anywhere, and what reaches
+ * the study is the text, sitting in the box where it can be read and corrected
+ * before it is sent. That distinction is the whole reason it is built this way
+ * rather than as a voice note.
+ *
+ * It is offered only where a recogniser exists, because a microphone button
+ * that cannot work is worse than no microphone button.
+ */
+interface SpeechLike {
+  lang: string;
+  continuous: boolean;
+  interimResults: boolean;
+  start(): void;
+  stop(): void;
+  onresult: ((event: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void) | null;
+  onerror: ((event: { error?: string }) => void) | null;
+  onend: (() => void) | null;
+}
+
+function wireMic(): void {
+  const button = document.getElementById("micBtn") as HTMLButtonElement | null;
+  if (!button) return;
+  const w = window as unknown as { SpeechRecognition?: new () => SpeechLike; webkitSpeechRecognition?: new () => SpeechLike };
+  const Recogniser = w.SpeechRecognition ?? w.webkitSpeechRecognition;
+  if (!Recogniser) return;
+  micAvailable = true;
+  showRightButton();
+
+  let listening: SpeechLike | null = null;
+  // What was in the box when they started talking, so speech is added to it
+  // rather than replacing something they had already typed.
+  let before = "";
+
+  const stop = () => {
+    listening?.stop();
+    listening = null;
+    button.classList.remove("listening");
+    button.setAttribute("aria-label", "Speak your answer");
+    showRightButton();
+  };
+  stopListening = stop;
+
+  button.addEventListener("click", () => {
+    if (listening) {
+      stop();
+      return;
+    }
+    const speech = new Recogniser();
+    speech.lang = navigator.language || "en-GB";
+    speech.continuous = true;
+    speech.interimResults = true;
+
+    speech.onresult = (event) => {
+      let heard = "";
+      for (let i = 0; i < event.results.length; i += 1) heard += event.results[i]?.[0]?.transcript ?? "";
+      const box = messageBox();
+      box.value = (before ? `${before.replace(/\s+$/, "")} ` : "") + heard.trim();
+      sizeMessageBox();
+    };
+    speech.onerror = (event) => {
+      stop();
+      headerNote(
+        event.error === "not-allowed"
+          ? "Your browser did not allow the microphone. You can type your answer instead."
+          : "That did not come through. You can try again, or type your answer instead.",
+      );
+    };
+    speech.onend = () => stop();
+
+    before = messageBox().value;
+    try {
+      speech.start();
+    } catch {
+      headerNote("The microphone could not be started. You can type your answer instead.");
+      return;
+    }
+    listening = speech;
+    button.classList.add("listening");
+    button.setAttribute("aria-label", "Stop listening");
+    showRightButton();
+    messageBox().focus();
+  });
+}
+
+/**
+ * Show or hide the bar for this screen.
+ *
+ * Focus is taken only when the bar first appears in a run. After that the
+ * element survives every turn, so focus survives with it and the keyboard
+ * never closes — which is the whole point of not rebuilding it.
+ */
+function setComposer(placeholder: string | null): void {
+  const bar = composerBar();
+  if (placeholder === null) {
+    bar.hidden = true;
+    return;
+  }
+  const appearing = bar.hidden;
+  bar.hidden = false;
+  messageBox().placeholder = placeholder;
+  if (appearing) {
+    sizeMessageBox();
+    if (document.body.classList.contains("participant-view")) messageBox().focus();
+  }
+}
+
 function render(frame: Frame): void {
   const s = frame.screen;
   currentKind = s.kind;
-
-  $("thread").innerHTML = threadFrom(frame.records) || `<p class="note">Start a run to see the conversation.</p>`;
-  scrollThread();
 
   // How far along. Announced politely rather than assertively: a screen reader
   // being interrupted to say "step 4 of 6" in the middle of reading the
@@ -482,7 +714,9 @@ function render(frame: Frame): void {
    */
   const choices = (s.choices ?? [])
     .map(
-      (c) => `<div class="msg from-them turn choice-msg">
+      // Three messages in one run, so the tail and the wider gap go on the
+      // first only — the same rule the rest of the thread follows.
+      (c, i) => `<div class="msg from-them ${i === 0 ? "turn " : ""}choice-msg" style="animation-delay: ${i * 140}ms">
           <div class="bubble choice-bubble" role="button" tabindex="0" data-choice="${c.index}"
                aria-label="Retelling. Press and hold, or press Enter, to choose this one.">
             <span class="who lab-only">${escapeHtml(c.persona)}</span>
@@ -492,6 +726,23 @@ function render(frame: Frame): void {
         </div>`,
     )
     .join("");
+
+  /**
+   * The conversation, including the retellings.
+   *
+   * The three used to be rendered into the panel below the thread, which was a
+   * second scrolling box stacked under the first. They scrolled independently,
+   * so a retelling could sit half above a boundary with nothing to show it had
+   * been cut — the "distorted" boxes. They are messages; they belong in the
+   * thread, with the instruction as a centred system line above them, which is
+   * where WhatsApp puts anything that is not a message.
+   */
+  const hint = choices
+    ? bubble("system", "Press and hold the one that fits best, and give it a \u{1F44D}")
+    : "";
+  $("thread").innerHTML =
+    (threadFrom(frame.records) || `<p class="note">Start a run to see the conversation.</p>`) + hint + choices;
+  scrollThread();
 
   // A slider with named ends, as the original has it: "needs a lot of work"
   // to "this looks good". Eleven radio buttons is a developer's idea of a
@@ -530,8 +781,8 @@ function render(frame: Frame): void {
              : ""
          }
          <div class="composer">
-           <textarea id="input" rows="1" placeholder="Describe what you&rsquo;d like to change\u2026"></textarea>
-           <button class="primary send-round" id="send" title="Ask for a rewrite"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M2.5 20.5 21 12 2.5 3.5v6.6L15 12 2.5 13.9z"/></svg></button>
+           <textarea id="rewrite" rows="1" placeholder="Describe what you&rsquo;d like to change\u2026"></textarea>
+           <button class="primary send-round" id="sendRewrite" title="Ask for a rewrite"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M3.4 20.4 21.8 12 3.4 3.6 3.4 10.1 16.5 12 3.4 13.9z"/></svg></button>
          </div>
        </div>`
     : "";
@@ -539,13 +790,14 @@ function render(frame: Frame): void {
   // The retelling under discussion, quoted, at the stage where it is rated.
   const quoted = s.scenario && !s.editable ? `<blockquote class="scenario">${escapeHtml(s.scenario)}</blockquote>` : "";
 
-  const composer =
-    s.expectsInput && !choices && !rating && !s.editable
-      ? `<div class="composer">
-           <textarea id="input" rows="1" placeholder="Type your answer\u2026"></textarea>
-           <button class="primary send-round" id="send" title="Send"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M2.5 20.5 21 12 2.5 3.5v6.6L15 12 2.5 13.9z"/></svg></button>
-         </div>`
-      : "";
+  /**
+   * Whether this screen is one somebody types a message on.
+   *
+   * The bar itself is permanent \u2014 see `setComposer`. This only decides whether
+   * it is on screen, and it is off at the screens where the answer is a
+   * gesture: choosing a retelling, dragging the rating, the closing screen.
+   */
+  const typing = s.expectsInput && !choices && !rating && !s.editable && !s.finished;
 
   /**
    * The end, said properly.
@@ -571,18 +823,17 @@ function render(frame: Frame): void {
        </div>`
     : s.editable
       ? ""
-      : `<div class="row">
-           ${
-             s.expectsInput && !composer
-               ? '<button class="primary" id="send">Continue</button>'
-               : composer
-                 ? ""
-                 : '<button class="primary" id="cont">Continue</button>'
-           }
-           ${s.optional ? '<button class="secondary" id="skip">Leave it as it is</button>' : ""}
-         </div>`;
+      : (() => {
+          // Nothing to press when the answer is typed or held: the bar and the
+          // bubbles are the controls. A Continue button beside them is the one
+          // that used to walk out of an unanswered interview.
+          const button = typing || choices ? "" : `<button class="primary" id="${s.expectsInput ? "send" : "cont"}">Continue</button>`;
+          const skip = s.optional ? '<button class="secondary" id="skip">Leave it as it is</button>' : "";
+          return button || skip ? `<div class="row">${button}${skip}</div>` : "";
+        })();
 
-  $("stageArea").innerHTML = `${quoted}${choices ? `<p class="choose-hint">Press and hold the one that fits best, and give it a \u{1F44D}</p><div class="choice-list">${choices}</div>` : ""}${rating}${adapt}${composer}${advance}`;
+  $("stageArea").innerHTML = `${quoted}${rating}${adapt}${advance}`;
+  setComposer(typing ? "Message" : null);
 
   $("fallbackNote").innerHTML = s.fallback
     ? `<div class="alert"><strong>Fallback applied:</strong> ${escapeHtml(s.fallback.reason)} \u2192
@@ -671,14 +922,26 @@ function setBusy(stageKind: string | null): void {
   busy = stageKind !== null;
   document.querySelectorAll<HTMLButtonElement>("#stageArea button").forEach((b) => (b.disabled = busy));
   document.querySelectorAll<HTMLTextAreaElement>("#stageArea textarea").forEach((t) => (t.disabled = busy));
+  /**
+   * The send button goes grey; the message box does not.
+   *
+   * Disabling a focused textarea blurs it, and on iOS a blur closes the
+   * keyboard and resizes the viewport — the exact churn the permanent composer
+   * exists to avoid. Typing ahead while a reply is coming is what a chat does
+   * anyway, and a second send is refused at the top of `turn` regardless.
+   */
+  const send = document.getElementById("sendMsg") as HTMLButtonElement | null;
+  if (send) send.disabled = busy;
 
   const existing = document.getElementById("thinking");
   // Choosing, rating and the closing screen call nothing, so a bot pretending
   // to think there would be theatre.
   if (stageKind === null || !THINKS.has(stageKind)) {
     existing?.remove();
+    setStatus(false);
     return;
   }
+  setStatus(true);
   if (existing) return;
 
   // The dots go in the thread, on the bot's side, where its reply will
@@ -801,6 +1064,12 @@ async function turn(payload: { action: string; input?: string; echo?: boolean })
     setBusy(null);
   }
 }
+
+// Wired once, at load. The composer, the header and the microphone all outlive
+// every render, which is precisely why they are stable to type into.
+wireComposer();
+wireHeader();
+wireMic();
 
 $("start").addEventListener("click", () => {
   void (async () => {

@@ -486,6 +486,57 @@ describe("the full CHI 2025 journey", () => {
     expect(runner.outcome.interviewDone).toBe(true);
   });
 
+  it("does not show a question it is about to end the conversation on", async () => {
+    /**
+     * The model may set `interviewDone` in the same turn as another question,
+     * and in a live run it did: the question went up on screen and the
+     * retellings landed underneath it a second later, so the participant had
+     * been asked something and then talked over.
+     *
+     * The completion is honoured — the researcher's list is covered — but the
+     * dangling question must reach neither the screen nor the transcript that
+     * extraction reads.
+     */
+    class DoneWithAQuestion extends MockAdapter {
+      override async generate(
+        prompt: Parameters<MockAdapter["generate"]>[0],
+        config: Parameters<MockAdapter["generate"]>[1],
+        schema?: Parameters<MockAdapter["generate"]>[2],
+      ) {
+        const result = await super.generate(prompt, config, schema);
+        if (schema?.name !== "interviewer_turn") return result;
+        // The opening turn asks normally; the turn after the first answer is
+        // the one that declares itself finished while still asking something.
+        const answered = prompt.messages.some((m) => m.role === "user" && !m.content.startsWith("("));
+        return {
+          ...result,
+          text: JSON.stringify({
+            reply: answered ? "Is there anything you would not miss at all?" : "What do you use your phone for?",
+            interviewDone: answered,
+            questionsCovered: [1],
+          }),
+        };
+      }
+    }
+
+    const runner = new NarrativeRunner(mocked(microNarrativeFull), context(), gatewayWith(new DoneWithAQuestion()));
+    runner.start();
+    let screen = await runner.next();
+    while (screen.kind === "introduction") screen = await runner.next();
+    screen = await runner.submit("I use it mostly for talking to my friends.");
+
+    expect(runner.outcome.interviewDone).toBe(true);
+    expect(screen.kind).not.toBe("collect");
+    const shown = runner.all.filter((r) => r.kind === "model_shown").map((r) => r.text ?? "");
+    expect(shown).not.toContain("Is there anything you would not miss at all?");
+    // Recorded, so the run can be read back — just not shown and not asked.
+    expect(
+      runner.all.some(
+        (r) => (r.data as { replyWithheld?: string } | null)?.replyWithheld === "question_asked_after_completion",
+      ),
+    ).toBe(true);
+  });
+
   it("cannot be ended by a participant saying the wrong word", async () => {
     // The original ended on a "FINISHED" sentinel in the model's reply, which
     // a participant could speak and a model could echo. Completion is now a
