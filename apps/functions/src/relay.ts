@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { FieldValue } from "firebase-admin/firestore";
 import * as logger from "firebase-functions/logger";
 import { defineSecret } from "firebase-functions/params";
@@ -8,6 +9,8 @@ import { STUDY, auth, research } from "./apps.js";
 import {
   ALLOWED_ORIGIN,
   CALLS_PER_CALLER_PER_DAY,
+  linkRefusal,
+  type LinkRecord,
   RelayError,
   configFor,
   mayCall,
@@ -49,18 +52,45 @@ const BUILD =
     : { built: "unpackaged", commit: "unknown", dirty: false };
 
 /**
+ * A tester link, presented as `Authorization: Link <key>`.
+ *
+ * Checked and spent in one transaction. Two people opening the same link at
+ * the same moment must not both be told there is one call left and both take
+ * it; the cap is the only thing standing between a forwarded URL and an
+ * unbounded bill, so it has to hold under concurrency rather than usually.
+ */
+async function spendLink(key: string): Promise<Caller> {
+  const hash = createHash("sha256").update(key).digest("hex");
+  const ref = research().doc(`${paths.audit(STUDY)}_testerLinks/${hash}`);
+
+  const uid = await research().runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    const link = snap.exists ? (snap.data() as LinkRecord) : null;
+    const refusal = linkRefusal(link, Date.now());
+    if (refusal) throw new RelayError(403, "auth", refusal);
+    tx.update(ref, { callsUsed: FieldValue.increment(1), lastUsedAt: FieldValue.serverTimestamp() });
+    return `link_${hash.slice(0, 12)}`;
+  });
+
+  // Not a device and has no role: `configFor` therefore gives it only what a
+  // published release froze, which is the right ceiling for a stranger.
+  return { uid, device: true };
+}
+
+/**
  * Who is asking, and whether they are anybody.
  *
- * A verified token is not a permission. Google sign-in is open to the world by
- * design, so anyone at all can arrive holding a perfectly valid token for this
- * project — and if that were enough, a page on the open web would be a
- * stranger's route to spending the study's model budget.
- *
- * So a caller must be an enrolled device, or must carry a role an owner
- * granted them. Signing in is how you say who you are; the role is how the
- * study says it knows you.
+ * Two ways in. A tester link, which is a bounded credential carried by a URL
+ * and belongs to nobody. Or a signed-in account, where a verified token is
+ * still not a permission: Google sign-in is open to the world by design, so
+ * anyone can arrive holding a valid token for this project, and if that were
+ * enough a page on the open web would be a stranger's route to the study's
+ * model budget. A signed-in caller must be an enrolled device or carry a role
+ * an owner granted.
  */
 async function authenticate(header: string | undefined): Promise<Caller> {
+  if (header?.startsWith("Link ")) return spendLink(header.slice(5).trim());
+
   const token = header?.startsWith("Bearer ") ? header.slice(7) : null;
   if (!token) throw new RelayError(401, "auth", "sign in, or enrol this device, before asking for a model call");
 

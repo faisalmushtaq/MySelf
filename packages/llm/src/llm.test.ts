@@ -74,3 +74,59 @@ describe("routing a call to the relay", () => {
     expect(calls.length, "the gateway never even started a call").toBeGreaterThan(0);
   });
 });
+
+describe("how the relay adapter says who it is", () => {
+  /**
+   * The scheme is the whole signal. The relay decides between verifying a
+   * Firebase ID token and spending a tester link purely on the word in front
+   * of the credential, so sending the wrong one is a 401 for a link that is
+   * perfectly valid — and the page would report it as the model being down.
+   */
+  const sent = async (options: Record<string, unknown>) => {
+    const { RelayAdapter } = await import("./index.js");
+    let headers: Record<string, string> = {};
+    const original = globalThis.fetch;
+    globalThis.fetch = (async (_url: string, init: { headers: Record<string, string> }) => {
+      headers = init.headers;
+      return { ok: true, json: async () => ({ text: "{}", modelServed: "gpt-4o" }) };
+    }) as unknown as typeof fetch;
+    try {
+      await new RelayAdapter({ url: "https://example.test/relay", ...options }).generate(
+        { promptKey: "p.x", promptVersion: "1.0.0", system: "s", messages: [{ role: "user", content: "hello" }], variables: {} },
+        {
+          key: "mc.x",
+          provider: "openai",
+          model: "gpt-4o",
+          temperature: 0.7,
+          maxOutputTokens: 100,
+          timeoutSeconds: 30,
+          maxAttempts: 1,
+          dataHandling: { trainingUseOptOut: true },
+        },
+      );
+    } catch {
+      // The response shape is not what is under test; the header is.
+    } finally {
+      globalThis.fetch = original;
+    }
+    return headers["authorization"] ?? null;
+  };
+
+  it("sends a signed-in credential as Bearer", async () => {
+    expect(await sent({ token: "abc" })).toBe("Bearer abc");
+  });
+
+  it("sends a tester link as Link", async () => {
+    expect(await sent({ linkKey: "xyz" })).toBe("Link xyz");
+  });
+
+  it("prefers the link when a page has both", async () => {
+    // A page opened from a tester link is acting as that link, not as whoever
+    // happens to be signed in to Google in the same browser.
+    expect(await sent({ token: "abc", linkKey: "xyz" })).toBe("Link xyz");
+  });
+
+  it("sends nothing at all rather than an empty credential", async () => {
+    expect(await sent({})).toBeNull();
+  });
+});

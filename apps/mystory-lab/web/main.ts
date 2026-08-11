@@ -1,22 +1,25 @@
-import { Gateway, MockAdapter, RelayAdapter, type ModelCall } from "@myself/llm";
-import { NarrativeRunner, checkProtocol, protocols, type NarrativeProtocol, type Screen } from "@myself/narrative";
+import { Gateway, RelayAdapter, type ModelCall } from "@myself/llm";
+import { NarrativeRunner, checkProtocol, protocols, type Screen } from "@myself/narrative";
 import { session } from "./session.js";
 
 /**
  * The lab, in the browser.
  *
- * One page, two modes, decided by what is actually there:
+ * Two ways to reach a model, and no third:
  *
  *   - Served by `server.mjs` with a key configured, it posts to that server,
  *     which holds the key and makes the real call. A provider key never
  *     reaches a page.
- *   - Served as static files — GitHub Pages, or anywhere — there is no server,
- *     so it runs the same protocols in the browser against the deterministic
- *     mock. Every stage, every record, every fallback, no key and no cost.
+ *   - Served as static files, it calls the relay, which holds the key. That
+ *     needs somebody signed in with a role, because the relay will not spend
+ *     the study's money for a caller it cannot name.
  *
- * The second mode is what makes this shareable. Somebody can click through the
- * whole thing, see exactly what a young person would see and exactly what
- * would be stored, and nothing has been sent anywhere.
+ * THERE IS NO MOCK MODE. There was, and it was the wrong idea: a mock reply
+ * sits in the same bubble as a real one and reads as a broken model rather
+ * than as a stand-in, so somebody testing the module cannot tell which they
+ * are looking at. When there is no model to talk to, this says so and starts
+ * nothing. The MockAdapter still exists for the tests, where determinism is
+ * the point and nobody is being asked to judge the writing.
  */
 
 const $ = (id: string) => document.getElementById(id)!;
@@ -24,18 +27,20 @@ const $ = (id: string) => document.getElementById(id)!;
 let live = false;
 /** The deployed relay this build was given, if any. */
 let relay: string | null = null;
+/**
+ * A tester link key from the URL, if this page was opened from one.
+ *
+ * Read once at load and never written back, so it stays in the address bar
+ * where the person who was sent it can see it, and does not end up in a form
+ * field somebody could edit into somebody else's.
+ */
+const linkKey = new URL(window.location.href).searchParams.get("k");
 let sessionId: string | null = null;
 let localRunner: NarrativeRunner | null = null;
 let localCalls: ModelCall[] = [];
 
 const escapeHtml = (value: unknown): string =>
   String(value).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
-
-/** Swap every model stage onto the mock, for running without a key. */
-const onMock = (protocol: NarrativeProtocol): NarrativeProtocol => ({
-  ...protocol,
-  stages: protocol.stages.map((s) => (s.modelConfigKey ? { ...s, modelConfigKey: "mc.mock" } : s)),
-});
 
 async function api<T>(path: string, body?: unknown): Promise<T> {
   const res = await fetch(path, {
@@ -59,21 +64,23 @@ declare const __RELAY_URL__: string;
 declare const __BUILD_STAMP__: string;
 
 /**
- * Three ways this page can reach a model, in order of preference.
+ * How this page reaches a model, in order of preference.
  *
  *   The local server, when one is running with a key. What a researcher uses
  *   while writing prompts.
  *   The deployed relay, when this build was given one. The Cloud Function
  *   holds the key; the page holds nothing.
- *   Nothing, in which case the mock does the whole job — which is what the
- *   public preview is, and is a complete demonstration rather than a
- *   degraded one.
+ *   Neither, in which case there is nothing to run and the page says so.
  */
 async function detectServer(): Promise<void> {
   try {
     const info = await api<{ live: boolean }>("/api/protocols");
     live = info.live;
-    if (live) relay = null;
+    // A local server that has no key is not a way to reach a model. It used to
+    // be enough to leave the relay unset, because the mock caught everything
+    // that fell through; without the mock that combination is a dead page, and
+    // it is the exact combination a researcher has before they add their key.
+    relay = live ? null : __RELAY_URL__ || null;
   } catch {
     // No local server. A build pointed at the relay can still make live calls,
     // once somebody is signed in to authorise them.
@@ -81,12 +88,20 @@ async function detectServer(): Promise<void> {
     live = false;
   }
   $("mode").textContent = live
-    ? "A key is configured on the server, so live calls are available. The mock is still the default."
+    ? "A key is configured on the server, which holds it and makes the calls."
     : relay
-      ? "Live calls go through the study's relay, which holds the key — this page never does. Sign in to use it. The mock is still the default."
-      : "Running entirely in this page on the deterministic mock — no key, no cost, nothing sent anywhere. Every path works, including the failures.";
+      ? linkKey
+        ? "Running on a tester link, which the relay accepts in place of an account."
+        : "Calls go through the study's relay, which holds the key — this page never does. Sign in to use it."
+      : "This build has no model to talk to: no local server with a key, and no relay configured.";
   if (!live && !relay) {
-    ($("provider") as HTMLSelectElement).querySelector<HTMLOptionElement>('[value="openai"]')!.disabled = true;
+    ($("start") as HTMLButtonElement).disabled = true;
+    // Said where a participant can read it, not only in the lab's mode line.
+    // Somebody handed a link to a build with nothing behind it should be told
+    // that, rather than left looking at a page that does nothing when tapped.
+    $("bootNote").innerHTML =
+      `<div class="alert">This page cannot reach the model at the moment, so there is nothing to start.
+       Do let whoever sent you this link know.</div>`;
   }
 }
 
@@ -239,7 +254,12 @@ function wireStageControls(): void {
     const picked = document.querySelector<HTMLInputElement>('input[name="choice"]:checked');
     const range = document.getElementById("ratingRange") as HTMLInputElement | null;
     const typed = document.getElementById("input") as HTMLTextAreaElement | null;
-    void turn({ action: "submit", input: picked?.value ?? range?.value ?? typed?.value ?? "" });
+    // `echo` only when the value is something they wrote. A choice sends an
+    // index and a rating sends a number, and neither is a sentence anybody
+    // said — the thread renders those as "I'll take the plain one" and
+    // "7 out of 10" once recorded, which is what should appear.
+    const wrote = picked === null && range === null && typed !== null;
+    void turn({ action: "submit", input: picked?.value ?? range?.value ?? typed?.value ?? "", echo: wrote });
   };
 
   document.getElementById("send")?.addEventListener("click", submit);
@@ -377,7 +397,7 @@ function render(frame: Frame): void {
   const composer =
     s.expectsInput && !choices && !rating && !s.editable
       ? `<div class="composer">
-           <textarea id="input" rows="1" placeholder="Type as the participant would\u2026"></textarea>
+           <textarea id="input" rows="1" placeholder="Type your answer\u2026"></textarea>
            <button class="primary send-round" id="send" title="Send">\u2191</button>
          </div>`
       : "";
@@ -486,10 +506,30 @@ function setBusy(stageKind: string | null): void {
   scrollThread();
 }
 
-async function turn(payload: { action: string; input?: string }): Promise<void> {
+async function turn(payload: { action: string; input?: string; echo?: boolean }): Promise<void> {
   // Ignore a second click while a call is in flight: double-submitting a turn
   // is how a participant ends up paying for two interviews of themselves.
   if (busy) return;
+
+  /**
+   * Their message, on screen the instant they send it.
+   *
+   * The thread is rebuilt from the records, and the records only come back
+   * when the model does — so until now, sending an answer made it disappear
+   * for the several seconds the call takes, and the dots appeared where the
+   * reply would go. You could watch your own sentence vanish.
+   *
+   * No messaging app has ever worked that way. The bubble goes up
+   * immediately and is replaced by the recorded one when the turn returns,
+   * which is the same text: this is the appearance arriving early, not a
+   * second copy or an optimistic guess about what will be stored.
+   */
+  const said = payload.echo === true ? payload.input?.trim() : undefined;
+  if (said) {
+    $("thread").insertAdjacentHTML("beforeend", bubble("me", escapeHtml(said)));
+    scrollThread();
+  }
+
   setBusy(currentKind);
   try {
     if (localRunner) {
@@ -523,13 +563,12 @@ $("start").addEventListener("click", () => {
     const key = ($("protocol") as HTMLSelectElement).value;
     const firstName = ($("firstName") as HTMLInputElement).value;
     const topic = ($("topic") as HTMLInputElement).value;
-    const wantsLive = ($("provider") as HTMLSelectElement).value === "openai" && live;
     const online = ($("online") as HTMLInputElement).checked;
 
     $("calls").querySelector("tbody")!.innerHTML = "";
 
-    if (wantsLive) {
-      // The server holds the key and makes the call.
+    if (live) {
+      // A local server with a key, which holds it and makes the call.
       localRunner = null;
       const data = await api<Frame & { sessionId: string; provider: string }>("/api/start", {
         protocol: key,
@@ -545,41 +584,54 @@ $("start").addEventListener("click", () => {
     }
 
     /**
-     * In this page, against whichever adapter applies.
+     * Otherwise the relay, or nothing at all.
      *
-     * The relay when one is configured and somebody is signed in — it holds
-     * the key and this page never does. The mock otherwise, which is a
-     * complete demonstration rather than a degraded one.
+     * There is deliberately no fallback to a mock. A mock reply is
+     * indistinguishable from a real one at a glance — "The participant
+     * described (the participant is ready)" appeared on a phone and read as a
+     * broken model rather than as a stand-in — and somebody testing the module
+     * has no way to know which they are looking at. Refusing is honest; a
+     * convincing imitation of the thing under test is not.
      */
-    const wantsRelay = ($("provider") as HTMLSelectElement).value === "openai" && relay;
-    const token = wantsRelay ? await session.token() : null;
-    if (wantsRelay && !token) {
+    if (!relay) {
       $("bootNote").innerHTML =
-        `<div class="alert">Sign in first — the relay will not spend money for somebody it cannot name.</div>`;
+        `<div class="alert">This page has no model to talk to: no local server with a key, and no relay
+         configured in this build. Nothing has been started.</div>`;
+      return;
+    }
+
+    /**
+     * A tester link stands in for signing in.
+     *
+     * Somebody sent this link to try the module. Asking them to make a Google
+     * account first loses most of them before the first screen, and the ones
+     * it does not lose have stopped being a fair test of what a participant
+     * would do. The key in the URL is the credential; the relay bounds what it
+     * can cost and can switch it off.
+     */
+    const token = linkKey ? null : await session.token();
+    if (!linkKey && !token) {
+      $("bootNote").innerHTML =
+        `<div class="alert">Sign in first — the relay will not spend the study's money for somebody it
+         cannot name. If you were sent a link to test this, use that link: it needs no account.</div>`;
       return;
     }
 
     localCalls = [];
     const gateway = new Gateway({
-      adapters:
-        wantsRelay && token
-          ? [new RelayAdapter({ url: relay!, token }), new MockAdapter()]
-          : [new MockAdapter()],
+      adapters: [new RelayAdapter({ url: relay, ...(linkKey ? { linkKey } : { token: token! }) })],
       onCall: (call) => {
         const at = localCalls.findIndex((c) => c.callId === call.callId);
         if (at >= 0) localCalls[at] = call;
         else localCalls.push(call);
       },
     });
-    const declared = protocols.find((p) => p.key === key)!;
-    const protocol = wantsRelay && token ? declared : onMock(declared);
     localRunner = new NarrativeRunner(
-      protocol,
+      protocols.find((p) => p.key === key)!,
       { sessionId: `lab_${Date.now().toString(36)}`, variables: { first_name: firstName, topic }, online },
       gateway,
     );
-    $("providerBadge").textContent =
-      wantsRelay && token ? "provider: relay (the key stays on the server)" : "provider: mock (in this page)";
+    $("providerBadge").textContent = "provider: relay (the key stays on the server)";
     render({ screen: localRunner.start(), records: localRunner.all, calls: localCalls });
   })();
 });
@@ -643,7 +695,26 @@ function wireViewToggle(): void {
     window.history.replaceState(null, "", url);
   };
 
-  apply(new URL(window.location.href).searchParams.get("view") === "participant");
+  /**
+   * Arriving on `?view=participant` is not the same as switching to it.
+   *
+   * A researcher who toggled needs the way back. Somebody handed the link is
+   * a participant for the duration, and "Back to the lab" is both meaningless
+   * to them and an invitation to somewhere they should not be — it was
+   * floating over the conversation on a tester's phone, which is what
+   * prompted this.
+   *
+   * So the toggle is removed entirely for a linked run, rather than hidden by
+   * a class somebody could flip: there is nothing to find in the markup.
+   */
+  const linked = new URL(window.location.href).searchParams.get("view") === "participant";
+  if (linked) {
+    apply(true);
+    toggle.remove();
+    return;
+  }
+
+  apply(false);
   toggle.addEventListener("click", () => apply(!document.body.classList.contains("participant-view")));
 }
 
@@ -686,10 +757,69 @@ function applyLinkedRun(): { start: boolean } {
   return { start: params.get("start") === "1" };
 }
 
+/**
+ * Minting a tester link, from the page the researcher is already signed in to.
+ *
+ * A callable function is ordinary HTTPS underneath — `{data}` in, `{result}`
+ * out — so this posts to it rather than pulling in the Functions SDK for one
+ * call. The owner check is on the server, where it belongs; this button being
+ * visible is a convenience, not a permission.
+ */
+async function callable<T>(name: string, data: unknown): Promise<T> {
+  const token = await session.token();
+  if (!token) throw new Error("sign in first");
+  const base = (relay ?? "").replace(/\/llmRelay$/, "");
+  const res = await fetch(`${base}/${name}`, {
+    method: "POST",
+    headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
+    body: JSON.stringify({ data }),
+  });
+  const body = (await res.json()) as { result?: T; error?: { message?: string } };
+  if (!res.ok || body.error) throw new Error(body.error?.message ?? `that failed (${res.status})`);
+  return body.result as T;
+}
+
+function wireTesterLink(): void {
+  const button = $("makeLink") as HTMLButtonElement;
+  if (!relay || !session.available) return;
+  session.onChange((user) => {
+    button.hidden = user === null;
+  });
+
+  button.addEventListener("click", () => {
+    void (async () => {
+      const label = window.prompt("What is this link for? (so you can recognise it when switching it off)");
+      if (label === null || label.trim() === "") return;
+      button.disabled = true;
+      try {
+        const made = await callable<{ key: string; expiresInDays: number; callCap: number }>("createTesterLink", {
+          label,
+        });
+        const url = new URL(window.location.href);
+        url.search = "";
+        url.searchParams.set("protocol", ($("protocol") as HTMLSelectElement).value);
+        url.searchParams.set("view", "participant");
+        url.searchParams.set("start", "1");
+        url.searchParams.set("k", made.key);
+        $("linkOut").innerHTML =
+          `<div class="alert"><strong>Send this. It needs no account.</strong>
+           <p class="note" style="word-break: break-all; margin-top: .5rem;"><code>${escapeHtml(url.toString())}</code></p>
+           <p class="note">Good for ${made.expiresInDays} days or ${made.callCap} model calls, whichever runs out
+           first, and you can switch it off at any time. Shown once — nothing can recover the key after this.</p></div>`;
+      } catch (error) {
+        $("linkOut").innerHTML = `<div class="alert">Could not make a link: ${escapeHtml((error as Error).message)}</div>`;
+      } finally {
+        button.disabled = false;
+      }
+    })();
+  });
+}
+
 $("buildStamp").textContent = `built ${__BUILD_STAMP__} UTC`;
 wireViewToggle();
 void detectServer().then(() => {
   wireSignIn();
+  wireTesterLink();
 
   /**
    * Sign-in is lab furniture right up until it is the only thing between a
@@ -698,7 +828,7 @@ void detectServer().then(() => {
    * participant view — otherwise the link written for testers is the one
    * link on which they cannot begin.
    */
-  if (relay && session.available) {
+  if (relay && session.available && !linkKey) {
     session.onChange((user) => {
       $("signIn").classList.toggle("lab-only", user !== null);
     });

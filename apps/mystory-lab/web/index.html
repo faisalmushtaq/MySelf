@@ -232,11 +232,6 @@
           <label for="topic">Topic</label>
           <input id="topic" value="how school has been this term" />
           <div id="topicPreview"></div>
-          <label for="provider">Provider</label>
-          <select id="provider">
-            <option value="mock">Deterministic mock — no key, no cost, repeatable</option>
-            <option value="openai">OpenAI — live call</option>
-          </select>
           <div class="row">
             <label style="margin: 0; display: flex; gap: .4rem; align-items: center; font-weight: 400;">
               <input type="checkbox" id="online" checked style="width: auto;" /> online
@@ -244,11 +239,19 @@
             <button class="primary" id="start" disabled>Start</button>
           </div>
           <p class="note" id="gate"></p>
-          <div id="bootNote"></div>
+          <div class="row">
+            <button class="secondary" id="makeLink" type="button" hidden>Make a link for testers</button>
+          </div>
+          <div id="linkOut"></div>
         </div>
 
         <div class="panel">
           <h2>What the participant sees</h2>
+          <!-- Deliberately NOT inside a lab-only panel. Once the mock was
+               removed this became the only way the page can say "sign in
+               first" or "there is nothing to run" — and a participant who
+               cannot be told either just sees a page that does nothing. -->
+          <div id="bootNote"></div>
           <div id="progress"></div>
           <div class="thread" id="thread">
             <p class="note">Start a run to see the conversation.</p>

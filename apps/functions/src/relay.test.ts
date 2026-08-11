@@ -2,7 +2,17 @@ import { describe, expect, it } from "vitest";
 import { modelConfig } from "@myself/llm";
 import { protocols } from "@myself/narrative";
 import { releasesByHash } from "./releases.js";
-import { ALLOWED_ORIGIN, allowedOrigins, configFor, mayCall, relayRequest, type Caller } from "./relay-policy.js";
+import {
+  ALLOWED_ORIGIN,
+  allowedOrigins,
+  configFor,
+  LINK_CALL_CAP,
+  LINK_DAYS,
+  linkRefusal,
+  mayCall,
+  relayRequest,
+  type Caller,
+} from "./relay-policy.js";
 
 /**
  * The relay's job is to be the only thing holding a key, and the only thing
@@ -147,5 +157,48 @@ describe("who may spend the study's model budget", () => {
     for (const role of ["owner", "researcher", "analyst"]) {
       expect(mayCall({ role })).toBe(true);
     }
+  });
+});
+
+describe("a tester link, which stands in for signing in", () => {
+  const good = { revokedAt: null, expiresAt: Date.now() + 60_000, callCap: 10, callsUsed: 0 };
+
+  it("lets a link that is in date and under its cap through", () => {
+    expect(linkRefusal(good, Date.now())).toBeNull();
+  });
+
+  /**
+   * A key in a URL will be forwarded, pasted into a chat and left in browser
+   * history. It is not trusted — it is bounded, and each bound is the reason
+   * a leaked link costs a known amount rather than an unknown one.
+   */
+  it("refuses on every bound, and says which", () => {
+    expect(linkRefusal(null, Date.now())).toMatch(/not one this study issued/);
+    expect(linkRefusal({ ...good, revokedAt: new Date() }, Date.now())).toMatch(/switched off/);
+    expect(linkRefusal({ ...good, expiresAt: Date.now() - 1 }, Date.now())).toMatch(/expired/);
+    expect(linkRefusal({ ...good, callsUsed: 10 }, Date.now())).toMatch(/as many times as it was allowed/);
+  });
+
+  it("counts the cap as a ceiling, not a target to overshoot", () => {
+    // The off-by-one that matters: at the cap it must already be refused,
+    // because the call being checked is the one that would exceed it.
+    expect(linkRefusal({ ...good, callsUsed: 9 }, Date.now())).toBeNull();
+    expect(linkRefusal({ ...good, callsUsed: 10 }, Date.now())).not.toBeNull();
+    expect(linkRefusal({ ...good, callsUsed: 11 }, Date.now())).not.toBeNull();
+  });
+
+  it("expires on time rather than on the next whole day", () => {
+    const at = good.expiresAt;
+    expect(linkRefusal(good, at)).toBeNull();
+    expect(linkRefusal(good, at + 1)).toMatch(/expired/);
+  });
+
+  it("ships bounds that are finite", () => {
+    // A cap of Infinity or a life of zero days would both be worse than the
+    // feature not existing.
+    expect(Number.isFinite(LINK_CALL_CAP)).toBe(true);
+    expect(LINK_CALL_CAP).toBeGreaterThan(0);
+    expect(Number.isFinite(LINK_DAYS)).toBe(true);
+    expect(LINK_DAYS).toBeGreaterThan(0);
   });
 });
