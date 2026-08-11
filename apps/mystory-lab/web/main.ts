@@ -108,6 +108,52 @@ const showGate = () => {
 $("protocol").addEventListener("change", showGate);
 showGate();
 
+/**
+ * The topic, as the young person will hear it.
+ *
+ * `{topic}` goes into two kinds of sentence: one spoken TO the participant
+ * ("I will ask you a few questions about {topic}") and several written ABOUT
+ * them for the model ("A young person was asked to describe {topic}"). A topic
+ * has to survive both, and nothing on this form used to say so.
+ *
+ * The trap is quiet. "how they feel about the future" reads perfectly in the
+ * prompts and produces "I will ask you a few questions about how they feel
+ * about the future" on the participant's screen, which is addressed to nobody.
+ * The default reads correctly in both only because it is impersonal.
+ *
+ * So the sentence is shown rather than described. A researcher writing a topic
+ * sees the line a child will read, as they type it — which is the check, and
+ * the pronoun warning below is only there to catch the eye.
+ */
+const THIRD_PERSON = /\b(they|them|their|theirs|he|him|his|she|her|hers|the (?:young person|child|participant|pupil|student))\b/i;
+
+const showTopic = () => {
+  const topic = ($("topic") as HTMLInputElement).value.trim();
+  const protocol = protocols.find((p) => p.key === ($("protocol") as HTMLSelectElement).value)!;
+  // The stage that speaks to the participant using the topic, whichever it is
+  // in this protocol — found rather than assumed, so a protocol that words its
+  // opening differently is previewed correctly.
+  const spoken = protocol.stages.find((s) => !s.modelConfigKey && s.text?.includes("{topic}"));
+
+  if (!spoken || topic === "") {
+    $("topicPreview").innerHTML = "";
+    return;
+  }
+
+  const sentence = spoken.text!.replace(/\{topic\}/g, topic);
+  const pronoun = THIRD_PERSON.exec(topic);
+  $("topicPreview").innerHTML =
+    `<p class="note preview-line">They will read: &ldquo;${escapeHtml(sentence)}&rdquo;</p>` +
+    (pronoun
+      ? `<p class="note warn-text">That says &ldquo;${escapeHtml(pronoun[0])}&rdquo; to the person it is about. A topic is
+         also written about the participant in the model prompts, so it needs to read correctly both ways &mdash;
+         &ldquo;how school has been this term&rdquo; rather than &ldquo;how they feel about school&rdquo;.</p>`
+      : "");
+};
+$("topic").addEventListener("input", showTopic);
+$("protocol").addEventListener("change", showTopic);
+showTopic();
+
 // ── Rendering ─────────────────────────────────────────────────────────────
 
 interface Frame {
