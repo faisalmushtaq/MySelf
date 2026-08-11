@@ -340,4 +340,167 @@ export const microNarrativeFullConfig: ProtocolConfig = protocolConfig.parse({
 
 export const microNarrativeFull: NarrativeProtocol = protocolFromConfig(microNarrativeFullConfig);
 
-export const protocols: NarrativeProtocol[] = [microNarrativeFull, microNarrative, futureSelf];
+/**
+ * Phones and wellbeing — a placeholder study, for putting the component in
+ * front of people.
+ *
+ * Written to be shared with testers before any real protocol is approved, so
+ * what is being judged is the journey rather than the wording of a study that
+ * does not exist yet. It is a real configuration in the real format, so
+ * replacing it means editing a file, not editing the platform.
+ *
+ * THE TOPIC IS FIXED rather than piped through {topic}. This one asks about a
+ * specific thing and the questions are written for it; a topic box that did
+ * nothing would be worse than no topic box.
+ *
+ * Three choices worth defending, because they are about young people and
+ * phones rather than about software:
+ *
+ * The questions ask for the good and the bad in the same breath, in that
+ * order. Asking only what is wrong with your phone tells a young person what
+ * answer is wanted, and they will give it. The research question is genuinely
+ * two-sided and the instrument has to be too.
+ *
+ * The persona is told not to give advice about screen time. Adults moralise
+ * about phones, young people know it, and one whiff of a lecture ends the
+ * honest version of this conversation.
+ *
+ * Safeguarding carries a second rule at the notification tier for bullying and
+ * exclusion, which the distress lexicon alone would miss. A phone is where a
+ * lot of that happens, so a study asking about phones should expect to hear
+ * about it — and should have decided in advance what it does when it does.
+ */
+export const phoneWellbeingConfig: ProtocolConfig = protocolConfig.parse({
+  model: "gpt-4o",
+  quality_control_flagging: false,
+
+  consent: {
+    intro_and_consent: "Hi {first_name} — this last bit is a short chat about your phone.",
+  },
+
+  // Left at its defaults deliberately. `require_participant_id` only gates the
+  // longitudinal `{previous_scenario}` feature, and it is DERIVED when a
+  // protocol is written back out — so setting it here would make the shipped
+  // config and the generated TOML look as though they disagreed.
+  participant: {},
+
+  collection: {
+    persona: [
+      "You're a friendly researcher talking to a young person aged 11 to 18 about their phone.",
+      "You are genuinely curious and never in a hurry.",
+      "You are not worried about their phone use and you are not here to change it.",
+      "Never give advice about screen time, never suggest they use it more or less, and never imply that any amount is too much.",
+    ].join(" "),
+    language_type:
+      "Use short sentences and everyday words — nothing a 12-year-old would have to look up. No jargon, no therapy language, and nothing that sounds like a parent.",
+    intro: [
+      "I am going to ask you a few questions about your phone and how it fits into your life, one at a time.",
+      "There are no right answers and nothing here is marked.",
+      "Some of it might be good and some of it might not be, and both are just as useful to me.",
+      "Afterwards I will show you a few short write-ups of what you told me, and you can pick the one that fits best — or tell me what is wrong with it.",
+    ].join(" "),
+    questions: [
+      "Tell me about your phone — what do you actually use it for most?",
+      "Can you tell me about a time recently when your phone made a day better?",
+      "And a time when it made a day worse?",
+      "How do you usually feel after you have been on it for a long stretch?",
+      "If you had to go a week without it, what would you miss most, and what would you not miss at all?",
+    ],
+    topic_restriction: [
+      "Stay on this young person's own experience of their phone and how it affects them.",
+      "If they raise something else, acknowledge it briefly and return to the questions.",
+      "Do not give advice, do not suggest changes, and do not comment on how much they use it.",
+    ].join(" "),
+  },
+
+  summaries: {
+    questions: {
+      what_they_use_it_for: "What did they say they mainly use their phone for?",
+      when_it_helps: "What did they describe their phone making better?",
+      when_it_gets_in_the_way: "What did they describe it making worse?",
+      how_it_leaves_them_feeling: "How did they say a long stretch on it leaves them feeling?",
+      what_they_would_miss: "What did they say they would miss, and not miss, without it?",
+    },
+    personas: {
+      plain: "You write plainly and briefly, telling it in the order they said it.",
+      feeling: "You lead with how it left them feeling, and keep the detail light.",
+      their_words: "You keep the young person's own turns of phrase wherever you can.",
+    },
+  },
+
+  example: {
+    conversation: [
+      "Question: Tell me about your phone — what do you actually use it for most?",
+      'Answer: "Mostly talking to my friends, and watching stuff before bed."',
+      "",
+      "Question: And a time when it made a day worse?",
+      'Answer: "I stayed up way too late on it and then felt rubbish at school the next day."',
+    ].join("\n"),
+    scenario:
+      "They mainly use their phone to talk to friends and to watch things before bed. One night they stayed up much later than they meant to and felt rubbish at school the next day.",
+  },
+
+  myself: {
+    key: "np.phone_wellbeing",
+    // 0.x deliberately: this is a placeholder for testing the component, not a
+    // study anybody has signed off.
+    version: "0.1.0",
+    name: "Phones and wellbeing (placeholder)",
+    research_question:
+      "How does this young person describe their relationship with their phone, and what do they say it does to how they feel?",
+    owner: "faisalmushtaq",
+    approval_status: "draft",
+    language: "en-GB",
+    estimated_minutes: 10,
+    age_min: 11,
+    age_max: 18,
+
+    // No {topic}: this protocol asks about one thing and says so.
+    permitted_variables: ["first_name"],
+    permitted_identifiers: [],
+
+    provider: "openai",
+    temperature: 0.7,
+    max_output_tokens: 400,
+    retention_note: "zero-retention endpoint requested",
+    region: "eu",
+
+    max_turns: 14,
+    min_chars: 2,
+
+    select_text: "Here are a few short write-ups of what you told me. Which one fits best?",
+    select_lede: "None of them will be perfect. Pick the closest and you can fix it next.",
+    rate_text: "How well does that one describe what you told me?",
+    rate_lede: "0 means it is not you at all. 10 means it is exactly right.",
+    adapt_text: "What would you change about it?",
+    adapt_lede: "Tell me in your own words and I will rewrite it. What you write here is kept alongside it.",
+    debrief_text: "Thank you, {first_name}. That is everything.",
+    debrief_lede:
+      "What you wrote is stored with the rest of your answers under your secret code. If you want it taken out later, that code is how we find it.",
+    fallback_text: "Thank you — that is really helpful.",
+
+    offline_fallback: "continue_without_model",
+    safeguarding_declaration: microNarrative.safeguardingDeclaration,
+    consent_requirements: microNarrative.consentRequirements,
+    safeguarding: [
+      ...microNarrative.safeguarding,
+      {
+        key: "online_harm_lexicon",
+        kind: "lexicon",
+        terms: ["bullied", "bullying", "left me out", "leaving me out", "nasty messages", "sent it round", "made a fake"],
+        // Notification, not safeguarding review: a young person saying they
+        // were left out of a group chat needs somebody to read it, not an
+        // escalation. Putting it at the higher tier would bury the rule that
+        // matters under the one that fires constantly.
+        tier: "team_notification",
+        reviewers: ["principal_investigator"],
+        disclosure:
+          "What you write here is read by the research team after the session — not while you are typing. If you need to talk to someone now, the last page has the numbers.",
+      },
+    ],
+  },
+});
+
+export const phoneWellbeing: NarrativeProtocol = protocolFromConfig(phoneWellbeingConfig);
+
+export const protocols: NarrativeProtocol[] = [phoneWellbeing, microNarrativeFull, microNarrative, futureSelf];

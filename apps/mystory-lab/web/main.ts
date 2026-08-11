@@ -647,6 +647,66 @@ function wireViewToggle(): void {
   toggle.addEventListener("click", () => apply(!document.body.classList.contains("participant-view")));
 }
 
+/**
+ * A run described in the URL, so a link can be sent to somebody.
+ *
+ *   ?protocol=np.phone_wellbeing&view=participant&start=1
+ *
+ * The point is a tester who is not a researcher. Asking them to pick the right
+ * protocol from a dropdown before they see anything is asking them to get the
+ * setup right on your behalf, and some of them will not, and you will read
+ * their feedback about the wrong instrument.
+ *
+ * An unknown protocol key is left alone rather than silently falling back to
+ * the first in the list, because a link that quietly runs a different study
+ * than the one it names is worse than a link that does not work.
+ */
+function applyLinkedRun(): { start: boolean } {
+  const params = new URL(window.location.href).searchParams;
+
+  const wanted = params.get("protocol");
+  if (wanted !== null) {
+    const select = $("protocol") as HTMLSelectElement;
+    if (protocols.some((p) => p.key === wanted)) select.value = wanted;
+    else {
+      $("bootNote").innerHTML =
+        `<div class="alert">This link asks for a protocol called <code>${escapeHtml(wanted)}</code>,
+         which is not one this build ships. Nothing has been started.</div>`;
+      return { start: false };
+    }
+  }
+
+  const name = params.get("name");
+  if (name !== null) ($("firstName") as HTMLInputElement).value = name;
+  const topic = params.get("topic");
+  if (topic !== null) ($("topic") as HTMLInputElement).value = topic;
+
+  showGate();
+  showTopic();
+  return { start: params.get("start") === "1" };
+}
+
 $("buildStamp").textContent = `built ${__BUILD_STAMP__} UTC`;
 wireViewToggle();
-void detectServer().then(wireSignIn);
+void detectServer().then(() => {
+  wireSignIn();
+
+  /**
+   * Sign-in is lab furniture right up until it is the only thing between a
+   * tester and the page working. When this build talks to the relay and
+   * nobody is signed in, the button has to be reachable even in the
+   * participant view — otherwise the link written for testers is the one
+   * link on which they cannot begin.
+   */
+  if (relay && session.available) {
+    session.onChange((user) => {
+      $("signIn").classList.toggle("lab-only", user !== null);
+    });
+  }
+
+  const { start } = applyLinkedRun();
+  // Started only once there is something to start against: before this
+  // resolves the page does not yet know whether it has a relay, a server or
+  // the mock, and would pick the wrong one.
+  if (start) ($("start") as HTMLButtonElement).click();
+});
