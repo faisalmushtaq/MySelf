@@ -63,6 +63,21 @@ export const paths = {
   narratives: (study: string) => `studies/${study}/narratives`,
   narrative: (study: string, sessionId: string) => `studies/${study}/narratives/${sessionId}`,
 
+  /**
+   * Spoken answers, in Storage rather than Firestore.
+   *
+   * A few seconds of Opus is tens of kilobytes and a long answer is hundreds —
+   * an order of magnitude more than the whole text log of a sitting, and not
+   * something to carry in a document that gets read on every analysis pass.
+   *
+   * Laid out under the session so a run's audio is one prefix: it can be
+   * listened to together, exported together, and DELETED TOGETHER, which is
+   * the operation that matters most for a recording of a child's voice.
+   */
+  voiceNotes: (study: string, sessionId: string) => `studies/${study}/voice/${sessionId}`,
+  voiceNote: (study: string, sessionId: string, clipId: string, extension: string) =>
+    `studies/${study}/voice/${sessionId}/${clipId}.${extension}`,
+
   /** identity project — a different Firebase project entirely */
   participants: (study: string) => `studies/${study}/participants`,
   participant: (study: string, code: string) => `studies/${study}/participants/${code}`,

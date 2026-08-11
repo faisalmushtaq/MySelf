@@ -285,6 +285,33 @@
       .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
                  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 
+      /* ── A voice note ────────────────────────────────────────────────────
+         What WhatsApp shows when you send one: a play button, a waveform, and
+         the length. The audio is the local recording — the copy in the bucket
+         is deliberately unreadable by any page, so the only thing that can
+         play it back is the device that made it. */
+      .voice-note .bubble { display: flex; align-items: center; gap: 8px; padding: 8px 10px 8px 8px;
+                            min-width: 210px; }
+      .vn-play { flex: 0 0 auto; width: 32px; height: 32px; border-radius: 50%; min-height: 0;
+                 padding: 0; display: grid; place-items: center; border: 0;
+                 background: rgba(0,0,0,.06); color: #3B4A54; }
+      .voice-note.playing .vn-play svg { opacity: .45; }
+      .vn-play svg { width: 18px; height: 18px; display: block; margin-left: 2px; }
+      .vn-wave { flex: 1 1 auto; display: flex; align-items: center; gap: 2px; height: 22px; }
+      /* Drawn rather than sampled: reading the real amplitudes would mean
+         decoding the clip on the phone to produce a decoration. */
+      .vn-wave i { flex: 1 1 auto; background: #B8C1C6; border-radius: 1px; }
+      .vn-wave i:nth-child(3n) { height: 60%; }
+      .vn-wave i:nth-child(3n+1) { height: 32%; }
+      .vn-wave i:nth-child(3n+2) { height: 90%; }
+      .vn-wave i:nth-child(7n) { height: 45%; }
+      .voice-note.playing .vn-wave i { background: #67B25F; }
+      .vn-time { flex: 0 0 auto; font-size: 12px; color: var(--wa-meta); }
+      .voice-note audio { display: none; }
+      /* A fault, left in the conversation so it can be read and screenshotted
+         rather than clearing itself before anybody looks. */
+      .trouble .bubble { background: #FFF6D8; box-shadow: var(--wa-shadow); color: #6B5B2E; }
+
       /* The three retellings, as messages you react to.
          The thumb is invisible until it is chosen, then it sits on the corner
          of the bubble the way a WhatsApp reaction does.

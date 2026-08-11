@@ -227,3 +227,23 @@ describe("the quarantined flag", () => {
     expect(doc.quarantined).toBe(false);
   });
 });
+
+describe("where a spoken answer is kept", () => {
+  /**
+   * One prefix per session. Deletion is the operation that matters most for a
+   * recording of a child's voice, and it has to be one prefix to delete rather
+   * than a search across the bucket.
+   */
+  it("puts every clip from a run under one prefix", () => {
+    const a = paths.voiceNote("ybm", "sess_1", "clip-a", "mp4");
+    const b = paths.voiceNote("ybm", "sess_1", "clip-b", "webm");
+    expect(a.startsWith(paths.voiceNotes("ybm", "sess_1"))).toBe(true);
+    expect(b.startsWith(paths.voiceNotes("ybm", "sess_1"))).toBe(true);
+    expect(paths.voiceNotes("ybm", "sess_2")).not.toBe(paths.voiceNotes("ybm", "sess_1"));
+  });
+
+  it("keeps the container in the name, because that is how it is read back", () => {
+    expect(paths.voiceNote("ybm", "s", "c", "mp4")).toMatch(/\.mp4$/);
+    expect(paths.voiceNote("ybm", "s", "c", "webm")).toMatch(/\.webm$/);
+  });
+});
