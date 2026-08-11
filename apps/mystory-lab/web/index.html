@@ -98,17 +98,30 @@
          the FIRST bubble of a run, at the top corner, which is where WhatsApp
          puts it. */
       :root {
-        --wa-bg: #EFE7DE;
+        --wa-bg: #F4F2EE;
         --wa-in: #FFFFFF;
         --wa-out: #D9FDD3;
         --wa-meta: rgba(0,0,0,.45);
         --wa-tick: #34B7F1;
         --wa-shadow: 0 1px .5px rgba(11,20,26,.13);
+        /* Original doodles — drawn for this, not WhatsApp's artwork — tiled at 280px.
+           Light grey on a near-white ground, matching the reference. */
+        --wa-paper: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='280' height='280' viewBox='0 0 280 280'%3E%3Cg fill='none' stroke='%23DEDAD3' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='26' cy='24' r='8'/%3E%3Cpath d='M60 16h26v18H72l-7 7v-7h-5z'/%3E%3Cpath d='M116 14l4 9 9 1-7 7 2 9-8-5-8 5 2-9-7-7 9-1z'/%3E%3Cpath d='M160 30c-5-6-13-3-13 3 0 5 7 10 13 14 6-4 13-9 13-14 0-6-8-9-13-3z'/%3E%3Crect x='196' y='16' width='24' height='18' rx='3'/%3E%3Ccircle cx='208' cy='25' r='5'/%3E%3Cpath d='M250 18v18M244 24h12'/%3E%3Cpath d='M24 66h20v14H24zM28 66v-5h12v5'/%3E%3Cpath d='M66 62c7 0 12 4 12 9s-5 9-12 9-12-4-12-9 5-9 12-9z'/%3E%3Cpath d='M104 80V60l14 4v14'/%3E%3Ccircle cx='101' cy='81' r='4'/%3E%3Ccircle cx='115' cy='78' r='4'/%3E%3Cpath d='M146 62l7 14h-14z'/%3E%3Ccircle cx='190' cy='70' r='10'/%3E%3Cpath d='M190 64v6l4 3'/%3E%3Cpath d='M232 60c6 6 6 14 0 20-6-6-6-14 0-20z'/%3E%3Cpath d='M20 116h22v16H20z'/%3E%3Cpath d='M20 116l11 8 11-8'/%3E%3Ccircle cx='70' cy='124' r='9'/%3E%3Cpath d='M66 122h1M74 122h1M66 128c3 3 5 3 8 0'/%3E%3Cpath d='M106 132l6-18 6 18M108 126h8'/%3E%3Cpath d='M148 114v18M140 132h16'/%3E%3Cpath d='M182 116c8 0 14 4 14 9s-6 9-14 9h-4l-6 5v-5c-2-2-4-5-4-9 0-5 6-9 14-9z'/%3E%3Cpath d='M226 114l4 8 8 1-6 6 2 9-8-5-8 5 2-9-6-6 8-1z'/%3E%3Cpath d='M22 166c6-6 14-6 20 0-6 8-14 8-20 0z'/%3E%3Ccircle cx='32' cy='166' r='3'/%3E%3Crect x='60' y='158' width='20' height='26' rx='3'/%3E%3Cpath d='M66 164h8M66 170h8'/%3E%3Cpath d='M104 184c0-10 6-18 14-20-2 10-6 17-14 20z'/%3E%3Cpath d='M144 160l12 8-12 8z'/%3E%3Ccircle cx='188' cy='170' r='10'/%3E%3Cpath d='M183 170h10M188 165v10'/%3E%3Cpath d='M222 162h20v14h-14l-6 5z'/%3E%3Cpath d='M18 212l8-14 8 14z'/%3E%3Cpath d='M56 204h24v18H56zM62 204v-4h12v4'/%3E%3Ccircle cx='108' cy='212' r='9'/%3E%3Cpath d='M104 209h1M112 209h1M104 216c3 2 5 2 8 0'/%3E%3Cpath d='M142 220c4-10 10-15 18-17-2 8-8 14-18 17z'/%3E%3Cpath d='M186 204l5 10 10 1-7 7 2 10-10-6-10 6 2-10-7-7 10-1z'/%3E%3Cpath d='M226 206h18v14h-18z'/%3E%3Cpath d='M230 206v-4h10v4'/%3E%3Cpath d='M30 246h18M30 252h10'/%3E%3Ccircle cx='84' cy='248' r='8'/%3E%3Cpath d='M84 243v5l4 2'/%3E%3Cpath d='M124 240l6 12h-12z'/%3E%3Cpath d='M164 240c6 0 10 3 10 7s-4 7-10 7-10-3-10-7 4-7 10-7z'/%3E%3Cpath d='M202 238v16M194 246h16'/%3E%3Cpath d='M236 240l8 6-8 6-8-6z'/%3E%3C/g%3E%3C/svg%3E");
         --wa: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", "Segoe UI", system-ui, sans-serif;
       }
+      /**
+       * The wallpaper.
+       *
+       * Drawn for this, not lifted: WhatsApp's doodles are their own
+       * illustration and copying the artwork is not something to do on a
+       * study's screen. These are original marks in the same register —
+       * single-weight outlines, scattered, low contrast — tiled as one small
+       * SVG so it costs a couple of hundred bytes and no request.
+       */
       .thread { display: flex; flex-direction: column; gap: 2px; max-height: 26rem; overflow-y: auto;
                 padding: .6rem .5rem; scroll-behavior: smooth; font-family: var(--wa);
-                background: var(--wa-bg); border-radius: 8px; }
+                background-color: var(--wa-bg); background-image: var(--wa-paper);
+                background-size: 168px 168px; border-radius: 8px; }
       .msg { display: flex; max-width: 80%; }
       .msg.from-them { align-self: flex-start; }
       .msg.from-me { align-self: flex-end; }
@@ -165,11 +178,10 @@
       /* The header, as WhatsApp has it: who you are talking to, and nothing
          else. It is what tells somebody at a glance that this is a
          conversation rather than a questionnaire wearing bubbles. */
+      /* No header and no progress bar. Safari already shows the address bar
+         above this, so a second header stacked under it read as chrome on
+         chrome — and a progress bar is the one thing a chat does not have. */
       .chat-header { display: none; }
-      body.participant-view .chat-header {
-        display: flex; align-items: center; gap: 10px; padding: 8px 12px;
-        background: #F6F6F6; border-bottom: 1px solid rgba(0,0,0,.12); font-family: var(--wa);
-      }
       .chat-header .who-avatar { flex: 0 0 34px; height: 34px; border-radius: 50%; overflow: hidden; }
       .chat-header .who-avatar svg { display: block; width: 34px; height: 34px; }
       .chat-header .who-name { font-size: 16px; font-weight: 600; color: #111B21; }
@@ -177,19 +189,42 @@
 
       /* The composer. WhatsApp's is a white pill on the cream ground with a
          round green send button beside it. */
-      .composer { display: flex; gap: 6px; align-items: flex-end; margin-top: .6rem; }
-      .composer textarea { flex: 1; min-height: 38px; max-height: 9rem; padding: 9px 14px;
-                           border-radius: 19px; resize: none; font-family: var(--wa);
-                           font-size: 16.5px; line-height: 20px; border: 1px solid rgba(0,0,0,.1);
-                           background: #fff; }
+      /* The composer as WhatsApp draws it: a white pill that grows with the
+         text, and a filled green circle with a paper plane beside it. */
+      .composer { display: flex; gap: 8px; align-items: flex-end; margin-top: .6rem; }
+      .composer textarea { flex: 1; min-height: 40px; max-height: 9rem; padding: 10px 16px;
+                           border-radius: 20px; resize: none; font-family: var(--wa);
+                           font-size: 16.5px; line-height: 20px; border: 1px solid rgba(0,0,0,.08);
+                           background: #fff; box-shadow: 0 1px .5px rgba(11,20,26,.08); }
+      .composer textarea::placeholder { color: #9AA3A8; }
       /* A green ring rather than the browser's black one, which on the cream
          ground reads as an error state. Still clearly visible: this is the
          control somebody is typing into. */
       .composer textarea:focus-visible,
       .scenario-edit:focus-visible { outline: 2px solid #00A884; outline-offset: 1px; border-color: #00A884; }
-      .send-round { flex: 0 0 auto; width: 38px; height: 38px; border-radius: 50%; padding: 0;
-                    display: grid; place-items: center; font-size: 1rem; min-height: 0;
-                    background: #00A884; border-color: #00A884; color: #fff; }
+      .send-round { flex: 0 0 auto; width: 40px; height: 40px; border-radius: 50%; padding: 0;
+                    display: grid; place-items: center; min-height: 0;
+                    background: #00A884; border: 0; color: #fff; }
+      .send-round svg { width: 20px; height: 20px; display: block; }
+
+      /* The three retellings, as messages you react to.
+         The thumb is invisible until it is chosen, then it sits on the corner
+         of the bubble the way a WhatsApp reaction does. */
+      .choose-hint { font-family: var(--wa); font-size: 13px; color: #667781; text-align: center;
+                     margin: .6rem 0 .5rem; }
+      .choice-list { display: flex; flex-direction: column; gap: 8px; }
+      .choice-bubble { cursor: pointer; user-select: none; -webkit-user-select: none;
+                       -webkit-touch-callout: none; transition: transform .12s ease; }
+      .choice-bubble:focus-visible { outline: 2px solid #00A884; outline-offset: 2px; }
+      .choice-bubble.holding { transform: scale(.97); }
+      .reaction { position: absolute; right: 10px; bottom: -12px; font-size: 15px; line-height: 1;
+                  background: #fff; border-radius: 999px; padding: 2px 4px;
+                  box-shadow: 0 1px 2px rgba(11,20,26,.2); opacity: 0; transform: scale(.4);
+                  transition: opacity .18s ease, transform .18s cubic-bezier(.2,1.4,.4,1); }
+      .choice-bubble.chosen .reaction { opacity: 1; transform: scale(1); }
+      @media (prefers-reduced-motion: reduce) {
+        .choice-bubble, .reaction { transition: none; }
+      }
 
       /* The retelling, at whatever length it came out.
          They are being asked to read it closely enough to say what is wrong
@@ -309,7 +344,6 @@
          rather than squeezing the conversation out of the frame. */
       body.participant-view #stageArea { flex: 0 1 auto; max-height: 62dvh; overflow-y: auto;
                                          padding: 0 .6rem .6rem; background: var(--wa-bg); }
-      body.participant-view #progress { padding: 0; flex: 0 0 auto; }
       body.participant-view .stem { font-size: 1.15rem; }
       body.participant-view .card-choice { font-size: 16.5px; line-height: 21px; padding: .9rem 1rem; }
       /* iOS controls, not the workbench's. The lab keeps its green; the page a
@@ -338,12 +372,7 @@
       body.participant-view #progress { position: sticky; top: 0; z-index: 5;
                                         padding: .75rem 0 .55rem; background: var(--canvas);
                                         border-bottom: 1px solid var(--hairline); }
-      /* The progress hairline, tucked under the header. No bottom padding on
-         the wrap: it was there to clear a floating toggle that a linked run no
-         longer has, and in a fixed frame it was 88px of the viewport the
-         conversation never got back. */
-      body.participant-view .progress { margin: 0; padding: 6px 0; background: var(--wa-bg); }
-      body.participant-view .progress-track { height: 2px; }
+      body.participant-view #progress { display: none; }
       /* Fixed, so it floats over whatever is beneath it — which on a short
          page is the view toggle, and a caption that swallows a button's
          clicks is a caption in the wrong place. It is something to read, not

@@ -24,7 +24,26 @@ export const INTERVIEWER_SCHEMA = {
   additionalProperties: false,
   required: ["reply", "interviewDone", "questionsCovered"],
   properties: {
-    reply: { type: "string", description: "What to say next: one short question, or a brief close." },
+    /**
+     * This description was the bug.
+     *
+     * "One short question" is exactly what it produced: a bare interrogation,
+     * question after question with no sign of having heard the answer. The
+     * original app has no schema at all — the model writes free text and the
+     * warmth comes for free — so the flatness was ours, introduced by the very
+     * constraint that makes the output safe to parse.
+     *
+     * The constraint stays; the description now asks for what a person would
+     * actually send.
+     */
+    reply: {
+      type: "string",
+      description:
+        "What to say next, as a message in a chat. React briefly to what they just said first — a few words, warm and " +
+        "specific to their answer, never a compliment on the answer itself — and then ask. If their last answer was " +
+        "one or two words, do not move on: ask them to say a bit more about that same thing. Never advice, never a " +
+        "diagnosis, never a summary of what they have told you so far.",
+    },
     interviewDone: {
       type: "boolean",
       description: "True only when every question on the list has been genuinely answered.",
@@ -99,6 +118,12 @@ export const INTERVIEWER_SYSTEM = [
   "Ask each question one at a time.",
   "{language_style}",
   "Ensure you get at least a basic answer to each question before moving to the next.",
+  // Two lines the original does not need and this does. The original's model
+  // writes free prose and is conversational by default; ours writes into a
+  // JSON field, which pulls it towards terse and functional. These put back
+  // what the schema takes away, and nothing about the method changes.
+  "Talk like a person in a chat: react to what they just said before you ask the next thing.",
+  "A one or two word answer is not a basic answer — ask them to say a bit more about that same thing before moving on.",
   "Never answer for the human. If you are unsure what the human meant, ask again.",
   "{topic_restriction}",
   "{collection_complete}, set interviewDone to true. Do not say so out loud; close warmly instead.",
