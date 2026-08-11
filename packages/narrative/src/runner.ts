@@ -7,6 +7,7 @@ import {
   INTERVIEWER_SCHEMA,
   INTERVIEWER_SYSTEM,
   SCENARIO_SCHEMA,
+  SCENARIO_CLOSE,
   SCENARIO_SYSTEM,
   collectionComplete,
   extractionSchema,
@@ -506,26 +507,26 @@ export class NarrativeRunner {
       const done = result.output.interviewDone === true;
 
       /**
-       * A question nobody will be allowed to answer is not shown.
+       * The closing turn is not shown, as in the original.
        *
-       * `interviewDone` ends the interview on the spot, and the model can set
-       * it in the same turn as another question — the prompt asks it not to,
-       * and in a live run it did anyway: "Is there anything you wouldn't miss
-       * at all about your phone?" went up on screen and the retellings landed
-       * underneath it a second later. From the participant's side they had
-       * been asked something and then talked over.
+       * Their app ends the interview when the model writes the single word
+       * FINISHED, and that word never reaches the screen: the next thing the
+       * participant reads is the app's own "Seems I have everything!". We
+       * swapped the sentinel for a boolean — a participant could type FINISHED
+       * — and then asked the model to close warmly instead, which produced a
+       * goodbye immediately before three retellings arrived, and on another
+       * run a question nobody could answer.
        *
-       * So the flag is honoured — the researcher's question list is covered
-       * and the protocol says stop — but the dangling question is withheld
-       * rather than displayed, and kept out of the transcript too: extraction
-       * reads that transcript, and a question the participant never saw is not
-       * part of the conversation they had.
+       * Both were the same mistake: letting a model have the last word on a
+       * turn whose only job is to stop. It is discarded now, and kept out of
+       * the transcript as well, since extraction reads that transcript and a
+       * sentence the participant never saw is not part of their conversation.
        *
        * Never on the opening turn, where there is nothing to be done with yet.
        */
-      if (done && this.transcript.length > 0 && /\?\s*$/.test(reply.trim())) {
+      if (done && this.transcript.length > 0) {
         this.append(stage.key, "system", "validation_result", {
-          data: { replyWithheld: "question_asked_after_completion", text: reply },
+          data: { replyWithheld: "interview_complete", text: reply },
         });
         return { reply: "", done: true };
       }
@@ -673,7 +674,7 @@ export class NarrativeRunner {
         const question = this.protocol.extraction?.keys[key];
         return `Question: ${question ? this.configText(question) : key}\nAnswer: ${value ?? "(they did not say)"}`;
       })
-      .join("\n");
+      .join("\n") + `\n\n${SCENARIO_CLOSE}`;
 
     /**
      * The personas write at the same time, as the original's do.
