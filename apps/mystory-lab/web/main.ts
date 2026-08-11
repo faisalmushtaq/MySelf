@@ -1,5 +1,12 @@
 import { Gateway, RelayAdapter, type ModelCall } from "@myself/llm";
-import { NarrativeRunner, checkProtocol, protocols, type Screen } from "@myself/narrative";
+import {
+  NarrativeRunner,
+  checkProtocol,
+  defaultCharacter,
+  protocols,
+  type CharacterConfig,
+  type Screen,
+} from "@myself/narrative";
 import { session } from "./session.js";
 
 /**
@@ -622,6 +629,99 @@ function wireComposer(): void {
     }
   });
   box.addEventListener("input", sizeMessageBox);
+}
+
+/* ── Who the participant is talking to ───────────────────────────────────── */
+
+/**
+ * The character, from the protocol.
+ *
+ * Per study because the cohort decides it: a ten-year-old holds onto "this is
+ * a robot called Botty" in a way they do not hold onto a name, and a
+ * sixteen-year-old dismisses a robot as something made for children. Both
+ * disclose; they disclose differently.
+ */
+let character: CharacterConfig = defaultCharacter();
+
+/** A robot for the young, a plain mark for the older, the study's own badge. */
+function avatarFor(look: CharacterConfig["look"], size: number): string {
+  if (look === "robot") {
+    return `<svg viewBox="0 0 40 40" width="${size}" height="${size}" aria-hidden="true">
+      <circle cx="20" cy="20" r="20" fill="#CFE9E1"/>
+      <rect x="18.7" y="5" width="2.6" height="5" rx="1.3" fill="#2F6F62"/>
+      <circle cx="20" cy="4.6" r="2.3" fill="#2F6F62"/>
+      <rect x="8.5" y="11" width="23" height="18" rx="6" fill="#2F6F62"/>
+      <circle cx="15.2" cy="19" r="3" fill="#fff"/><circle cx="24.8" cy="19" r="3" fill="#fff"/>
+      <circle cx="15.2" cy="19.6" r="1.4" fill="#2F6F62"/><circle cx="24.8" cy="19.6" r="1.4" fill="#2F6F62"/>
+      <path d="M16 24.6c2.4 1.7 5.6 1.7 8 0" stroke="#fff" stroke-width="1.6" fill="none" stroke-linecap="round"/>
+      <rect x="4.4" y="16" width="3.4" height="8" rx="1.7" fill="#2F6F62"/>
+      <rect x="32.2" y="16" width="3.4" height="8" rx="1.7" fill="#2F6F62"/>
+      <rect x="12" y="30" width="16" height="6" rx="3" fill="#4E8F81"/>
+    </svg>`;
+  }
+  if (look === "logo") {
+    // The study's own badge, for a protocol that would rather be itself than a
+    // character. Drawn rather than fetched: a page that loads an image from
+    // somewhere is a page that can fail to.
+    return `<svg viewBox="0 0 40 40" width="${size}" height="${size}" aria-hidden="true">
+      <circle cx="20" cy="20" r="20" fill="#95C11F"/>
+      <text x="20" y="26" text-anchor="middle" font-family="system-ui, sans-serif" font-size="16"
+            font-weight="700" fill="#fff">BiB</text>
+    </svg>`;
+  }
+  /**
+   * Neutral, and deliberately not a face.
+   *
+   * A drawn person has a skin tone, a hairstyle and an apparent gender, and a
+   * study about how young people see themselves should not be putting any of
+   * those on the other side of the conversation. A speech mark says "something
+   * that writes to you" and says nothing else.
+   */
+  return `<svg viewBox="0 0 40 40" width="${size}" height="${size}" aria-hidden="true">
+    <circle cx="20" cy="20" r="20" fill="#2F6F62"/>
+    <path d="M11 13.5h18a2.5 2.5 0 0 1 2.5 2.5v7.5a2.5 2.5 0 0 1-2.5 2.5H19l-6 4.5V26h-2a2.5 2.5 0 0 1-2.5-2.5V16a2.5 2.5 0 0 1 2.5-2.5Z"
+          fill="#fff"/>
+    <circle cx="15.4" cy="20" r="1.7" fill="#2F6F62"/>
+    <circle cx="20" cy="20" r="1.7" fill="#2F6F62"/>
+    <circle cx="24.6" cy="20" r="1.7" fill="#2F6F62"/>
+  </svg>`;
+}
+
+/** Put the character on the header and build its profile. */
+function showCharacter(next: CharacterConfig): void {
+  character = next;
+  const name = document.getElementById("whoName");
+  if (name) name.textContent = next.name;
+  const avatar = document.querySelector<HTMLElement>(".chat-header .who-avatar");
+  if (avatar) avatar.innerHTML = avatarFor(next.look, 38);
+
+  const big = document.getElementById("profileAvatar");
+  if (big) big.innerHTML = avatarFor(next.look, 132);
+  const profileName = document.getElementById("profileName");
+  if (profileName) profileName.textContent = next.name;
+  const meaning = document.getElementById("profileMeaning");
+  if (meaning) meaning.textContent = next.meaning;
+  const about = document.getElementById("profileAbout");
+  if (about) about.innerHTML = next.about.map((line) => `<p class="profile-line">${escapeHtml(line)}</p>`).join("");
+}
+
+function wireProfile(): void {
+  const view = document.getElementById("profileView");
+  const open = () => {
+    if (view) view.hidden = false;
+  };
+  const close = () => {
+    if (view) view.hidden = true;
+  };
+  document.getElementById("openProfile")?.addEventListener("click", open);
+  document.getElementById("closeProfile")?.addEventListener("click", close);
+  // The same refusals as the header's, in the place the profile puts them.
+  document
+    .getElementById("profileVoice")
+    ?.addEventListener("click", () => headerNote(`${character.name} can\u2019t take calls. This chat is writing only.`));
+  document
+    .getElementById("profileVideo")
+    ?.addEventListener("click", () => headerNote(`${character.name} can\u2019t do video calls. This chat is writing only.`));
 }
 
 /* ── The header, and the things it declines to do ────────────────────────── */
@@ -1790,6 +1890,7 @@ async function turn(payload: { action: string; input?: string; echo?: boolean })
 // every render, which is precisely why they are stable to type into.
 wireComposer();
 wireHeader();
+wireProfile();
 wireMic();
 
 $("start").addEventListener("click", () => {
@@ -1804,6 +1905,9 @@ $("start").addEventListener("click", () => {
     if (live) {
       // A local server with a key, which holds it and makes the call.
       localRunner = null;
+      // The character is a property of the protocol, so it is the same
+      // whichever side is running it.
+      showCharacter(protocols.find((p) => p.key === key)?.character ?? defaultCharacter());
       const data = await api<Frame & { sessionId: string; provider: string }>("/api/start", {
         protocol: key,
         firstName,
@@ -1861,8 +1965,10 @@ $("start").addEventListener("click", () => {
       },
     });
     sessionId = `lab_${Date.now().toString(36)}`;
+    const chosen = protocols.find((p) => p.key === key)!;
+    showCharacter(chosen.character);
     localRunner = new NarrativeRunner(
-      protocols.find((p) => p.key === key)!,
+      chosen,
       { sessionId, variables: { first_name: firstName, topic }, online },
       gateway,
     );

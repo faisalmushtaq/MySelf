@@ -217,6 +217,50 @@ export const qualityControlConfig = z.object({
   stopBeforeGeneration: z.boolean().default(true),
 });
 
+/**
+ * Who the participant thinks they are talking to.
+ *
+ * Not decoration. A ten-year-old and a sixteen-year-old need different
+ * answers to "what is this", and the honest answer is the same for both: an
+ * AI. For the younger cohort that is easiest to hold onto if it plainly looks
+ * like a robot and is called one; for the older cohort a robot reads as
+ * childish and gets dismissed, so it is a name — and the name has to carry no
+ * gender and no culture, because a study about how young people see
+ * themselves should not be putting a boy or a girl or a background on the
+ * other side of the conversation.
+ *
+ * `meaning` is what the name stands for and is shown in the profile. Sam is
+ * Stories About Me; that it also reads as a person's name is the point, and
+ * saying what it stands for is how the design keeps that from being a trick.
+ */
+export const characterConfig = z.object({
+  name: z.string().min(1).max(40).default("Sam"),
+  /** What the name stands for, shown wherever the character is explained. */
+  meaning: z.string().max(120).default("Stories About Me"),
+  /** Which face to draw. A robot for the young, a plain mark for the older. */
+  look: z.enum(["robot", "neutral", "logo"]).default("neutral"),
+  /**
+   * The profile, in sentences a participant reads.
+   *
+   * Required to say it is an AI somewhere, and checked below rather than left
+   * to whoever writes the next protocol: the whole design rests on nobody
+   * being misled about what they are talking to.
+   */
+  about: z
+    .array(z.string().min(1).max(300))
+    .min(1)
+    .default([
+      "I am an AI, not a person. Nobody is reading this as you type.",
+      "I can only read and write. I cannot see you or hear you unless you send a recording.",
+      "What you tell me is kept for the research, and your name is not attached to it.",
+    ]),
+});
+
+export type CharacterConfig = z.infer<typeof characterConfig>;
+
+/** The character, filled in, for a protocol that did not name one. */
+export const defaultCharacter = (): CharacterConfig => characterConfig.parse({});
+
 export const narrativeProtocol = z.object({
   key: z.string().regex(/^np\.[a-z0-9_]+$/, "protocol keys look like np.micro_narrative"),
   version: z.string().min(1),
@@ -245,6 +289,13 @@ export const narrativeProtocol = z.object({
   permittedIdentifiers: z.array(z.string()).default([]),
 
   /** Present when the protocol runs the full guided-interview journey. */
+  /**
+   * Who is on the other side of the conversation. Defaulted rather than
+   * required, so every existing protocol keeps working — but defaulted to
+   * something that names itself as an AI.
+   */
+  character: characterConfig.default({}),
+
   interview: interviewConfig.optional(),
   extraction: extractionConfig.optional(),
   scenario: scenarioConfig.optional(),
@@ -329,6 +380,20 @@ export function checkProtocol(protocol: NarrativeProtocol): string[] {
       }
     }
   };
+
+  /**
+   * The character has to say it is an AI, somewhere in its profile.
+   *
+   * A name and a face are exactly the two things that make somebody assume a
+   * person is on the other end — "Sam" more than most, which is the reason it
+   * was chosen and the reason this check exists. A protocol may word the
+   * disclosure however suits its cohort; it may not leave it out.
+   */
+  if (!protocol.character.about.some((line) => /\bAI\b|\brobot\b|not a (real )?person|computer/i.test(line))) {
+    problems.push(
+      `the character '${protocol.character.name}' never says it is an AI — one line of its profile has to, because a name and a face are what make somebody assume otherwise`,
+    );
+  }
 
   if (protocol.interview) {
     checkPromptConfig("the interviewer persona", protocol.interview.persona);

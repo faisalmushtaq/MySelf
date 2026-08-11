@@ -54,6 +54,23 @@ const myselfSection = z
     age_min: z.number().int().optional(),
     age_max: z.number().int().optional(),
 
+    /**
+     * Who the participant thinks they are talking to.
+     *
+     * Set per study because the cohort decides it: a ten-year-old holds onto
+     * "this is a robot called Botty" far better than a name, and a
+     * sixteen-year-old dismisses a robot as something made for children. The
+     * name carries no gender and no culture on purpose.
+     */
+    character: z
+      .object({
+        name: z.string().min(1).max(40).optional(),
+        meaning: z.string().max(120).optional(),
+        look: z.enum(["robot", "neutral", "logo"]).optional(),
+        about: z.array(z.string().min(1).max(300)).optional(),
+      })
+      .default({}),
+
     /** Substitutable in what the participant reads and in the prompts. */
     permitted_variables: z.array(z.string()).default([]),
     /** Of those, the ones allowed to reach a provider. Sending a name is a decision. */
@@ -245,6 +262,16 @@ export function protocolFromConfig(input: unknown, options: ExpandOptions = {}):
       ? { ageRange: { min: myself.age_min, max: myself.age_max } }
       : {}),
 
+    // Only the keys the file actually set; the rest come from the schema's
+    // defaults, so a study that says nothing still gets a character that
+    // names itself as an AI.
+    character: {
+      ...(myself.character.name !== undefined ? { name: myself.character.name } : {}),
+      ...(myself.character.meaning !== undefined ? { meaning: myself.character.meaning } : {}),
+      ...(myself.character.look !== undefined ? { look: myself.character.look } : {}),
+      ...(myself.character.about !== undefined ? { about: myself.character.about } : {}),
+    },
+
     permittedVariables: [...permitted],
     permittedIdentifiers: myself.permitted_identifiers,
 
@@ -384,6 +411,14 @@ export function configFromProtocol(protocol: NarrativeProtocol): ProtocolConfig 
       language: protocol.language,
       estimated_minutes: protocol.estimatedMinutes,
       ...(protocol.ageRange ? { age_min: protocol.ageRange.min, age_max: protocol.ageRange.max } : {}),
+      // Written out in full on the way back, so a researcher editing the file
+      // can see what the character currently is rather than an empty section.
+      character: {
+        name: protocol.character.name,
+        meaning: protocol.character.meaning,
+        look: protocol.character.look,
+        about: protocol.character.about,
+      },
       permitted_variables: protocol.permittedVariables,
       permitted_identifiers: protocol.permittedIdentifiers,
       provider: model.provider,

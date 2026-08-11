@@ -308,6 +308,27 @@ export const microNarrativeFullConfig: ProtocolConfig = protocolConfig.parse({
     age_min: 10,
     age_max: 19,
 
+    /**
+     * Botty, for the younger end.
+     *
+     * This protocol reaches ten-year-olds, and at that age "it is a robot" is
+     * a thing somebody can hold onto for a whole conversation in a way that a
+     * name is not. Looking like what it is does the disclosure's work before
+     * anybody reads a word of the profile.
+     */
+    character: {
+      name: "Botty",
+      meaning: "a robot that listens",
+      look: "robot",
+      about: [
+        "Botty is a robot — a computer program, not a real person.",
+        "It asks you about your life, then writes back what it heard so you can say if it got it right or wrong.",
+        "It cannot see you. It only hears you if you send it a recording.",
+        "What you tell it is kept for the research, and your name is not kept with it.",
+        "There are no right answers, and nothing you say here is marked.",
+      ],
+    },
+
     permitted_variables: ["first_name", "topic"],
     permitted_identifiers: [],
 
@@ -466,6 +487,33 @@ export const phoneWellbeingConfig: ProtocolConfig = protocolConfig.parse({
     estimated_minutes: 10,
     age_min: 11,
     age_max: 18,
+
+    /**
+     * Sam, for eleven to eighteen.
+     *
+     * A robot reads as something made for younger children and gets dismissed
+     * by this age group, so the character is a name — and the name carries no
+     * gender and no culture, because a study about how young people see
+     * themselves has no business putting a boy, a girl, or a background on the
+     * other side of the conversation.
+     *
+     * That it reads as a person's name is exactly why the profile says what it
+     * stands for and what it is. The disclosure is not a footnote here; it is
+     * the first thing the profile says, and the publish gate refuses a
+     * character whose profile never says it.
+     */
+    character: {
+      name: "Sam",
+      meaning: "Stories About Me",
+      look: "neutral",
+      about: [
+        "Sam is an AI, not a person. Nobody is sitting somewhere reading this as you type.",
+        "Sam stands for Stories About Me. It asks about your life and then writes back what it heard, so you can say whether it got it right.",
+        "It can only read and write. It cannot see you, and it only hears you if you send a recording.",
+        "What you say is kept for the research. Your name is not stored with it.",
+        "There are no right answers and nothing here is marked.",
+      ],
+    },
 
     // No {topic}: this protocol asks about one thing and says so.
     permitted_variables: ["first_name"],
