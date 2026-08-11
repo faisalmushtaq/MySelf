@@ -171,7 +171,7 @@ export async function authenticate(header: string | undefined): Promise<Caller> 
  * that quietly runs ten times longer than anyone expected all end the same way
  * without this, and the first anyone hears of it is the invoice.
  */
-async function meter(caller: Caller): Promise<void> {
+export async function meter(caller: Caller): Promise<void> {
   const day = new Date().toISOString().slice(0, 10);
   const ref = research().doc(`${paths.audit(STUDY)}_relay/${day}_${caller.uid}`);
   const used = await research().runTransaction(async (tx) => {

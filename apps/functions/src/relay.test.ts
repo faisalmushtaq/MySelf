@@ -14,6 +14,7 @@ import {
   type Caller,
 } from "./relay-policy.js";
 import { narrativeSave, provenanceOf } from "./narratives.js";
+import { extensionFor } from "./transcribe.js";
 
 /**
  * The relay's job is to be the only thing holding a key, and the only thing
@@ -297,5 +298,24 @@ describe("what a tester link may actually run", () => {
   it("keeps a real iPad held to what was published", () => {
     const key = protocols[0]!.models.find((m) => m.provider !== "mock")!.key;
     expect(() => configFor(key, { uid: "dev_ipad_4", device: true })).toThrow(/published configurations/);
+  });
+});
+
+describe("what the transcriber will accept", () => {
+  /**
+   * The provider decides which decoder to use from the FILE EXTENSION, not
+   * from the content type on the part — so a clip named wrongly comes back as
+   * a corrupt-file error with nothing in it about the real cause. iOS Safari
+   * records mp4 and everything else records webm, and both have to land right.
+   */
+  it("names an iOS clip mp4 and a Chrome clip webm", () => {
+    expect(extensionFor("audio/mp4")).toBe("mp4");
+    expect(extensionFor("audio/webm;codecs=opus")).toBe("webm");
+    expect(extensionFor("AUDIO/WEBM")).toBe("webm");
+  });
+
+  it("refuses a container it cannot name rather than guessing at one", () => {
+    expect(() => extensionFor("video/mp4")).toThrow(/cannot transcribe/);
+    expect(() => extensionFor("application/octet-stream")).toThrow(/cannot transcribe/);
   });
 });

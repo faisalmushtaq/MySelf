@@ -262,10 +262,17 @@
                    background: none; border: 0; color: #54656F; }
       .mic-round[hidden] { display: none; }
       .mic-round svg { width: 24px; height: 24px; display: block; }
-      .mic-round.listening { background: #00A884; color: #fff; animation: pulse 1.4s ease-in-out infinite; }
-      @keyframes pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(0,168,132,.45); }
-                         50% { box-shadow: 0 0 0 7px rgba(0,168,132,0); } }
-      @media (prefers-reduced-motion: reduce) { .mic-round.listening { animation: none; } }
+      .mic-round.listening { background: #E8453C; color: #fff; animation: pulse 1.4s ease-in-out infinite; }
+      @keyframes pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(232,69,60,.45); }
+                         50% { box-shadow: 0 0 0 7px rgba(232,69,60,0); } }
+      /* Uploading and being written down. Not a spinner elsewhere on the page:
+         the wait belongs on the control that started it. */
+      .mic-round.writing { background: #8696A0; color: #fff; animation: none; }
+      .mic-round.writing svg { animation: fade 1s ease-in-out infinite; }
+      @keyframes fade { 0%, 100% { opacity: 1 } 50% { opacity: .35 } }
+      @media (prefers-reduced-motion: reduce) {
+        .mic-round.listening, .mic-round.writing svg { animation: none; }
+      }
       /* The lab's rewrite box keeps the older inline shape. */
       .composer { display: flex; gap: 8px; align-items: flex-end; margin-top: .6rem; }
       .composer textarea { border: 1px solid rgba(0,0,0,.08); background: #fff; border-radius: 20px;

@@ -481,11 +481,18 @@ function showRightButton(): void {
   const listening = mic?.classList.contains("listening") === true;
   // Send hides only when a microphone is there to take its place. A browser
   // with no recogniser would otherwise show an empty box and no button at all.
-  if (send) send.hidden = empty && micAvailable && !listening;
-  if (mic && micAvailable) mic.hidden = !(empty || listening);
+  const canSpeak = micAvailable();
+  if (send) send.hidden = empty && canSpeak && !listening;
+  if (mic) mic.hidden = !(canSpeak && (empty || listening));
 }
-/** Set by `wireMic` once it knows whether this browser has a recogniser. */
-let micAvailable = false;
+/** Set by `wireMic` once it knows whether this browser can record at all. */
+let micSupported = false;
+/**
+ * A microphone is only offered when there is something behind it: the relay
+ * carries the transcriber, so a build without one gets no button rather than a
+ * button that fails.
+ */
+const micAvailable = () => micSupported && relay !== null;
 
 /** Set by `wireMic`, so sending can stop the microphone still writing. */
 let stopListening: (() => void) | null = null;
@@ -565,92 +572,170 @@ function wireHeader(): void {
 /* ── Speaking instead of typing ──────────────────────────────────────────── */
 
 /**
- * Dictation, where the browser has it.
+ * Talking to it, and getting back text you can edit.
  *
- * The recogniser is the browser's own — Safari's and Chrome's both send audio
- * to their vendor to transcribe it, which is the same path as the dictation key
- * on the keyboard a participant already has. THIS PAGE RECORDS NOTHING: no
- * audio is captured by us, uploaded by us or stored anywhere, and what reaches
- * the study is the text, sitting in the box where it can be read and corrected
- * before it is sent. That distinction is the whole reason it is built this way
- * rather than as a voice note.
+ * A young person who finds writing hard should not be shut out of a method
+ * whose whole subject is what they have to say.
  *
- * It is offered only where a recogniser exists, because a microphone button
- * that cannot work is worse than no microphone button.
+ * NOT THE BROWSER'S RECOGNISER. Safari transcribes by sending audio to Apple
+ * and Chrome by sending it to Google, so the easy route would hand children's
+ * voices to a processor nobody named in the approval. The clip goes to the
+ * study's own relay, which holds the study's own key and calls the study's own
+ * provider — the one already named, already covered, already paying for every
+ * other call this page makes.
+ *
+ * NOTHING IS KEPT BUT THE WORDS. The recording exists in this tab for as long
+ * as it takes to upload, and in the function for as long as it takes to
+ * transcribe. It is written to no database and no bucket at either end. What
+ * lands is text, in the box, where it can be read and corrected before it is
+ * sent — so the participant sees what the study will have, and can change it,
+ * which is not true of a voice note.
  */
-interface SpeechLike {
-  lang: string;
-  continuous: boolean;
-  interimResults: boolean;
-  start(): void;
-  stop(): void;
-  onresult: ((event: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void) | null;
-  onerror: ((event: { error?: string }) => void) | null;
-  onend: (() => void) | null;
+
+/** What MediaRecorder will produce here, in the order the provider prefers. */
+const CLIP_TYPES = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/aac", "audio/ogg"];
+
+function clipType(): string | null {
+  if (typeof MediaRecorder === "undefined") return null;
+  return CLIP_TYPES.find((t) => MediaRecorder.isTypeSupported(t)) ?? null;
 }
+
+/** Base64 without loading a second copy of the clip into a string by hand. */
+async function base64Of(blob: Blob): Promise<string> {
+  const buffer = new Uint8Array(await blob.arrayBuffer());
+  let binary = "";
+  for (let i = 0; i < buffer.length; i += 0x8000) {
+    binary += String.fromCharCode(...buffer.subarray(i, i + 0x8000));
+  }
+  return btoa(binary);
+}
+
+/**
+ * A hard ceiling on one clip, matching the function's.
+ *
+ * Somebody who taps the microphone and puts the phone in their pocket should
+ * cost one upload, not a stream.
+ */
+const MAX_CLIP_MS = 120_000;
 
 function wireMic(): void {
   const button = document.getElementById("micBtn") as HTMLButtonElement | null;
   if (!button) return;
-  const w = window as unknown as { SpeechRecognition?: new () => SpeechLike; webkitSpeechRecognition?: new () => SpeechLike };
-  const Recogniser = w.SpeechRecognition ?? w.webkitSpeechRecognition;
-  if (!Recogniser) return;
-  micAvailable = true;
+  const type = clipType();
+  // No relay means no transcriber. The lab's local server does not carry one,
+  // and a microphone with nothing behind it is worse than none.
+  if (!type || !navigator.mediaDevices?.getUserMedia) return;
+  micSupported = true;
   showRightButton();
 
-  let listening: SpeechLike | null = null;
-  // What was in the box when they started talking, so speech is added to it
-  // rather than replacing something they had already typed.
-  let before = "";
+  let recorder: MediaRecorder | null = null;
+  let capping: ReturnType<typeof setTimeout> | null = null;
+  /** Set when the clip is being thrown away rather than transcribed. */
+  let discarding = false;
 
-  const stop = () => {
-    listening?.stop();
-    listening = null;
+  const release = () => {
+    if (capping) clearTimeout(capping);
+    capping = null;
+    recorder?.stream.getTracks().forEach((t) => t.stop());
+    recorder = null;
     button.classList.remove("listening");
     button.setAttribute("aria-label", "Speak your answer");
     showRightButton();
   };
-  stopListening = stop;
+  /** Stop and write it down — the microphone button, and the length cap. */
+  const finish = () => {
+    discarding = false;
+    if (recorder?.state === "recording") recorder.stop();
+    else release();
+  };
+  /**
+   * Stop and throw it away. This is what sending does: the message is already
+   * on its way, so transcribing what was said over the top of it would drop a
+   * stray sentence into the next answer.
+   */
+  stopListening = () => {
+    discarding = true;
+    if (recorder?.state === "recording") recorder.stop();
+    else release();
+  };
+
+  const send = async (clip: Blob) => {
+    if (!relay || clip.size === 0) {
+      release();
+      return;
+    }
+    const credential = linkKey ? `Link ${linkKey}` : await session.token().then((t) => (t ? `Bearer ${t}` : null));
+    if (!credential) {
+      release();
+      headerNote("That could not be written down — this page is not signed in.");
+      return;
+    }
+    button.classList.add("writing");
+    try {
+      const res = await fetch(`${relay.replace(/\/llmRelay$/, "")}/transcribe`, {
+        method: "POST",
+        headers: { "content-type": "application/json", authorization: credential },
+        body: JSON.stringify({
+          audio: await base64Of(clip),
+          mimeType: clip.type || type,
+          protocolKey: ($("protocol") as HTMLSelectElement | null)?.value ?? "unknown",
+        }),
+      });
+      const body = (await res.json()) as { text?: string; error?: { message?: string } };
+      if (!res.ok || typeof body.text !== "string") {
+        headerNote(body.error?.message ?? "That could not be written down. You can type your answer instead.");
+        return;
+      }
+      if (!body.text) {
+        headerNote("Nothing came through on that one. Try again, or type your answer.");
+        return;
+      }
+      // Added to whatever was already typed rather than replacing it.
+      const box = messageBox();
+      const had = box.value.replace(/\s+$/, "");
+      box.value = had ? `${had} ${body.text}` : body.text;
+      sizeMessageBox();
+      box.focus();
+    } catch {
+      headerNote("That could not be written down. You can type your answer instead.");
+    } finally {
+      button.classList.remove("writing");
+      release();
+    }
+  };
 
   button.addEventListener("click", () => {
-    if (listening) {
-      stop();
+    if (recorder) {
+      finish();
       return;
     }
-    const speech = new Recogniser();
-    speech.lang = navigator.language || "en-GB";
-    speech.continuous = true;
-    speech.interimResults = true;
-
-    speech.onresult = (event) => {
-      let heard = "";
-      for (let i = 0; i < event.results.length; i += 1) heard += event.results[i]?.[0]?.transcript ?? "";
-      const box = messageBox();
-      box.value = (before ? `${before.replace(/\s+$/, "")} ` : "") + heard.trim();
-      sizeMessageBox();
-    };
-    speech.onerror = (event) => {
-      stop();
-      headerNote(
-        event.error === "not-allowed"
-          ? "Your browser did not allow the microphone. You can type your answer instead."
-          : "That did not come through. You can try again, or type your answer instead.",
-      );
-    };
-    speech.onend = () => stop();
-
-    before = messageBox().value;
-    try {
-      speech.start();
-    } catch {
-      headerNote("The microphone could not be started. You can type your answer instead.");
-      return;
-    }
-    listening = speech;
-    button.classList.add("listening");
-    button.setAttribute("aria-label", "Stop listening");
-    showRightButton();
-    messageBox().focus();
+    void (async () => {
+      let stream: MediaStream;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      } catch {
+        headerNote("Your phone did not allow the microphone. You can type your answer instead.");
+        return;
+      }
+      const parts: Blob[] = [];
+      const rec = new MediaRecorder(stream, { mimeType: type });
+      rec.ondataavailable = (e) => {
+        if (e.data.size > 0) parts.push(e.data);
+      };
+      rec.onstop = () => {
+        if (discarding) {
+          release();
+          return;
+        }
+        void send(new Blob(parts, { type }));
+      };
+      rec.start();
+      recorder = rec;
+      capping = setTimeout(finish, MAX_CLIP_MS);
+      button.classList.add("listening");
+      button.setAttribute("aria-label", "Stop and write it down");
+      showRightButton();
+    })();
   });
 }
 
