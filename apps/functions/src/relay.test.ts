@@ -266,3 +266,36 @@ describe("storing a narrative run", () => {
     expect(parsed.records[0]!.text).toContain("short chat about your phone");
   });
 });
+
+describe("what a tester link may actually run", () => {
+  /**
+   * The bug this pins down. A link caller was marked as a device, and a device
+   * may only run configs a release froze — but nothing is released yet, and a
+   * protocol being piloted is `draft` precisely so it cannot be. Every call on
+   * a tester link was refused before it reached the provider, and the page
+   * reported the interviewer as unreachable.
+   */
+  const linkCaller: Caller = { uid: "link_abc123", device: false };
+
+  it("can run a config a shipped protocol declares, before any release exists", () => {
+    const key = protocols[0]!.models.find((m) => m.provider !== "mock")!.key;
+    expect(() => configFor(key, linkCaller)).not.toThrow();
+    expect(configFor(key, linkCaller).key).toBe(key);
+  });
+
+  it("still cannot invent one", () => {
+    expect(() => configFor("mc.something.expensive", linkCaller)).toThrow(/no shipped protocol or published release/);
+  });
+
+  it("is still a test as far as the data is concerned", () => {
+    // The two properties have to hold together: runnable like a researcher,
+    // recorded like a stranger. Getting one right and the other wrong is how
+    // pilot data ends up in the dataset, or a pilot cannot run at all.
+    expect(provenanceOf(linkCaller)).toBe("test");
+  });
+
+  it("keeps a real iPad held to what was published", () => {
+    const key = protocols[0]!.models.find((m) => m.provider !== "mock")!.key;
+    expect(() => configFor(key, { uid: "dev_ipad_4", device: true })).toThrow(/published configurations/);
+  });
+});

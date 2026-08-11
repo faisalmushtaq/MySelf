@@ -802,8 +802,22 @@ function applyLinkedRun(): { start: boolean } {
     }
   }
 
+  /**
+   * A linked run starts with no name unless the link gives one.
+   *
+   * The First name box carries "Amara" as a convenience for whoever is sitting
+   * in the lab writing prompts. That default belongs to the lab, and it was
+   * reaching testers: a link made with the box left blank still greeted every
+   * stranger who opened it as Amara, because the page they loaded had the
+   * default in the box and nothing had overwritten it.
+   *
+   * So the link says, and silence means nobody. The greeting is written to
+   * read correctly without a name.
+   */
   const name = params.get("name");
+  const linkedRun = params.get("view") === "participant" || params.get("k") !== null || params.get("start") === "1";
   if (name !== null) ($("firstName") as HTMLInputElement).value = name;
+  else if (linkedRun) ($("firstName") as HTMLInputElement).value = "";
   const topic = params.get("topic");
   if (topic !== null) ($("topic") as HTMLInputElement).value = topic;
 
