@@ -104,9 +104,28 @@ async function spendLink(key: string): Promise<Caller> {
     return `link_${hash.slice(0, 12)}`;
   });
 
-  // Not a device and has no role: `configFor` therefore gives it only what a
-  // published release froze, which is the right ceiling for a stranger.
-  return { uid, device: true };
+  /**
+   * NOT a device.
+   *
+   * The first version said `device: true`, reasoning that a stranger should be
+   * held to what a release froze. That reasoning is right for an iPad and
+   * exactly backwards here: a tester link exists to pilot a protocol BEFORE it
+   * is published, and a protocol being piloted is `draft` precisely so it
+   * cannot be released. With no release yet declaring any model config, every
+   * call on a tester link was refused before it reached the provider, and the
+   * page reported the interviewer as unreachable.
+   *
+   * The device rule protects reproducibility in a fielded study: what a child
+   * in a school runs must be what was published. A pilot is not that, and its
+   * runs are stored as `provenance: "test"` and kept out of the dataset for
+   * the same reason.
+   *
+   * Nothing is loosened by this. The caller still sends only a config KEY, and
+   * it is still resolved against the protocols bundled into this function — so
+   * a link can run what a shipped protocol declares and cannot invent a model,
+   * a temperature or a token ceiling.
+   */
+  return { uid, device: false };
 }
 
 /**
