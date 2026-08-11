@@ -77,103 +77,135 @@
                   background: #f7faf8; font-size: 1rem; line-height: 1.55; }
 
       /* ── The conversation ────────────────────────────────────────────────
-         Built to look like Messages on the phone in their hand, because that
-         is the interface a young person has thousands of hours in. Every
-         convention borrowed here is one they do not have to learn: which side
-         is theirs, that grey is the other party, that three dots means someone
-         is typing, that a tail points at who spoke.
+         WhatsApp on iOS, because that is where a young person in the UK
+         actually has their conversations, and every convention it uses is one
+         they do not have to be taught.
 
-         iOS system values rather than approximations of them: 17px text on a
-         22px line, 18px corners, #007AFF for the sender and #E9E9EB for the
-         recipient, San Francisco via -apple-system. On a device that has SF
-         this is the real typeface; elsewhere it degrades to the platform's own
-         UI font, which is the right answer for a page that is also opened on a
-         laptop. */
+         Read off the real thing rather than approximated: a warm cream ground,
+         white for the other party and pale green for you, a soft one-pixel
+         drop shadow under each bubble, 12px corners, the time set INSIDE the
+         bubble at the bottom right with the text wrapping around it, ticks
+         after it on your own messages, and no avatars at all — a one-to-one
+         WhatsApp chat has none, only the header.
+
+         The doodle wallpaper is deliberately not reproduced. It is WhatsApp's
+         own illustration; the cream ground carries the same recognition
+         without copying artwork.
+
+         Two spacings that matter more than they sound. Consecutive messages
+         from one speaker sit 2px apart and a change of speaker opens to 8px:
+         that is what makes five bubbles read as one turn. And the tail sits on
+         the FIRST bubble of a run, at the top corner, which is where WhatsApp
+         puts it. */
       :root {
-        --imsg-blue: #007AFF;
-        --imsg-grey: #E9E9EB;
-        --imsg-tail: 20px;
-        --imsg: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", "Segoe UI", system-ui, sans-serif;
+        --wa-bg: #EFE7DE;
+        --wa-in: #FFFFFF;
+        --wa-out: #D9FDD3;
+        --wa-meta: rgba(0,0,0,.45);
+        --wa-tick: #34B7F1;
+        --wa-shadow: 0 1px .5px rgba(11,20,26,.13);
+        --wa: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", "Segoe UI", system-ui, sans-serif;
       }
-      .thread { display: flex; flex-direction: column; gap: 2px; max-height: 26rem;
-                overflow-y: auto; padding: .3rem .1rem .3rem 0; scroll-behavior: smooth;
-                font-family: var(--imsg); }
-      .msg { display: flex; gap: .4rem; align-items: flex-end; max-width: 78%; }
+      .thread { display: flex; flex-direction: column; gap: 2px; max-height: 26rem; overflow-y: auto;
+                padding: .6rem .5rem; scroll-behavior: smooth; font-family: var(--wa);
+                background: var(--wa-bg); border-radius: 8px; }
+      .msg { display: flex; max-width: 80%; }
       .msg.from-them { align-self: flex-start; }
-      .msg.from-me { align-self: flex-end; flex-direction: row-reverse; }
-      /* Consecutive messages from the same speaker sit close, as Messages
-         groups them, with the gap only where the speaker changes. */
-      .msg + .msg { margin-top: 2px; }
-      .msg.turn { margin-top: 10px; }
+      .msg.from-me { align-self: flex-end; }
+      .msg.turn { margin-top: 8px; }
 
-      .avatar { flex: 0 0 26px; height: 26px; border-radius: 50%; display: grid; place-items: center;
-                overflow: hidden; }
-      .avatar svg { width: 26px; height: 26px; display: block; }
+      .bubble { position: relative; padding: 6px 9px 8px 9px; border-radius: 12px; font-size: 16.5px;
+                line-height: 21px; background: var(--wa-in); color: #111B21;
+                box-shadow: var(--wa-shadow); word-break: break-word; }
+      .from-me .bubble { background: var(--wa-out); }
 
-      .bubble { position: relative; padding: 7px 13px; border-radius: 18px; font-size: 17px;
-                line-height: 22px; background: var(--imsg-grey); color: #000;
-                word-break: break-word; }
-      .from-me .bubble { background: var(--imsg-blue); color: #fff; }
-
-      /* The tail, drawn the way Messages draws it: a rounded wedge behind the
-         bubble, and a second wedge in the page colour punched out of it.
-         Only on the last bubble of a run, which is where Messages puts it. */
-      .msg.tail .bubble::before,
-      .msg.tail .bubble::after { content: ""; position: absolute; bottom: 0; height: var(--imsg-tail); }
-      .msg.tail.from-them .bubble::before {
-        left: -7px; width: var(--imsg-tail); background: var(--imsg-grey);
-        border-bottom-right-radius: 16px; z-index: -2;
+      /* The tail: a small wedge at the top outer corner of the first bubble in
+         a run, drawn with a border triangle so it takes the bubble's colour. */
+      .msg.turn .bubble::before {
+        content: ""; position: absolute; top: 0; width: 8px; height: 13px;
       }
-      .msg.tail.from-them .bubble::after {
-        left: -10px; width: 10px; background: var(--canvas); border-bottom-right-radius: 10px; z-index: -1;
+      .msg.turn.from-them .bubble { border-top-left-radius: 0; }
+      .msg.turn.from-them .bubble::before {
+        left: -8px; background: var(--wa-in);
+        clip-path: polygon(100% 0, 100% 100%, 0 0);
       }
-      .msg.tail.from-me .bubble::before {
-        right: -7px; width: var(--imsg-tail); background: var(--imsg-blue);
-        border-bottom-left-radius: 16px; z-index: -2;
-      }
-      .msg.tail.from-me .bubble::after {
-        right: -10px; width: 10px; background: var(--canvas); border-bottom-left-radius: 10px; z-index: -1;
+      .msg.turn.from-me .bubble { border-top-right-radius: 0; }
+      .msg.turn.from-me .bubble::before {
+        right: -8px; background: var(--wa-out);
+        clip-path: polygon(0 0, 0 100%, 100% 0);
       }
 
-      .bubble.system { background: transparent; color: var(--muted); font-size: 13px;
-                       padding-left: 0; }
+      /* The time and the ticks, inside the bubble at the bottom right, with the
+         message text flowing around them. Floated rather than positioned,
+         because that is what lets a short message sit on one line with the
+         time beside it and a long one wrap above it. */
+      .meta { float: right; margin: 8px 0 -2px 8px; font-size: 11px; line-height: 11px;
+              color: var(--wa-meta); display: inline-flex; align-items: center; gap: 3px;
+              white-space: nowrap; }
+      .ticks { width: 16px; height: 11px; display: inline-block; }
+      .ticks svg { display: block; width: 16px; height: 11px; }
+      .ticks path { fill: var(--wa-meta); }
+      .saved .ticks path { fill: var(--wa-tick); }
 
-      /* Three dots and nothing else. Messages says nothing while somebody is
-         typing, and a caption explaining the wait is a caption a young person
-         has never seen in a chat. */
-      .dots { display: inline-flex; gap: 4px; padding: 4px 0; align-items: center; }
-      .dots span { width: 8px; height: 8px; border-radius: 50%; background: #8E8E93;
+      .bubble.system { background: transparent; box-shadow: none; color: #54656F; font-size: 12.5px;
+                       text-align: center; }
+      .msg.system-msg { align-self: center; max-width: 92%; }
+
+      /* Three dots in a bubble on their side, which is exactly what WhatsApp
+         shows while somebody is typing. No caption: nobody has ever seen one. */
+      .dots { display: inline-flex; gap: 4px; padding: 3px 2px; align-items: center; }
+      .dots span { width: 7px; height: 7px; border-radius: 50%; background: #9AA3A8;
                    animation: blink 1.4s infinite ease-in-out both; }
       .dots span:nth-child(2) { animation-delay: .2s; }
       .dots span:nth-child(3) { animation-delay: .4s; }
-      @keyframes blink { 0%, 70%, 100% { opacity: .35; transform: scale(.85); }
-                         35% { opacity: 1; transform: scale(1); } }
+      @keyframes blink { 0%, 70%, 100% { opacity: .4; transform: translateY(0); }
+                         35% { opacity: 1; transform: translateY(-2px); } }
       @media (prefers-reduced-motion: reduce) { .dots span { animation: none; opacity: .6; } }
 
-      /* The composer, as a message box rather than a form field. */
-      .composer { display: flex; gap: .5rem; align-items: flex-end; margin-top: .9rem; }
-      .composer textarea { flex: 1; min-height: 36px; max-height: 9rem; padding: 7px 13px;
-                           border-radius: 18px; resize: none; font-family: var(--imsg);
-                           font-size: 17px; line-height: 22px; border: 1px solid #C7C7CC; }
-      .send-round { flex: 0 0 auto; width: 34px; height: 34px; border-radius: 50%; padding: 0;
+      /* The header, as WhatsApp has it: who you are talking to, and nothing
+         else. It is what tells somebody at a glance that this is a
+         conversation rather than a questionnaire wearing bubbles. */
+      .chat-header { display: none; }
+      body.participant-view .chat-header {
+        display: flex; align-items: center; gap: 10px; padding: 8px 12px;
+        background: #F6F6F6; border-bottom: 1px solid rgba(0,0,0,.12); font-family: var(--wa);
+      }
+      .chat-header .who-avatar { flex: 0 0 34px; height: 34px; border-radius: 50%; overflow: hidden; }
+      .chat-header .who-avatar svg { display: block; width: 34px; height: 34px; }
+      .chat-header .who-name { font-size: 16px; font-weight: 600; color: #111B21; }
+      .chat-header .who-sub { font-size: 12px; color: #667781; }
+
+      /* The composer. WhatsApp's is a white pill on the cream ground with a
+         round green send button beside it. */
+      .composer { display: flex; gap: 6px; align-items: flex-end; margin-top: .6rem; }
+      .composer textarea { flex: 1; min-height: 38px; max-height: 9rem; padding: 9px 14px;
+                           border-radius: 19px; resize: none; font-family: var(--wa);
+                           font-size: 16.5px; line-height: 20px; border: 1px solid rgba(0,0,0,.1);
+                           background: #fff; }
+      /* A green ring rather than the browser's black one, which on the cream
+         ground reads as an error state. Still clearly visible: this is the
+         control somebody is typing into. */
+      .composer textarea:focus-visible,
+      .scenario-edit:focus-visible { outline: 2px solid #00A884; outline-offset: 1px; border-color: #00A884; }
+      .send-round { flex: 0 0 auto; width: 38px; height: 38px; border-radius: 50%; padding: 0;
                     display: grid; place-items: center; font-size: 1rem; min-height: 0;
-                    background: var(--imsg-blue); border-color: var(--imsg-blue); }
+                    background: #00A884; border-color: #00A884; color: #fff; }
 
       /* The retelling, at whatever length it came out.
          They are being asked to read it closely enough to say what is wrong
          with it, and then to edit it. A fixed box that shows four lines of a
          nine-line paragraph asks them to do both through a letterbox. */
-      .scenario-edit { font-family: var(--imsg); font-size: 17px; line-height: 22px;
-                       border-radius: 14px; overflow: hidden; }
+      .scenario-edit { font-family: var(--wa); font-size: 16.5px; line-height: 21px;
+                       border-radius: 12px; overflow: hidden; }
 
       /* The last screen. A study that ends on a grey status line leaves
          somebody wondering whether more is coming. */
       .ending { margin-top: 1.2rem; text-align: center; }
-      .ending-title { font-family: var(--imsg); font-size: 20px; font-weight: 600; margin: 0 0 .4rem; }
+      .ending-title { font-family: var(--wa); font-size: 19px; font-weight: 600; margin: 0 0 .4rem; }
       .ending .note { margin: 0 auto; max-width: 26rem; }
       .button-link { display: inline-grid; place-items: center; min-height: 44px; padding: 0 1.2rem;
-                     border-radius: 22px; text-decoration: none; border: 1px solid var(--imsg-blue);
-                     color: var(--imsg-blue); font-family: var(--imsg); font-size: 17px; margin: .9rem auto 0; }
+                     border-radius: 22px; text-decoration: none; border: 1px solid #00A884;
+                     color: #00A884; font-family: var(--wa); font-size: 16.5px; margin: .9rem auto 0; }
       .ending .row { justify-content: center; }
 
       /* ── Choosing, rating, adapting ──────────────────────────────────── */
@@ -229,34 +261,73 @@
          Same markup and the same runner — only the chrome differs, so what
          is being looked at is what would run. */
       body.participant-view .lab-only { display: none !important; }
-      body.participant-view .wrap { grid-template-columns: 1fr; max-width: 42rem; padding-top: 1.5rem; }
-      body.participant-view header { border: 0; padding-bottom: .5rem; }
-      body.participant-view .panel { border: 0; padding: 0; background: transparent; }
+
+      /**
+       * The whole viewport is the chat.
+       *
+       * A conversation that grows down a scrolling document behaves like a
+       * document: the beginning walks off the top and the thing you type into
+       * drifts down the page. WhatsApp is a fixed frame with a scrolling
+       * middle, so this is too — header, then the thread taking whatever is
+       * left and scrolling inside itself, then the controls under it.
+       *
+       * The controls are NOT pinned with `position: fixed`. On iOS Safari a
+       * fixed element and the on-screen keyboard fight each other, and losing
+       * that fight puts the send button under the keyboard — which is worse
+       * than the layout being slightly less rigid than the real app.
+       */
+      body.participant-view { height: 100dvh; overflow: hidden; }
+      body.participant-view .wrap { grid-template-columns: 1fr; max-width: 34rem; height: 100dvh;
+                                    display: flex; flex-direction: column; gap: 0; padding: 0; }
+      body.participant-view header { display: none; }
+      /* The conversation lives in a <section>, and that is what has to stretch
+         — styling the .panel alone left its parent at content height, so the
+         thread grew and the whole document scrolled instead of the chat.
+         Sections with nothing participant-facing in them are removed rather
+         than left as empty flex children taking part in the layout. */
+      body.participant-view .wrap > section:has(#thread) {
+        flex: 1 1 auto; display: flex; flex-direction: column; min-height: 0;
+      }
+      body.participant-view .wrap > section:not(:has(#thread)) { display: none; }
+      body.participant-view .panel { border: 0; padding: 0; margin: 0; background: transparent;
+                                     flex: 1 1 auto; display: flex; flex-direction: column; min-height: 0; }
       body.participant-view .panel > h2 { display: none; }
-      body.participant-view .thread { max-height: none; overflow: visible; gap: 1rem; }
-      body.participant-view .bubble { font-size: 1.08rem; line-height: 1.6; padding: .8rem 1.05rem; }
-      body.participant-view .msg { max-width: 100%; }
-      body.participant-view .avatar { flex-basis: 34px; height: 34px; font-size: 1.15rem; }
-      body.participant-view .stem { font-size: 1.25rem; }
-      body.participant-view .composer textarea,
-      body.participant-view .scenario-edit { font-size: 1.05rem; }
-      body.participant-view .card-choice { font-size: 1.05rem; line-height: 1.6; padding: 1rem 1.1rem; }
+      /* The conversation keeps a quarter of the screen whatever else is on it.
+         At the choosing stage three retellings would otherwise push it down to
+         a sliver, and the point of a thread is that what was said is still
+         there while you decide. */
+      body.participant-view .thread { flex: 1 1 auto; max-height: none; min-height: 26dvh;
+                                      overflow-y: auto; border-radius: 0; padding: .6rem .6rem 1rem; }
+      /* Cream all the way down, so nothing below the last control shows the
+         page underneath — an empty control row was leaving a white band. */
+      body.participant-view .panel { background: var(--wa-bg); }
+      body.participant-view #controls:empty,
+      body.participant-view #fallbackNote:empty,
+      body.participant-view #bootNote:empty { display: none; }
+      body.participant-view .msg { max-width: 80%; }
+      /* Tall stages — three retellings, the edit box — scroll on their own
+         rather than squeezing the conversation out of the frame. */
+      body.participant-view #stageArea { flex: 0 1 auto; max-height: 62dvh; overflow-y: auto;
+                                         padding: 0 .6rem .6rem; background: var(--wa-bg); }
+      body.participant-view #progress { padding: 0; flex: 0 0 auto; }
+      body.participant-view .stem { font-size: 1.15rem; }
+      body.participant-view .card-choice { font-size: 16.5px; line-height: 21px; padding: .9rem 1rem; }
       /* iOS controls, not the workbench's. The lab keeps its green; the page a
          young person sees uses the system blue and the pill shapes that go
          with the bubbles above them. */
-      body.participant-view button { min-height: 46px; font-size: 17px; font-family: var(--imsg);
+      body.participant-view button { min-height: 46px; font-size: 17px; font-family: var(--wa);
                                      border-radius: 22px; }
-      body.participant-view .primary { background: var(--imsg-blue); border-color: var(--imsg-blue); }
-      body.participant-view .secondary { color: var(--imsg-blue); border-color: #C7C7CC; }
-      body.participant-view .card-choice { border-radius: 16px; font-family: var(--imsg); }
-      body.participant-view .card-choice.picked { border-color: var(--imsg-blue);
-                                                  box-shadow: inset 0 0 0 1px var(--imsg-blue); }
+      body.participant-view .primary { background: #00A884; border-color: #00A884; }
+      body.participant-view .secondary { color: #00A884; border-color: #C7C7CC; }
+      body.participant-view .card-choice { border-radius: 16px; font-family: var(--wa); }
+      body.participant-view .card-choice.picked { border-color: #00A884;
+                                                  box-shadow: inset 0 0 0 1px #00A884; }
       body.participant-view .stem, body.participant-view .lede,
       body.participant-view .slider-ends, body.participant-view .slider-value,
       body.participant-view .adapt-block h3, body.participant-view .adapt-ai h3 {
-        font-family: var(--imsg);
+        font-family: var(--wa);
       }
-      body.participant-view input[type="range"] { accent-color: var(--imsg-blue); }
+      body.participant-view input[type="range"] { accent-color: #00A884; }
       /* Sticky, because in this view the whole page scrolls and a conversation
          gets long. A progress bar that has scrolled off the top is answering
          the question at the only moment nobody is asking it.
@@ -267,11 +338,12 @@
       body.participant-view #progress { position: sticky; top: 0; z-index: 5;
                                         padding: .75rem 0 .55rem; background: var(--canvas);
                                         border-bottom: 1px solid var(--hairline); }
-      body.participant-view .progress { margin-bottom: .5rem; }
-      body.participant-view .progress-track { height: 6px; }
-      /* The toggle is fixed to the bottom corner, so without this it sits on
-         top of the last thing said. */
-      body.participant-view .wrap { padding-bottom: 5.5rem; }
+      /* The progress hairline, tucked under the header. No bottom padding on
+         the wrap: it was there to clear a floating toggle that a linked run no
+         longer has, and in a fixed frame it was 88px of the viewport the
+         conversation never got back. */
+      body.participant-view .progress { margin: 0; padding: 6px 0; background: var(--wa-bg); }
+      body.participant-view .progress-track { height: 2px; }
       /* Fixed, so it floats over whatever is beneath it — which on a short
          page is the view toggle, and a caption that swallows a button's
          clicks is a caption in the wrong place. It is something to read, not
@@ -336,6 +408,20 @@
 
         <div class="panel">
           <h2>What the participant sees</h2>
+          <!-- WhatsApp's header: who you are talking to and nothing else.
+               Hidden in the lab, where the panel heading already says it. -->
+          <div class="chat-header">
+            <div class="who-avatar" aria-hidden="true">
+              <svg viewBox="0 0 34 34"><circle cx="17" cy="17" r="17" fill="#00A884"/>
+                <rect x="9" y="11" width="16" height="13" rx="4" fill="#fff"/>
+                <circle cx="13.6" cy="17.5" r="2" fill="#00A884"/><circle cx="20.4" cy="17.5" r="2" fill="#00A884"/>
+                <rect x="16.3" y="6" width="1.4" height="4" rx=".7" fill="#fff"/></svg>
+            </div>
+            <div>
+              <div class="who-name">MyStory</div>
+              <div class="who-sub">a short conversation for research</div>
+            </div>
+          </div>
           <!-- Deliberately NOT inside a lab-only panel. Once the mock was
                removed this became the only way the page can say "sign in
                first" or "there is nothing to run" — and a participant who
