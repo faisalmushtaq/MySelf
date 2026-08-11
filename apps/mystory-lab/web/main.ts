@@ -592,12 +592,31 @@ function wireHeader(): void {
  * which is not true of a voice note.
  */
 
-/** What MediaRecorder will produce here, in the order the provider prefers. */
-const CLIP_TYPES = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/aac", "audio/ogg"];
+/**
+ * Which container to record in — decided by TRYING, not by asking.
+ *
+ * `isTypeSupported` cannot be trusted here. Safari answers true for
+ * "audio/webm" and then throws NotSupportedError when you actually construct
+ * the recorder with it, which is precisely the shape of failure that leaves a
+ * microphone button doing nothing at all: the throw happened inside an async
+ * handler, so nothing turned red, nothing was said, and nothing recorded.
+ *
+ * So each candidate is constructed for real and the first one that survives is
+ * used, ending with no options at all — letting the browser pick whatever it
+ * records natively, which is the case that cannot fail.
+ */
+const CLIP_TYPES = ["audio/mp4", "audio/webm;codecs=opus", "audio/webm", "audio/aac", "audio/ogg;codecs=opus", ""];
 
-function clipType(): string | null {
-  if (typeof MediaRecorder === "undefined") return null;
-  return CLIP_TYPES.find((t) => MediaRecorder.isTypeSupported(t)) ?? null;
+function makeRecorder(stream: MediaStream): MediaRecorder | null {
+  for (const type of CLIP_TYPES) {
+    try {
+      if (type && MediaRecorder.isTypeSupported && !MediaRecorder.isTypeSupported(type)) continue;
+      return type ? new MediaRecorder(stream, { mimeType: type }) : new MediaRecorder(stream);
+    } catch {
+      // Claimed to support it and could not. Try the next.
+    }
+  }
+  return null;
 }
 
 /** Base64 without loading a second copy of the clip into a string by hand. */
@@ -621,10 +640,9 @@ const MAX_CLIP_MS = 120_000;
 function wireMic(): void {
   const button = document.getElementById("micBtn") as HTMLButtonElement | null;
   if (!button) return;
-  const type = clipType();
-  // No relay means no transcriber. The lab's local server does not carry one,
-  // and a microphone with nothing behind it is worse than none.
-  if (!type || !navigator.mediaDevices?.getUserMedia) return;
+  // Whether recording is possible at all. Which container it will use is
+  // decided when the recorder is built, not now — see `makeRecorder`.
+  if (typeof MediaRecorder === "undefined" || !navigator.mediaDevices?.getUserMedia) return;
   micSupported = true;
   showRightButton();
 
@@ -632,6 +650,8 @@ function wireMic(): void {
   let capping: ReturnType<typeof setTimeout> | null = null;
   /** Set when the clip is being thrown away rather than transcribed. */
   let discarding = false;
+  /** What the recorder actually chose, which is not always what was asked. */
+  let recordedAs = "";
 
   const release = () => {
     if (capping) clearTimeout(capping);
@@ -660,8 +680,14 @@ function wireMic(): void {
   };
 
   const send = async (clip: Blob) => {
-    if (!relay || clip.size === 0) {
+    if (clip.size === 0) {
       release();
+      headerNote("No sound was recorded. Check the microphone is not muted, or type your answer instead.");
+      return;
+    }
+    if (!relay) {
+      release();
+      headerNote("There is nowhere to send that recording from this build.");
       return;
     }
     const credential = linkKey ? `Link ${linkKey}` : await session.token().then((t) => (t ? `Bearer ${t}` : null));
@@ -677,7 +703,7 @@ function wireMic(): void {
         headers: { "content-type": "application/json", authorization: credential },
         body: JSON.stringify({
           audio: await base64Of(clip),
-          mimeType: clip.type || type,
+          mimeType: clip.type || recordedAs,
           protocolKey: ($("protocol") as HTMLSelectElement | null)?.value ?? "unknown",
         }),
       });
@@ -696,8 +722,10 @@ function wireMic(): void {
       box.value = had ? `${had} ${body.text}` : body.text;
       sizeMessageBox();
       box.focus();
-    } catch {
-      headerNote("That could not be written down. You can type your answer instead.");
+    } catch (error) {
+      // The real reason, not a shrug. A microphone that fails silently is the
+      // bug this whole path already had once.
+      headerNote(`That could not be written down (${String((error as Error).message ?? error)}).`);
     } finally {
       button.classList.remove("writing");
       release();
@@ -713,23 +741,48 @@ function wireMic(): void {
       let stream: MediaStream;
       try {
         stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      } catch {
-        headerNote("Your phone did not allow the microphone. You can type your answer instead.");
+      } catch (error) {
+        const denied = (error as { name?: string }).name === "NotAllowedError";
+        headerNote(
+          denied
+            ? "Your phone did not allow the microphone. You can turn it on in Settings, or type your answer instead."
+            : `The microphone could not be opened (${String((error as Error).message ?? error)}).`,
+        );
         return;
       }
+
+      const rec = makeRecorder(stream);
+      if (!rec) {
+        stream.getTracks().forEach((t) => t.stop());
+        headerNote("This browser will not record audio. You can type your answer instead.");
+        return;
+      }
+      recordedAs = rec.mimeType || "";
+
       const parts: Blob[] = [];
-      const rec = new MediaRecorder(stream, { mimeType: type });
       rec.ondataavailable = (e) => {
         if (e.data.size > 0) parts.push(e.data);
+      };
+      rec.onerror = () => {
+        headerNote("The recording stopped unexpectedly. You can try again, or type your answer instead.");
+        release();
       };
       rec.onstop = () => {
         if (discarding) {
           release();
           return;
         }
-        void send(new Blob(parts, { type }));
+        void send(recordedAs ? new Blob(parts, { type: recordedAs }) : new Blob(parts));
       };
-      rec.start();
+      try {
+        // A timeslice rather than one blob at the end: Safari is happier
+        // flushing as it goes, and a crash mid-answer still leaves something.
+        rec.start(1000);
+      } catch (error) {
+        stream.getTracks().forEach((t) => t.stop());
+        headerNote(`The recording would not start (${String((error as Error).message ?? error)}).`);
+        return;
+      }
       recorder = rec;
       capping = setTimeout(finish, MAX_CLIP_MS);
       button.classList.add("listening");
