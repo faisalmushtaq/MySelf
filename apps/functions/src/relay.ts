@@ -38,6 +38,17 @@ import {
 const OPENAI_API_KEY = defineSecret("OPENAI_API_KEY");
 
 /**
+ * Stamped in by the packaging step. Guarded with `typeof` rather than assumed,
+ * because the tests import this module without going through esbuild, and a
+ * diagnostic that crashes the thing it is diagnosing is worse than none.
+ */
+declare const __RELAY_BUILD__: { built: string; commit: string; dirty: boolean } | undefined;
+const BUILD =
+  typeof __RELAY_BUILD__ === "object" && __RELAY_BUILD__
+    ? __RELAY_BUILD__
+    : { built: "unpackaged", commit: "unknown", dirty: false };
+
+/**
  * Who is asking, and whether they are anybody.
  *
  * A verified token is not a permission. Google sign-in is open to the world by
@@ -127,6 +138,29 @@ export const llmRelay = onRequest(
     }
     if (req.method === "OPTIONS") {
       res.status(204).end();
+      return;
+    }
+    /**
+     * What is deployed here, and would this caller's page be let in.
+     *
+     * The two questions that have actually cost time. A rejected origin gets
+     * no CORS headers, so the browser refuses the request before sending it:
+     * the relay logs nothing, and the page reports the model as unreachable.
+     * From the outside, "the allowlist is wrong", "the old build is deployed"
+     * and "the model is down" look identical.
+     *
+     * This makes them one curl apart. Nothing here is sensitive — a commit
+     * hash and whether an origin is on a list — and it deliberately says
+     * nothing about the key, the configs, or any caller but the one asking.
+     */
+    if (req.method === "GET") {
+      const asked = typeof origin === "string" ? origin : null;
+      res.status(200).json({
+        service: "llmRelay",
+        source: BUILD,
+        origin: asked,
+        originAllowed: asked === null ? null : ALLOWED_ORIGIN.test(asked),
+      });
       return;
     }
     if (req.method !== "POST") {

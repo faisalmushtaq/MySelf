@@ -26,6 +26,33 @@ import { build } from "esbuild";
 const here = (p) => fileURLToPath(new URL(p, import.meta.url));
 
 /**
+ * Which source this bundle was built from.
+ *
+ * A functions deploy bundles the working tree, not a branch — so "I merged the
+ * fix" and "the fix is deployed" are different claims, and the gap between
+ * them is invisible from the outside. This has already cost a round: a fix was
+ * merged, deployed minutes later from a checkout that predated it, and then
+ * debugged as though it were live.
+ *
+ * The commit and whether the tree was dirty are enough to settle it. Neither
+ * is sensitive: the repository is the same one the deploy came from.
+ */
+function sourceStamp() {
+  const git = (...args) => execFileSync("git", args, { cwd: here("."), encoding: "utf8" }).trim();
+  let commit = "unknown";
+  let dirty = false;
+  try {
+    commit = git("rev-parse", "--short", "HEAD");
+    dirty = git("status", "--porcelain").length > 0;
+  } catch {
+    // A tarball rather than a checkout. Say so instead of inventing a commit.
+  }
+  return { built: new Date().toISOString().replace(/\.\d+Z$/, "Z"), commit, dirty };
+}
+
+const stamp = sourceStamp();
+
+/**
  * Inside the Firebase project directory, not beside the source.
  *
  * The CLI refuses a `source` outside the directory holding firebase.json —
@@ -49,6 +76,7 @@ await build({
   format: "esm",
   external: Object.keys(runtimeDeps),
   loader: { ".json": "json" },
+  define: { __RELAY_BUILD__: JSON.stringify(stamp) },
   // Named so a stack trace from production points at a real line.
   sourcemap: true,
   logLevel: "info",
