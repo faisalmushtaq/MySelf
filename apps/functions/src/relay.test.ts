@@ -175,10 +175,10 @@ describe("a tester link, which stands in for signing in", () => {
    * a leaked link costs a known amount rather than an unknown one.
    */
   it("refuses on every bound, and says which", () => {
-    expect(linkRefusal(null, Date.now())).toMatch(/not one this study issued/);
+    expect(linkRefusal(null, Date.now())).toMatch(/not one this study gave out/);
     expect(linkRefusal({ ...good, revokedAt: new Date() }, Date.now())).toMatch(/switched off/);
-    expect(linkRefusal({ ...good, expiresAt: Date.now() - 1 }, Date.now())).toMatch(/expired/);
-    expect(linkRefusal({ ...good, callsUsed: 10 }, Date.now())).toMatch(/as many times as it was allowed/);
+    expect(linkRefusal({ ...good, expiresAt: Date.now() - 1 }, Date.now())).toMatch(/run out/);
+    expect(linkRefusal({ ...good, callsUsed: 10 }, Date.now())).toMatch(/as many times as it was set up for/);
   });
 
   it("counts the cap as a ceiling, not a target to overshoot", () => {
@@ -192,7 +192,7 @@ describe("a tester link, which stands in for signing in", () => {
   it("expires on time rather than on the next whole day", () => {
     const at = good.expiresAt;
     expect(linkRefusal(good, at)).toBeNull();
-    expect(linkRefusal(good, at + 1)).toMatch(/expired/);
+    expect(linkRefusal(good, at + 1)).toMatch(/run out/);
   });
 
   it("ships bounds that are finite", () => {
@@ -315,7 +315,41 @@ describe("what the transcriber will accept", () => {
   });
 
   it("refuses a container it cannot name rather than guessing at one", () => {
-    expect(() => extensionFor("video/mp4")).toThrow(/cannot transcribe/);
-    expect(() => extensionFor("application/octet-stream")).toThrow(/cannot transcribe/);
+    expect(() => extensionFor("video/mp4")).toThrow(/can\u2019t read/);
+    expect(() => extensionFor("application/octet-stream")).toThrow(/can\u2019t read/);
+  });
+});
+
+describe("what a participant is allowed to read", () => {
+  /**
+   * A refusal reaches a ten-year-old's chat, not a terminal.
+   *
+   * "that is not a recording this relay understands" was shown to somebody
+   * mid-conversation: it told them nothing they could act on, and named a
+   * piece of infrastructure they have no reason to know exists. Every message
+   * that can reach the screen is checked for the vocabulary that gives that
+   * away, and for actually saying what to do next.
+   */
+  const JARGON = /\b(relay|credential|caller|endpoint|payload|token|uid|schema|parse|null|undefined|400|502)\b/i;
+
+  const refusals = [
+    linkRefusal(null, Date.now()),
+    linkRefusal({ revokedAt: new Date(), expiresAt: Date.now() + 1000, callCap: 10, callsUsed: 0 }, Date.now()),
+    linkRefusal({ revokedAt: null, expiresAt: Date.now() - 1, callCap: 10, callsUsed: 0 }, Date.now()),
+    linkRefusal({ revokedAt: null, expiresAt: Date.now() + 1000, callCap: 10, callsUsed: 10 }, Date.now()),
+  ];
+
+  it("says nothing about the plumbing", () => {
+    for (const message of refusals) {
+      expect(message, "a refusal with no message is a closed door").not.toBeNull();
+      expect(message!, `jargon in: ${message}`).not.toMatch(JARGON);
+    }
+  });
+
+  it("tells somebody what to do next, and starts like a sentence", () => {
+    for (const message of refusals) {
+      expect(message!, `no way forward in: ${message}`).toMatch(/check|ask/i);
+      expect(message![0], `should start capitalised: ${message}`).toBe(message![0]!.toUpperCase());
+    }
   });
 });

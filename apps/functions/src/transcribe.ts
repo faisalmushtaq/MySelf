@@ -108,7 +108,10 @@ export function extensionFor(mimeType: string): string {
   // "audio/webm;codecs=opus" is what MediaRecorder reports.
   const base = mimeType.split(";")[0]!.trim().toLowerCase();
   const extension = EXTENSIONS[base];
-  if (!extension) throw new RelayError(400, "unknown", `this relay cannot transcribe ${base}`);
+  if (!extension) {
+    logger.error("transcribe: a container this cannot read", { mimeType: base });
+    throw new RelayError(400, "unknown", "Your phone recorded that in a way I can\u2019t read. You can type your answer instead.");
+  }
   return extension;
 }
 
@@ -190,7 +193,7 @@ async function transcribeClip(audio: Buffer, mimeType: string, extension: string
     // The provider's own message is not passed to the page: it can quote
     // request content back, and this request's content is a child's voice.
     logger.error("transcribe: the provider refused", { status: response.status });
-    throw new RelayError(502, "unknown", "that could not be written down just now", true);
+    throw new RelayError(502, "unknown", "I couldn\u2019t turn that into words just now. Try again, or type it instead.", true);
   }
   const { text } = (await response.json()) as { text?: string };
   return (text ?? "").trim();
@@ -216,13 +219,25 @@ export const transcribe = onRequest(
 
       const parsed = request.safeParse(req.body);
       if (!parsed.success) {
-        throw new RelayError(400, "unknown", "that is not a recording this relay understands");
+        /**
+         * WHICH field, in the log — and only the field.
+         *
+         * The old message said "that is not a recording this relay
+         * understands", which told a child nothing and told me nothing
+         * either: any of five fields could have failed and the reply named
+         * none of them. The names and codes go to the log; the VALUES never
+         * do, because one of those fields is a recording of somebody's voice.
+         */
+        logger.error("transcribe: the request did not validate", {
+          issues: parsed.error.issues.map((i) => ({ at: i.path.join("."), code: i.code })),
+        });
+        throw new RelayError(400, "unknown", "Something went wrong sending that. Try again, or type your answer instead.");
       }
       const extension = extensionFor(parsed.data.mimeType);
       const audio = Buffer.from(parsed.data.audio, "base64");
       bytes = audio.byteLength;
-      if (bytes === 0) throw new RelayError(400, "unknown", "that recording was empty");
-      if (bytes > MAX_BYTES) throw new RelayError(413, "unknown", "that recording is longer than this accepts");
+      if (bytes === 0) throw new RelayError(400, "unknown", "I didn\u2019t catch any sound there. Try again, or type your answer instead.");
+      if (bytes > MAX_BYTES) throw new RelayError(413, "unknown", "That was a bit too long to send. Try a shorter one, or type your answer.");
 
       /**
        * Both at once.
@@ -257,7 +272,11 @@ export const transcribe = onRequest(
         // The recording is safe; only the words are missing. Said plainly, so
         // the page can offer typing without implying the answer was lost.
         res.status(502).json({
-          error: { kind: "unknown", message: "that was saved, but could not be written down. You can type it instead.", retryable: true },
+          error: {
+            kind: "unknown",
+            message: "I\u2019ve kept your recording, but I couldn\u2019t turn it into words. Could you type what you said?",
+            retryable: true,
+          },
           ...(path ? { clipId, seconds: parsed.data.seconds ?? null, kept: true } : {}),
         });
         return;
@@ -271,7 +290,9 @@ export const transcribe = onRequest(
         return;
       }
       logger.error("transcribe: the call failed");
-      res.status(502).json({ error: { kind: "unknown", message: "that could not be written down just now", retryable: true } });
+      res.status(502).json({
+        error: { kind: "unknown", message: "I couldn\u2019t turn that into words just now. Try again, or type it instead.", retryable: true },
+      });
     } finally {
       // No text, no bytes of audio, no clip — only that it happened and for how
       // long. Logs are the one place this could leak by accident.

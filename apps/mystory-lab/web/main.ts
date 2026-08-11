@@ -562,9 +562,9 @@ function wireComposer(): void {
  * enough to be read, scrolled back to, and screenshotted to me. A fault
  * reported as "nothing happens" is a fault with nowhere to be seen.
  */
-function micTrouble(text: string): void {
+function micTrouble(text: string, detail?: string): void {
   headerNote(text);
-  troubleInThread(text);
+  troubleInThread(text, detail);
 }
 
 /** A line under the header, said once and cleared. */
@@ -624,8 +624,15 @@ function wireHeader(): void {
  * Cleared when the tab goes, which is the right lifetime for a playback aid.
  */
 const voiceNotes: { url: string; seconds: number; kept: boolean; claimedBy: number | null }[] = [];
-/** Faults, kept so a re-render does not wipe the thing somebody is reading. */
-const troubles: string[] = [];
+/**
+ * Faults, kept so a re-render does not wipe the thing somebody is reading.
+ *
+ * Two layers on purpose. `text` is what a ten-year-old reads and can act on;
+ * `detail` is the exception message, which is lab-only and never shown in the
+ * participant view. Putting the raw error in front of a child is how "that is
+ * not a recording this relay understands" ended up in somebody's chat.
+ */
+const troubles: { text: string; detail?: string }[] = [];
 
 /**
  * Tie any loose recordings to the answer just sent.
@@ -693,10 +700,12 @@ function renderVoiceNotes(): void {
     if (anchor) anchor.before(el);
     else thread.append(el);
   }
-  for (const text of troubles) {
+  for (const trouble of troubles) {
     const el = document.createElement("div");
     el.className = "msg system-msg turn trouble";
-    el.innerHTML = `<div class="bubble system">${escapeHtml(text)}</div>`;
+    el.innerHTML = `<div class="bubble system">${escapeHtml(trouble.text)}${
+      trouble.detail ? `<span class="lab-only trouble-detail">${escapeHtml(trouble.detail)}</span>` : ""
+    }</div>`;
     thread.append(el);
   }
   if (voiceNotes.length > 0 || troubles.length > 0) scrollThread();
@@ -710,8 +719,8 @@ function renderVoiceNotes(): void {
  * report to me. This puts it in the thread, where it stays, scrolls with
  * everything else and survives being screenshotted.
  */
-function troubleInThread(text: string): void {
-  troubles.push(text);
+function troubleInThread(text: string, detail?: string): void {
+  troubles.push(detail ? { text, detail } : { text });
   renderVoiceNotes();
 }
 
@@ -862,18 +871,21 @@ function wireMic(): void {
     const seconds = Math.max(1, Math.round((Date.now() - startedAt) / 1000));
     if (clip.size === 0) {
       release();
-      micTrouble("No sound was recorded. Check the microphone is not muted, or type your answer instead.");
+      micTrouble("I didn\u2019t catch any sound there. Have another go, or type your answer instead.");
       return;
     }
     if (!relay) {
       release();
-      micTrouble("There is nowhere to send that recording from this build.");
+      micTrouble("That recording could not be sent. You can type your answer instead.", "no relay configured in this build");
       return;
     }
     const credential = linkKey ? `Link ${linkKey}` : await session.token().then((t) => (t ? `Bearer ${t}` : null));
     if (!credential) {
       release();
-      micTrouble("That could not be written down — this page is not signed in.");
+      micTrouble(
+        "Something is wrong with this link, so that could not be sent. Do let whoever sent it to you know.",
+        "no credential: not signed in and no link key",
+      );
       return;
     }
     // The bubble first, the words after. Their own recording is a thing that
@@ -917,7 +929,7 @@ function wireMic(): void {
         return;
       }
       if (!body.text) {
-        micTrouble("Nothing came through on that one. Try again, or type your answer.");
+        micTrouble("Nothing came through on that one. Have another go, or type your answer.");
         return;
       }
       /**
@@ -943,7 +955,10 @@ function wireMic(): void {
     } catch (error) {
       // The real reason, not a shrug. A microphone that fails silently is the
       // bug this whole path already had once.
-      micTrouble(`That could not be written down (${String((error as Error).message ?? error)}).`);
+      micTrouble(
+        "That could not be sent just now. Have another go, or type your answer instead.",
+        String((error as Error).message ?? error),
+      );
     } finally {
       button.classList.remove("writing");
       release();
@@ -969,7 +984,8 @@ function wireMic(): void {
       micTrouble(
         denied
           ? "Your phone did not allow the microphone. You can turn it on in Settings, or type your answer instead."
-          : `The microphone could not be opened (${String((error as Error).message ?? error)}).`,
+          : "The microphone would not turn on. You can type your answer instead.",
+        denied ? undefined : String((error as Error).message ?? error),
       );
       return false;
     }
