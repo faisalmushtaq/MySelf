@@ -331,7 +331,8 @@ function wireStageControls(): void {
    * the only way in: nobody on a laptop, a keyboard or a switch should be
    * stranded at the one screen the whole method turns on.
    */
-  for (const el of document.querySelectorAll<HTMLElement>(".choice-bubble")) {
+  for (const el of document.querySelectorAll<HTMLElement>(".choice-bubble:not([data-wired])")) {
+    el.dataset["wired"] = "yes";
     let held: ReturnType<typeof setTimeout> | null = null;
     let fired = false;
 
@@ -342,6 +343,34 @@ function wireStageControls(): void {
       el.classList.remove("holding");
       // Long enough to see the thumb land, short enough not to feel stuck.
       setTimeout(() => void turn({ action: "submit", input: el.dataset["choice"] ?? "" }), 320);
+    };
+
+    /**
+     * A tap SELECTS. It does not choose.
+     *
+     * Tap used to be a full second way of choosing, on the reasoning that
+     * long-press should be taught and not required. That was wrong in one
+     * specific way: these bubbles are paragraphs, and the first thing anybody
+     * does with a paragraph on a phone is touch it while reading. Somebody
+     * tapped one to look at it and the study recorded their answer and moved
+     * on — the single most consequential screen in the method, decided by
+     * accident.
+     *
+     * So a tap highlights the one under your finger and puts a confirm button
+     * up. Holding still chooses outright, because a press-and-hold is not
+     * something anybody does by accident, and it is the gesture the hint
+     * teaches. Keyboard and switch users get the same two steps as a tap.
+     */
+    const select = () => {
+      if (busy || fired) return;
+      for (const other of document.querySelectorAll(".choice-bubble")) other.classList.remove("picked");
+      el.classList.add("picked");
+      const confirm = document.getElementById("confirmChoice") as HTMLButtonElement | null;
+      if (confirm) {
+        confirm.hidden = false;
+        confirm.dataset["choice"] = el.dataset["choice"] ?? "";
+      }
+      scrollThread();
     };
     const cancel = () => {
       if (held) clearTimeout(held);
@@ -357,8 +386,9 @@ function wireStageControls(): void {
     el.addEventListener("pointerup", () => {
       const wasHolding = held !== null;
       cancel();
-      // A tap counts as well, so the hint is guidance rather than a gate.
-      if (wasHolding && !fired) choose();
+      // Released before the hold completed: that was a tap, so select it and
+      // wait to be told rather than deciding for them.
+      if (wasHolding && !fired) select();
     });
     el.addEventListener("pointerleave", cancel);
     el.addEventListener("pointercancel", cancel);
@@ -368,7 +398,7 @@ function wireStageControls(): void {
       if (fired) return;
       if (event.key === "Enter" || event.key === " ") {
         event.preventDefault();
-        choose();
+        select();
       }
     });
   }
@@ -376,12 +406,37 @@ function wireStageControls(): void {
   const submit = () => {
     const picked = document.querySelector<HTMLInputElement>('input[name="choice"]:checked');
     const range = document.getElementById("ratingRange") as HTMLInputElement | null;
+    // An untouched slider is not an answer. Belt as well as braces: the button
+    // is disabled too, and both have to fail for a number nobody chose to be
+    // recorded as though they had.
+    if (range && range.dataset["set"] !== "yes") return;
     // `echo` only when the value is something they wrote. A choice sends an
     // index and a rating sends a number, and neither is a sentence anybody
     // said — the thread renders those as "I'll take the plain one" and
     // "7 out of 10" once recorded, which is what should appear.
     void turn({ action: "submit", input: picked?.value ?? range?.value ?? "", echo: false });
   };
+
+  /**
+   * The confirm, wired once.
+   *
+   * This function runs again as each retelling lands, and the button is the
+   * same element every time — a second listener on it would submit the choice
+   * twice, which at this stage means recording two answers to the question the
+   * whole method turns on.
+   */
+  const confirm = document.getElementById("confirmChoice") as HTMLButtonElement | null;
+  if (confirm && !confirm.dataset["wired"]) {
+    confirm.dataset["wired"] = "yes";
+    confirm.addEventListener("click", () => {
+      const index = confirm.dataset["choice"];
+      if (index === undefined || index === "" || busy) return;
+      document.querySelector<HTMLElement>(`.choice-bubble[data-choice="${index}"]`)?.classList.add("chosen");
+      confirm.disabled = true;
+      // Long enough to see the thumb land, as the hold gesture does.
+      setTimeout(() => void turn({ action: "submit", input: index }), 320);
+    });
+  }
 
   document.getElementById("send")?.addEventListener("click", submit);
   document.getElementById("cont")?.addEventListener("click", () => void turn({ action: "next" }));
@@ -444,10 +499,26 @@ function wireStageControls(): void {
   });
 
   const range = document.getElementById("ratingRange") as HTMLInputElement | null;
-  range?.addEventListener("input", () => {
-    const out = document.getElementById("ratingValue");
-    if (out) out.textContent = range.value;
-  });
+  if (range) {
+    const send = document.getElementById("send") as HTMLButtonElement | null;
+    if (send) {
+      send.disabled = true;
+      send.dataset["gate"] = "shut";
+    }
+    const touched = () => {
+      range.dataset["set"] = "yes";
+      const out = document.getElementById("ratingValue");
+      if (out) out.textContent = `${range.value} out of ${range.max}`;
+      if (send) {
+        delete send.dataset["gate"];
+        send.disabled = false;
+      }
+    };
+    // `input` covers dragging; `keydown` covers the arrow keys, which move the
+    // handle without firing on some browsers until release.
+    range.addEventListener("input", touched);
+    range.addEventListener("keydown", touched);
+  }
 }
 
 /* ── The message bar, wired once ─────────────────────────────────────────── */
@@ -1190,9 +1261,63 @@ function setComposer(placeholder: string | null): void {
   }
 }
 
+/**
+ * How many of the retellings have arrived.
+ *
+ * They used to land as one block: three paragraphs appearing in the same
+ * frame, which shoves the conversation off the top of the screen and reads as
+ * the page breaking rather than as somebody sending you something. Reset when
+ * a new set is generated, and stepped up by `deliverChoices`.
+ */
+let choicesDelivered = 0;
+let delivering = false;
+
+/**
+ * Send them one at a time, with the dots in between, as messages.
+ *
+ * Each one gets a pause the length of the message before it — the same rule as
+ * every other bubble — but capped harder, because three of those in a row is a
+ * different kind of wait from one. What matters is that they arrive as three
+ * separate acts rather than one dump.
+ */
+async function deliverChoices(all: string[], hint: string): Promise<void> {
+  if (delivering) return;
+  delivering = true;
+  try {
+    while (choicesDelivered < all.length) {
+      const html = all[choicesDelivered]!;
+      // The instruction goes up once, before the first of them.
+      if (choicesDelivered === 0) $("thread").insertAdjacentHTML("beforeend", hint);
+
+      const dots = document.createElement("div");
+      dots.className = "msg from-them turn";
+      dots.innerHTML = `<div class="bubble"><span class="dots"><span></span><span></span><span></span></span></div>`;
+      $("thread").append(dots);
+      scrollThread();
+      // Long enough to read as composing, short enough that three of them do
+      // not become a minute of waiting.
+      await wait(Math.min(1400, 400 + (all[choicesDelivered]!.length - 300) * 2));
+      dots.remove();
+
+      $("thread").insertAdjacentHTML("beforeend", html);
+      choicesDelivered += 1;
+      scrollThread();
+      // Wired as each one lands, so the first can be held before the third
+      // has arrived.
+      wireStageControls();
+      await wait(320);
+    }
+  } finally {
+    delivering = false;
+  }
+}
+
 function render(frame: Frame): void {
   const s = frame.screen;
   currentKind = s.kind;
+  // A screen with no retellings on it resets the count, so the next set is
+  // delivered rather than assumed to have already arrived.
+  if ((s.choices ?? []).length === 0) choicesDelivered = 0;
 
   // How far along. Announced politely rather than assertively: a screen reader
   // being interrupted to say "step 4 of 6" in the middle of reading the
@@ -1226,20 +1351,21 @@ function render(frame: Frame): void {
    * The persona key is still lab-only: a card labelled "their words"
    * advertises itself as the honest one, and which they choose is the data.
    */
-  const choices = (s.choices ?? [])
-    .map(
-      // Three messages in one run, so the tail and the wider gap go on the
-      // first only — the same rule the rest of the thread follows.
-      (c, i) => `<div class="msg from-them ${i === 0 ? "turn " : ""}choice-msg" style="animation-delay: ${i * 140}ms">
+  const choiceHtml = (s.choices ?? []).map(
+    // Three messages in one run, so the tail and the wider gap go on the
+    // first only — the same rule the rest of the thread follows.
+    (c, i) => `<div class="msg from-them ${i === 0 ? "turn " : ""}choice-msg">
           <div class="bubble choice-bubble" role="button" tabindex="0" data-choice="${c.index}"
-               aria-label="Retelling. Press and hold, or press Enter, to choose this one.">
+               aria-label="Retelling. Press and hold to choose it, or press Enter to select it.">
             <span class="who lab-only">${escapeHtml(c.persona)}</span>
             ${escapeHtml(c.text)}
             <span class="reaction" aria-hidden="true">\u{1F44D}</span>
           </div>
         </div>`,
-    )
-    .join("");
+  );
+  // Only the ones already delivered go into this pass; the rest arrive after
+  // it, one at a time. See `deliverChoices`.
+  const choices = choiceHtml.slice(0, choicesDelivered).join("");
 
   /**
    * The conversation, including the retellings.
@@ -1251,24 +1377,43 @@ function render(frame: Frame): void {
    * thread, with the instruction as a centred system line above them, which is
    * where WhatsApp puts anything that is not a message.
    */
-  const hint = choices
-    ? bubble("system", "Press and hold the one that fits best, and give it a \u{1F44D}")
+  const hint = choiceHtml.length > 0
+    ? bubble("system", "Press and hold the one that fits best to give it a \u{1F44D} \u2014 or tap it, then press the button.")
     : "";
   $("thread").innerHTML =
-    (threadFrom(frame.records) || `<p class="note">Start a run to see the conversation.</p>`) + hint + choices;
+    (threadFrom(frame.records) || `<p class="note">Start a run to see the conversation.</p>`) +
+    (choicesDelivered > 0 ? hint : "") +
+    choices;
   // The audio and any faults live outside the records, so they are put back
   // after every rebuild rather than being lost with the innerHTML.
   renderVoiceNotes();
   scrollThread();
+  if (choiceHtml.length > choicesDelivered) void deliverChoices(choiceHtml, hint);
 
   // A slider with named ends, as the original has it: "needs a lot of work"
   // to "this looks good". Eleven radio buttons is a developer's idea of a
   // rating scale, and it reads as a form rather than an opinion.
+  /**
+   * The rating, which starts UNSET.
+   *
+   * It used to be born at the maximum, and Continue submitted whatever the
+   * slider held. So a participant who never touched it — or, as happened, who
+   * never even saw it because the panel had been squeezed off the screen —
+   * had a perfect score recorded in their name. That is not a UI bug, it is a
+   * measurement being invented, and it is the worst kind because the number
+   * looks like data.
+   *
+   * The handle now sits in the middle as a starting point, the readout says
+   * nothing until it is moved, and the button that submits it is disabled
+   * until it has been. A rating has to be an act.
+   */
   const rating = s.rating
     ? `<div class="slider-wrap">
+         <p class="slider-ask">How well does it fit? Drag the slider to say.</p>
          <div class="slider-ends"><span class="low">needs a lot of work</span><span class="high">this looks good</span></div>
-         <input type="range" id="ratingRange" min="0" max="${s.rating.max}" value="${s.rating.max}" step="1" />
-         <p class="slider-value"><span id="ratingValue">${s.rating.max}</span> out of ${s.rating.max}</p>
+         <input type="range" id="ratingRange" min="0" max="${s.rating.max}" value="${Math.round(s.rating.max / 2)}"
+                step="1" data-set="no" aria-label="How well it fits, from 0 to ${s.rating.max}" />
+         <p class="slider-value"><span id="ratingValue">\u2014</span></p>
        </div>`
     : "";
 
@@ -1314,7 +1459,7 @@ function render(frame: Frame): void {
    * it is on screen, and it is off at the screens where the answer is a
    * gesture: choosing a retelling, dragging the rating, the closing screen.
    */
-  const typing = s.expectsInput && !choices && !rating && !s.editable && !s.finished;
+  const typing = s.expectsInput && choiceHtml.length === 0 && !rating && !s.editable && !s.finished;
 
   /**
    * The end, said properly.
@@ -1349,7 +1494,13 @@ function render(frame: Frame): void {
           return button || skip ? `<div class="row">${button}${skip}</div>` : "";
         })();
 
-  $("stageArea").innerHTML = `${quoted}${rating}${adapt}${advance}`;
+  const confirmRow = choiceHtml.length > 0
+    ? `<div class="confirm-row">
+         <button class="primary" id="confirmChoice" type="button" hidden>Choose this one \u{1F44D}</button>
+       </div>`
+    : "";
+
+  $("stageArea").innerHTML = `${quoted}${confirmRow}${rating}${adapt}${advance}`;
   setComposer(typing ? "Message" : null);
 
   $("fallbackNote").innerHTML = s.fallback
@@ -1478,7 +1629,17 @@ let currentKind = "introduction";
 
 function setBusy(stageKind: string | null): void {
   busy = stageKind !== null;
-  document.querySelectorAll<HTMLButtonElement>("#stageArea button").forEach((b) => (b.disabled = busy));
+  /**
+   * A button held shut on purpose stays shut.
+   *
+   * This runs at the end of every turn and used to set `disabled = busy` on
+   * everything in the stage area — which re-enabled the submit button that the
+   * rating had just locked, because the render happens before this does. The
+   * gate was defeated by the housekeeping that came after it.
+   */
+  document
+    .querySelectorAll<HTMLButtonElement>("#stageArea button")
+    .forEach((b) => (b.disabled = busy || b.dataset["gate"] === "shut"));
   document.querySelectorAll<HTMLTextAreaElement>("#stageArea textarea").forEach((t) => (t.disabled = busy));
   /**
    * The send button goes grey; the message box does not.
