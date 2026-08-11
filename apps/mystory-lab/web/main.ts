@@ -512,6 +512,49 @@ function setBusy(stageKind: string | null): void {
   scrollThread();
 }
 
+/** When this run began, for the elapsed time the original also recorded. */
+let runStartedAt = 0;
+
+/**
+ * Keep the run, as it happens.
+ *
+ * Sent after every turn rather than at the end, because most of what is worth
+ * reading from a test is in the runs that did not finish — somebody who gave
+ * up at the rating screen has told you something, and an end-of-run save loses
+ * exactly those.
+ *
+ * It never blocks the conversation and never surfaces an error to the person
+ * talking. A participant cannot do anything about a failed write, and stopping
+ * them mid-sentence to say so would cost the answer as well as the record. The
+ * whole log is re-sent each time, so the next successful write repairs any
+ * that were missed.
+ */
+async function store(runner: NarrativeRunner, finished: boolean): Promise<void> {
+  if (!relay) return;
+  const credential = linkKey ? `Link ${linkKey}` : await session.token().then((t) => (t ? `Bearer ${t}` : null));
+  if (!credential) return;
+
+  const records = runner.all;
+  if (records.length === 0) return;
+
+  try {
+    await fetch(`${relay.replace(/\/llmRelay$/, "")}/saveNarrative`, {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: credential },
+      body: JSON.stringify({
+        sessionId: records[0]!.sessionId,
+        protocolKey: records[0]!.protocolKey,
+        protocolVersion: records[0]!.protocolVersion,
+        records,
+        finished,
+        elapsedSeconds: runStartedAt ? Math.round((Date.now() - runStartedAt) / 1000) : 0,
+      }),
+    });
+  } catch {
+    // Deliberately silent — see above.
+  }
+}
+
 async function turn(payload: { action: string; input?: string; echo?: boolean }): Promise<void> {
   // Ignore a second click while a call is in flight: double-submitting a turn
   // is how a participant ends up paying for two interviews of themselves.
@@ -550,6 +593,7 @@ async function turn(payload: { action: string; input?: string; echo?: boolean })
                 ? localRunner.revertScenario()
                 : await localRunner.submit(payload.input ?? "");
       render({ screen, records: localRunner.all, calls: localCalls });
+      void store(localRunner, screen.finished);
       return;
     }
     render(await api<Frame>("/api/turn", { sessionId, ...payload }));
@@ -638,7 +682,12 @@ $("start").addEventListener("click", () => {
       gateway,
     );
     $("providerBadge").textContent = "provider: relay (the key stays on the server)";
-    render({ screen: localRunner.start(), records: localRunner.all, calls: localCalls });
+    runStartedAt = Date.now();
+    const opening = localRunner.start();
+    render({ screen: opening, records: localRunner.all, calls: localCalls });
+    // From the first screen, so a run abandoned before a single answer is
+    // still a stored run that says so.
+    void store(localRunner, opening.finished);
   })();
 });
 

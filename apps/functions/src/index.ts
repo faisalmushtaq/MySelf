@@ -19,3 +19,4 @@ export {
 export { captureIdentity, lookupParticipant, searchParticipants, linkIdentifier, recordRelationship } from "./identity.js";
 export { nightlyExport, exportNow } from "./export.js";
 export { llmRelay } from "./relay.js";
+export { saveNarrative } from "./narratives.js";

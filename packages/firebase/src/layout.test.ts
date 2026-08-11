@@ -153,6 +153,14 @@ describe("paths", () => {
     expect(paths.participant("ybm", "JA101CD")).toBe("studies/ybm/participants/JA101CD");
     expect(paths.sessionChunk("ybm", "s1", 3)).toBe("studies/ybm/sessions/s1/chunks/0003");
   });
+
+  it("gives a narrative run its own collection, not a corner of the sitting", () => {
+    // docs/08 §9.3: narratives arrive later and only where there is a network,
+    // so attaching one must not mean rewriting 54 kB of survey log — and an
+    // analysis that does not want them should not pay to read them.
+    expect(paths.narrative("ybm", "s1")).toBe("studies/ybm/narratives/s1");
+    expect(paths.narrative("ybm", "s1")).not.toContain(paths.session("ybm", "s1"));
+  });
 });
 
 describe("a torn write", () => {

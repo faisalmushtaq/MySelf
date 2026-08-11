@@ -52,6 +52,38 @@ const BUILD =
     : { built: "unpackaged", commit: "unknown", dirty: false };
 
 /**
+ * The origin allowlist and the preflight, shared by every endpoint a page
+ * calls.
+ *
+ * Set explicitly rather than with the built-in `cors` option, so the pages
+ * that may call these are a list somebody wrote down. Returns true when the
+ * request is already answered — a preflight — and the caller should stop.
+ *
+ * Shared rather than copied, because a second endpoint with its own slightly
+ * different copy is how one of them ends up permissive.
+ */
+export function cors(
+  req: { method?: string; headers: { origin?: string | undefined } },
+  res: {
+    set(key: string, value: string): unknown;
+    status(code: number): { end(): unknown };
+  },
+): boolean {
+  const origin = req.headers.origin;
+  if (origin && ALLOWED_ORIGIN.test(origin)) {
+    res.set("Access-Control-Allow-Origin", origin);
+    res.set("Vary", "Origin");
+    res.set("Access-Control-Allow-Headers", "authorization, content-type");
+    res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+  }
+  if (req.method === "OPTIONS") {
+    res.status(204).end();
+    return true;
+  }
+  return false;
+}
+
+/**
  * A tester link, presented as `Authorization: Link <key>`.
  *
  * Checked and spent in one transaction. Two people opening the same link at
@@ -88,7 +120,7 @@ async function spendLink(key: string): Promise<Caller> {
  * model budget. A signed-in caller must be an enrolled device or carry a role
  * an owner granted.
  */
-async function authenticate(header: string | undefined): Promise<Caller> {
+export async function authenticate(header: string | undefined): Promise<Caller> {
   if (header?.startsWith("Link ")) return spendLink(header.slice(5).trim());
 
   const token = header?.startsWith("Bearer ") ? header.slice(7) : null;
@@ -157,19 +189,8 @@ async function recordCall(caller: Caller, call: ModelCall): Promise<void> {
 export const llmRelay = onRequest(
   { secrets: [OPENAI_API_KEY], cors: false, maxInstances: 20, timeoutSeconds: 120 },
   async (req, res) => {
-    // Set explicitly rather than with the built-in cors option, so the pages
-    // that may call this are a list somebody wrote down.
     const origin = req.headers.origin;
-    if (origin && ALLOWED_ORIGIN.test(origin)) {
-      res.set("Access-Control-Allow-Origin", origin);
-      res.set("Vary", "Origin");
-      res.set("Access-Control-Allow-Headers", "authorization, content-type");
-      res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
-    }
-    if (req.method === "OPTIONS") {
-      res.status(204).end();
-      return;
-    }
+    if (cors(req, res)) return;
     /**
      * What is deployed here, and would this caller's page be let in.
      *
