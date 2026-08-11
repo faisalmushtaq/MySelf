@@ -605,7 +605,7 @@ function wireHeader(): void {
  * used, ending with no options at all — letting the browser pick whatever it
  * records natively, which is the case that cannot fail.
  */
-const CLIP_TYPES = ["audio/mp4", "audio/webm;codecs=opus", "audio/webm", "audio/aac", "audio/ogg;codecs=opus", ""];
+const CLIP_TYPES = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/aac", "audio/ogg;codecs=opus", ""];
 
 function makeRecorder(stream: MediaStream): MediaRecorder | null {
   for (const type of CLIP_TYPES) {
@@ -768,6 +768,10 @@ function wireMic(): void {
         release();
       };
       rec.onstop = () => {
+        // The tracks stop here rather than after the upload, as Bolo does it:
+        // otherwise iOS keeps the orange recording dot lit for the seconds the
+        // transcription takes, which looks like it is still listening.
+        stream.getTracks().forEach((t) => t.stop());
         if (discarding) {
           release();
           return;
@@ -775,9 +779,16 @@ function wireMic(): void {
         void send(recordedAs ? new Blob(parts, { type: recordedAs }) : new Blob(parts));
       };
       try {
-        // A timeslice rather than one blob at the end: Safari is happier
-        // flushing as it goes, and a crash mid-answer still leaves something.
-        rec.start(1000);
+        /**
+         * No timeslice. This is the one line copied deliberately from Bolo,
+         * which records on these same phones and works.
+         *
+         * `start(1000)` seemed the safer choice and is the opposite on iOS:
+         * asking Safari for periodic chunks makes it emit FRAGMENTED MP4, and
+         * the concatenation of those fragments is not a file a decoder will
+         * open. One blob at the end is one valid file.
+         */
+        rec.start();
       } catch (error) {
         stream.getTracks().forEach((t) => t.stop());
         headerNote(`The recording would not start (${String((error as Error).message ?? error)}).`);
