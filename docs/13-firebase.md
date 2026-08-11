@@ -291,6 +291,16 @@ The failure arrives late and reads as though the secret is missing —
 "Permission 'secretmanager.secrets.get' denied on resource (or it may not
 exist)" — when in fact the secret exists and the caller cannot see it.
 
+Last, **Cloud Scheduler Admin**, for `nightlyExport`. A scheduled function is
+two things: the function, and a Cloud Scheduler job that calls it. The eleven
+HTTP and Firestore-triggered functions deploy without it and the scheduled one
+does not, so this appears only once everything else is already working.
+
+Six roles, then, and they surface one deploy at a time because each is checked
+only when the deploy reaches the resource that needs it. If a deploy fails on
+a permission not listed here, the message names it: read the permission, grant
+the role that carries it, and add it to this list.
+
 ### 5.3 Pointing the pages at it
 
 Two build-time values, both public, neither secret:
