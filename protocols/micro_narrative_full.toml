@@ -1,25 +1,3 @@
-# MyStory — study configuration
-#
-# This is the micro-narratives app's own config format, not a lookalike: the
-# same sections and key names that `llm_config.py` reads. A .toml written for
-# that app drops in here and runs, and a file written here runs there.
-#
-# Check one before it goes anywhere near a school:
-#
-#   pnpm --filter @myself/narrative check protocols/your_study.toml
-#
-# which validates it, runs the publish gate, and prints every screen as a
-# participant would read it — so a mistyped {placeholder} shows up as a mistyped
-# placeholder rather than as a blank screen in front of a child.
-#
-# The [myself] table is the only addition, and every field in it is optional. A
-# file without one loads and runs; it cannot be FIELDED until it has a
-# safeguarding declaration, which is the right place for that boundary.
-#
-# What no config contains: the four prompt templates, the stage order and the
-# output schemas. Those are the method (docs/08 §8.2), shared by every study
-# running it.
-
 model = "gpt-4o"
 quality_control_flagging = false
 
@@ -104,6 +82,18 @@ stop_before_generation = true
 offline_fallback = "continue_without_model"
 safeguarding_declaration = "No automated safeguarding decisions. Lexicon rules raise a flag for researcher review only; nobody is contacted automatically and nothing is shown to the participant. Participants are told their answers are read by the research team later, and are not monitored as they type."
 consent_requirements = ["consent.narrative_ai_assistance", "consent.free_text_storage"]
+
+[myself.character]
+name = "Botty"
+meaning = "a robot that listens"
+look = "robot"
+about = [
+  "Botty is a robot — a computer program, not a real person.",
+  "It asks you about your life, then writes back what it heard so you can say if it got it right or wrong.",
+  "It cannot see you. It only hears you if you send it a recording.",
+  "What you tell it is kept for the research, and your name is not kept with it.",
+  "There are no right answers, and nothing you say here is marked.",
+]
 
 [[myself.safeguarding]]
 key = "distress_lexicon"

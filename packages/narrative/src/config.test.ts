@@ -268,3 +268,40 @@ describe("the publish gate over a configuration", () => {
     expect(microNarrativeFull.stages.every((s) => s.modelConfigKey !== "mc.mock")).toBe(true);
   });
 });
+
+describe("who the participant is talking to", () => {
+  /**
+   * The character is per-study because the cohort decides it, and the one
+   * thing it may never do is let somebody believe there is a person on the
+   * other end. A name and a face are precisely what create that belief, so
+   * the disclosure is enforced rather than trusted to whoever writes the
+   * next protocol.
+   */
+  it("gives the younger protocol a robot and the older one a neutral name", () => {
+    expect(microNarrativeFull.character.name).toBe("Botty");
+    expect(microNarrativeFull.character.look).toBe("robot");
+    expect(phoneWellbeing.character.name).toBe("Sam");
+    expect(phoneWellbeing.character.look).toBe("neutral");
+    expect(phoneWellbeing.character.meaning).toBe("Stories About Me");
+  });
+
+  it("refuses a character whose profile never says it is an AI", () => {
+    const pretending = {
+      ...phoneWellbeing,
+      character: { ...phoneWellbeing.character, about: ["I like hearing about your day.", "Tell me anything."] },
+    };
+    expect(checkProtocol(pretending).join(" ")).toMatch(/never says it is an AI/);
+    expect(checkProtocol(phoneWellbeing)).not.toContain(expect.stringMatching(/never says it is an AI/));
+  });
+
+  it("carries the character through a file and back", () => {
+    const rewritten = parseProtocolFile(protocolToToml(microNarrativeFull), "micro_narrative_full.toml");
+    expect(rewritten.character).toEqual(microNarrativeFull.character);
+  });
+
+  it("defaults a study that names no character to one that names itself", () => {
+    const bare = parseProtocolFile(read("overdiagnosis1.toml"), "overdiagnosis1.toml");
+    expect(bare.character.name).toBe("Sam");
+    expect(checkProtocol(bare).join(" ")).not.toMatch(/never says it is an AI/);
+  });
+});

@@ -85,6 +85,18 @@ offline_fallback = "continue_without_model"
 safeguarding_declaration = "No automated safeguarding decisions. Lexicon rules raise a flag for researcher review only; nobody is contacted automatically and nothing is shown to the participant. Participants are told their answers are read by the research team later, and are not monitored as they type."
 consent_requirements = ["consent.narrative_ai_assistance", "consent.free_text_storage"]
 
+[myself.character]
+name = "Sam"
+meaning = "Stories About Me"
+look = "neutral"
+about = [
+  "Sam is an AI, not a person. Nobody is sitting somewhere reading this as you type.",
+  "Sam stands for Stories About Me. It asks about your life and then writes back what it heard, so you can say whether it got it right.",
+  "It can only read and write. It cannot see you, and it only hears you if you send a recording.",
+  "What you say is kept for the research. Your name is not stored with it.",
+  "There are no right answers and nothing here is marked.",
+]
+
 [[myself.safeguarding]]
 key = "distress_lexicon"
 kind = "lexicon"

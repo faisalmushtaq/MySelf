@@ -230,6 +230,42 @@
                      padding: 8px 12px; text-align: center; line-height: 1.4; }
       .header-note[hidden] { display: none; }
 
+      /* ── Contact info ────────────────────────────────────────────────────
+         iOS settings furniture, which is what WhatsApp uses: a grey ground,
+         white rounded blocks, a hairline between rows and nothing between the
+         blocks. It covers the conversation rather than navigating away, so
+         closing it puts somebody back exactly where they were. */
+      .profile { position: absolute; inset: 0; z-index: 20; background: #F2F2F7;
+                 display: flex; flex-direction: column; font-family: var(--wa); }
+      .profile-bar { flex: 0 0 auto; display: flex; align-items: center; gap: 4px;
+                     padding: 6px 12px 6px 2px; background: #F6F6F6;
+                     border-bottom: 1px solid rgba(0,0,0,.09); }
+      .profile-title { flex: 1 1 auto; text-align: center; font-size: 17px; font-weight: 600;
+                       color: #111B21; margin-right: 26px; }
+      .profile-scroll { flex: 1 1 auto; overflow-y: auto; padding-bottom: 2rem; }
+      .profile-head { text-align: center; padding: 1.6rem 1rem 1.2rem; }
+      .profile-avatar { width: 132px; height: 132px; margin: 0 auto .9rem; border-radius: 50%;
+                        overflow: hidden; background: #D9DDE1; }
+      .profile-avatar svg { display: block; width: 132px; height: 132px; }
+      .profile-name { font-size: 26px; font-weight: 700; color: #111B21; margin: 0; letter-spacing: -.01em; }
+      .profile-meaning { font-size: 16px; color: #667781; margin: .35rem 0 0; }
+      .profile-actions { display: flex; gap: 10px; padding: 0 1rem 1.2rem; }
+      .profile-action { flex: 1 1 0; background: #fff; border: 0; border-radius: 12px; padding: .7rem 0;
+                        display: grid; justify-items: center; gap: 5px; color: #00A884; min-height: 0; }
+      .profile-action svg { width: 24px; height: 24px; }
+      .profile-action span { font-size: 13px; color: #111B21; }
+      .profile-block { background: #fff; border-radius: 12px; margin: 0 1rem; overflow: hidden; }
+      .profile-line { padding: .85rem 1rem; font-size: 15.5px; line-height: 1.45; color: #111B21;
+                      border-bottom: 1px solid rgba(0,0,0,.07); }
+      .profile-line:last-child { border-bottom: 0; }
+      .profile-foot { text-align: center; font-size: 13px; color: #8696A0; margin: 1.1rem 1rem 0; }
+      /* The header name is a button, and must not look like one. */
+      .who-open { flex: 1 1 auto; display: flex; align-items: center; gap: 8px; min-width: 0;
+                  background: none; border: 0; padding: 0; margin: 0; min-height: 0; text-align: left;
+                  font: inherit; color: inherit; cursor: pointer; }
+      /* The conversation is the positioning context the profile covers. */
+      body.participant-view .wrap > section:has(#thread) { position: relative; }
+
       /* ── The composer ────────────────────────────────────────────────────
          WhatsApp's is a bar, not a text box: a strip across the foot of the
          screen holding a grey plus, a white pill with the placeholder and a
@@ -668,6 +704,7 @@
             <button type="button" class="header-back" id="chatBack" aria-label="Back">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" d="M15 4.5 7.5 12 15 19.5"/></svg>
             </button>
+            <button type="button" class="who-open" id="openProfile" aria-label="About who you are talking to">
             <div class="who-avatar" aria-hidden="true">
               <svg viewBox="0 0 40 40">
                 <defs><clipPath id="avatarClip"><circle cx="20" cy="20" r="20"/></clipPath></defs>
@@ -687,9 +724,10 @@
                  disclosure rides in the name — the initials are the point —
                  and every one of these buttons says it in full when pressed. -->
             <div class="who-text">
-              <div class="who-name">Alex Ingram (AI)</div>
+              <div class="who-name" id="whoName">Sam</div>
               <div class="who-sub" id="whoSub">online</div>
             </div>
+            </button>
             <!--
               The call buttons are real buttons that decline. WhatsApp's header
               has them and their absence is noticeable; what is behind them is
@@ -706,6 +744,41 @@
           <!-- What the call buttons say. Announced, so it is not silent to a
                screen reader, and dismissed by tapping anywhere. -->
           <div id="headerNote" class="header-note" role="status" hidden></div>
+          <!--
+            Contact info, as WhatsApp lays it out and cut to what a study
+            needs: who this is, what the name stands for, and what it can and
+            cannot do. No media, no storage, no theme — every row WhatsApp has
+            that we do not is a row that would do nothing.
+          -->
+          <div id="profileView" class="profile" hidden>
+            <div class="profile-bar">
+              <button type="button" class="header-back" id="closeProfile" aria-label="Back to the conversation">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" d="M15 4.5 7.5 12 15 19.5"/></svg>
+              </button>
+              <span class="profile-title">Contact info</span>
+            </div>
+            <div class="profile-scroll">
+              <div class="profile-head">
+                <div class="profile-avatar" id="profileAvatar" aria-hidden="true"></div>
+                <h3 class="profile-name" id="profileName">Sam</h3>
+                <p class="profile-meaning" id="profileMeaning">Stories About Me</p>
+              </div>
+              <!-- The same two buttons the header has, in the place WhatsApp
+                   puts them, declining for the same reason. -->
+              <div class="profile-actions">
+                <button type="button" class="profile-action" id="profileVoice">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M6.6 3.2c.6-.3 1.4-.1 1.8.5l1.9 3a1.4 1.4 0 0 1-.2 1.8l-1.2 1a11 11 0 0 0 4.6 4.6l1-1.2a1.4 1.4 0 0 1 1.8-.2l3 1.9c.6.4.8 1.2.5 1.8l-.9 1.7a2.2 2.2 0 0 1-2.4 1.1C11 18.4 5.6 13 4.4 6.5A2.2 2.2 0 0 1 5.5 4.1l1.1-.9Z"/></svg>
+                  <span>Audio</span>
+                </button>
+                <button type="button" class="profile-action" id="profileVideo">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M4 6.5h9.5A2.5 2.5 0 0 1 16 9v6a2.5 2.5 0 0 1-2.5 2.5H4A2.5 2.5 0 0 1 1.5 15V9A2.5 2.5 0 0 1 4 6.5Zm13.6 3.4 3.4-2.2c.6-.4 1.5 0 1.5.8v7c0 .8-.9 1.2-1.5.8l-3.4-2.2V9.9Z"/></svg>
+                  <span>Video</span>
+                </button>
+              </div>
+              <div class="profile-block" id="profileAbout"></div>
+              <p class="profile-foot">Part of a research study. You can stop at any time.</p>
+            </div>
+          </div>
           <!-- Deliberately NOT inside a lab-only panel. Once the mock was
                removed this became the only way the page can say "sign in
                first" or "there is nothing to run" — and a participant who
