@@ -794,7 +794,43 @@ function wireHeader(): void {
  * hear back what they just said is the blob their own device still holds.
  * Cleared when the tab goes, which is the right lifetime for a playback aid.
  */
-const voiceNotes: { url: string; seconds: number; kept: boolean; claimedBy: number | null }[] = [];
+const voiceNotes: {
+  url: string;
+  seconds: number;
+  kept: boolean;
+  claimedBy: number | null;
+  /** Bar heights, 0 to 1, taken from what the meter heard while recording. */
+  shape: number[];
+}[] = [];
+
+/** How many bars a voice note is drawn with. WhatsApp's is about this many. */
+const WAVE_BARS = 34;
+
+/**
+ * The recording's own shape, from the levels the meter collected.
+ *
+ * Downsampled by taking the PEAK of each bucket rather than the mean: a mean
+ * flattens speech into a uniform sausage, because most of any sentence is
+ * quieter than its loudest syllable. Peaks are what make a waveform look like
+ * the thing that was said.
+ *
+ * Falls back to a flat-ish row when there were no levels — a browser with no
+ * AudioContext still gets a voice note, it just gets a plain one.
+ */
+function shapeOf(levels: number[]): number[] {
+  if (levels.length === 0) return Array.from({ length: WAVE_BARS }, (_, i) => 0.25 + ((i * 7) % 5) / 12);
+  const size = levels.length / WAVE_BARS;
+  const loudest = Math.max(...levels, 0.001);
+  return Array.from({ length: WAVE_BARS }, (_, i) => {
+    let peak = 0;
+    for (let j = Math.floor(i * size); j < Math.max(Math.floor((i + 1) * size), Math.floor(i * size) + 1); j += 1) {
+      peak = Math.max(peak, levels[j] ?? 0);
+    }
+    // Normalised against the loudest moment, so a quiet speaker still gets a
+    // waveform with shape in it rather than a flat line.
+    return Math.max(0.12, Math.min(1, peak / loudest));
+  });
+}
 /**
  * Faults, kept so a re-render does not wipe the thing somebody is reading.
  *
@@ -849,16 +885,46 @@ function renderVoiceNotes(): void {
     el.innerHTML = `<div class="bubble">
         <audio src="${note.url}" preload="metadata"></audio>
         <button type="button" class="vn-play" aria-label="Play what you said">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M8 5.5v13l11-6.5z"/></svg>
+          <svg class="vn-icon-play" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M8 5.5v13l11-6.5z"/></svg>
+          <svg class="vn-icon-pause" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M8 5.5h3v13H8zm5 0h3v13h-3z"/></svg>
         </button>
-        <span class="vn-wave" aria-hidden="true">${"<i></i>".repeat(22)}</span>
+        <span class="vn-wave" aria-hidden="true">${note.shape
+          .map((h) => `<i style="height:${Math.round(h * 100)}%"></i>`)
+          .join("")}</span>
         <span class="vn-time">${mmss(note.seconds)}</span>
         <span class="meta">${clock()}${TICKS}</span>
       </div>`;
     const audio = el.querySelector("audio")!;
     const play = el.querySelector<HTMLButtonElement>(".vn-play")!;
+    const bars = [...el.querySelectorAll<HTMLElement>(".vn-wave i")];
+    const time = el.querySelector<HTMLElement>(".vn-time")!;
+
+    /**
+     * The bars fill as it plays, and the counter counts up.
+     *
+     * WhatsApp fills the waveform behind a moving dot and shows elapsed rather
+     * than total time while playing. Both are what tell you it is actually
+     * playing when the phone is on silent — which, for a young person handed a
+     * phone in a classroom, is most of the time.
+     */
+    const paint = () => {
+      const length = audio.duration && Number.isFinite(audio.duration) ? audio.duration : note.seconds;
+      const through = length > 0 ? audio.currentTime / length : 0;
+      bars.forEach((b, i) => b.classList.toggle("played", i / bars.length < through));
+      time.textContent = audio.paused && audio.currentTime === 0 ? mmss(note.seconds) : mmss(Math.floor(audio.currentTime));
+    };
+    const stop = () => {
+      el.classList.remove("playing");
+      paint();
+    };
+
     play.addEventListener("click", () => {
       if (audio.paused) {
+        // One at a time, as a chat does. Two voice notes over each other is
+        // nobody's idea of playback.
+        for (const other of document.querySelectorAll<HTMLAudioElement>(".voice-note audio")) {
+          if (other !== audio) other.pause();
+        }
         void audio.play();
         el.classList.add("playing");
       } else {
@@ -866,7 +932,12 @@ function renderVoiceNotes(): void {
         el.classList.remove("playing");
       }
     });
-    audio.addEventListener("ended", () => el.classList.remove("playing"));
+    audio.addEventListener("timeupdate", paint);
+    audio.addEventListener("pause", stop);
+    audio.addEventListener("ended", () => {
+      audio.currentTime = 0;
+      stop();
+    });
     const anchor = note.claimedBy === null ? null : thread.querySelector(`[data-seq="${note.claimedBy}"]`);
     if (anchor) anchor.before(el);
     else thread.append(el);
@@ -979,12 +1050,51 @@ function wireMic(): void {
   let recordedAs = "";
   /** When this clip began, for the length shown on the voice note. */
   let startedAt = 0;
+  /**
+   * How loud it was, moment by moment.
+   *
+   * Sampled off the live stream rather than decoded from the finished clip.
+   * Two reasons: it is the only way to draw the bars WHILE somebody is
+   * talking, which is the whole point of a live waveform; and it means the
+   * bubble's waveform is the same measurement, so what you watched arrive is
+   * what you see afterwards. Decoding an mp4 on an old iPhone to draw a
+   * decoration would be the expensive way to get a worse answer.
+   */
+  let levels: number[] = [];
+  let listening: { context: AudioContext; stop: () => void } | null = null;
   /** The counter, ticking in real seconds. */
   let ticking: ReturnType<typeof setInterval> | null = null;
 
   const bar = () => composerBar();
   const strip = () => $("recordingStrip");
   const timeLabel = () => $("recTime");
+  const liveWave = () => $("recWave");
+
+  /**
+   * The waveform, while it is happening.
+   *
+   * A counter says the phone is running; bars that move when you speak say the
+   * phone is hearing YOU, which is a different and better assurance — and the
+   * one thing that tells somebody their microphone is pointed the wrong way
+   * before they have said their whole answer to nothing.
+   *
+   * The last fifty samples, oldest scrolling off the left, which is how every
+   * recorder anybody has used behaves.
+   */
+  const LIVE_BARS = 50;
+  const drawLive = () => {
+    const wave = liveWave();
+    if (wave.childElementCount !== LIVE_BARS) {
+      wave.innerHTML = "<i></i>".repeat(LIVE_BARS);
+    }
+    const recent = levels.slice(-LIVE_BARS);
+    const bars = wave.children;
+    for (let i = 0; i < LIVE_BARS; i += 1) {
+      // Right-aligned, so the newest sample is always at the same edge.
+      const level = recent[i - (LIVE_BARS - recent.length)] ?? 0;
+      (bars[i] as HTMLElement).style.height = `${Math.max(8, Math.round(level * 100))}%`;
+    }
+  };
 
   /**
    * Show the recording strip in place of the message box.
@@ -1014,6 +1124,8 @@ function wireMic(): void {
     capping = null;
     if (ticking) clearInterval(ticking);
     ticking = null;
+    listening?.stop();
+    listening = null;
     recorder?.stream.getTracks().forEach((t) => t.stop());
     recorder = null;
     button.classList.remove("listening");
@@ -1063,7 +1175,7 @@ function wireMic(): void {
     // exists the instant they stop talking, and showing it then is what makes
     // the transcription feel like it is happening TO something rather than
     // being a gap with nothing on screen.
-    const note = { url: URL.createObjectURL(clip), seconds, kept: false, claimedBy: null };
+    const note = { url: URL.createObjectURL(clip), seconds, kept: false, claimedBy: null, shape: shapeOf(levels) };
     voiceNotes.push(note);
     renderVoiceNotes();
     button.classList.add("writing");
@@ -1168,6 +1280,50 @@ function wireMic(): void {
       return false;
     }
     recordedAs = rec.mimeType || "";
+
+    /**
+     * The meter. Off the same stream the recorder is using, so it costs one
+     * extra node and no extra permission.
+     */
+    try {
+      const Context = window.AudioContext ?? (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      const context = new Context();
+      // Created inside an async continuation, so the gesture that opened the
+      // microphone no longer counts and the context arrives suspended — an
+      // analyser on a suspended context reads pure silence, which draws a
+      // flat line and looks exactly like a microphone that is not working.
+      void context.resume();
+      const analyser = context.createAnalyser();
+      analyser.fftSize = 1024;
+      context.createMediaStreamSource(stream).connect(analyser);
+      const buffer = new Uint8Array(analyser.fftSize);
+      let raf = 0;
+      const read = () => {
+        analyser.getByteTimeDomainData(buffer);
+        // Root mean square about the midpoint: loudness, not the waveform's
+        // instantaneous sign, which is what a bar should be tall for.
+        let sum = 0;
+        for (const v of buffer) {
+          const d = (v - 128) / 128;
+          sum += d * d;
+        }
+        levels.push(Math.min(1, Math.sqrt(sum / buffer.length) * 3.2));
+        drawLive();
+        raf = requestAnimationFrame(read);
+      };
+      raf = requestAnimationFrame(read);
+      listening = {
+        context,
+        stop: () => {
+          cancelAnimationFrame(raf);
+          void context.close();
+        },
+      };
+    } catch {
+      // No meter is survivable; no recording is not. The bars simply stay
+      // flat and everything else behaves.
+      listening = null;
+    }
 
     const parts: Blob[] = [];
     rec.ondataavailable = (e) => {

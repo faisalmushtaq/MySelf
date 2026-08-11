@@ -332,6 +332,16 @@
       /* WhatsApp says "slide to cancel" because it is a hold gesture. This is
          tap-to-start and tap-to-stop — a child who lifts a finger early should
          not lose the answer — so the way out is a word you can press. */
+      /* The live meter. Right-aligned so the newest sample is always at the
+         same edge, which is how every recorder anybody has used behaves. */
+      .rec-wave { flex: 1 1 auto; display: flex; align-items: center; justify-content: flex-end;
+                  gap: 1.5px; height: 24px; min-width: 0; overflow: hidden; }
+      .rec-wave i { flex: 0 0 2px; height: 8%; background: #8AB6AC; border-radius: 1px;
+                    transition: height .08s linear; }
+      .recording-strip.held .rec-wave, .recording-strip.cancelling .rec-wave { display: none; }
+      .composer-bar.writing .rec-wave { display: none; }
+      @media (prefers-reduced-motion: reduce) { .rec-wave i { transition: none; } }
+
       .rec-cancel { flex: 1 1 auto; text-align: right; background: none; border: 0; padding: 0 6px 0 0;
                     min-height: 0; font-family: var(--wa); font-size: 15px; color: #667781; }
       /* Held: WhatsApp's wording, moving with the finger, so the slide is
@@ -396,15 +406,21 @@
                  background: rgba(0,0,0,.06); color: #3B4A54; }
       .voice-note.playing .vn-play svg { opacity: .45; }
       .vn-play svg { width: 18px; height: 18px; display: block; margin-left: 2px; }
-      .vn-wave { flex: 1 1 auto; display: flex; align-items: center; gap: 2px; height: 22px; }
-      /* Drawn rather than sampled: reading the real amplitudes would mean
-         decoding the clip on the phone to produce a decoration. */
-      .vn-wave i { flex: 1 1 auto; background: #B8C1C6; border-radius: 1px; }
-      .vn-wave i:nth-child(3n) { height: 60%; }
-      .vn-wave i:nth-child(3n+1) { height: 32%; }
-      .vn-wave i:nth-child(3n+2) { height: 90%; }
-      .vn-wave i:nth-child(7n) { height: 45%; }
-      .voice-note.playing .vn-wave i { background: #67B25F; }
+      .vn-wave { flex: 1 1 auto; display: flex; align-items: center; gap: 2px; height: 24px; }
+      /* Real heights, from what the meter heard while it was being recorded —
+         so the shape belongs to this recording and not to a pattern. */
+      .vn-wave i { flex: 1 1 auto; min-width: 2px; background: #B8C1C6; border-radius: 1px;
+                   transition: background-color .12s linear; }
+      /* Behind the playhead. WhatsApp fills the bars it has passed. */
+      .vn-wave i.played { background: #4D9E7F; }
+      /* Specificity, not order: `.vn-play svg { display: block }` is a class
+         plus an element and beats a bare class, so `.vn-icon-pause` on its own
+         lost and both icons drew on top of each other. Same shape of mistake
+         as the `hidden` attribute being overridden — a display toggle is only
+         as good as the rule it has to beat. */
+      .vn-play .vn-icon-pause { display: none; }
+      .voice-note.playing .vn-play .vn-icon-play { display: none; }
+      .voice-note.playing .vn-play .vn-icon-pause { display: block; }
       .vn-time { flex: 0 0 auto; font-size: 12px; color: var(--wa-meta); }
       .voice-note audio { display: none; }
       /* A fault, left in the conversation so it can be read and screenshotted
@@ -821,6 +837,9 @@
                 <svg viewBox="0 0 24 24"><path fill="currentColor" d="M12 14.5a3.2 3.2 0 0 0 3.2-3.2V5.7a3.2 3.2 0 1 0-6.4 0v5.6a3.2 3.2 0 0 0 3.2 3.2Zm5.6-3.4a.9.9 0 0 0-1.8 0 3.8 3.8 0 0 1-7.6 0 .9.9 0 1 0-1.8 0 5.6 5.6 0 0 0 4.7 5.5v2.2H9.4a.9.9 0 1 0 0 1.8h5.2a.9.9 0 1 0 0-1.8h-1.7v-2.2a5.6 5.6 0 0 0 4.7-5.5Z"/></svg>
               </span>
               <span class="rec-time" id="recTime" role="timer" aria-live="off">0:00</span>
+              <!-- Bars that move with the voice. A counter says the phone is
+                   running; this says it is hearing YOU. -->
+              <span class="rec-wave" id="recWave" aria-hidden="true"></span>
               <!-- While the finger is down: WhatsApp's own words, sliding with
                    it. Replaced by a pressable Cancel once the recording is
                    locked and there is no finger to slide. -->
