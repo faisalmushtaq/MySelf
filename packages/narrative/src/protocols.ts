@@ -341,7 +341,7 @@ export const microNarrativeFullConfig: ProtocolConfig = protocolConfig.parse({
     max_turns: 12,
     min_chars: 2,
 
-    select_text: "Here are a few short write-ups of what you told me. Which one fits best?",
+    select_text: "Here are three short stories about what you told me. Which one fits best?",
     select_lede: "None of them will be perfect. Pick the closest and you can fix it next.",
     rate_text: "How well does that one describe what you told me?",
     rate_lede: "0 means it is not you at all. 10 means it is exactly right.",
@@ -453,10 +453,39 @@ export const phoneWellbeingConfig: ProtocolConfig = protocolConfig.parse({
      * retells in the third person deliberately, and both live in the same
      * codebase without one overruling the other.
      */
+    /**
+     * Three retellings a participant can actually tell apart.
+     *
+     * The first versions of these were one-line nudges about tone — "plainly
+     * and briefly", "lead with how it felt" — and they produced three
+     * paragraphs that differed by a few words. That is not a choice; it is a
+     * coin flip wearing three coats, and which one somebody picks is the
+     * measurement this whole component exists to take.
+     *
+     * The fix is to make them differ in WHAT THEY INCLUDE rather than how they
+     * sound. One names no feelings at all. One is almost entirely feelings.
+     * One is their own phrasing kept as they said it. Given the same four
+     * facts those cannot converge, because they are not selecting the same
+     * material.
+     *
+     * All three stay in the first person, which costs the axis the CHI
+     * protocol used — its personas were different NARRATORS, and a narrator is
+     * the strongest way to make retellings diverge. That trade is deliberate:
+     * "is this you?" is a question a young person answers about "I", and reads
+     * as a case note about "they".
+     */
     personas: {
-      plain: "You write plainly and briefly, in the first person as 'I', telling it in the order they said it.",
-      feeling: "You lead with how it left you feeling, writing in the first person as 'I', and keep the detail light.",
-      their_words: "You keep the young person's own turns of phrase wherever you can, writing in the first person as 'I'.",
+      plain:
+        "You write it as short and matter-of-fact as you can, in the first person as 'I': what happens, in the " +
+        "order they said it, in three or four sentences. You never name a feeling and never say what anything " +
+        "meant to you.",
+      feeling:
+        "You write mostly about how it leaves you feeling, in the first person as 'I'. Feelings come first and " +
+        "get the most words; you mention what actually happened only where it is needed to explain one of them.",
+      their_words:
+        "You build it out of the young person's own phrases, in the first person as 'I', kept exactly as they " +
+        "said them even where they are rough or unfinished. You add as few words of your own as it takes to join " +
+        "them up, and you never smooth their wording into better English.",
     },
   },
 
@@ -528,7 +557,7 @@ export const phoneWellbeingConfig: ProtocolConfig = protocolConfig.parse({
     max_turns: 14,
     min_chars: 2,
 
-    select_text: "Here are a few short write-ups of what you told me. Which one fits best?",
+    select_text: "Here are three short stories about what you told me. Which one fits best?",
     select_lede: "None of them will be perfect. Pick the closest and you can fix it next.",
     rate_text: "How well does that one describe what you told me?",
     rate_lede: "0 means it is not you at all. 10 means it is exactly right.",

@@ -43,7 +43,8 @@ export const INTERVIEWER_SCHEMA = {
         "specific to their answer, never a compliment on the answer itself — and then ask. If their last answer was " +
         "one or two words, do not move on: ask them to say a bit more about that same thing. Never advice, never a " +
         "diagnosis, never a summary of what they have told you so far. When interviewDone is true this must be a " +
-        "short warm sign-off and must NOT ask anything — the conversation ends on it and nobody will be able to reply.",
+        "brief thank-you AND a handover to what comes next — a few short write-ups to pick from — and must NOT ask " +
+        "anything and must NOT say goodbye. Nobody will be able to reply to it, and more of the conversation follows.",
     },
     interviewDone: {
       type: "boolean",
@@ -129,7 +130,18 @@ export const INTERVIEWER_SYSTEM = [
   "A one or two word answer is not a basic answer — ask them to say a bit more about that same thing before moving on.",
   "Never answer for the human. If you are unsure what the human meant, ask again.",
   "{topic_restriction}",
-  "{collection_complete}, set interviewDone to true. Do not say so out loud; close warmly instead.",
+  /**
+   * The last thing it says is a HANDOVER, not a goodbye.
+   *
+   * "Close warmly" produced exactly what it asked for and exactly the wrong
+   * thing: "Thanks for sharing all this with me. Take care!" — immediately
+   * before three retellings arrived. A participant told the conversation is
+   * over and then shown more of it has been misled about where they are, at
+   * the point where the method needs them still paying attention.
+   */
+  "{collection_complete}, set interviewDone to true. Do not say so out loud. Do not say goodbye and do not wish " +
+    "them well — the conversation is not over. Thank them briefly and say that you are about to show them a few " +
+    "short write-ups of what they told you, for them to pick from.",
 ].join("\n");
 
 /** "Once you have collected answers to all N questions", as the original phrases it. */
@@ -178,6 +190,13 @@ export const SCENARIO_SYSTEM = [
   "Use only what this person said. Add nothing they did not say: no motives, no diagnosis, and no",
   "resolution they did not describe. If their account is thin, write a short scenario and say so in the",
   "confidence field rather than inventing enough material to fill a paragraph.",
+  // The example above is one worked case, and a model handed a worked case
+  // copies its VOICE — which is how three personas produced three paragraphs
+  // that differed by a few words. It is there to show scope and length. The
+  // persona, and only the persona, decides how this one sounds and what it
+  // leaves out.
+  "The example shows how much to include and how long to be. It does not show how to sound: the instruction at",
+  "the top of this prompt decides that, and you follow it even where it makes this read nothing like the example.",
 ].join("\n");
 
 /**

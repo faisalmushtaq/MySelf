@@ -30,9 +30,9 @@ how_it_leaves_them_feeling = "How did they say a long stretch on it leaves them 
 what_they_would_miss = "What did they say they would miss, and not miss, without it?"
 
 [summaries.personas]
-plain = "You write plainly and briefly, in the first person as 'I', telling it in the order they said it."
-feeling = "You lead with how it left you feeling, writing in the first person as 'I', and keep the detail light."
-their_words = "You keep the young person's own turns of phrase wherever you can, writing in the first person as 'I'."
+plain = "You write it as short and matter-of-fact as you can, in the first person as 'I': what happens, in the order they said it, in three or four sentences. You never name a feeling and never say what anything meant to you."
+feeling = "You write mostly about how it leaves you feeling, in the first person as 'I'. Feelings come first and get the most words; you mention what actually happened only where it is needed to explain one of them."
+their_words = "You build it out of the young person's own phrases, in the first person as 'I', kept exactly as they said them even where they are rough or unfinished. You add as few words of your own as it takes to join them up, and you never smooth their wording into better English."
 
 [example]
 conversation = """
@@ -65,7 +65,7 @@ training_use_opt_out = true
 retention_note = "zero-retention endpoint requested"
 region = "eu"
 outro = "Great, I think I got all I need -- but let me double check!"
-select_text = "Here are a few short write-ups of what you told me. Which one fits best?"
+select_text = "Here are three short stories about what you told me. Which one fits best?"
 select_lede = "None of them will be perfect. Pick the closest and you can fix it next."
 rate_text = "How well does that one describe what you told me?"
 rate_lede = "0 means it is not you at all. 10 means it is exactly right."
