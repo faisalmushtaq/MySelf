@@ -247,7 +247,8 @@ export const microNarrativeFullConfig: ProtocolConfig = protocolConfig.parse({
   quality_control_flagging: false,
 
   consent: {
-    intro_and_consent: "Hi {first_name} — this last part is a short conversation.",
+    intro_and_consent:
+      "Hi {first_name} — I'm Botty. I'm an AI bot, a bit like ChatGPT, except our research team built me just for this project. This last part is a short conversation.",
   },
 
   participant: { require_participant_id: true, editable_participant_id: false, text: "" },
@@ -365,11 +366,11 @@ export const microNarrativeFullConfig: ProtocolConfig = protocolConfig.parse({
 
     select_text: "Seems I have everything! Let me try to summarise what you said in three scenarios. See if you like any of these!",
     select_lede: "None of them will be perfect. Pick the closest and you can fix it next.",
-    rate_text: "How close is this to what I want to say?",
+    rate_text: "How close is this to what you want to say?",
     rate_lede: "0 means it is not you at all. 10 means it is exactly right.",
     adapt_text: "What would you change about it?",
     adapt_lede: "Tell me in your own words and I will rewrite it. What you write here is kept alongside it.",
-    debrief_text: "Thank you, {first_name}. That is everything.",
+    debrief_text: "Here's the story you made, {first_name}.",
     debrief_lede:
       "What you wrote is stored with the rest of your answers under your secret code. If you want it taken out later, that code is how we find it.",
     fallback_text: "Thank you — that is really helpful.",
@@ -418,7 +419,8 @@ export const phoneWellbeingConfig: ProtocolConfig = protocolConfig.parse({
   quality_control_flagging: false,
 
   consent: {
-    intro_and_consent: "Hi {first_name} — this last bit is a short chat about your phone.",
+    intro_and_consent:
+      "Hi {first_name} — I'm Sam. I'm an AI bot, a bit like ChatGPT, except our research team built me just for this project. This last bit is a short chat about your phone.",
   },
 
   // Left at its defaults deliberately. `require_participant_id` only gates the
@@ -599,11 +601,11 @@ export const phoneWellbeingConfig: ProtocolConfig = protocolConfig.parse({
 
     select_text: "Seems I have everything! Let me try to summarise what you said in three scenarios. See if you like any of these!",
     select_lede: "None of them will be perfect. Pick the closest and you can fix it next.",
-    rate_text: "How close is this to what I want to say?",
+    rate_text: "How close is this to what you want to say?",
     rate_lede: "0 means it is not you at all. 10 means it is exactly right.",
     adapt_text: "What would you change about it?",
     adapt_lede: "Tell me in your own words and I will rewrite it. What you write here is kept alongside it.",
-    debrief_text: "Thank you, {first_name}. That is everything.",
+    debrief_text: "Here's the story you made, {first_name}.",
     debrief_lede:
       "What you wrote is stored with the rest of your answers under your secret code. If you want it taken out later, that code is how we find it.",
     fallback_text: "Thank you — that is really helpful.",

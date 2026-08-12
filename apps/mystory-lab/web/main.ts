@@ -289,9 +289,29 @@ function threadFrom(records: Frame["records"]): string {
     } else if (r.kind === "participant_correction") {
       if (r.text) push(bubble("me", escapeHtml(r.text)), r.seq);
     } else if (r.kind === "participant_reaction" && typeof data["persona"] === "string") {
-      // Which one they picked, said as a person would say it. The retelling
-      // itself is on screen; repeating it here is noise.
-      push(bubble("me", `I&rsquo;ll take the <em>${escapeHtml(data["persona"])}</em> one.`), r.seq);
+      /**
+       * The one they picked, kept in the thread with their thumb on it.
+       *
+       * This used to say "I'll take the sibling one", which names something
+       * only the lab can see: the persona label is hidden on the retellings
+       * themselves precisely because "their words" or "psychologist" would
+       * tell a participant which one is supposed to be the honest one. Saying
+       * it out loud in their own voice, a line later, gave it back — and to
+       * the participant it named nothing at all.
+       *
+       * What actually happened is that they chose a message, so that message
+       * stays, with the reaction on it. It also keeps the story on screen
+       * through the rating, which is what the rate stage needs anyway; it
+       * used to vanish from the thread and be quoted again in a panel below.
+       */
+      push(
+        bubble(
+          "them",
+          `<span class="who lab-only">${escapeHtml(data["persona"])}</span>${escapeHtml(r.text ?? "")}` +
+            `<span class="reaction kept" aria-hidden="true">\u{1F44D}</span>`,
+        ),
+        r.seq,
+      );
     } else if (r.kind === "participant_rating") {
       push(bubble("me", `${escapeHtml(data["rating"])} out of ${escapeHtml(data["max"])}`), r.seq);
     } else if (r.kind === "participant_edit") {
@@ -499,8 +519,17 @@ function wireStageControls(): void {
    * page.
    */
   const grow = (el: HTMLTextAreaElement) => {
+    /**
+     * Capped, and scrolling inside itself past the cap.
+     *
+     * This grew to fit whatever it held, and what it holds is a paragraph —
+     * so on a phone the box took two-thirds of the screen and the
+     * conversation above it became a letterbox. Growing is right; growing
+     * without limit is the two-regions-fighting layout again.
+     */
+    const ceiling = Math.max(96, Math.round(window.innerHeight * 0.3));
     el.style.height = "auto";
-    el.style.height = `${el.scrollHeight}px`;
+    el.style.height = `${Math.min(el.scrollHeight, ceiling)}px`;
   };
   const edit = document.getElementById("scenarioEdit") as HTMLTextAreaElement | null;
   if (edit) {
@@ -824,9 +853,31 @@ function wireHeader(): void {
         `${character.name} can’t take calls — ${character.name} is an AI. You can talk to it though: tap the microphone by the message box.`,
       ),
     );
-  document
-    .getElementById("chatBack")
-    ?.addEventListener("click", () => headerNote("This is the only chat here — there’s nothing behind it."));
+  /**
+   * The back chevron, which was a dead control.
+   *
+   * It used to answer a tap with "there's nothing behind it", which is a
+   * worse thing for a control to do than not being there: it looks like
+   * navigation, so people press it, and then it tells them off. A header
+   * without a chevron still reads as WhatsApp; a chevron that argues with you
+   * does not.
+   *
+   * It appears when there IS somewhere to go — the `done` address a survey or
+   * a study website hands over in the link, which is the case where this chat
+   * is one part of something larger. That is the integration the header was
+   * drawn for, and the only case where going back means anything.
+   */
+  const back = document.getElementById("chatBack") as HTMLButtonElement | null;
+  if (back) {
+    if (returnLink) {
+      back.hidden = false;
+      back.addEventListener("click", () => {
+        window.location.href = returnLink;
+      });
+    } else {
+      back.hidden = true;
+    }
+  }
 }
 
 /* ── Speaking instead of typing ──────────────────────────────────────────── */
@@ -1744,18 +1795,29 @@ function render(frame: Frame): void {
    * they made is a message, and the note about saving is the centred system
    * line that a chat uses for anything that is not one.
    */
-  const endingMessages = s.finished
-    ? // The protocol's debrief has already thanked them by this point, so this
-      // does not thank them again — it hands over the thing they made.
-      bubble("them", escapeHtml(s.stopped ? "Thank you — that is everything." : "Here is the story you made:")) +
-      (s.scenario && !s.stopped ? bubble("them", `<span class="final-story">${escapeHtml(s.scenario)}</span>`) : "") +
-      bubble(
-        "system",
-        s.stopped
-          ? escapeHtml(`We stopped early: ${s.stopped.reason}. Nothing you wrote has been lost.`)
-          : "It has been saved with the rest of your answers. You can close this page now.",
-      )
-    : "";
+  /**
+   * The story first, the thanks after it.
+   *
+   * "Thank you. That is everything." used to land BEFORE the story, wedged
+   * between the last question and the thing it was handing over. Read on a
+   * phone it is a door closing: the conversation is finished, and then three
+   * more messages arrive. The protocol's debrief now introduces the story
+   * ("Here's the story you made"), and everything that sounds like an ending
+   * happens after the ending.
+   *
+   * Two bubbles rather than one, because that is how a person signs off in a
+   * chat — the warm bit, then the goodbye — and because the last thing said
+   * should be what this was all for.
+   */
+  const endingMessages = !s.finished
+    ? ""
+    : s.stopped
+      ? bubble("them", "Thank you \u2014 that is everything.") +
+        bubble("system", escapeHtml(`We stopped early: ${s.stopped.reason}. Nothing you wrote has been lost.`))
+      : (s.scenario ? bubble("them", `<span class="final-story">${escapeHtml(s.scenario)}</span>`) : "") +
+        bubble("them", "That\u2019s everything \u2014 thank you for talking to me. It was really good to hear about it all.") +
+        bubble("them", "And thank you for contributing your story to our research. Take care!") +
+        bubble("system", "It has been saved with the rest of your answers. You can close this page now.");
 
   const hint = choiceHtml.length > 0
     ? bubble("system", "Press and hold the one that fits best to give it a \u{1F44D} \u2014 or tap it, then press the button.")
@@ -1805,7 +1867,7 @@ function render(frame: Frame): void {
    */
   const rating = s.rating
     ? `<div class="slider-wrap">
-         <p class="slider-ask">How well does it fit? Drag the slider to say.</p>
+         <p class="slider-ask">Drag the slider to say.</p>
          <div class="slider-ends"><span class="low">needs a lot of work</span><span class="high">this looks good</span></div>
          <input type="range" id="ratingRange" min="0" max="${s.rating.max}" value="${Math.round(s.rating.max / 2)}"
                 step="1" data-set="no" aria-label="How well it fits, from 0 to ${s.rating.max}" />
@@ -1819,7 +1881,7 @@ function render(frame: Frame): void {
   const adapt = s.editable
     ? `<div class="adapt-block">
          <h3>Change it yourself</h3>
-         <textarea id="scenarioEdit" class="scenario-edit" rows="7">${escapeHtml(s.scenario ?? "")}</textarea>
+         <textarea id="scenarioEdit" class="scenario-edit" rows="4">${escapeHtml(s.scenario ?? "")}</textarea>
          <p class="hint-right">Press \u2318/Ctrl + Enter to keep it</p>
          <div class="row">
            <button class="secondary" id="revert">Reset to the last version</button>
@@ -1845,11 +1907,19 @@ function render(frame: Frame): void {
        </div>`
     : "";
 
-  // The retelling under discussion, quoted, at the stage where it is rated.
-  // Not on the last screen: the ending shows the story itself, and rendering
-  // it here as well put it on screen twice, once cut off by the panel above it.
-  const quoted =
-    s.scenario && !s.editable && !s.finished ? `<blockquote class="scenario">${escapeHtml(s.scenario)}</blockquote>` : "";
+  /**
+   * Nothing. The retelling under discussion is a MESSAGE now.
+   *
+   * It used to be quoted into a bordered slab below the thread at the rating
+   * stage, because choosing one made all three vanish from the conversation
+   * and it had to be shown again somewhere. That put a paragraph of text in a
+   * panel that took half the screen, with the chat squeezed above it — the
+   * two-regions-fighting layout the ending already had to be rescued from.
+   *
+   * The chosen one now stays in the thread with a thumb on it, so the panel
+   * below only has to hold the slider.
+   */
+  const quoted = "";
 
   /**
    * Whether this screen is one somebody types a message on.
