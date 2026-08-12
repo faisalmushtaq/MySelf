@@ -372,7 +372,22 @@ function wireStageControls(): void {
       if (busy || fired) return;
       for (const other of document.querySelectorAll(".choice-bubble")) other.classList.remove("picked");
       el.classList.add("picked");
-      const confirm = document.getElementById("confirmChoice") as HTMLButtonElement | null;
+      document.getElementById("showStories")?.addEventListener("click", (event) => {
+    const button = event.currentTarget as HTMLButtonElement;
+    button.disabled = true;
+    // The stage does not change and no turn is taken: this only starts the
+    // delivery that render would otherwise have started by itself.
+    void deliverChoices(pendingChoices.html, pendingChoices.hint).then(() => {
+      button.remove();
+      const confirmRow = document.querySelector(".confirm-row");
+      if (confirmRow) {
+        confirmRow.innerHTML = `<button class="primary" id="confirmChoice" type="button" hidden>Choose this one \u{1F44D}</button>`;
+        wireStageControls();
+      }
+    });
+  });
+
+  const confirm = document.getElementById("confirmChoice") as HTMLButtonElement | null;
       if (confirm) {
         confirm.hidden = false;
         confirm.dataset["choice"] = el.dataset["choice"] ?? "";
@@ -432,6 +447,21 @@ function wireStageControls(): void {
    * twice, which at this stage means recording two answers to the question the
    * whole method turns on.
    */
+  document.getElementById("showStories")?.addEventListener("click", (event) => {
+    const button = event.currentTarget as HTMLButtonElement;
+    button.disabled = true;
+    // The stage does not change and no turn is taken: this only starts the
+    // delivery that render would otherwise have started by itself.
+    void deliverChoices(pendingChoices.html, pendingChoices.hint).then(() => {
+      button.remove();
+      const confirmRow = document.querySelector(".confirm-row");
+      if (confirmRow) {
+        confirmRow.innerHTML = `<button class="primary" id="confirmChoice" type="button" hidden>Choose this one \u{1F44D}</button>`;
+        wireStageControls();
+      }
+    });
+  });
+
   const confirm = document.getElementById("confirmChoice") as HTMLButtonElement | null;
   if (confirm && !confirm.dataset["wired"]) {
     confirm.dataset["wired"] = "yes";
@@ -1529,6 +1559,8 @@ function setComposer(placeholder: string | null): void {
  */
 let choicesDelivered = 0;
 let delivering = false;
+/** The set waiting on the Continue press, so the button can send for it. */
+let pendingChoices: { html: string[]; hint: string } = { html: [], hint: "" };
 
 /**
  * Send them one at a time, with the dots in between, as messages.
@@ -1635,18 +1667,60 @@ function render(frame: Frame): void {
    * thread, with the instruction as a centred system line above them, which is
    * where WhatsApp puts anything that is not a message.
    */
+  /**
+   * The last thing said, said in the conversation.
+   *
+   * It used to be a panel below the thread: a title, the story, and a note,
+   * stacked under a chat that had been squeezed into whatever space was left.
+   * On a phone that reads as two screens fighting — the conversation cut off
+   * mid-bubble above, a slab of centred text below, and no way to scroll back
+   * through what you had just spent ten minutes saying.
+   *
+   * A conversation ends inside itself. The sign-off is a message, the story
+   * they made is a message, and the note about saving is the centred system
+   * line that a chat uses for anything that is not one.
+   */
+  const endingMessages = s.finished
+    ? // The protocol's debrief has already thanked them by this point, so this
+      // does not thank them again — it hands over the thing they made.
+      bubble("them", escapeHtml(s.stopped ? "Thank you — that is everything." : "Here is the story you made:")) +
+      (s.scenario && !s.stopped ? bubble("them", `<span class="final-story">${escapeHtml(s.scenario)}</span>`) : "") +
+      bubble(
+        "system",
+        s.stopped
+          ? escapeHtml(`We stopped early: ${s.stopped.reason}. Nothing you wrote has been lost.`)
+          : "It has been saved with the rest of your answers. You can close this page now.",
+      )
+    : "";
+
   const hint = choiceHtml.length > 0
     ? bubble("system", "Press and hold the one that fits best to give it a \u{1F44D} \u2014 or tap it, then press the button.")
     : "";
+  // Held for the Continue press, which is what actually sends for them.
+  pendingChoices = { html: choiceHtml, hint };
+
   $("thread").innerHTML =
     (threadFrom(frame.records) || `<p class="note">Start a run to see the conversation.</p>`) +
     (choicesDelivered > 0 ? hint : "") +
-    choices;
+    choices +
+    endingMessages;
   // The audio and any faults live outside the records, so they are put back
   // after every rebuild rather than being lost with the innerHTML.
   renderVoiceNotes();
   scrollThread();
-  if (choiceHtml.length > choicesDelivered) void deliverChoices(choiceHtml, hint);
+  /**
+   * The stories wait to be sent for.
+   *
+   * They used to start arriving the moment the screen rendered, so the line
+   * saying they were coming and the first of them landed together and the
+   * conversation jumped. Pressing Continue is the beat that makes the next
+   * part expected rather than sprung — and it is the participant deciding
+   * when to read three paragraphs, which is the more considerate order.
+   *
+   * Only the FIRST one waits. Once delivery has started, the rest follow on
+   * their own; asking again between each would be a form, not a chat.
+   */
+  if (choiceHtml.length > choicesDelivered && choicesDelivered > 0) void deliverChoices(choiceHtml, hint);
 
   // A slider with named ends, as the original has it: "needs a lot of work"
   // to "this looks good". Eleven radio buttons is a developer's idea of a
@@ -1708,7 +1782,10 @@ function render(frame: Frame): void {
     : "";
 
   // The retelling under discussion, quoted, at the stage where it is rated.
-  const quoted = s.scenario && !s.editable ? `<blockquote class="scenario">${escapeHtml(s.scenario)}</blockquote>` : "";
+  // Not on the last screen: the ending shows the story itself, and rendering
+  // it here as well put it on screen twice, once cut off by the panel above it.
+  const quoted =
+    s.scenario && !s.editable && !s.finished ? `<blockquote class="scenario">${escapeHtml(s.scenario)}</blockquote>` : "";
 
   /**
    * Whether this screen is one somebody types a message on.
@@ -1745,30 +1822,30 @@ function render(frame: Frame): void {
    * conversation was over while it was still going.
    */
   const advance = s.finished
-    ? `<div class="ending">
-         <p class="ending-title">${s.stopped ? "Thank you — that is everything." : "That is your story. Thank you."}</p>
-         ${s.scenario && !s.stopped ? `<blockquote class="final-story">${escapeHtml(s.scenario)}</blockquote>` : ""}
-         <p class="note">${
-           s.stopped
-             ? escapeHtml(`We stopped early: ${s.stopped.reason}. Nothing you wrote has been lost.`)
-             : "It has been saved with the rest of your answers. You can close this page now."
-         }</p>
-         ${returnLink ? `<div class="row"><a class="secondary button-link" href="${escapeHtml(returnLink)}">Back to the website</a></div>` : ""}
-       </div>`
+    ? // Only the way out is a control. Everything the ending SAYS is in the
+      // thread — see `endingMessages`.
+      returnLink
+      ? `<div class="row"><a class="secondary button-link" href="${escapeHtml(returnLink)}">Back to the website</a></div>`
+      : ""
     : s.editable
       ? ""
       : (() => {
           // Nothing to press when the answer is typed or held: the bar and the
           // bubbles are the controls. A Continue button beside them is the one
           // that used to walk out of an unanswered interview.
-          const button = typing || choices ? "" : `<button class="primary" id="${s.expectsInput ? "send" : "cont"}">Continue</button>`;
+          const button =
+            typing || choiceHtml.length > 0 ? "" : `<button class="primary" id="${s.expectsInput ? "send" : "cont"}">Continue</button>`;
           const skip = s.optional ? '<button class="secondary" id="skip">Leave it as it is</button>' : "";
           return button || skip ? `<div class="row">${button}${skip}</div>` : "";
         })();
 
   const confirmRow = choiceHtml.length > 0
     ? `<div class="confirm-row">
-         <button class="primary" id="confirmChoice" type="button" hidden>Choose this one \u{1F44D}</button>
+         ${
+           choicesDelivered === 0
+             ? `<button class="primary" id="showStories" type="button">Show me the stories</button>`
+             : `<button class="primary" id="confirmChoice" type="button" hidden>Choose this one \u{1F44D}</button>`
+         }
        </div>`
     : "";
 
@@ -1782,6 +1859,10 @@ function render(frame: Frame): void {
   $("controls").innerHTML = "";
 
   wireStageControls();
+  // After the stage area exists, not before: scrolling to the bottom of the
+  // thread while the panel below it is still empty leaves the last message
+  // hidden behind whatever the panel then adds.
+  scrollThread();
 
   $("records").querySelector("tbody")!.innerHTML = frame.records
     .map(
