@@ -373,22 +373,7 @@ function wireStageControls(): void {
       if (busy || fired) return;
       for (const other of document.querySelectorAll(".choice-bubble")) other.classList.remove("picked");
       el.classList.add("picked");
-      document.getElementById("showStories")?.addEventListener("click", (event) => {
-    const button = event.currentTarget as HTMLButtonElement;
-    button.disabled = true;
-    // The stage does not change and no turn is taken: this only starts the
-    // delivery that render would otherwise have started by itself.
-    void deliverChoices(pendingChoices.html, pendingChoices.hint).then(() => {
-      button.remove();
-      const confirmRow = document.querySelector(".confirm-row");
-      if (confirmRow) {
-        confirmRow.innerHTML = `<button class="primary" id="confirmChoice" type="button" hidden>Choose this one \u{1F44D}</button>`;
-        wireStageControls();
-      }
-    });
-  });
-
-  const confirm = document.getElementById("confirmChoice") as HTMLButtonElement | null;
+      const confirm = document.getElementById("confirmChoice") as HTMLButtonElement | null;
       if (confirm) {
         confirm.hidden = false;
         confirm.dataset["choice"] = el.dataset["choice"] ?? "";
