@@ -2138,12 +2138,13 @@ const SAVED_RUN_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 /**
  * And how long a FINISHED one may be, which is much less.
  *
- * A run in progress is somebody's unfinished work and worth holding onto. A
- * finished one is a receipt: worth a refresh at the end to show somebody the
- * story, and nothing after that. The difference matters on a shared iPad in a
- * school — the next child to open the link should not be handed the last
- * one's interview, and an interview that is over has no reason to still be
- * on the device an hour later.
+ * A completed run is normally cleared the instant the study confirms it has
+ * it — see the end of `turn`. This is the case that does not reach: the run
+ * finished but the write failed, so the copy on the device is the only copy
+ * there is. Keeping it means a refresh can still show the story and the next
+ * save can still repair the gap; half an hour is long enough for that and
+ * short enough that a shared tablet in a school is not still holding one
+ * child's interview when the next one picks it up.
  */
 const SAVED_FINISHED_MAX_AGE_MS = 30 * 60 * 1000;
 
@@ -2343,13 +2344,13 @@ async function restore(): Promise<boolean> {
  * whole log is re-sent each time, so the next successful write repairs any
  * that were missed.
  */
-async function store(runner: NarrativeRunner, finished: boolean): Promise<void> {
-  if (!relay) return;
+async function store(runner: NarrativeRunner, finished: boolean): Promise<boolean> {
+  if (!relay) return false;
   const credential = linkKey ? `Link ${linkKey}` : await session.token().then((t) => (t ? `Bearer ${t}` : null));
-  if (!credential) return;
+  if (!credential) return false;
 
   const records = runner.all;
-  if (records.length === 0) return;
+  if (records.length === 0) return false;
 
   try {
     const res = await fetch(`${relay.replace(/\/llmRelay$/, "")}/saveNarrative`, {
@@ -2374,8 +2375,12 @@ async function store(runner: NarrativeRunner, finished: boolean): Promise<void> 
      * know.
      */
     document.body.classList.toggle("saved", res.ok);
+    // Whether the study actually has it. The end of a run reads this to decide
+    // whether the copy on the device may be thrown away.
+    return res.ok;
   } catch {
     // Deliberately silent — see above.
+    return false;
   }
 }
 
@@ -2424,7 +2429,24 @@ async function turn(payload: { action: string; input?: string; echo?: boolean })
       // copy that gets the participant back to where they were, and it must
       // not depend on the relay being reachable.
       remember();
-      void store(localRunner, screen.finished);
+      /**
+       * And cleared again once the study actually has it.
+       *
+       * The copy on the device exists to get ONE person back to where they
+       * were. The moment their run is complete and stored, it stops being
+       * that and becomes somebody else’s interview sitting on a tablet that
+       * may well be handed to the next child in the room — so it goes, and
+       * whoever picks it up next gets a clean screen rather than the last
+       * one’s conversation.
+       *
+       * Only on a CONFIRMED save. If the write failed, the copy on the device
+       * is the only copy there is, and clearing it to tidy up would lose the
+       * run; it stays until its own short window runs out.
+       */
+      const runner = localRunner;
+      void store(runner, screen.finished).then((saved) => {
+        if (screen.finished && saved) forget();
+      });
       return;
     }
     const frame = await api<Frame>("/api/turn", { sessionId, ...payload });
