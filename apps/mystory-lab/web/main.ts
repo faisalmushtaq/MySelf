@@ -5,6 +5,7 @@ import {
   defaultCharacter,
   protocols,
   type CharacterConfig,
+  type RunnerSnapshot,
   type Screen,
 } from "@myself/narrative";
 import { session } from "./session.js";
@@ -372,22 +373,7 @@ function wireStageControls(): void {
       if (busy || fired) return;
       for (const other of document.querySelectorAll(".choice-bubble")) other.classList.remove("picked");
       el.classList.add("picked");
-      document.getElementById("showStories")?.addEventListener("click", (event) => {
-    const button = event.currentTarget as HTMLButtonElement;
-    button.disabled = true;
-    // The stage does not change and no turn is taken: this only starts the
-    // delivery that render would otherwise have started by itself.
-    void deliverChoices(pendingChoices.html, pendingChoices.hint).then(() => {
-      button.remove();
-      const confirmRow = document.querySelector(".confirm-row");
-      if (confirmRow) {
-        confirmRow.innerHTML = `<button class="primary" id="confirmChoice" type="button" hidden>Choose this one \u{1F44D}</button>`;
-        wireStageControls();
-      }
-    });
-  });
-
-  const confirm = document.getElementById("confirmChoice") as HTMLButtonElement | null;
+      const confirm = document.getElementById("confirmChoice") as HTMLButtonElement | null;
       if (confirm) {
         confirm.hidden = false;
         confirm.dataset["choice"] = el.dataset["choice"] ?? "";
@@ -622,7 +608,12 @@ function showRightButton(): void {
   // Send hides only when a microphone is there to take its place. A browser
   // with no recogniser would otherwise show an empty box and no button at all.
   const canSpeak = micAvailable();
-  if (send) send.hidden = empty && canSpeak && !listening;
+  if (send) {
+    send.hidden = empty && canSpeak && !listening;
+    // While the phone is listening the green button means something else, and
+    // it has to say so to anybody who cannot see it turn red.
+    send.setAttribute("aria-label", listening ? "Stop recording and send it" : "Send");
+  }
   if (mic) mic.hidden = !(canSpeak && (empty || listening));
 }
 /** Set by `wireMic` once it knows whether this browser can record at all. */
@@ -636,11 +627,33 @@ const micAvailable = () => micSupported && relay !== null;
 
 /** Set by `wireMic`, so sending can stop the microphone still writing. */
 let stopListening: (() => void) | null = null;
+/**
+ * Set by `wireMic`. Ends a recording and sends it, in one press.
+ *
+ * Returns whether there was a recording to end, so the caller can tell "the
+ * green button finished a voice note" from "the green button sent what was
+ * typed" without knowing anything about the microphone.
+ */
+let finishAndSend: (() => boolean) | null = null;
 
 function sendMessage(): void {
+  if (busy) return;
+  /**
+   * One press, not two.
+   *
+   * The green button sat next to the red one while the phone was listening
+   * and did nothing, because there was no text yet — so sending a spoken
+   * answer took three acts: stop, wait, send. Two of those are the app's
+   * business and not the participant's. Pressing send while it is listening
+   * now stops the recording, waits for the words, and sends them.
+   *
+   * The red button is still there and still means stop-and-read-it-back, for
+   * anybody who wants to check the transcription before it goes.
+   */
+  if (finishAndSend?.() === true) return;
   const box = messageBox();
   const said = box.value;
-  if (!said.trim() || busy) return;
+  if (!said.trim()) return;
   stopListening?.();
   // Cleared the instant it is sent, as a message box is. The bubble is already
   // on screen by the time the box is empty — see the echo in `turn`.
@@ -1078,6 +1091,11 @@ function wireMic(): void {
   let capping: ReturnType<typeof setTimeout> | null = null;
   /** Set when the clip is being thrown away rather than transcribed. */
   let discarding = false;
+  /**
+   * Set when this clip is on its way out as a message the moment it is
+   * written down, rather than being put in the box to be read first.
+   */
+  let sendWhenWritten = false;
   /** What the recorder actually chose, which is not always what was asked. */
   let recordedAs = "";
   /** When this clip began, for the length shown on the voice note. */
@@ -1172,17 +1190,42 @@ function wireMic(): void {
     else release();
   };
   /**
+   * Stop, write it down, and send it — the green button.
+   *
+   * Set here rather than in `sendMessage` because everything it needs to know
+   * is in this closure: whether anything is being recorded at all, and the
+   * flag that tells `send` the words are not being handed back for review.
+   */
+  finishAndSend = () => {
+    if (recorder?.state !== "recording") return false;
+    sendWhenWritten = true;
+    finish();
+    return true;
+  };
+  /**
    * Stop and throw it away. This is what sending does: the message is already
    * on its way, so transcribing what was said over the top of it would drop a
    * stray sentence into the next answer.
    */
   stopListening = () => {
     discarding = true;
+    sendWhenWritten = false;
     if (recorder?.state === "recording") recorder.stop();
     else release();
   };
 
   const send = async (clip: Blob) => {
+    /**
+     * Read once, here, and cleared.
+     *
+     * Whether this clip goes straight out is decided by the press that ended
+     * it, not by whatever the flag happens to say several seconds later when
+     * the transcription lands.
+     */
+    const autoSend = sendWhenWritten;
+    sendWhenWritten = false;
+    /** Set only on the path where there are words worth sending. */
+    let sendAfterwards = false;
     const seconds = Math.max(1, Math.round((Date.now() - startedAt) / 1000));
     if (clip.size === 0) {
       release();
@@ -1262,11 +1305,24 @@ function wireMic(): void {
       const had = box.value.replace(/\s+$/, "");
       box.value = had ? `${had} ${body.text}` : body.text;
       sizeMessageBox();
-      box.focus();
-      // The words arriving in the box is the last beat, and it is easy to
-      // miss on a phone. A brief highlight says where to look.
-      box.classList.add("just-heard");
-      setTimeout(() => box.classList.remove("just-heard"), 1400);
+      /**
+       * Whether this is a draft or a message, decided by which button ended
+       * the recording.
+       *
+       * The green one means it is already gone, so putting the cursor in the
+       * box and highlighting it would be pointing at something nobody needs
+       * to read — and on a phone it would raise the keyboard over the reply
+       * that is about to arrive.
+       */
+      if (autoSend && !discarding) {
+        sendAfterwards = true;
+      } else {
+        box.focus();
+        // The words arriving in the box is the last beat, and it is easy to
+        // miss on a phone. A brief highlight says where to look.
+        box.classList.add("just-heard");
+        setTimeout(() => box.classList.remove("just-heard"), 1400);
+      }
     } catch (error) {
       // The real reason, not a shrug. A microphone that fails silently is the
       // bug this whole path already had once.
@@ -1277,6 +1333,9 @@ function wireMic(): void {
     } finally {
       button.classList.remove("writing");
       release();
+      // After the strip has gone and the composer is back, so the bubble goes
+      // up against a settled screen rather than one still rearranging itself.
+      if (sendAfterwards) sendMessage();
     }
   };
 
@@ -1595,6 +1654,9 @@ async function deliverChoices(all: string[], hint: string): Promise<void> {
       // Wired as each one lands, so the first can be held before the third
       // has arrived.
       wireStageControls();
+      // Saved after each one, not after all three: a reload between the
+      // second and the third should not replay the two already read.
+      remember();
       await wait(320);
     }
   } finally {
@@ -1605,6 +1667,8 @@ async function deliverChoices(all: string[], hint: string): Promise<void> {
 function render(frame: Frame): void {
   const s = frame.screen;
   currentKind = s.kind;
+  // Held so a reload can come back to it — see `remember`.
+  lastScreen = s;
   // A screen with no retellings on it resets the count, so the next set is
   // delivered rather than assumed to have already arrived.
   if ((s.choices ?? []).length === 0) choicesDelivered = 0;
@@ -2031,6 +2095,240 @@ function setBusy(stageKind: string | null): void {
 /** When this run began, for the elapsed time the original also recorded. */
 let runStartedAt = 0;
 
+/* ── Surviving a reload ───────────────────────────────────────────────────── */
+
+/**
+ * The run, kept on the device so a refresh is not the end of it.
+ *
+ * The runner lives in the tab. Until now that meant a reload wiped the whole
+ * interview and started again at the first question — and on a phone a reload
+ * is not a rare accident: a notification, a swap to another app and back, or
+ * Safari quietly reclaiming a backgrounded tab all do it. A young person who
+ * had spent eight minutes answering came back to an empty screen, and the
+ * study lost the run as well.
+ *
+ * So the state goes to `localStorage` after every turn and is put back on
+ * load. `localStorage` rather than `sessionStorage` deliberately: the case
+ * that costs the most is the tab being killed and reopened, which is exactly
+ * the case `sessionStorage` does not cover.
+ *
+ * Two things are NOT restored, and both are correct:
+ *
+ *   The voice notes. A recording is a blob URL belonging to a page that no
+ *   longer exists, and the stored copy is deliberately unreadable by any
+ *   client. What the run keeps of a spoken answer is the transcript, which is
+ *   in the records and comes back with them.
+ *
+ *   Anything from a different protocol or a different version of it. The
+ *   runner refuses those outright, because half a run under one version of
+ *   the method and half under another is not a run.
+ */
+const SAVED_RUN_KEY = "mystory.run.v1";
+
+/**
+ * How stale a saved run may be before it is a different occasion.
+ *
+ * A day. Long enough that a phone put down over lunch, or an interview
+ * finished in the evening and reopened the next morning to show somebody the
+ * story, both come back. Short enough that a shared iPad in a school does not
+ * offer next week's child the last one's interview.
+ */
+const SAVED_RUN_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * And how long a FINISHED one may be, which is much less.
+ *
+ * A run in progress is somebody's unfinished work and worth holding onto. A
+ * finished one is a receipt: worth a refresh at the end to show somebody the
+ * story, and nothing after that. The difference matters on a shared iPad in a
+ * school — the next child to open the link should not be handed the last
+ * one's interview, and an interview that is over has no reason to still be
+ * on the device an hour later.
+ */
+const SAVED_FINISHED_MAX_AGE_MS = 30 * 60 * 1000;
+
+interface SavedRun {
+  savedAt: number;
+  protocolKey: string;
+  variables: Record<string, string>;
+  online: boolean;
+  runStartedAt: number;
+  /** How many of the retellings had already been delivered into the thread. */
+  choicesDelivered: number;
+  screen: Screen;
+  runner: RunnerSnapshot;
+  calls: ModelCall[];
+}
+
+/** What this run was started with, so it can be started again the same way. */
+let runSetup: { protocolKey: string; variables: Record<string, string>; online: boolean } | null = null;
+/** The last screen rendered, which is the one a reload has to come back to. */
+let lastScreen: Screen | null = null;
+
+function remember(): void {
+  if (!localRunner || !lastScreen || !runSetup) return;
+  const saved: SavedRun = {
+    savedAt: Date.now(),
+    protocolKey: runSetup.protocolKey,
+    variables: runSetup.variables,
+    online: runSetup.online,
+    runStartedAt,
+    choicesDelivered,
+    screen: lastScreen,
+    runner: localRunner.snapshot(),
+    calls: localCalls,
+  };
+  try {
+    localStorage.setItem(SAVED_RUN_KEY, JSON.stringify(saved));
+  } catch {
+    // A private window, a full store, or a browser with storage switched off.
+    // None of those are worth interrupting an interview over: the run carries
+    // on exactly as it did before this existed, and the server copy — which is
+    // the one the study needs — is written by `store` regardless.
+  }
+}
+
+function forget(): void {
+  try {
+    localStorage.removeItem(SAVED_RUN_KEY);
+  } catch {
+    // See above.
+  }
+}
+
+function savedRun(): SavedRun | null {
+  let raw: string | null = null;
+  try {
+    raw = localStorage.getItem(SAVED_RUN_KEY);
+  } catch {
+    return null;
+  }
+  if (!raw) return null;
+  try {
+    const saved = JSON.parse(raw) as SavedRun;
+    // Anything that does not have the shape this build writes is from an older
+    // one. Dropped rather than half-read: a run restored from a guess about
+    // what a missing field meant is worse than a run started again.
+    if (typeof saved?.savedAt !== "number" || !saved.screen || !saved.runner || !saved.protocolKey) {
+      forget();
+      return null;
+    }
+    const age = Date.now() - saved.savedAt;
+    if (age > (saved.screen.finished ? SAVED_FINISHED_MAX_AGE_MS : SAVED_RUN_MAX_AGE_MS)) {
+      forget();
+      return null;
+    }
+    return saved;
+  } catch {
+    forget();
+    return null;
+  }
+}
+
+/**
+ * Put a saved run back on the screen, if there is one and it still fits.
+ *
+ * Returns whether it did, so the caller knows whether a `start=1` link should
+ * begin a fresh run or leave the restored one alone — starting over the top of
+ * somebody's half-finished interview being the one outcome this whole
+ * mechanism exists to prevent.
+ */
+let resuming = false;
+
+async function resumeSavedRun(): Promise<boolean> {
+  // The server holds the state in live mode, and resuming would need it to
+  // hand that back. Nothing here to restore.
+  if (live || !relay) return false;
+  // Two callers, one run: the load, and sign-in completing. Both can be in
+  // flight at once, and both awaiting a token — without this the second would
+  // build a second runner over the top of the first.
+  if (resuming || localRunner) return false;
+  resuming = true;
+  try {
+    return await restore();
+  } finally {
+    resuming = false;
+  }
+}
+
+async function restore(): Promise<boolean> {
+  // Taken before the awaits below: `relay` is a mutable module binding, so
+  // the narrowing the caller did does not survive them.
+  const relayUrl = relay;
+  if (!relayUrl) return false;
+  const saved = savedRun();
+  if (!saved) return false;
+
+  const protocol = protocols.find((p) => p.key === saved.protocolKey);
+  if (!protocol) {
+    forget();
+    return false;
+  }
+
+  const token = linkKey ? null : await session.token();
+  // Not signed in yet. The run is left where it is rather than discarded —
+  // signing in retries this, and throwing away an interview because the auth
+  // state had not settled would be the same bug wearing a different hat.
+  if (!linkKey && !token) return false;
+
+  const calls: ModelCall[] = [...saved.calls];
+  const gateway = new Gateway({
+    adapters: [new RelayAdapter({ url: relayUrl, ...(linkKey ? { linkKey } : { token: token! }) })],
+    onCall: (call) => {
+      const at = calls.findIndex((c) => c.callId === call.callId);
+      if (at >= 0) calls[at] = call;
+      else calls.push(call);
+    },
+  });
+
+  const runner = NarrativeRunner.resume(
+    protocol,
+    { sessionId: saved.runner.sessionId, variables: saved.variables, online: saved.online },
+    gateway,
+    saved.runner,
+  );
+  if (!runner) {
+    forget();
+    return false;
+  }
+
+  localRunner = runner;
+  localCalls = calls;
+  sessionId = saved.runner.sessionId;
+  runStartedAt = saved.runStartedAt;
+  runSetup = { protocolKey: saved.protocolKey, variables: saved.variables, online: saved.online };
+  // Set before the render, because render only resets it when the screen has
+  // no retellings on it — so a reload at the choosing stage puts back the ones
+  // that had already arrived rather than delivering all three again.
+  choicesDelivered = saved.choicesDelivered;
+
+  // The form put back too, so a researcher reloading the lab sees what is
+  // actually running rather than the defaults.
+  ($("protocol") as HTMLSelectElement).value = saved.protocolKey;
+  const firstName = saved.variables["first_name"];
+  if (firstName !== undefined) ($("firstName") as HTMLInputElement).value = firstName;
+  const topic = saved.variables["topic"];
+  if (topic !== undefined) ($("topic") as HTMLInputElement).value = topic;
+  showGate();
+
+  showCharacter(protocol.character);
+  $("providerBadge").textContent = "provider: relay (the key stays on the server)";
+  render({ screen: saved.screen, records: runner.all, calls });
+  /**
+   * Said once, quietly, in the thread.
+   *
+   * A conversation that reappears with no explanation invites the reasonable
+   * suspicion that it started over — so the centred line says it did not. It
+   * is a system line, not a message, because nothing was said by anybody.
+   */
+  $("thread").insertAdjacentHTML(
+    "beforeend",
+    bubble("system", "Picking up where you left off."),
+  );
+  scrollThread();
+  return true;
+}
+
 /**
  * Keep the run, as it happens.
  *
@@ -2122,6 +2420,10 @@ async function turn(payload: { action: string; input?: string; echo?: boolean })
                 : await localRunner.submit(payload.input ?? "");
       await settle(pauseFor(screen));
       render({ screen, records: localRunner.all, calls: localCalls });
+      // Written before the network write is even attempted: this one is the
+      // copy that gets the participant back to where they were, and it must
+      // not depend on the relay being reachable.
+      remember();
       void store(localRunner, screen.finished);
       return;
     }
@@ -2154,6 +2456,10 @@ $("start").addEventListener("click", () => {
     const online = ($("online") as HTMLInputElement).checked;
 
     $("calls").querySelector("tbody")!.innerHTML = "";
+    // A new run replaces any saved one. Pressing Start is an unambiguous "not
+    // that one", and leaving the old snapshot in place would restore it over
+    // the top of this the next time the page loaded.
+    forget();
 
     if (live) {
       // A local server with a key, which holds it and makes the call.
@@ -2220,15 +2526,14 @@ $("start").addEventListener("click", () => {
     sessionId = `lab_${Date.now().toString(36)}`;
     const chosen = protocols.find((p) => p.key === key)!;
     showCharacter(chosen.character);
-    localRunner = new NarrativeRunner(
-      chosen,
-      { sessionId, variables: { first_name: firstName, topic }, online },
-      gateway,
-    );
+    const variables = { first_name: firstName, topic };
+    localRunner = new NarrativeRunner(chosen, { sessionId, variables, online }, gateway);
+    runSetup = { protocolKey: key, variables, online };
     $("providerBadge").textContent = "provider: relay (the key stays on the server)";
     runStartedAt = Date.now();
     const opening = localRunner.start();
     render({ screen: opening, records: localRunner.all, calls: localCalls });
+    remember();
     // From the first screen, so a run abandoned before a single answer is
     // still a stored run that says so.
     void store(localRunner, opening.finished);
@@ -2448,8 +2753,35 @@ void detectServer().then(() => {
   }
 
   const { start } = applyLinkedRun();
-  // Started only once there is something to start against: before this
-  // resolves the page does not yet know whether it has a relay, a server or
-  // the mock, and would pick the wrong one.
-  if (start) ($("start") as HTMLButtonElement).click();
+
+  void (async () => {
+    /**
+     * A run in progress beats a link that says to start one.
+     *
+     * Tester links carry `start=1`, and the whole point of them is that
+     * opening the link begins the study. But the same link is what somebody
+     * has in their address bar when they reload — so obeying it after a
+     * refresh would throw away the interview and start a second one, which is
+     * precisely the loss this exists to prevent.
+     */
+    if (await resumeSavedRun()) return;
+    // Started only once there is something to start against: before this
+    // resolves the page does not yet know whether it has a relay or a server,
+    // and would pick the wrong one.
+    if (start) ($("start") as HTMLButtonElement).click();
+  })();
+
+  /**
+   * Signing in is the other moment a saved run becomes restorable.
+   *
+   * The relay will not run a turn for a caller it cannot name, so a resume
+   * attempted before the auth state has settled has no credential to build a
+   * gateway with. Rather than discard the run, it waits — and this is the
+   * wait ending.
+   */
+  if (relay && session.available && !linkKey) {
+    session.onChange((user) => {
+      if (user && !localRunner) void resumeSavedRun();
+    });
+  }
 });

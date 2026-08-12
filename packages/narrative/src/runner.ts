@@ -93,6 +93,41 @@ export interface Screen {
   finished: boolean;
 }
 
+/**
+ * A run, frozen as plain data.
+ *
+ * A page reload used to be the end of somebody's session: the runner lives in
+ * the tab, so refreshing threw away the interview and started again from the
+ * first question. On a phone that is not a rare event — a notification, a
+ * switch to another app and back, Safari reclaiming the tab — and it costs the
+ * participant everything they had said.
+ *
+ * So the whole of the machine's mutable state is expressible as JSON, and can
+ * be put back. What is deliberately NOT in here is anything derived: the
+ * protocol, the gateway and the context are supplied again on resume, which
+ * means a run cannot resurrect a protocol that has since been republished.
+ * `resume` refuses that outright rather than continuing a run half under one
+ * version of the method and half under another.
+ */
+export interface RunnerSnapshot {
+  /** Bumped whenever the shape below changes, so an old one is discarded. */
+  version: 1;
+  protocolKey: string;
+  protocolVersion: string;
+  sessionId: string;
+  records: NarrativeRecord[];
+  stageIndex: number;
+  seq: number;
+  transcript: { role: "assistant" | "user"; content: string }[];
+  interviewTurns: number;
+  interviewDone: boolean;
+  extraction: Record<string, string | null>;
+  candidates: { index: number; persona: string; text: string }[];
+  chosen: { index: number; persona: string; text: string } | null;
+  finalScenario: string | null;
+  signals: MessageSignals[];
+}
+
 let counter = 0;
 const nextId = () => `nr_${Date.now().toString(36)}${(counter++).toString(36)}${Math.random().toString(36).slice(2, 6)}`;
 
@@ -168,6 +203,75 @@ export class NarrativeRunner {
 
   get all(): NarrativeRecord[] {
     return [...this.records];
+  }
+
+  /** Everything this run is, as plain data — see `RunnerSnapshot`. */
+  snapshot(): RunnerSnapshot {
+    return {
+      version: 1,
+      protocolKey: this.protocol.key,
+      protocolVersion: this.protocol.version,
+      sessionId: this.context.sessionId,
+      // Copied rather than handed out. A caller that serialises this
+      // immediately would not notice, and one that holds it while the run
+      // continues would be reading a moving target.
+      records: this.records.map((r) => ({ ...r })),
+      stageIndex: this.stageIndex,
+      seq: this.seq,
+      transcript: this.transcript.map((t) => ({ ...t })),
+      interviewTurns: this.interviewTurns,
+      interviewDone: this.interviewDone,
+      extraction: { ...this.extraction },
+      candidates: this.candidates.map((c) => ({ ...c })),
+      chosen: this.chosen ? { ...this.chosen } : null,
+      finalScenario: this.finalScenario,
+      signals: this.signals.map((s) => ({ ...s })),
+    };
+  }
+
+  /**
+   * Put a run back where it was.
+   *
+   * Returns null rather than throwing when the snapshot does not belong to
+   * this protocol at this version, or was written by an older build. Both are
+   * ordinary: a researcher switches study in the picker, or a release goes out
+   * while somebody has a tab open. The caller's answer to null is to start
+   * fresh, which is the correct outcome and not an error worth showing anyone.
+   *
+   * Nothing is appended. Resuming is not an event in the run — the records are
+   * exactly the ones that were there before the tab closed, and the analysis
+   * should not be able to tell that a page was reloaded.
+   */
+  static resume(
+    protocol: NarrativeProtocol,
+    context: RunnerContext,
+    gateway: Gateway,
+    snapshot: RunnerSnapshot,
+  ): NarrativeRunner | null {
+    if (snapshot.version !== 1) return null;
+    if (snapshot.protocolKey !== protocol.key || snapshot.protocolVersion !== protocol.version) return null;
+    if (snapshot.sessionId !== context.sessionId) return null;
+    // A snapshot with no records is a run that never started; there is nothing
+    // to put back and starting fresh is the same thing without the risk.
+    if (snapshot.records.length === 0) return null;
+
+    const runner = new NarrativeRunner(protocol, context, gateway);
+    runner.records = snapshot.records.map((r) => ({ ...r }));
+    runner.stageIndex = snapshot.stageIndex;
+    // Taken from the snapshot rather than recomputed from the records, so a
+    // run that skipped a sequence number keeps having skipped it. Guarded
+    // against a snapshot that would let the next record collide with an
+    // existing one, which would break the ordering the whole log relies on.
+    runner.seq = Math.max(snapshot.seq, ...snapshot.records.map((r) => r.seq + 1));
+    runner.transcript = snapshot.transcript.map((t) => ({ ...t }));
+    runner.interviewTurns = snapshot.interviewTurns;
+    runner.interviewDone = snapshot.interviewDone;
+    runner.extraction = { ...snapshot.extraction };
+    runner.candidates = snapshot.candidates.map((c) => ({ ...c }));
+    runner.chosen = snapshot.chosen ? { ...snapshot.chosen } : null;
+    runner.finalScenario = snapshot.finalScenario;
+    runner.signals = snapshot.signals.map((s) => ({ ...s }));
+    return runner;
   }
 
   private get stage(): NarrativeStage | undefined {
