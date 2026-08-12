@@ -974,7 +974,29 @@ export class NarrativeRunner {
    * nothing and still advances.
    */
   async keepScenario(text: string): Promise<Screen> {
+    const before = this.finalScenario;
     this.editScenario(text);
+    /**
+     * Accepting it unchanged IS an answer, and it is now recorded as one.
+     *
+     * The stage asks "what would you change about it?" and this button says
+     * "nothing". With nothing written down, two things went wrong. In the
+     * conversation the question sat there with no reply under it, as though
+     * the participant had walked off mid-sentence. And in the data, a
+     * retelling somebody read and accepted was indistinguishable from one
+     * they never reached — which is the wrong way round, because "this is
+     * already me" is one of the more interesting things a young person can
+     * say about a retelling of themselves.
+     */
+    if (this.finalScenario === before) {
+      const stage = this.stage;
+      if (stage) {
+        this.append(stage.key, "participant", "participant_reaction", {
+          text: "happy with it as it is",
+          data: { accepted: true, scenarioIndex: this.chosen?.index ?? null },
+        });
+      }
+    }
     return this.advance();
   }
 
