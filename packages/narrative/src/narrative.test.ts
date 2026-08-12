@@ -749,3 +749,131 @@ describe("the participant rewriting the retelling themselves", () => {
     expect(reactions[reactions.length - 1]?.data?.["rejected"]).toBe("A version they then thought better of.");
   });
 });
+
+/**
+ * A reload is not the end of a run.
+ *
+ * The runner lives in the tab, so refreshing used to lose the interview and
+ * start again at the first question — on a phone, a notification or Safari
+ * reclaiming a backgrounded tab does exactly that. What the page keeps is a
+ * snapshot; these are the invariants that make putting one back safe.
+ */
+describe("carrying a run across a reload", () => {
+  const partWayThrough = async () => {
+    const protocol = mocked(microNarrativeFull);
+    protocol.interview = { ...protocol.interview!, maxTurns: 1 };
+    const runner = new NarrativeRunner(protocol, context(), gatewayWith(new MockAdapter()));
+    runner.start();
+    let screen = await runner.next();
+    while (screen.kind === "introduction") screen = await runner.next();
+    screen = await runner.submit("We fell out at lunch and it was horrible.");
+    return { protocol, runner };
+  };
+
+  it("comes back with the same records, in the same order", async () => {
+    const { protocol, runner } = await partWayThrough();
+    const resumed = NarrativeRunner.resume(protocol, context(), gatewayWith(new MockAdapter()), runner.snapshot());
+
+    expect(resumed).not.toBeNull();
+    expect(resumed!.all).toEqual(runner.all);
+    expect(resumed!.all.map((r) => r.seq)).toEqual(runner.all.map((r) => r.seq));
+    // And the participant's own words are still theirs, unaltered.
+    expect(originalsIntact(resumed!.all)).toBe(true);
+    expect(participantWords(resumed!.all).map((w) => w.text)).toEqual(
+      participantWords(runner.all).map((w) => w.text),
+    );
+  });
+
+  it("carries the retellings and the extraction, not just the transcript", async () => {
+    const { protocol, runner } = await partWayThrough();
+    const resumed = NarrativeRunner.resume(protocol, context(), gatewayWith(new MockAdapter()), runner.snapshot());
+
+    expect(resumed!.outcome.candidates).toEqual(runner.outcome.candidates);
+    expect(resumed!.outcome.extraction).toEqual(runner.outcome.extraction);
+    expect(resumed!.outcome.interviewDone).toBe(runner.outcome.interviewDone);
+  });
+
+  it("carries on from the stage it was on rather than starting over", async () => {
+    const { protocol, runner } = await partWayThrough();
+    const resumed = NarrativeRunner.resume(protocol, context(), gatewayWith(new MockAdapter()), runner.snapshot());
+
+    // Choosing a retelling on the resumed runner does what it would have done
+    // on the original: it is at the select stage, not back at the beginning.
+    const after = await resumed!.submit("0");
+    expect(after.kind).toBe("rate");
+    expect(resumed!.outcome.chosenIndex).toBe(0);
+  });
+
+  it("appends nothing, so the analysis cannot tell a page was reloaded", async () => {
+    const { protocol, runner } = await partWayThrough();
+    const before = runner.all.length;
+    const resumed = NarrativeRunner.resume(protocol, context(), gatewayWith(new MockAdapter()), runner.snapshot());
+    expect(resumed!.all).toHaveLength(before);
+  });
+
+  it("keeps writing where the sequence left off", async () => {
+    const { protocol, runner } = await partWayThrough();
+    const lastSeq = runner.all[runner.all.length - 1]!.seq;
+    const resumed = NarrativeRunner.resume(protocol, context(), gatewayWith(new MockAdapter()), runner.snapshot());
+    await resumed!.submit("0");
+    const seqs = resumed!.all.map((r) => r.seq);
+    // Contiguous, and nothing has reused a number already spent.
+    expect(seqs).toEqual(seqs.map((_, i) => i));
+    expect(seqs[seqs.length - 1]).toBeGreaterThan(lastSeq);
+  });
+
+  /**
+   * The refusals. Each is an ordinary thing that happens rather than an
+   * error: the caller's answer to null is to start a fresh run.
+   */
+  it("refuses a snapshot from a different protocol", async () => {
+    const { runner } = await partWayThrough();
+    expect(
+      NarrativeRunner.resume(mocked(futureSelf), context(), gatewayWith(new MockAdapter()), runner.snapshot()),
+    ).toBeNull();
+  });
+
+  it("refuses a snapshot from a different version of the same protocol", async () => {
+    const { protocol, runner } = await partWayThrough();
+    // A release went out while somebody had a tab open. Half a run under one
+    // version of the method and half under another is not a run.
+    const republished = { ...protocol, version: `${protocol.version}.1` };
+    expect(
+      NarrativeRunner.resume(republished, context(), gatewayWith(new MockAdapter()), runner.snapshot()),
+    ).toBeNull();
+  });
+
+  it("refuses a snapshot belonging to a different session", async () => {
+    const { protocol, runner } = await partWayThrough();
+    const other = { ...context(), sessionId: "ses_somebody_else" };
+    expect(NarrativeRunner.resume(protocol, other, gatewayWith(new MockAdapter()), runner.snapshot())).toBeNull();
+  });
+
+  it("refuses a snapshot written by an older build", async () => {
+    const { protocol, runner } = await partWayThrough();
+    const old = { ...runner.snapshot(), version: 0 as unknown as 1 };
+    expect(NarrativeRunner.resume(protocol, context(), gatewayWith(new MockAdapter()), old)).toBeNull();
+  });
+
+  it("refuses a run that never started", async () => {
+    const { protocol, runner } = await partWayThrough();
+    const empty = { ...runner.snapshot(), records: [] };
+    expect(NarrativeRunner.resume(protocol, context(), gatewayWith(new MockAdapter()), empty)).toBeNull();
+  });
+
+  it("survives the round trip through JSON, which is how it actually travels", async () => {
+    const { protocol, runner } = await partWayThrough();
+    const throughStorage = JSON.parse(JSON.stringify(runner.snapshot())) as ReturnType<NarrativeRunner["snapshot"]>;
+    const resumed = NarrativeRunner.resume(protocol, context(), gatewayWith(new MockAdapter()), throughStorage);
+    expect(resumed).not.toBeNull();
+    expect(resumed!.all).toEqual(runner.all);
+  });
+
+  it("hands out a copy, so a snapshot taken mid-run does not move under the caller", async () => {
+    const { runner } = await partWayThrough();
+    const snapshot = runner.snapshot();
+    const taken = snapshot.records.length;
+    await runner.submit("0");
+    expect(snapshot.records).toHaveLength(taken);
+  });
+});

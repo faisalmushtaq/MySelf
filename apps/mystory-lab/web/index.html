@@ -864,12 +864,17 @@
             <!--
               Speaking instead of typing.
 
-              The browser turns speech into text and the text goes into the box,
-              where it can be read and edited before it is sent. No audio is
-              recorded, uploaded by this page, or stored anywhere: what the
-              study keeps is the same sentence it would have kept if it had been
-              typed. Hidden entirely where the browser has no recogniser, so
-              nobody is offered a button that cannot work.
+              This records. The clip goes to the study's own relay, which keeps
+              it in a bucket no client can read and has it written down by the
+              transcriber; the words come back into the box, where they can be
+              read and corrected before they are sent. Both are kept, and the
+              consent form says so.
+
+              Tap or hold to start. The red button stops and puts the words in
+              the box; the green one stops and sends them, which is one press
+              rather than two. Hidden entirely where the browser cannot record
+              or the build has no relay, so nobody is offered a button that
+              cannot work.
             -->
             <button class="mic-round" id="micBtn" type="button" aria-label="Speak your answer" hidden>
               <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 14.5a3.2 3.2 0 0 0 3.2-3.2V5.7a3.2 3.2 0 1 0-6.4 0v5.6a3.2 3.2 0 0 0 3.2 3.2Zm5.6-3.4a.9.9 0 0 0-1.8 0 3.8 3.8 0 0 1-7.6 0 .9.9 0 1 0-1.8 0 5.6 5.6 0 0 0 4.7 5.5v2.2H9.4a.9.9 0 1 0 0 1.8h5.2a.9.9 0 1 0 0-1.8h-1.7v-2.2a5.6 5.6 0 0 0 4.7-5.5Z"/></svg>
