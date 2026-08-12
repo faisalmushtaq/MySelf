@@ -315,9 +315,18 @@ function threadFrom(records: Frame["records"]): string {
     } else if (r.kind === "participant_rating") {
       push(bubble("me", `${escapeHtml(data["rating"])} out of ${escapeHtml(data["max"])}`), r.seq);
     } else if (r.kind === "participant_edit") {
-      push(bubble("system", "They rewrote the write-up in their own words."), r.seq);
+      // Their own words, in their own bubble. This was a centred system line
+      // reading "They rewrote the write-up in their own words" — written
+      // about the participant, in the participant's own conversation, while
+      // the thing they actually wrote was nowhere on screen.
+      if (r.text) push(bubble("me", escapeHtml(r.text)), r.seq);
+    } else if (r.kind === "participant_reaction" && data["accepted"] === true) {
+      // The reply to "what would you change about it?" when the answer is
+      // nothing. Without it the question sat unanswered in the thread and it
+      // looked as though they had never replied.
+      push(bubble("me", "I&rsquo;m happy with it as it is."), r.seq);
     } else if (r.kind === "participant_reaction" && typeof data["restored"] === "string") {
-      push(bubble("system", "They put the previous version back."), r.seq);
+      push(bubble("me", "Put the previous version back, please."), r.seq);
     } else if (r.kind === "fallback_applied" && typeof data["reason"] === "string" && !data["persona"]) {
       push(bubble("system", `The model could not be reached: ${escapeHtml(data["reason"])}.`), r.seq);
     }
@@ -1715,6 +1724,50 @@ async function deliverChoices(all: string[], hint: string): Promise<void> {
   }
 }
 
+/**
+ * How many of the closing messages have arrived.
+ *
+ * The same mechanism as `choicesDelivered`, and for the same reason: a
+ * refresh must put back what had already been said rather than replaying it
+ * as though the conversation were happening again.
+ */
+let endingDelivered = 0;
+let endingInFlight = false;
+
+/** Send the closing messages one at a time, with the dots in between. */
+async function deliverEnding(all: string[], pauses: number[]): Promise<void> {
+  if (endingInFlight) return;
+  endingInFlight = true;
+  try {
+    while (endingDelivered < all.length) {
+      const html = all[endingDelivered]!;
+      const wait_ = pauses[endingDelivered] ?? 700;
+      // A system line is not somebody speaking, so it gets no dots — the same
+      // rule the rest of the thread follows.
+      const isSystem = html.includes("system-msg");
+      if (!isSystem) {
+        const dots = document.createElement("div");
+        dots.className = "msg from-them turn";
+        dots.innerHTML = `<div class="bubble"><span class="dots"><span></span><span></span><span></span></span></div>`;
+        $("thread").append(dots);
+        scrollThread();
+        await wait(wait_);
+        dots.remove();
+      } else {
+        await wait(wait_);
+      }
+      $("thread").insertAdjacentHTML("beforeend", html);
+      endingDelivered += 1;
+      scrollThread();
+      // Saved as each one lands, so a refresh between two of them does not
+      // replay the ones already read.
+      remember();
+    }
+  } finally {
+    endingInFlight = false;
+  }
+}
+
 function render(frame: Frame): void {
   const s = frame.screen;
   currentKind = s.kind;
@@ -1809,15 +1862,50 @@ function render(frame: Frame): void {
    * chat — the warm bit, then the goodbye — and because the last thing said
    * should be what this was all for.
    */
-  const endingMessages = !s.finished
-    ? ""
+  /**
+   * A LIST, not a lump of markup, because they arrive one at a time.
+   *
+   * All four used to be written into the thread in the same frame: the story,
+   * the thank-you, the sign-off and the note, instantly, the moment Continue
+   * was pressed. Every other message in this conversation is preceded by dots
+   * for about as long as it would take to type it — and then the last thing
+   * anybody sees is four messages appearing at once, which is the tell that
+   * nobody was ever typing. The ending is where that matters most.
+   *
+   * `deliverEnding` sends them, with the same pause rule as the rest.
+   */
+  const endingMessages: string[] = !s.finished
+    ? []
     : s.stopped
-      ? bubble("them", "Thank you \u2014 that is everything.") +
-        bubble("system", escapeHtml(`We stopped early: ${s.stopped.reason}. Nothing you wrote has been lost.`))
-      : (s.scenario ? bubble("them", `<span class="final-story">${escapeHtml(s.scenario)}</span>`) : "") +
-        bubble("them", "That\u2019s everything \u2014 thank you for talking to me. It was really good to hear about it all.") +
-        bubble("them", "And thank you for contributing your story to our research. Take care!") +
-        bubble("system", "It has been saved with the rest of your answers. You can close this page now.");
+      ? [
+          bubble("them", "Thank you \u2014 that is everything."),
+          bubble("system", escapeHtml(`We stopped early: ${s.stopped.reason}. Nothing you wrote has been lost.`)),
+        ]
+      : [
+          ...(s.scenario ? [bubble("them", `<span class="final-story">${escapeHtml(s.scenario)}</span>`)] : []),
+          bubble("them", "That\u2019s everything \u2014 thank you for talking to me. It was really good to hear about it all."),
+          bubble("them", "And thank you for contributing your story to our research. Take care!"),
+          bubble("system", "It has been saved with the rest of your answers. You can close this page now."),
+        ];
+  /**
+   * How long to wait before each one.
+   *
+   * The two closing lines get the ordinary rule — roughly as long as they
+   * would take to type. The story does NOT: it is six hundred characters, the
+   * rule would put it near the four-second ceiling, and it is not somebody
+   * typing anyway. It is a thing being handed over, and it has already been
+   * announced by the message before it.
+   */
+  const endingPauses: number[] = !s.finished
+    ? []
+    : s.stopped
+      ? [typingPause("Thank you — that is everything."), 300]
+      : [
+          ...(s.scenario ? [900] : []),
+          typingPause("That’s everything — thank you for talking to me. It was really good to hear about it all."),
+          typingPause("And thank you for contributing your story to our research. Take care!"),
+          400,
+        ];
 
   const hint = choiceHtml.length > 0
     ? bubble("system", "Press and hold the one that fits best to give it a \u{1F44D} \u2014 or tap it, then press the button.")
@@ -1825,11 +1913,14 @@ function render(frame: Frame): void {
   // Held for the Continue press, which is what actually sends for them.
   pendingChoices = { html: choiceHtml, hint };
 
+  // Only the ending messages already delivered go into this pass; the rest
+  // arrive after it, one at a time. See `deliverEnding`.
+  if (endingMessages.length === 0) endingDelivered = 0;
   $("thread").innerHTML =
     (threadFrom(frame.records) || `<p class="note">Start a run to see the conversation.</p>`) +
     (choicesDelivered > 0 ? hint : "") +
     choices +
-    endingMessages;
+    endingMessages.slice(0, endingDelivered).join("");
   // The audio and any faults live outside the records, so they are put back
   // after every rebuild rather than being lost with the innerHTML.
   renderVoiceNotes();
@@ -1847,6 +1938,8 @@ function render(frame: Frame): void {
    * their own; asking again between each would be a form, not a chat.
    */
   if (choiceHtml.length > choicesDelivered && choicesDelivered > 0) void deliverChoices(choiceHtml, hint);
+  // The ending needs no Continue: they have already pressed one to get here.
+  if (endingMessages.length > endingDelivered) void deliverEnding(endingMessages, endingPauses);
 
   // A slider with named ends, as the original has it: "needs a lot of work"
   // to "this looks good". Eleven radio buttons is a developer's idea of a
@@ -2226,6 +2319,8 @@ interface SavedRun {
   runStartedAt: number;
   /** How many of the retellings had already been delivered into the thread. */
   choicesDelivered: number;
+  /** And how many of the closing messages. */
+  endingDelivered: number;
   screen: Screen;
   runner: RunnerSnapshot;
   calls: ModelCall[];
@@ -2236,8 +2331,18 @@ let runSetup: { protocolKey: string; variables: Record<string, string>; online: 
 /** The last screen rendered, which is the one a reload has to come back to. */
 let lastScreen: Screen | null = null;
 
+/**
+ * Set once a completed run has been handed to the study and cleared.
+ *
+ * The closing messages arrive one at a time and save as they land, and the
+ * confirmed-save clear happens on its own clock — so without this the last
+ * bubble could write the run back to the device a moment after it had been
+ * wiped, and the next person would find it there.
+ */
+let handedOver = false;
+
 function remember(): void {
-  if (!localRunner || !lastScreen || !runSetup) return;
+  if (handedOver || !localRunner || !lastScreen || !runSetup) return;
   const saved: SavedRun = {
     savedAt: Date.now(),
     protocolKey: runSetup.protocolKey,
@@ -2245,6 +2350,7 @@ function remember(): void {
     online: runSetup.online,
     runStartedAt,
     choicesDelivered,
+    endingDelivered,
     screen: lastScreen,
     runner: localRunner.snapshot(),
     calls: localCalls,
@@ -2372,6 +2478,8 @@ async function restore(): Promise<boolean> {
   // no retellings on it — so a reload at the choosing stage puts back the ones
   // that had already arrived rather than delivering all three again.
   choicesDelivered = saved.choicesDelivered;
+  // Older snapshots predate this, and 0 would replay the whole ending.
+  endingDelivered = saved.endingDelivered ?? 0;
 
   // The form put back too, so a researcher reloading the lab sees what is
   // actually running rather than the defaults.
@@ -2515,7 +2623,10 @@ async function turn(payload: { action: string; input?: string; echo?: boolean })
        */
       const runner = localRunner;
       void store(runner, screen.finished).then((saved) => {
-        if (screen.finished && saved) forget();
+        if (screen.finished && saved) {
+          handedOver = true;
+          forget();
+        }
       });
       return;
     }
@@ -2552,6 +2663,7 @@ $("start").addEventListener("click", () => {
     // that one", and leaving the old snapshot in place would restore it over
     // the top of this the next time the page loaded.
     forget();
+    handedOver = false;
 
     if (live) {
       // A local server with a key, which holds it and makes the call.
