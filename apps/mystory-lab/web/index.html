@@ -214,6 +214,12 @@
         flex: 0 0 auto; background: none; border: 0; padding: 0; min-height: 0;
         display: grid; place-items: center; color: #007AFF; cursor: pointer; }
       .header-back { width: 26px; height: 40px; }
+      /* With no chevron there is nothing holding the avatar off the edge.
+         The header's 2px padding was set for a header that starts with a
+         26px button, so hiding it slid the whole name group hard left and it
+         read as unaligned. This puts back a normal inset — the same place
+         WhatsApp puts an avatar in a header with no back arrow. */
+      .header-back[hidden] + .who-open { margin-left: 10px; }
       .header-back svg { width: 20px; height: 20px; }
       .header-action { width: 38px; height: 40px; }
       .header-action svg { width: 23px; height: 23px; }
