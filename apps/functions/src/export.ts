@@ -3,7 +3,15 @@ import { HttpsError, onCall } from "firebase-functions/v2/https";
 import * as logger from "firebase-functions/logger";
 import { getStorage } from "firebase-admin/storage";
 import { joinSession, paths, type ChunkDoc, type SessionDoc } from "@myself/firebase";
-import { buildBidsExport, buildZip, emptyDataset, ingest, type Dataset, type DeviceSession } from "@myself/store";
+import {
+  buildBidsExport,
+  buildZip,
+  emptyDataset,
+  ingest,
+  type Dataset,
+  type DeviceSession,
+  type StoredNarrativeRun,
+} from "@myself/store";
 import { STUDY, research } from "./apps.js";
 import { latestRelease, releasesByHash } from "./releases.js";
 
@@ -22,6 +30,19 @@ import { latestRelease, releasesByHash } from "./releases.js";
  */
 
 /** Read every sitting and derive the dataset, the same way the browser does. */
+/**
+ * Every narrative run stored for this study.
+ *
+ * Read separately because they are stored separately — an analysis that does
+ * not want narratives never pays to read them, and a study that never ran the
+ * module gets an empty collection and no files. Filtering happens in the
+ * export builder, which knows which sittings made it into the dataset.
+ */
+export async function readNarratives(study: string): Promise<StoredNarrativeRun[]> {
+  const snap = await research().collection(paths.narratives(study)).get();
+  return snap.docs.map((d) => d.data() as StoredNarrativeRun);
+}
+
 export async function buildStudyDataset(study: string): Promise<{ dataset: Dataset; sittings: number }> {
   const db = research();
   // Every sitting, filtered in code rather than in the query.
@@ -117,9 +138,19 @@ async function writeExport(study: string, prefix: string): Promise<{ files: numb
   const { dataset, sittings } = await buildStudyDataset(study);
   if (!latestRelease) throw new Error("no release manifest available");
 
+  /**
+   * The narratives, joined to the sittings they belong to.
+   *
+   * Read even when the study has none: an empty collection costs one query
+   * and produces no files, and the alternative is a flag somebody has to
+   * remember to turn on when a study starts using the module.
+   */
+  const narratives = await readNarratives(study);
+
   const files = buildBidsExport(dataset, {
     manifest: latestRelease,
     datasetName: `MySelf ${study}`,
+    narratives,
   });
   const bucket = getStorage().bucket();
 
@@ -134,7 +165,7 @@ async function writeExport(study: string, prefix: string): Promise<{ files: numb
   const zip = buildZip(files);
   await bucket.file(`${prefix}/bids.zip`).save(Buffer.from(zip), { contentType: "application/zip" });
 
-  logger.info("export written", { prefix, files: files.length, sittings });
+  logger.info("export written", { prefix, files: files.length, sittings, narratives: narratives.length });
   return { files: files.length, bytes: zip.length };
 }
 

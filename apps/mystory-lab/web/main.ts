@@ -45,6 +45,53 @@ let relay: string | null = null;
 const linkKey = new URL(window.location.href).searchParams.get("k");
 
 /**
+ * Running inside the survey, rather than on its own.
+ *
+ * MyStory is one position in the MyThoughts walk (docs/08 §10): the survey
+ * reaches a narrative component, hands over, and carries on when the module
+ * says it is finished. Three things have to travel across that hand-over, and
+ * all three come in the URL because the module is embedded as a page.
+ *
+ * THE SITTING'S OWN SESSION ID, so the run is stored against the sitting it
+ * belongs to rather than against a session id this page invented. That single
+ * value is the whole join: `saveNarrative` keys on it, the sitting keys on it,
+ * and the export puts the conversation and the questionnaire side by side
+ * because they agree about who this was.
+ *
+ * THE RELEASE HASH, so the run is tied to the study as it stood that day and
+ * not merely to a protocol version.
+ *
+ * AND `embed`, which says to report finishing to whoever is hosting this
+ * rather than leaving somebody on a closing screen with nowhere to go.
+ */
+const embedded = new URL(window.location.href).searchParams.get("embed") === "1";
+const hostSessionId = new URL(window.location.href).searchParams.get("sessionId");
+const hostReleaseHash = new URL(window.location.href).searchParams.get("releaseHash");
+
+/**
+ * Tell the survey the module is done.
+ *
+ * Posted rather than navigated, because the survey owns the walk: it decides
+ * what comes next, records that this position was reached, and keeps its own
+ * event log intact. Sent once — `finished` can render more than once, and a
+ * host that advanced twice would skip the screen after this one.
+ */
+let toldTheHost = false;
+function tellHostFinished(reason: "finished" | "stopped"): void {
+  if (!embedded || toldTheHost) return;
+  toldTheHost = true;
+  try {
+    window.parent?.postMessage(
+      { type: "mystory:finished", reason, sessionId, protocolKey: runSetup?.protocolKey ?? null },
+      "*",
+    );
+  } catch {
+    // A host that cannot be reached is not the participant's problem: the run
+    // is already stored, and the survey has its own way out of this screen.
+  }
+}
+
+/**
  * Where to send somebody when they have finished, if the link says.
  *
  * Checked for scheme rather than trusted. A `javascript:` URL in an href is a
@@ -1763,6 +1810,9 @@ async function deliverEnding(all: string[], pauses: number[]): Promise<void> {
       // replay the ones already read.
       remember();
     }
+    // Only now. Told any earlier, a survey hosting this would move on over the
+    // top of the last three messages — which are the ones that thank them.
+    tellHostFinished(lastScreen?.stopped ? "stopped" : "finished");
   } finally {
     endingInFlight = false;
   }
@@ -1885,7 +1935,14 @@ function render(frame: Frame): void {
           ...(s.scenario ? [bubble("them", `<span class="final-story">${escapeHtml(s.scenario)}</span>`)] : []),
           bubble("them", "That\u2019s everything \u2014 thank you for talking to me. It was really good to hear about it all."),
           bubble("them", "And thank you for contributing your story to our research. Take care!"),
-          bubble("system", "It has been saved with the rest of your answers. You can close this page now."),
+          bubble(
+            "system",
+            // "Close this page" is wrong when a survey is going to carry on
+            // with the next section the moment this finishes.
+            embedded
+              ? "It has been saved with the rest of your answers."
+              : "It has been saved with the rest of your answers. You can close this page now.",
+          ),
         ];
   /**
    * How long to wait before each one.
@@ -2538,6 +2595,7 @@ async function store(runner: NarrativeRunner, finished: boolean): Promise<boolea
         sessionId: records[0]!.sessionId,
         protocolKey: records[0]!.protocolKey,
         protocolVersion: records[0]!.protocolVersion,
+        ...(hostReleaseHash ? { releaseHash: hostReleaseHash } : {}),
         records,
         finished,
         elapsedSeconds: runStartedAt ? Math.round((Date.now() - runStartedAt) / 1000) : 0,
@@ -2727,7 +2785,9 @@ $("start").addEventListener("click", () => {
         else localCalls.push(call);
       },
     });
-    sessionId = `lab_${Date.now().toString(36)}`;
+    // The sitting's id when the survey handed one over, so the run is filed
+    // against the sitting rather than against an id invented here.
+    sessionId = hostSessionId ?? `lab_${Date.now().toString(36)}`;
     const chosen = protocols.find((p) => p.key === key)!;
     showCharacter(chosen.character);
     const variables = { first_name: firstName, topic };

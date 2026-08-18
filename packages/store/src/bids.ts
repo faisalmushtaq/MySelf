@@ -1,5 +1,6 @@
 import type { ReleaseManifest, ResponseScale } from "@myself/schema";
 import type { Dataset } from "./dataset.js";
+import { exportableNarratives, summariseNarrative, type StoredNarrativeRun } from "./narratives.js";
 
 /**
  * BIDS-style export.
@@ -33,12 +34,137 @@ export interface BidsOptions {
   authors?: string[];
   /** Ethics reference, licence and anything else for the description. */
   description?: Record<string, unknown>;
+  /**
+   * Narrative runs, if the study ran the micro-narrative module.
+   *
+   * Passed in rather than carried on the Dataset because they are stored
+   * apart and arrive apart — a study with no narratives should not pay to
+   * read them, and an ingest of questionnaire data should not have to know
+   * they exist.
+   */
+  narratives?: StoredNarrativeRun[];
 }
 
 /** BIDS labels are alphanumeric only — no underscores, dashes or spaces. */
 const label = (raw: string): string => raw.replace(/[^A-Za-z0-9]/g, "");
 
 const NA = "n/a";
+
+/**
+ * The narrative files: the raw log, and a table beside it.
+ *
+ * The log first, because the conversation IS the data — a young person's own
+ * words in their own order, with what the model said back and what they did
+ * about it. The table is derived from the log on every export and is never a
+ * substitute for it; anything it gets wrong can be recomputed, and anything
+ * it leaves out is still there.
+ */
+function narrativeFiles(runs: StoredNarrativeRun[], data: Dataset): BidsFile[] {
+  const joined = exportableNarratives(runs, data);
+  if (joined.length === 0) return [];
+
+  const files: BidsFile[] = [];
+  const rows: Record<string, unknown>[] = [];
+
+  for (const { run, participantId, wave } of joined) {
+    const subject = `sub-${label(participantId)}`;
+    const session = `ses-${String(wave).padStart(2, "0")}`;
+    const summary = summariseNarrative(run);
+
+    rows.push({
+      participant_id: subject,
+      session_id: session,
+      wave,
+      protocol: summary.protocolKey,
+      protocol_version: summary.protocolVersion,
+      finished: summary.finished ? 1 : 0,
+      elapsed_s: summary.elapsedSeconds,
+      turns: summary.turns,
+      words: summary.words,
+      chosen_persona: summary.chosenPersona,
+      offered: summary.offered,
+      rating: summary.rating,
+      rating_max: summary.ratingMax,
+      adapted: summary.adapted ? 1 : 0,
+      accepted_unchanged: summary.acceptedUnchanged ? 1 : 0,
+      fallbacks: summary.fallbacks,
+      final_scenario: summary.finalScenario,
+    });
+
+    files.push({
+      path: `phenotype/narratives/${subject}_${session}_narrative.json`,
+      content: json({
+        participant_id: subject,
+        session_id: session,
+        protocol: run.protocolKey,
+        protocol_version: run.protocolVersion,
+        ...(run.releaseHash ? { release_hash: run.releaseHash } : {}),
+        finished: run.finished === true,
+        ...(run.elapsedSeconds === undefined ? {} : { elapsed_seconds: run.elapsedSeconds }),
+        records: [...run.records].sort((a, b) => a.seq - b.seq),
+      }),
+    });
+  }
+
+  const columns = [
+    "participant_id",
+    "session_id",
+    "wave",
+    "protocol",
+    "protocol_version",
+    "finished",
+    "elapsed_s",
+    "turns",
+    "words",
+    "chosen_persona",
+    "offered",
+    "rating",
+    "rating_max",
+    "adapted",
+    "accepted_unchanged",
+    "fallbacks",
+    "final_scenario",
+  ];
+  files.push({ path: "phenotype/narratives.tsv", content: tsv(columns, rows) });
+  files.push({
+    path: "phenotype/narratives.json",
+    content: json({
+      Description:
+        "One row per micro-narrative run. Derived on every export from the record logs in phenotype/narratives/, which are the data; nothing here is entered by hand and nothing here replaces the log.",
+      participant_id: { Description: "Participant's derived study code, stable across waves." },
+      session_id: { Description: "The sitting this run belonged to." },
+      protocol: { Description: "Which narrative protocol was administered." },
+      protocol_version: { Description: "Its version, so the questions and personas are recoverable." },
+      finished: { Description: "1 if the participant reached the end of the module.", Levels: { "0": "no", "1": "yes" } },
+      elapsed_s: { Description: "Seconds from the first screen of the module to the last." },
+      turns: { Description: "Messages the participant wrote, including corrections and their own edits." },
+      words: { Description: "Total words the participant wrote across those messages." },
+      chosen_persona: {
+        Description:
+          "Which retelling they said fitted best. The persona label is never shown to the participant, so this is their judgement of the writing rather than of the label.",
+      },
+      offered: { Description: "How many retellings they were shown to choose between." },
+      rating: { Description: "How well the chosen retelling described what they had said." },
+      rating_max: { Description: "Top of the rating scale this protocol used." },
+      adapted: {
+        Description: "1 if they changed the retelling, either by rewriting it themselves or by asking for a rewrite.",
+        Levels: { "0": "no", "1": "yes" },
+      },
+      accepted_unchanged: {
+        Description:
+          "1 if they were offered a rewrite and said it was already right. An answer, not an absence: distinguishing it from a run that never reached the question is the point of recording it.",
+        Levels: { "0": "no", "1": "yes" },
+      },
+      fallbacks: {
+        Description:
+          "How many model stages could not be reached and fell back. A run with fallbacks is complete with a documented gap, not corrupt.",
+      },
+      final_scenario: { Description: "The retelling the participant left with, after any changes they made." },
+    }),
+  });
+
+  return files;
+}
 
 /** A TSV cell: `n/a` for missing, tabs and newlines stripped from text. */
 function cell(value: unknown): string {
@@ -344,6 +470,9 @@ export function buildBidsExport(data: Dataset, options: BidsOptions): BidsFile[]
     path: ".bidsignore",
     content: "# Survey-only dataset: no imaging modalities are present yet.\n",
   });
+
+  // The narrative module's runs, where a study ran one.
+  files.push(...narrativeFiles(options.narratives ?? [], data));
 
   return files.sort((a, b) => a.path.localeCompare(b.path));
 }

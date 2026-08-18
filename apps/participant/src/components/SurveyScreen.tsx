@@ -23,6 +23,7 @@ import {
   SliderControl,
   TextControl,
 } from "./controls.js";
+import { NarrativeStep } from "./NarrativeStep.js";
 
 export interface EffortPolicy extends DwellPolicy {
   confirmSkip: boolean;
@@ -35,6 +36,20 @@ export interface EffortPolicy extends DwellPolicy {
 
 export interface SurveyScreenProps {
   units: PresentableUnit[];
+  /**
+   * Where the narrative module is served from, and what to tell it.
+   *
+   * Absent when this build has no module configured, in which case a
+   * narrative position says so rather than showing an empty frame.
+   */
+  narrative?:
+    | {
+        moduleUrl: string | null;
+        sessionId: string;
+        releaseHash: string;
+        firstName?: string | undefined;
+      }
+    | undefined;
   scales: Map<string, ResponseScale>;
   store: AnswerStore;
   allowBack: boolean;
@@ -123,6 +138,49 @@ export function SurveyScreen(props: SurveyScreenProps) {
   }, [index]);
 
   if (!unit) return null;
+
+  /**
+   * A narrative position: hand over to the module rather than draw a question.
+   *
+   * Before the rest of the screen's work, because none of it applies — there
+   * is no scale, no answer to record, and the marker item exists only so the
+   * walk can count this position like any other.
+   */
+  if (unit.narrative) {
+    const handover = props.narrative;
+    if (!handover?.moduleUrl) {
+      // A build with no module configured. Said plainly rather than shown as
+      // an empty rectangle, and never a dead end: the sitting must be
+      // finishable whatever else is broken.
+      return (
+        <div className="screen survey">
+          <div className="narrative-step">
+            <div className="narrative-after">
+              <p>This part of the study is not available on this device.</p>
+              <button type="button" className="primary" onClick={() => props.onAdvance(index, "skip")}>
+                Keep going
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+    return (
+      <div className="screen survey narrative-screen">
+        <NarrativeStep
+          moduleUrl={handover.moduleUrl}
+          protocol={unit.narrative.protocol}
+          protocolVersion={unit.narrative.version}
+          sessionId={handover.sessionId}
+          releaseHash={handover.releaseHash}
+          firstName={handover.firstName}
+          onEvent={props.onEvent}
+          onDone={() => props.onAdvance(index, "next")}
+        />
+      </div>
+    );
+  }
+
   const item = unit.item;
   const baseScale = "scale" in item ? scales.get(item.scale) : undefined;
   // Options this participant could not truthfully choose are not offered —

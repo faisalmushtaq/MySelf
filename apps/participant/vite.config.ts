@@ -9,7 +9,19 @@ const buildStamp = new Date().toISOString().slice(0, 16).replace("T", " ");
 
 export default defineConfig({
   base,
-  define: { __BUILD_STAMP__: JSON.stringify(buildStamp) },
+  define: {
+    __BUILD_STAMP__: JSON.stringify(buildStamp),
+    /**
+     * Where the narrative module is served from.
+     *
+     * Baked in rather than typed into the page, for the same reason the relay
+     * URL is: the survey must not be a place where somebody can point a
+     * child's conversation at a host of their choosing. Empty means this build
+     * has no module, and a narrative position says so instead of showing an
+     * empty frame.
+     */
+    __MYSTORY_URL__: JSON.stringify(process.env["MYSELF_MYSTORY_URL"] ?? ""),
+  },
   plugins: [
     react(),
     VitePWA({

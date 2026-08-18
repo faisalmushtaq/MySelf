@@ -502,6 +502,15 @@ export default function App() {
           sessionStart={new Date(phase.session.startedAt)}
           effort={effort}
           context={flattened.context.get(phase.index)}
+          narrative={{
+            // The sitting's own id is the whole join: the module stores its
+            // run against it, the sitting is stored against it, and the export
+            // puts the conversation beside the questionnaire because the two
+            // agree about who this was.
+            moduleUrl: __MYSTORY_URL__ || null,
+            sessionId: phase.session.sessionId,
+            releaseHash: manifest.hash ?? "",
+          }}
           onRecord={(u, v) => void record(u, v)}
           onAdvance={(f, k) => void advance(f, k)}
           onBack={(f) => void goBack(f)}
