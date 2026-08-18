@@ -67,6 +67,17 @@ export const narrativeSave = z.object({
   finished: z.boolean().default(false),
   /** Seconds from the first screen, as the original recorded it. */
   elapsedSeconds: z.number().min(0).optional(),
+  /**
+   * Which release this run belonged to.
+   *
+   * A protocol key and version say which questions were asked. The release
+   * hash says which frozen bundle of instruments, wording and model
+   * parameters the sitting around it was collected under — and without it a
+   * narrative can be tied to a participant but not to the study as it stood
+   * that day. Optional because the standalone lab has no release; a run that
+   * came through the survey always has one.
+   */
+  releaseHash: z.string().max(200).optional(),
 });
 
 /**
@@ -122,6 +133,7 @@ export const saveNarrative = onRequest(
             recordCount: run.records.length,
             finished: run.finished,
             ...(run.elapsedSeconds === undefined ? {} : { elapsedSeconds: run.elapsedSeconds }),
+            ...(run.releaseHash === undefined ? {} : { releaseHash: run.releaseHash }),
             updatedAt: FieldValue.serverTimestamp(),
           },
           { merge: true },

@@ -21,3 +21,4 @@ export { nightlyExport, exportNow } from "./export.js";
 export { llmRelay } from "./relay.js";
 export { transcribe } from "./transcribe.js";
 export { saveNarrative } from "./narratives.js";
+export { saveSitting } from "./sittings.js";

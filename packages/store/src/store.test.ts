@@ -6,9 +6,16 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { releaseManifest, type ReleaseManifest } from "@myself/schema";
 import { buildBidsExport } from "./bids.js";
+import { emptyDataset, type Dataset } from "./dataset.js";
 import { buildDemoSessions } from "./demo.js";
 import { deriveParticipantCode, isParticipantCode, monthNumber } from "./identity.js";
 import { ingest, resolveAlias, type DeviceEvent, type DeviceSession } from "./ingest.js";
+import {
+  exportableNarratives,
+  summariseNarrative,
+  type StoredNarrativeRecord,
+  type StoredNarrativeRun,
+} from "./narratives.js";
 import { summarise, summariseNumbers, wideTable } from "./summary.js";
 import { buildZip } from "./zip.js";
 
@@ -767,5 +774,137 @@ describe("a sitting somebody did not finish", () => {
     const table = wideTable(dataset);
     expect(table.rows).toHaveLength(1);
     expect(table.rows[0]!["complete"]).toBe("no");
+  });
+});
+
+/* ------------------------------------------------- narratives in the export */
+
+describe("narrative runs in the dataset", () => {
+  const record = (
+    seq: number,
+    kind: string,
+    extra: Partial<StoredNarrativeRecord> = {},
+  ): StoredNarrativeRecord => ({ seq, stageKey: "s", source: "participant", kind, ...extra });
+
+  const run = (overrides: Partial<StoredNarrativeRun> = {}): StoredNarrativeRun => ({
+    sessionId: "ses_1",
+    protocolKey: "np.micro_narrative_full",
+    protocolVersion: "1.0.0",
+    provenance: "study",
+    finished: true,
+    elapsedSeconds: 480,
+    records: [
+      record(0, "participant_original", { text: "We fell out at lunch and it was horrible." }),
+      record(1, "participant_clarification", { text: "Nobody said anything after." }),
+      record(2, "participant_reaction", {
+        text: "A retelling in the friend's voice.",
+        data: { persona: "friend", chosenIndex: 0, offered: 3 },
+      }),
+      record(3, "participant_rating", { data: { rating: 8, max: 10 } }),
+    ],
+    ...overrides,
+  });
+
+  it("reduces a run to a row without being told anything twice", () => {
+    const summary = summariseNarrative(run());
+    expect(summary).toMatchObject({
+      turns: 2,
+      words: 13,
+      chosenPersona: "friend",
+      offered: 3,
+      rating: 8,
+      ratingMax: 10,
+      adapted: false,
+      acceptedUnchanged: false,
+      fallbacks: 0,
+      finalScenario: "A retelling in the friend's voice.",
+    });
+  });
+
+  it("tells accepting it unchanged apart from never reaching the question", () => {
+    // The distinction the record exists for: "this is already me" is a
+    // finding, and an absence is not.
+    const accepted = summariseNarrative(
+      run({ records: [...run().records, record(4, "participant_reaction", { data: { accepted: true } })] }),
+    );
+    expect(accepted.acceptedUnchanged).toBe(true);
+    expect(summariseNarrative(run()).acceptedUnchanged).toBe(false);
+  });
+
+  it("counts an edit and a requested rewrite as adaptation, and keeps the last version", () => {
+    const edited = summariseNarrative(
+      run({ records: [...run().records, record(4, "participant_edit", { text: "My own words instead." })] }),
+    );
+    expect(edited.adapted).toBe(true);
+    expect(edited.finalScenario).toBe("My own words instead.");
+    // The edit is the participant writing, so it counts as a turn too.
+    expect(edited.turns).toBe(3);
+  });
+
+  it("puts a reverted version back as the one they left with", () => {
+    const reverted = summariseNarrative(
+      run({
+        records: [
+          ...run().records,
+          record(4, "participant_edit", { text: "A version they thought better of." }),
+          record(5, "participant_reaction", { data: { restored: "A retelling in the friend's voice." } }),
+        ],
+      }),
+    );
+    expect(reverted.finalScenario).toBe("A retelling in the friend's voice.");
+  });
+
+  it("counts fallbacks rather than hiding them", () => {
+    const withGap = summariseNarrative(
+      run({ records: [...run().records, { ...record(4, "fallback_applied"), source: "system" }] }),
+    );
+    expect(withGap.fallbacks).toBe(1);
+  });
+
+  it("summarises the same way whatever order the records arrive in", () => {
+    const shuffled = run({ records: [...run().records].reverse() });
+    expect(summariseNarrative(shuffled)).toEqual(summariseNarrative(run()));
+  });
+});
+
+describe("which narrative runs may be exported", () => {
+  const data = {
+    ...emptyDataset(),
+    sessions: [
+      {
+        sessionId: "ses_1",
+        participantId: "P1",
+        study: "ybm",
+        wave: 1,
+        releaseKey: "k",
+        releaseHash: "h",
+        startedAt: new Date().toISOString(),
+      },
+    ],
+  } as unknown as Dataset;
+
+  const base: StoredNarrativeRun = {
+    sessionId: "ses_1",
+    protocolKey: "np.x",
+    protocolVersion: "1.0.0",
+    provenance: "study",
+    records: [],
+  };
+
+  it("keeps a run belonging to a sitting in the dataset", () => {
+    expect(exportableNarratives([base], data)).toHaveLength(1);
+  });
+
+  it("never exports a tester link's run as research data", () => {
+    // The mark comes from how the caller authenticated, so a page cannot
+    // claim to be a participant.
+    expect(exportableNarratives([{ ...base, provenance: "test" }], data)).toEqual([]);
+  });
+
+  it("leaves out a run whose sitting is not in the dataset", () => {
+    // Quarantined, withdrawn, or simply not handed over yet. Exporting the
+    // conversation without the sitting would be a child's words with no code
+    // to withdraw them by.
+    expect(exportableNarratives([{ ...base, sessionId: "ses_missing" }], data)).toEqual([]);
   });
 });
