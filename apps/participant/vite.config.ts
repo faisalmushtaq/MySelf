@@ -64,6 +64,6 @@ export default defineConfig({
       },
     }),
   ],
-  server: { fs: { allow: [".."] } },
+  server: { fs: { allow: ["..", "../.."] } },
   test: { environment: "node", include: ["src/**/*.test.ts"] },
 } as Parameters<typeof defineConfig>[0]);
