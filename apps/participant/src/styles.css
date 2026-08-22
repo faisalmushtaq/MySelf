@@ -20,6 +20,8 @@
 @import "@fontsource/inter/500.css";
 @import "@fontsource/inter/600.css";
 @import "@fontsource/inter/700.css";
+@import "@fontsource/atkinson-hyperlegible/400.css";
+@import "@fontsource/atkinson-hyperlegible/700.css";
 
 :root {
   --canvas: #fcfcfb;        /* near-white page */
@@ -52,6 +54,69 @@
 
   --radius: 6px;
   --measure: 30ch;
+  --text-scale: 1;
+  font-size: calc(16px * var(--text-scale));
+}
+
+:root[data-text-size="large"] {
+  --text-scale: 1.15;
+}
+
+:root[data-text-size="extra_large"] {
+  --text-scale: 1.3;
+}
+
+:root[data-contrast="high"] {
+  --canvas: #ffffff;
+  --off-white: #f0f0f0;
+  --paper: #ffffff;
+  --text: #000000;
+  --muted: #1f1f1f;
+  --hairline: #000000;
+  --hairline-strong: #000000;
+  --accent: #003ec7;
+  --accent-hover: #002b8c;
+  --accent-wash: #d9e5ff;
+  --warn: #9a1b00;
+}
+
+:root[data-contrast="dark"] {
+  --canvas: #101418;
+  --off-white: #1b2228;
+  --paper: #172027;
+  --text: #ffffff;
+  --muted: #e0e5e8;
+  --hairline: rgba(255, 255, 255, 0.55);
+  --hairline-strong: rgba(255, 255, 255, 0.82);
+  --accent: #6ce6a8;
+  --accent-hover: #a4f3c8;
+  --accent-wash: rgba(108, 230, 168, 0.15);
+  --warn: #ffb5a1;
+}
+
+:root[data-reading-mode="dyslexia"] {
+  --font-ui: "Atkinson Hyperlegible", Arial, Verdana, sans-serif;
+  --font-display: var(--font-ui);
+  --font-body: var(--font-ui);
+  --measure: 34ch;
+}
+
+:root[data-reading-mode="dyslexia"] .stem,
+:root[data-reading-mode="dyslexia"] .stem-long {
+  font-weight: 700;
+  line-height: 1.45;
+  letter-spacing: 0.015em;
+}
+
+:root[data-reading-mode="dyslexia"] .info-text,
+:root[data-reading-mode="dyslexia"] .lede,
+:root[data-reading-mode="dyslexia"] .lede-body,
+:root[data-reading-mode="dyslexia"] .screen p,
+:root[data-reading-mode="dyslexia"] label,
+:root[data-reading-mode="dyslexia"] button {
+  letter-spacing: 0.012em;
+  word-spacing: 0.08em;
+  line-height: 1.8;
 }
 
 *,
@@ -69,7 +134,7 @@ body,
 
 body {
   font-family: var(--font-body);
-  font-size: 20px;
+  font-size: 1.25rem;
   line-height: 1.6;
   color: var(--text);
   background-color: var(--canvas);
@@ -112,8 +177,7 @@ textarea {
   padding: calc(env(safe-area-inset-top, 0px) + 0.85rem) 1.75rem 0.5rem;
   font-size: 0.78rem;
   font-weight: 500;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  letter-spacing: 0.03em;
   color: var(--text);
 }
 
@@ -134,6 +198,178 @@ textarea {
   margin-left: auto;
   color: var(--accent);
   font-weight: 500;
+}
+
+.accessibility-trigger {
+  margin-left: auto;
+  min-height: 44px;
+  padding: 0.35rem 0.6rem;
+  border: 1px solid var(--hairline-strong);
+  border-radius: 999px;
+  background: var(--paper);
+  color: var(--text);
+  font-family: var(--font-ui);
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: none;
+  cursor: pointer;
+}
+
+.saved + .accessibility-trigger {
+  margin-left: 0.4rem;
+}
+
+.accessibility-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 1rem;
+  background: rgba(0, 0, 0, 0.45);
+}
+
+.accessibility-panel {
+  width: min(100%, 620px);
+  max-height: min(86vh, 760px);
+  overflow-y: auto;
+  padding: 1.3rem;
+  border: 2px solid var(--hairline-strong);
+  border-radius: 14px;
+  background: var(--paper);
+  color: var(--text);
+  box-shadow: 0 1rem 3rem rgba(0, 0, 0, 0.28);
+}
+
+.accessibility-panel-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.accessibility-panel h2 {
+  margin: 0;
+  font-size: 1.45rem;
+}
+
+.accessibility-kicker {
+  margin: 0 0 0.15rem;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.accessibility-close {
+  min-height: 44px;
+  padding: 0.45rem 0.75rem;
+  border: 1px solid var(--hairline-strong);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.accessibility-intro {
+  max-width: 56ch;
+  margin: 1rem 0 1.3rem;
+  color: var(--text);
+}
+
+.accessibility-group {
+  min-width: 0;
+  margin: 1rem 0 0;
+  padding: 0;
+  border: 0;
+}
+
+.accessibility-group legend {
+  margin-bottom: 0.55rem;
+  font-family: var(--font-ui);
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.accessibility-options {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.55rem;
+}
+
+.accessibility-choice {
+  min-height: 52px;
+  padding: 0.5rem;
+  border: 2px solid var(--hairline-strong);
+  border-radius: 8px;
+  background: var(--paper);
+  color: var(--text);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.accessibility-choice.selected {
+  border-color: var(--accent);
+  background: var(--accent-wash);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.accessibility-toggle {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.8rem;
+  align-items: start;
+  margin-top: 1.25rem;
+  padding: 1rem;
+  border: 2px solid var(--hairline-strong);
+  border-radius: 8px;
+  background: var(--off-white);
+  cursor: pointer;
+}
+
+.accessibility-toggle input {
+  width: 1.4rem;
+  height: 1.4rem;
+  margin: 0.18rem 0 0;
+  accent-color: var(--accent);
+}
+
+.accessibility-toggle strong,
+.accessibility-toggle small {
+  display: block;
+}
+
+.accessibility-toggle strong {
+  font-family: var(--font-ui);
+  font-size: 1rem;
+}
+
+.accessibility-toggle small {
+  margin-top: 0.25rem;
+  color: var(--text);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+@media (max-width: 480px) {
+  .status-strip {
+    flex-wrap: wrap;
+  }
+
+  .accessibility-trigger {
+    margin-left: 0;
+  }
+
+  .accessibility-panel {
+    padding: 1rem;
+  }
+
+  .accessibility-options {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* ── Screens ───────────────────────────────────────────────────────────── */
@@ -869,8 +1105,7 @@ input[type="range"] {
   font-family: var(--font-body);
   font-size: 0.72rem;
   font-weight: 500;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
+  letter-spacing: 0.04em;
   color: var(--text);
 }
 
@@ -1425,8 +1660,7 @@ input[type="range"] {
 .review-section {
   font-size: 0.78rem;
   font-weight: 600;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
+  letter-spacing: 0.04em;
   color: var(--muted);
   margin: 0 0 0.5rem;
 }

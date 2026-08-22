@@ -2,6 +2,11 @@ import Dexie, { type EntityTable } from "dexie";
 import type { AnswerValue } from "@myself/engine";
 import type { ResponseStatus, SessionState } from "@myself/schema";
 import { generateDeviceKey, seal, unseal, type Sealed } from "./crypto.js";
+import {
+  DEFAULT_ACCESSIBILITY_PREFERENCES,
+  normaliseAccessibilityPreferences,
+  type AccessibilityPreferences,
+} from "./accessibility.js";
 import { ulid } from "./ulid.js";
 
 /**
@@ -66,6 +71,11 @@ interface SyncReceiptRow {
   verifiedAt: string;
 }
 
+interface AccessibilityRow extends AccessibilityPreferences {
+  id: "participant";
+  updatedAt: string;
+}
+
 export interface SyncConfiguration {
   endpoint: string;
   token: string;
@@ -109,6 +119,7 @@ class MySelfDb extends Dexie {
   sync_config!: EntityTable<SyncConfigRow, "id">;
   sync_state!: EntityTable<SyncStateRow, "sessionId">;
   sync_receipts!: EntityTable<SyncReceiptRow, "batchId">;
+  accessibility!: EntityTable<AccessibilityRow, "id">;
 
   constructor() {
     super("myself");
@@ -124,6 +135,15 @@ class MySelfDb extends Dexie {
       sync_config: "id",
       sync_state: "sessionId, nextAttemptAt, syncedAt, quarantinedAt",
       sync_receipts: "batchId, sessionId, verifiedAt",
+    });
+    this.version(3).stores({
+      sessions: "sessionId, participantCode, state, updatedAt",
+      events: "eventId, sessionId, [sessionId+seq]",
+      device: "id",
+      sync_config: "id",
+      sync_state: "sessionId, nextAttemptAt, syncedAt, quarantinedAt",
+      sync_receipts: "batchId, sessionId, verifiedAt",
+      accessibility: "id, updatedAt",
     });
   }
 }
@@ -148,6 +168,17 @@ export async function deviceKey(): Promise<CryptoKey> {
 export interface RecordedAnswer {
   status: ResponseStatus;
   value?: AnswerValue;
+}
+
+export async function accessibilityPreferences(): Promise<AccessibilityPreferences> {
+  const stored = await db.accessibility.get("participant");
+  return normaliseAccessibilityPreferences(stored ?? DEFAULT_ACCESSIBILITY_PREFERENCES);
+}
+
+export async function saveAccessibilityPreferences(preferences: AccessibilityPreferences): Promise<AccessibilityPreferences> {
+  const normalised = normaliseAccessibilityPreferences(preferences);
+  await db.accessibility.put({ id: "participant", ...normalised, updatedAt: new Date().toISOString() });
+  return normalised;
 }
 
 export async function createSession(participantCode: string, releaseKey: string, releaseHash: string): Promise<SessionRow> {

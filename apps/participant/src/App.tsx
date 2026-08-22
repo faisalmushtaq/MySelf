@@ -5,6 +5,7 @@ import rawManifest from "../../../releases/ybm_nd2026_standard_r7.0.0.manifest.j
 import { flattenManifest } from "./lib/flatten.js";
 import { resolveText, useScoringDefinitions } from "./lib/pipes.js";
 import {
+  accessibilityPreferences,
   appendEvent,
   completeSession,
   configureSync,
@@ -12,11 +13,17 @@ import {
   createSession,
   findResumableSession,
   loadAnswers,
+  saveAccessibilityPreferences,
   syncConfiguration,
   type SessionRow,
   type StoredSessionCounts,
 } from "./lib/db.js";
 import { buildDeviceExport, downloadExport } from "./lib/export.js";
+import {
+  applyAccessibilityPreferences,
+  DEFAULT_ACCESSIBILITY_PREFERENCES,
+  type AccessibilityPreferences,
+} from "./lib/accessibility.js";
 import { synchroniseCompletedSessions } from "./lib/sync.js";
 import { SessionTiming, wordCount } from "./lib/timing.js";
 import { ReviewScreen } from "./components/ReviewScreen.js";
@@ -97,11 +104,15 @@ export default function App() {
   const [syncToken, setSyncToken] = useState("");
   const [syncNote, setSyncNote] = useState<string | null>(null);
   const [codeError, setCodeError] = useState<string | null>(null);
+  const [accessibility, setAccessibility] = useState<AccessibilityPreferences>(DEFAULT_ACCESSIBILITY_PREFERENCES);
+  const [accessibilityOpen, setAccessibilityOpen] = useState(false);
   // Handover is a researcher action on a device that spends its day in
   // participants' hands, so it sits behind a deliberate gesture on the build
   // line rather than a button anyone can find by wandering.
   const handoverTaps = useRef(0);
   const syncBusyRef = useRef(false);
+  const readingSettingsTriggerRef = useRef<HTMLButtonElement>(null);
+  const accessibilityPanelRef = useRef<HTMLElement>(null);
   const [handoverOpen, setHandoverOpen] = useState(false);
   const [handoverNote, setHandoverNote] = useState<string | null>(null);
   // Consecutive skips, and where the run began, so a check-in can offer to
@@ -116,6 +127,57 @@ export default function App() {
   const [, bumpAnswers] = useReducer((c: number) => c + 1, 0);
   const storeRef = useRef(new AnswerStore());
   const monoStart = useRef(performance.now());
+
+  const updateAccessibility = useCallback((patch: Partial<AccessibilityPreferences>) => {
+    const next = { ...accessibility, ...patch };
+    setAccessibility(next);
+    applyAccessibilityPreferences(next);
+    void saveAccessibilityPreferences(next);
+  }, [accessibility]);
+
+  useEffect(() => {
+    let active = true;
+    void accessibilityPreferences().then((stored) => {
+      if (!active) return;
+      setAccessibility(stored);
+      applyAccessibilityPreferences(stored);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const closeAccessibilitySettings = useCallback(() => {
+    setAccessibilityOpen(false);
+    requestAnimationFrame(() => readingSettingsTriggerRef.current?.focus());
+  }, []);
+
+  useEffect(() => {
+    if (!accessibilityOpen) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        closeAccessibilitySettings();
+        return;
+      }
+      if (event.key !== "Tab") return;
+      const panel = accessibilityPanelRef.current;
+      if (!panel) return;
+      const controls = [...panel.querySelectorAll<HTMLElement>("button:not([disabled]), input:not([disabled])")];
+      if (controls.length === 0) return;
+      const first = controls[0]!;
+      const last = controls.at(-1)!;
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    addEventListener("keydown", onKeyDown);
+    return () => removeEventListener("keydown", onKeyDown);
+  }, [accessibilityOpen, closeAccessibilitySettings]);
 
   const refreshDeviceStatus = useCallback(async () => {
     const [stored, configuration] = await Promise.all([countStoredSessions(), syncConfiguration()]);
@@ -452,7 +514,81 @@ export default function App() {
         <span className={`dot ${online ? "online" : "offline"}`} />
         <span className="status-text">{online ? "Online" : "Offline — everything is saved on this device"}</span>
         {savedAt && phase.kind === "running" && <span className="saved">Saved ✓</span>}
+        <button
+          type="button"
+          ref={readingSettingsTriggerRef}
+          className="accessibility-trigger"
+          aria-haspopup="dialog"
+          aria-expanded={accessibilityOpen}
+          aria-controls="reading-settings"
+          onClick={() => setAccessibilityOpen(true)}
+        >
+          Reading settings
+        </button>
       </div>
+
+      {accessibilityOpen && (
+        <div className="accessibility-backdrop" role="presentation">
+          <aside ref={accessibilityPanelRef} id="reading-settings" className="accessibility-panel" role="dialog" aria-modal="true" aria-labelledby="reading-settings-title">
+            <div className="accessibility-panel-heading">
+              <div>
+                <p className="accessibility-kicker">Display</p>
+                <h2 id="reading-settings-title">Reading settings</h2>
+              </div>
+              <button type="button" className="accessibility-close" autoFocus onClick={closeAccessibilitySettings} aria-label="Close reading settings">
+                Close
+              </button>
+            </div>
+            <p className="accessibility-intro">Choose the display that feels clearest. These preferences stay on this device and are never included in study data.</p>
+
+            <fieldset className="accessibility-group">
+              <legend>Text size</legend>
+              <div className="accessibility-options" role="group" aria-label="Text size">
+                {(["default", "large", "extra_large"] as const).map((size) => (
+                  <button
+                    key={size}
+                    type="button"
+                    className={`accessibility-choice ${accessibility.textSize === size ? "selected" : ""}`}
+                    aria-pressed={accessibility.textSize === size}
+                    onClick={() => updateAccessibility({ textSize: size })}
+                  >
+                    {size === "default" ? "Default" : size === "large" ? "Large" : "Extra large"}
+                  </button>
+                ))}
+              </div>
+            </fieldset>
+
+            <fieldset className="accessibility-group">
+              <legend>Contrast</legend>
+              <div className="accessibility-options" role="group" aria-label="Contrast">
+                {(["standard", "high", "dark"] as const).map((contrast) => (
+                  <button
+                    key={contrast}
+                    type="button"
+                    className={`accessibility-choice ${accessibility.contrast === contrast ? "selected" : ""}`}
+                    aria-pressed={accessibility.contrast === contrast}
+                    onClick={() => updateAccessibility({ contrast })}
+                  >
+                    {contrast === "standard" ? "Standard" : contrast === "high" ? "High" : "Dark"}
+                  </button>
+                ))}
+              </div>
+            </fieldset>
+
+            <label className="accessibility-toggle">
+              <input
+                type="checkbox"
+                checked={accessibility.dyslexiaFriendly}
+                onChange={(event) => updateAccessibility({ dyslexiaFriendly: event.target.checked })}
+              />
+              <span>
+                <strong>Dyslexia-friendly reading mode</strong>
+                <small>Uses clearer letter shapes, wider spacing, and a more relaxed reading rhythm.</small>
+              </span>
+            </label>
+          </aside>
+        </div>
+      )}
 
       {phase.kind === "start" && (
         <div className="screen start">
