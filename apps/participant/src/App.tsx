@@ -7,13 +7,17 @@ import { resolveText, useScoringDefinitions } from "./lib/pipes.js";
 import {
   appendEvent,
   completeSession,
+  configureSync,
   countStoredSessions,
   createSession,
   findResumableSession,
   loadAnswers,
+  syncConfiguration,
   type SessionRow,
+  type StoredSessionCounts,
 } from "./lib/db.js";
 import { buildDeviceExport, downloadExport } from "./lib/export.js";
+import { synchroniseCompletedSessions } from "./lib/sync.js";
 import { SessionTiming, wordCount } from "./lib/timing.js";
 import { ReviewScreen } from "./components/ReviewScreen.js";
 import { SurveyScreen } from "./components/SurveyScreen.js";
@@ -77,13 +81,27 @@ export default function App() {
   const [code, setCode] = useState("");
   const [online, setOnline] = useState(navigator.onLine);
   const [savedAt, setSavedAt] = useState<string | null>(null);
-  const [counts, setCounts] = useState({ inProgress: 0, completed: 0 });
+  const [counts, setCounts] = useState<StoredSessionCounts>({
+    inProgress: 0,
+    completed: 0,
+    awaitingSync: 0,
+    syncing: 0,
+    syncFailed: 0,
+    syncedVerified: 0,
+    quarantined: 0,
+  });
   const [busy, setBusy] = useState(false);
+  const [syncBusy, setSyncBusy] = useState(false);
+  const [syncConfigured, setSyncConfigured] = useState(false);
+  const [syncEndpoint, setSyncEndpoint] = useState("");
+  const [syncToken, setSyncToken] = useState("");
+  const [syncNote, setSyncNote] = useState<string | null>(null);
   const [codeError, setCodeError] = useState<string | null>(null);
   // Handover is a researcher action on a device that spends its day in
   // participants' hands, so it sits behind a deliberate gesture on the build
   // line rather than a button anyone can find by wandering.
   const handoverTaps = useRef(0);
+  const syncBusyRef = useRef(false);
   const [handoverOpen, setHandoverOpen] = useState(false);
   const [handoverNote, setHandoverNote] = useState<string | null>(null);
   // Consecutive skips, and where the run began, so a check-in can offer to
@@ -99,6 +117,43 @@ export default function App() {
   const storeRef = useRef(new AnswerStore());
   const monoStart = useRef(performance.now());
 
+  const refreshDeviceStatus = useCallback(async () => {
+    const [stored, configuration] = await Promise.all([countStoredSessions(), syncConfiguration()]);
+    setCounts(stored);
+    setSyncConfigured(configuration !== null);
+    if (configuration && !syncEndpoint) setSyncEndpoint(configuration.endpoint);
+  }, [syncEndpoint]);
+
+  const runSync = useCallback(
+    async (force = false) => {
+      if (syncBusyRef.current) return;
+      syncBusyRef.current = true;
+      setSyncBusy(true);
+      try {
+        const report = await synchroniseCompletedSessions({ force });
+        if (report.outcomes[0]?.kind === "not_configured") {
+          setSyncNote("This device has not yet been enrolled for synchronisation.");
+        } else if (report.outcomes[0]?.kind === "offline") {
+          setSyncNote("This device is offline. Completed sessions remain queued safely on the device.");
+        } else if (report.quarantined > 0) {
+          setSyncNote(`${report.quarantined} session${report.quarantined === 1 ? " requires" : "s require"} researcher review.`);
+        } else if (report.failed > 0) {
+          setSyncNote(`${report.failed} session${report.failed === 1 ? " is" : "s are"} queued for a later retry.`);
+        } else if (report.synced > 0) {
+          setSyncNote(`${report.synced} session${report.synced === 1 ? " was" : "s were"} synchronised and verified.`);
+        }
+      } finally {
+        try {
+          await refreshDeviceStatus();
+        } finally {
+          syncBusyRef.current = false;
+          setSyncBusy(false);
+        }
+      }
+    },
+    [refreshDeviceStatus],
+  );
+
   useEffect(() => {
     const on = () => setOnline(true);
     const off = () => setOnline(false);
@@ -111,9 +166,22 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    void countStoredSessions().then(setCounts);
+    void refreshDeviceStatus();
     void navigator.storage?.persist?.();
-  }, [phase.kind]);
+  }, [phase.kind, refreshDeviceStatus]);
+
+  useEffect(() => {
+    if (online && (phase.kind === "start" || phase.kind === "finished")) void runSync();
+  }, [online, phase.kind, runSync]);
+
+  // Safari cannot continue uploads after the PWA closes. While it remains in
+  // the foreground, this checks the durable retry deadline once a minute; the
+  // queue itself applies exponential back-off and jitter before selecting work.
+  useEffect(() => {
+    if (!online || !syncConfigured || (phase.kind !== "start" && phase.kind !== "finished")) return;
+    const timer = window.setInterval(() => void runSync(), 60_000);
+    return () => window.clearInterval(timer);
+  }, [online, phase.kind, runSync, syncConfigured]);
 
   const walker = useMemo(
     () => new Walker(flattened.units, storeRef.current, manifest.composition.allowBackNavigation),
@@ -437,17 +505,57 @@ export default function App() {
             }}
           >
             Preview build · release {manifest.release.version} · {manifest.hash?.slice(7, 19)} ·{" "}
-            {counts.completed} completed session{counts.completed === 1 ? "" : "s"} stored on this device · build{" "}
+            {counts.awaitingSync + counts.syncFailed} session{counts.awaitingSync + counts.syncFailed === 1 ? "" : "s"} awaiting sync · {counts.syncedVerified} verified · build{" "}
             {__BUILD_STAMP__}
           </p>
           {handoverOpen && (
             <div className="handover">
               <h2>Handover</h2>
               <p className="hint">
-                {counts.completed} completed and {counts.inProgress} unfinished session
-                {counts.inProgress === 1 ? "" : "s"} on this device. The file contains real answers: put it
-                straight into approved storage, and only delete anything here once it has landed.
+                {counts.awaitingSync + counts.syncFailed} completed session{counts.awaitingSync + counts.syncFailed === 1 ? "" : "s"} awaiting upload, {counts.syncedVerified} verified, and {counts.inProgress} unfinished on this device. Sessions stay here until the server acknowledgement has been verified.
               </p>
+              <div className="handover-actions">
+                <button
+                  type="button"
+                  className="secondary"
+                  disabled={!online || syncBusy || counts.awaitingSync + counts.syncFailed === 0}
+                  onClick={() => void runSync(true)}
+                >
+                  {syncBusy ? "Synchronising…" : "Sync completed sessions"}
+                </button>
+              </div>
+              {!syncConfigured && (
+                <div className="sync-provisioning">
+                  <p className="hint">Enrol this research device once with its API address and one-time device token. The token is encrypted in device storage and is never shown again.</p>
+                  <label className="field">
+                    <span className="field-label">API address</span>
+                    <input className="text-input" value={syncEndpoint} placeholder="https://research.example.org" onChange={(event) => setSyncEndpoint(event.target.value)} />
+                  </label>
+                  <label className="field">
+                    <span className="field-label">Device token</span>
+                    <input className="text-input" type="password" value={syncToken} autoComplete="off" onChange={(event) => setSyncToken(event.target.value)} />
+                  </label>
+                  <button
+                    type="button"
+                    className="secondary"
+                    disabled={syncEndpoint.trim().length === 0 || syncToken.trim().length < 32}
+                    onClick={() => {
+                      void (async () => {
+                        try {
+                          await configureSync(syncEndpoint, syncToken);
+                          setSyncToken("");
+                          setSyncNote("Device enrolment saved. Completed sessions can now synchronise.");
+                          await refreshDeviceStatus();
+                        } catch (error) {
+                          setSyncNote(error instanceof Error ? error.message : "Could not save device enrolment.");
+                        }
+                      })();
+                    }}
+                  >
+                    Save device enrolment
+                  </button>
+                </div>
+              )}
               <div className="handover-actions">
                 <button
                   type="button"
@@ -478,6 +586,7 @@ export default function App() {
                   Include unfinished
                 </button>
               </div>
+              {syncNote && <p className="hint">{syncNote}</p>}
               {handoverNote && <p className="hint">{handoverNote}</p>}
             </div>
           )}

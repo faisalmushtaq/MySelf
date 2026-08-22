@@ -86,7 +86,7 @@ export async function buildDeviceExport(options: ExportOptions = {}): Promise<De
       releaseHash: row.releaseHash,
       startedAt: row.startedAt,
       ...(row.completedAt ? { completedAt: row.completedAt } : {}),
-      complete: row.state === "completed_locally",
+      complete: row.state !== "in_progress" && row.state !== "not_started",
       events: out,
     });
   }

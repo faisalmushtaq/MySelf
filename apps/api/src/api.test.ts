@@ -76,6 +76,7 @@ describe("sync", () => {
     const second = await ingestBatch(db, device, batch("ses_1"));
     expect(second.duplicate).toBe(true);
     expect(second.ackHash).toBe(first.ackHash);
+    expect(second.accepted).toEqual(first.accepted);
     const events = await db.query("SELECT seq FROM research.events WHERE session_id = 'ses_1'");
     expect(events.rows).toHaveLength(3);
   });

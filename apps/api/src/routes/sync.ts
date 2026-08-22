@@ -98,16 +98,17 @@ const ackHashOf = (accepted: SyncAck["accepted"]): string =>
 export async function ingestBatch(db: Db, device: Device, batch: SyncBatch): Promise<SyncAck> {
   const id = batchId(device.deviceId, batch);
 
-  const existing = await db.query<{ ack_hash: string }>(
-    "SELECT ack_hash FROM research.sync_receipts WHERE batch_id = $1",
+  const existing = await db.query<{ ack_hash: string; accepted: SyncAck["accepted"] }>(
+    "SELECT ack_hash, accepted FROM research.sync_receipts WHERE batch_id = $1",
     [id],
   );
   if (existing.rows[0]) {
-    // Already landed. Return the same acknowledgement rather than re-running:
-    // the device is retrying because it never saw the first answer.
+    // Already landed. Return the original acknowledgement rather than a blank
+    // duplicate marker: a device that missed the first HTTP response still has
+    // to verify every event before it may mark its local copy as synced.
     return {
       batchId: id,
-      accepted: [],
+      accepted: existing.rows[0].accepted,
       quarantined: [],
       ackHash: existing.rows[0].ack_hash,
       duplicate: true,
@@ -196,9 +197,9 @@ export async function ingestBatch(db: Db, device: Device, batch: SyncBatch): Pro
 
     const hash = ackHashOf(accepted);
     await tx.query(
-      `INSERT INTO research.sync_receipts (batch_id, device_id, session_count, event_count, ack_hash)
-       VALUES ($1, $2, $3, $4, $5)`,
-      [id, device.deviceId, batch.sessions.length, eventCount, hash],
+      `INSERT INTO research.sync_receipts (batch_id, device_id, session_count, event_count, ack_hash, accepted)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [id, device.deviceId, batch.sessions.length, eventCount, hash, JSON.stringify(accepted)],
     );
     await audit(tx, {
       actor: `device:${device.deviceId}`,
