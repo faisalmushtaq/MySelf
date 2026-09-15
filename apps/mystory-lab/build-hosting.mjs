@@ -36,25 +36,7 @@ const firebaseConfig =
   process.env.MYSELF_FIREBASE_CONFIG ??
   JSON.stringify({
     apiKey: "AIzaSyCqcaFWJMobljhX63s--l4NEPZV6IXWJvM",
-    /**
-     * The SAME origin this build is served from, not the .firebaseapp.com one.
-     *
-     * This is the point of the whole file and it was half done. Sign-in
-     * completes by handing off to `/__/auth/handler` on the authDomain and
-     * handing back; with the app on `myself-research.web.app` and the handler
-     * on `myself-research.firebaseapp.com`, those are two origins, and Safari
-     * partitions storage between them. The handler cannot read the state it
-     * just wrote — "Unable to process request due to missing initial state" —
-     * and on the Home Screen, where sign-in has to go by redirect, that is the
-     * difference between it working and it silently forgetting you.
-     *
-     * Firebase Hosting serves the auth handler on every site of the project,
-     * and a project's own `.web.app` domain is authorised by default, so this
-     * needs nothing switched on in the console. A deployment on a custom
-     * domain must set `MYSELF_FIREBASE_CONFIG` with that domain here, and add
-     * it under Authentication → Settings → Authorised domains.
-     */
-    authDomain: "myself-research.web.app",
+    authDomain: "myself-research.firebaseapp.com",
     projectId: "myself-research",
   });
 
