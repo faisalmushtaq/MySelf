@@ -1,13 +1,11 @@
 import { initializeApp, type FirebaseApp } from "firebase/app";
 import {
   GoogleAuthProvider,
-  browserLocalPersistence,
   browserSessionPersistence,
-  getRedirectResult,
-  indexedDBLocalPersistence,
-  initializeAuth,
+  getAuth,
   onAuthStateChanged,
-  signInWithRedirect,
+  setPersistence,
+  signInWithPopup,
   signOut,
   type Auth,
   type User,
@@ -28,51 +26,8 @@ import {
  * It is baked in at build time rather than typed into the page so that nobody
  * can point this page at a different project.
  *
- * ── Signing in from the Home Screen ──────────────────────────────────────
- *
- * This worked in Safari and did not work once the page had been added to the
- * Home Screen: sign-in appeared to succeed, and coming back to the app it had
- * never heard of you. Three separate causes, and all three had to be fixed —
- * any one of them on its own reproduces the symptom.
- *
- * A HOME SCREEN WEB APP HAS ITS OWN STORAGE. Since iOS 16.4 it is not a
- * bookmark that opens Safari; it is a separate container with its own cookies,
- * its own IndexedDB and its own local storage. Nothing signed in on one side
- * is visible from the other, which is why it looked like the sign-in had been
- * thrown away when in fact it had landed somewhere else.
- *
- * SO A POPUP CANNOT WORK THERE. `signInWithPopup` needs a second window to
- * talk back to the first. A standalone app has no window model to open one
- * in, so iOS hands the URL to Safari — the sign-in genuinely succeeds, in
- * Safari's container, and the app that asked for it is never told. That is
- * exactly what "it lets me log in and then shows me the sign in thing again"
- * is. Installed, this now REDIRECTS instead: the navigation happens in the
- * app's own web view, so the credential comes back to the container that
- * asked for it. In an ordinary tab the popup is still nicer and still used.
- *
- * AND THE SESSION HAD TO SURVIVE THE APP BEING CLOSED. This is the one that
- * actually caused it. Persistence was `browserSessionPersistence` —
- * `sessionStorage`, which belongs to one browsing context and is empty in the
- * next one. A Home Screen icon opens a fresh context every time it is tapped,
- * so the sign-in was never "lost": it was written into a context that no
- * longer existed by the time anybody came back. In Safari with the tab left
- * open it survives, which is exactly why it "works fine in Safari".
- *
- * PERSISTENCE IS NOW DURABLE UNCONDITIONALLY, and that is the correction to a
- * first attempt at this. That attempt made the durable choice conditional on
- * the app reporting itself as installed — `navigator.standalone`, or a
- * `display-mode: standalone` media query. This page ships no web app manifest
- * and no `apple-mobile-web-app-capable`, so iOS does not run it in standalone
- * display mode and BOTH of those report false. The condition was never true
- * on the device it was written for, the old branch ran, and the bug was
- * unchanged. A fix that depends on a signal the page does not emit is not a
- * fix.
- *
- * The original reason for scoping it to the tab was a real one — somebody
- * demonstrating this on a borrowed laptop should not leave their account
- * behind. That case is served by `?ephemeral=1`, which is a deliberate act by
- * the person doing the demonstrating, rather than by a guess about the
- * environment that quietly breaks everybody else.
+ * Sign-in is scoped to the tab. Someone demonstrating the module on a borrowed
+ * machine should not leave an account signed in behind them.
  */
 
 declare const __FIREBASE_CONFIG__: string;
@@ -81,36 +36,6 @@ export interface Session {
   /** Configured at build time; without it the page is mock-only. */
   readonly available: boolean;
   readonly user: User | null;
-  /**
-   * Resolves once a returning redirect has been consumed and the first auth
-   * state is known.
-   *
-   * Anything that asks "is somebody signed in?" at boot has to wait for this.
-   * Firebase reports `null` before it has finished restoring, so a page that
-   * checked immediately would decide nobody was signed in and show the button
-   * again — the same visible bug, arrived at a different way.
-   */
-  ready(): Promise<void>;
-  /**
-   * Why a returning sign-in did not complete, if one did not.
-   *
-   * There is no console on a phone. Without this, a redirect that comes back
-   * and fails looks exactly like never having signed in — the button is there
-   * again and nothing says why — which is the bug this whole module was just
-   * rewritten for, arrived at from the other side.
-   */
-  trouble(): Promise<string | null>;
-  /**
-   * What this browser reported, and what was chosen because of it.
-   *
-   * Put on the page rather than kept for a console, because the failure this
-   * module exists to fix happens on a phone opened from a Home Screen icon —
-   * no console, no address bar, and nothing to distinguish "signed out" from
-   * "signed in somewhere you cannot see". Two rounds of this were diagnosed
-   * from guesses about what iOS reports; one line of what it ACTUALLY reports
-   * would have settled it immediately.
-   */
-  diagnostics(): string;
   signIn(): Promise<void>;
   signOut(): Promise<void>;
   /** A fresh ID token for the relay, or null when nobody is signed in. */
@@ -127,183 +52,26 @@ function parseConfig(): Record<string, string> | null {
   }
 }
 
-/**
- * Whether this is running as an app somebody installed, rather than a tab.
- *
- * Two ways of asking because iOS answers to the older one: `navigator.standalone`
- * is Apple's, and the display-mode media query is the standard. Either being
- * true means there is no useful popup and no reason to forget the sign-in when
- * the app is closed.
- */
-declare const __BUILD_STAMP__: string;
-
-/**
- * Which bundle this is.
- *
- * Two fixes have now been deployed and reported as changing nothing, and
- * there was no way to tell from the phone whether the new code was even
- * running — a Home Screen icon can hold an old one indefinitely. This makes
- * "did it update?" answerable instead of assumed.
- */
-export function buildStamp(): string {
-  try {
-    return typeof __BUILD_STAMP__ === "string" ? __BUILD_STAMP__ : "unknown";
-  } catch {
-    return "unknown";
-  }
-}
-
-export function ephemeral(): boolean {
-  try {
-    return new URL(window.location.href).searchParams.get("ephemeral") === "1";
-  } catch {
-    return false;
-  }
-}
-
-/**
- * What the browser says this is — REPORTED, never acted on.
- *
- * Twice this decided how to sign somebody in, and twice it was wrong: this
- * page ships no manifest and no `apple-mobile-web-app-capable`, so iOS says
- * `display: browser` and no `navigator.standalone` even from a Home Screen
- * icon, and the branch meant for a phone never ran on one. It stays only
- * because seeing what a device claims is how that was finally worked out, and
- * it is in the diagnostics for the next person looking.
- */
-export function reportedDisplay(): { standalone: string; mode: string } {
-  try {
-    const standalone = (navigator as unknown as { standalone?: boolean }).standalone;
-    return {
-      standalone: standalone === undefined ? "absent" : String(standalone),
-      mode:
-        typeof matchMedia === "function" && matchMedia("(display-mode: standalone)").matches
-          ? "standalone"
-          : "browser",
-    };
-  } catch {
-    return { standalone: "unknown", mode: "unknown" };
-  }
-}
-
 class FirebaseSession implements Session {
   private readonly app: FirebaseApp;
   private readonly auth: Auth;
   private listeners: ((user: User | null) => void)[] = [];
-  private readonly settled: Promise<void>;
-  private failure: string | null = null;
   user: User | null = null;
 
   readonly available = true;
 
   constructor(config: Record<string, string>) {
     this.app = initializeApp(config);
-
-    /**
-     * Persistence is chosen HERE, not set afterwards.
-     *
-     * `setPersistence` is asynchronous, and the old code did not await it —
-     * so a sign-in that began before it resolved could be written with
-     * whatever persistence Firebase had defaulted to. `initializeAuth` takes
-     * the choice up front and there is no window in which it is unset.
-     *
-     * The list is tried in order: IndexedDB, then local storage for a browser
-     * that will not give us IndexedDB (a private window, mostly).
-     */
-    this.auth = initializeAuth(this.app, {
-      persistence: ephemeral()
-        ? [browserSessionPersistence]
-        // Session storage last, as a floor rather than a choice: a browser
-        // that refuses both of the durable ones should still be able to
-        // complete a redirect, even if it forgets afterwards.
-        : [indexedDBLocalPersistence, browserLocalPersistence, browserSessionPersistence],
-    });
-
-    this.settled = new Promise<void>((resolve) => {
-      /**
-       * Consume a returning redirect before answering anybody.
-       *
-       * Coming back from Google, the credential is in the URL and is only
-       * turned into a signed-in user by this call. It has to happen, and it
-       * has to happen before the page concludes anything about who is signed
-       * in.
-       */
-      void getRedirectResult(this.auth)
-        .catch((error: unknown) => {
-          // Not fatal, and worth seeing: on iOS this is where a cross-origin
-          // auth handler fails, and it fails silently otherwise.
-          const code = (error as { code?: string }).code ?? "";
-          const message = (error as Error).message ?? String(error);
-          this.failure = code.includes("missing-initial-state")
-            ? "Signing in did not complete because this device would not carry the sign-in between two web addresses. Whoever set this up needs the sign-in handler served from the same address as the app."
-            : `Signing in did not finish: ${message}`;
-          console.warn("sign-in: could not complete a returning redirect", error);
-          return null;
-        })
-        .finally(() => {
-          let first = true;
-          onAuthStateChanged(this.auth, (user) => {
-            this.user = user;
-            for (const listener of this.listeners) listener(user);
-            if (first) {
-              first = false;
-              resolve();
-            }
-          });
-        });
+    this.auth = getAuth(this.app);
+    void setPersistence(this.auth, browserSessionPersistence);
+    onAuthStateChanged(this.auth, (user) => {
+      this.user = user;
+      for (const listener of this.listeners) listener(user);
     });
   }
 
-  ready(): Promise<void> {
-    return this.settled;
-  }
-
-  diagnostics(): string {
-    const reported = reportedDisplay();
-    return [
-      `kept: ${ephemeral() ? "for this tab only" : "on this device"}`,
-      `sign-in: redirect`,
-      `build: ${buildStamp()}`,
-      `display: ${reported.mode}`,
-      `navigator.standalone: ${reported.standalone}`,
-      `authDomain: ${this.auth.config.authDomain ?? "?"}`,
-      `origin: ${window.location.origin}`,
-    ].join(" · ");
-  }
-
-  async trouble(): Promise<string | null> {
-    await this.settled;
-    // Cleared once somebody is actually signed in: a stale complaint about a
-    // redirect that failed an hour ago helps nobody.
-    return this.user ? null : this.failure;
-  }
-
-  /**
-   * Always by redirect. No popup, and nothing conditional.
-   *
-   * This is the third attempt at the Home Screen problem and the previous two
-   * both failed the same way: they branched on whether the app reported
-   * itself as installed, and this page reports `display: browser` and no
-   * `navigator.standalone`, so the popup branch ran every time.
-   *
-   * The popup cannot work from a Home Screen icon. iOS has no child-window
-   * relationship to give it, so what opens is Safari — a context with no
-   * opener to report back to. The sign-in genuinely succeeds there and the
-   * result is never delivered, which is why it looked like nothing had
-   * happened. Worse, it does not FAIL: `signInWithPopup` is left waiting for
-   * a message that will never arrive, so the fallback written to catch a
-   * refused popup never fired either.
-   *
-   * A redirect has none of that. The context navigates and comes back to the
-   * same origin carrying the credential, which works in a Home Screen web
-   * clip, in Safari, and on a desktop. It costs a page navigation instead of
-   * a popup, and that is a price worth paying for a sign-in that works
-   * everywhere rather than one that works where the detection happens to be
-   * right.
-   */
   async signIn(): Promise<void> {
-    // Nothing after this runs: the page navigates away and returns.
-    await signInWithRedirect(this.auth, new GoogleAuthProvider());
+    await signInWithPopup(this.auth, new GoogleAuthProvider());
   }
 
   async signOut(): Promise<void> {
@@ -311,9 +79,6 @@ class FirebaseSession implements Session {
   }
 
   async token(): Promise<string | null> {
-    // Wait for the restore before answering. Asked at boot, this used to
-    // return null while Firebase was still reading its own storage.
-    await this.settled;
     // Asked for on every call rather than cached: a token lasts an hour and a
     // narrative session can outlast one, and a refusal halfway through an
     // interview would cost the participant the rest of it.
@@ -330,13 +95,6 @@ class FirebaseSession implements Session {
 const unavailable: Session = {
   available: false,
   user: null,
-  async ready() {},
-  async trouble() {
-    return null;
-  },
-  diagnostics() {
-    return "no Firebase project configured in this build";
-  },
   async signIn() {
     throw new Error("this build has no Firebase project configured, so it cannot sign anybody in");
   },
