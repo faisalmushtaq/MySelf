@@ -2770,9 +2770,19 @@ $("start").addEventListener("click", () => {
      */
     const token = linkKey ? null : await session.token();
     if (!linkKey && !token) {
+      /**
+       * The stuck state, with what the browser reported underneath it.
+       *
+       * The header carrying the other copy of this is hidden in the
+       * participant view, which is the view somebody opening a Home Screen
+       * icon is most likely to be in — and the state this says is exactly the
+       * one that needs diagnosing.
+       */
       $("bootNote").innerHTML =
         `<div class="alert">Sign in first — the relay will not spend the study's money for somebody it
-         cannot name. If you were sent a link to test this, use that link: it needs no account.</div>`;
+         cannot name. If you were sent a link to test this, use that link: it needs no account.
+         <span class="note" style="display: block; margin-top: .5rem; font-size: .72rem; opacity: .75;
+         word-break: break-word;">${escapeHtml(session.diagnostics())}</span></div>`;
       return;
     }
 
@@ -2830,7 +2840,25 @@ function wireSignIn(): void {
   session.onChange((user) => {
     signIn.hidden = user !== null;
     out.hidden = user === null;
+    /**
+     * What the browser reported, beside the button.
+     *
+     * Small and always there. Signing in from a Home Screen icon failed twice
+     * and both diagnoses were guesses about what iOS reports — the second one
+     * turned on a media query this page never matches, so the fix never ran.
+     * One line of what it actually reports settles that in seconds, and it is
+     * the only way to see anything at all on a phone with no console.
+     */
     $("who").textContent = user ? `signed in as ${user.email ?? user.uid}` : "not signed in";
+    /**
+     * Only when somebody is actually stuck.
+     *
+     * Signed in, or here on a tester link, there is nothing to diagnose and a
+     * line of browser internals under the header is just noise — especially
+     * in the participant view, where the reader is a child.
+     */
+    const note = $("whoDetail");
+    if (note) note.textContent = !user && !linkKey && session.available ? session.diagnostics() : "";
   });
   signIn.addEventListener("click", () => {
     void session.signIn().catch((error: Error) => {
