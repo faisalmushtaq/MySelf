@@ -26,19 +26,19 @@ function installedFrom(env: { standalone?: boolean; displayMode?: boolean }): bo
  */
 const persistenceFor = (opts: { ephemeral: boolean }) =>
   opts.ephemeral ? ["browserSession"] : ["indexedDBLocal", "browserLocal"];
-const methodFor = (installed: boolean) => (installed ? "redirect" : "popup");
+/** There is no longer anything to pass in. That is the point. */
+const methodFor = () => "redirect";
 
-describe("whether this is an installed app or a tab", () => {
-  it("believes Apple's flag, which is how iOS answers", () => {
-    expect(installedFrom({ standalone: true })).toBe(true);
-  });
-
-  it("believes the standard display-mode query too", () => {
-    expect(installedFrom({ displayMode: true })).toBe(true);
-  });
-
-  it("treats an ordinary tab as an ordinary tab", () => {
+describe("what a Home Screen icon actually reports", () => {
+  it("is an ordinary browser, which is why two fixes missed", () => {
+    // No manifest and no apple-mobile-web-app-capable on this page, so iOS
+    // does not run it standalone: both signals say "tab" from the icon.
     expect(installedFrom({ standalone: false, displayMode: false })).toBe(false);
+  });
+
+  it("would say so only if the page declared itself an app", () => {
+    expect(installedFrom({ standalone: true })).toBe(true);
+    expect(installedFrom({ displayMode: true })).toBe(true);
   });
 });
 
@@ -68,13 +68,34 @@ describe("keeping the sign-in", () => {
 });
 
 describe("how it asks", () => {
-  it("redirects from a genuinely standalone app, which has no popup", () => {
-    // A popup needs a second window to talk back to the first.
-    expect(methodFor(true)).toBe("redirect");
+  it("always redirects, whatever the browser says it is", () => {
+    // THE SECOND REGRESSION TEST. Two fixes branched on whether the app
+    // reported itself installed; this page reports `display: browser` and no
+    // `navigator.standalone` even from a Home Screen icon, so the popup
+    // branch ran both times and neither fix reached the bug.
+    expect(methodFor()).toBe("redirect");
   });
 
-  it("uses a popup in a tab, which is the nicer thing where it works", () => {
-    expect(methodFor(false)).toBe("popup");
+  it("has no popup path left to fall into", async () => {
+    // A popup from a Home Screen icon opens Safari — a context with no opener
+    // to report back to — and does not even fail: it waits for a message that
+    // never comes, so a fallback written to catch a refused popup never fires.
+    const { readFileSync } = await import("node:fs");
+    const source = readFileSync(new URL("./session.ts", import.meta.url), "utf8");
+    const code = source.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*/g, "");
+    expect(code).not.toContain("signInWithPopup");
+  });
+
+  it("keeps the display signal as reporting, never as a decision", async () => {
+    // It survives only because seeing what a device claims is how this was
+    // finally worked out. Used in a branch again, it would repeat the bug.
+    const { readFileSync } = await import("node:fs");
+    const source = readFileSync(new URL("./session.ts", import.meta.url), "utf8");
+    const code = source.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*/g, "");
+    // Named once where it is defined and once where it is reported, and in no
+    // `if` anywhere.
+    expect(/if\s*\([^)]*reportedDisplay/.test(code)).toBe(false);
+    expect(code).not.toContain("isInstalled");
   });
 });
 

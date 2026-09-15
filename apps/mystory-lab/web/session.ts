@@ -7,7 +7,6 @@ import {
   indexedDBLocalPersistence,
   initializeAuth,
   onAuthStateChanged,
-  signInWithPopup,
   signInWithRedirect,
   signOut,
   type Auth,
@@ -136,6 +135,24 @@ function parseConfig(): Record<string, string> | null {
  * true means there is no useful popup and no reason to forget the sign-in when
  * the app is closed.
  */
+declare const __BUILD_STAMP__: string;
+
+/**
+ * Which bundle this is.
+ *
+ * Two fixes have now been deployed and reported as changing nothing, and
+ * there was no way to tell from the phone whether the new code was even
+ * running — a Home Screen icon can hold an old one indefinitely. This makes
+ * "did it update?" answerable instead of assumed.
+ */
+export function buildStamp(): string {
+  try {
+    return typeof __BUILD_STAMP__ === "string" ? __BUILD_STAMP__ : "unknown";
+  } catch {
+    return "unknown";
+  }
+}
+
 export function ephemeral(): boolean {
   try {
     return new URL(window.location.href).searchParams.get("ephemeral") === "1";
@@ -144,19 +161,34 @@ export function ephemeral(): boolean {
   }
 }
 
-export function isInstalled(): boolean {
+/**
+ * What the browser says this is — REPORTED, never acted on.
+ *
+ * Twice this decided how to sign somebody in, and twice it was wrong: this
+ * page ships no manifest and no `apple-mobile-web-app-capable`, so iOS says
+ * `display: browser` and no `navigator.standalone` even from a Home Screen
+ * icon, and the branch meant for a phone never ran on one. It stays only
+ * because seeing what a device claims is how that was finally worked out, and
+ * it is in the diagnostics for the next person looking.
+ */
+export function reportedDisplay(): { standalone: string; mode: string } {
   try {
-    if ((navigator as unknown as { standalone?: boolean }).standalone === true) return true;
-    return typeof matchMedia === "function" && matchMedia("(display-mode: standalone)").matches;
+    const standalone = (navigator as unknown as { standalone?: boolean }).standalone;
+    return {
+      standalone: standalone === undefined ? "absent" : String(standalone),
+      mode:
+        typeof matchMedia === "function" && matchMedia("(display-mode: standalone)").matches
+          ? "standalone"
+          : "browser",
+    };
   } catch {
-    return false;
+    return { standalone: "unknown", mode: "unknown" };
   }
 }
 
 class FirebaseSession implements Session {
   private readonly app: FirebaseApp;
   private readonly auth: Auth;
-  private readonly installed = isInstalled();
   private listeners: ((user: User | null) => void)[] = [];
   private readonly settled: Promise<void>;
   private failure: string | null = null;
@@ -181,7 +213,10 @@ class FirebaseSession implements Session {
     this.auth = initializeAuth(this.app, {
       persistence: ephemeral()
         ? [browserSessionPersistence]
-        : [indexedDBLocalPersistence, browserLocalPersistence],
+        // Session storage last, as a floor rather than a choice: a browser
+        // that refuses both of the durable ones should still be able to
+        // complete a redirect, even if it forgets afterwards.
+        : [indexedDBLocalPersistence, browserLocalPersistence, browserSessionPersistence],
     });
 
     this.settled = new Promise<void>((resolve) => {
@@ -224,16 +259,13 @@ class FirebaseSession implements Session {
   }
 
   diagnostics(): string {
-    const standalone = (navigator as unknown as { standalone?: boolean }).standalone;
-    const mode =
-      typeof matchMedia === "function" && matchMedia("(display-mode: standalone)").matches
-        ? "standalone"
-        : "browser";
+    const reported = reportedDisplay();
     return [
       `kept: ${ephemeral() ? "for this tab only" : "on this device"}`,
-      `sign-in: ${this.installed ? "redirect" : "popup"}`,
-      `display: ${mode}`,
-      `navigator.standalone: ${standalone === undefined ? "absent" : String(standalone)}`,
+      `sign-in: redirect`,
+      `build: ${buildStamp()}`,
+      `display: ${reported.mode}`,
+      `navigator.standalone: ${reported.standalone}`,
       `authDomain: ${this.auth.config.authDomain ?? "?"}`,
       `origin: ${window.location.origin}`,
     ].join(" · ");
@@ -246,33 +278,32 @@ class FirebaseSession implements Session {
     return this.user ? null : this.failure;
   }
 
+  /**
+   * Always by redirect. No popup, and nothing conditional.
+   *
+   * This is the third attempt at the Home Screen problem and the previous two
+   * both failed the same way: they branched on whether the app reported
+   * itself as installed, and this page reports `display: browser` and no
+   * `navigator.standalone`, so the popup branch ran every time.
+   *
+   * The popup cannot work from a Home Screen icon. iOS has no child-window
+   * relationship to give it, so what opens is Safari — a context with no
+   * opener to report back to. The sign-in genuinely succeeds there and the
+   * result is never delivered, which is why it looked like nothing had
+   * happened. Worse, it does not FAIL: `signInWithPopup` is left waiting for
+   * a message that will never arrive, so the fallback written to catch a
+   * refused popup never fired either.
+   *
+   * A redirect has none of that. The context navigates and comes back to the
+   * same origin carrying the credential, which works in a Home Screen web
+   * clip, in Safari, and on a desktop. It costs a page navigation instead of
+   * a popup, and that is a price worth paying for a sign-in that works
+   * everywhere rather than one that works where the detection happens to be
+   * right.
+   */
   async signIn(): Promise<void> {
-    if (this.installed) {
-      // The whole app navigates and comes back. Nothing after this runs.
-      await signInWithRedirect(this.auth, new GoogleAuthProvider());
-      return;
-    }
-    try {
-      await signInWithPopup(this.auth, new GoogleAuthProvider());
-    } catch (error) {
-      /**
-       * A browser that would not give us a popup, in a context that did not
-       * look installed.
-       *
-       * Rather than tell somebody their sign-in failed when the only thing
-       * that failed was the manner of asking, fall back to the redirect —
-       * which works anywhere.
-       */
-      const code = (error as { code?: string }).code ?? "";
-      const popupTrouble =
-        code.includes("popup-blocked") ||
-        code.includes("popup-closed-by-user") ||
-        code.includes("operation-not-supported") ||
-        code.includes("cancelled-popup-request");
-      if (!popupTrouble) throw error;
-      if (code.includes("popup-closed-by-user")) return;
-      await signInWithRedirect(this.auth, new GoogleAuthProvider());
-    }
+    // Nothing after this runs: the page navigates away and returns.
+    await signInWithRedirect(this.auth, new GoogleAuthProvider());
   }
 
   async signOut(): Promise<void> {
