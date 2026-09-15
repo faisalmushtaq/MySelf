@@ -2837,6 +2837,18 @@ function wireSignIn(): void {
       $("bootNote").innerHTML = `<div class="alert">Could not sign in: ${escapeHtml(error.message)}</div>`;
     });
   });
+
+  /**
+   * A sign-in that came back and failed, said on the page.
+   *
+   * Installed on a Home Screen there is no console and no address bar, so a
+   * redirect that returns and fails is indistinguishable from never having
+   * signed in: the button is simply there again. This is the difference
+   * between "it does not work" and knowing which part did not.
+   */
+  void session.trouble().then((why) => {
+    if (why) $("bootNote").innerHTML = `<div class="alert">${escapeHtml(why)}</div>`;
+  });
   out.addEventListener("click", () => void session.signOut());
 }
 
