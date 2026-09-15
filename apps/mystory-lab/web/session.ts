@@ -51,19 +51,29 @@ import {
  * app's own web view, so the credential comes back to the container that
  * asked for it. In an ordinary tab the popup is still nicer and still used.
  *
- * AND THE SESSION HAD TO SURVIVE THE APP BEING CLOSED. Persistence was
- * `browserSessionPersistence` — `sessionStorage`, which is emptied when the
- * context goes away. iOS reclaims standalone web apps aggressively, so every
- * return to the Home Screen icon was a fresh context and an empty store: even
- * a credential that HAD landed correctly would have been gone by the time
- * anybody looked. Installed, persistence is now IndexedDB, which survives the
- * app being closed and reopened.
+ * AND THE SESSION HAD TO SURVIVE THE APP BEING CLOSED. This is the one that
+ * actually caused it. Persistence was `browserSessionPersistence` —
+ * `sessionStorage`, which belongs to one browsing context and is empty in the
+ * next one. A Home Screen icon opens a fresh context every time it is tapped,
+ * so the sign-in was never "lost": it was written into a context that no
+ * longer existed by the time anybody came back. In Safari with the tab left
+ * open it survives, which is exactly why it "works fine in Safari".
  *
- * The original reason for scoping it to the tab was a good one — somebody
+ * PERSISTENCE IS NOW DURABLE UNCONDITIONALLY, and that is the correction to a
+ * first attempt at this. That attempt made the durable choice conditional on
+ * the app reporting itself as installed — `navigator.standalone`, or a
+ * `display-mode: standalone` media query. This page ships no web app manifest
+ * and no `apple-mobile-web-app-capable`, so iOS does not run it in standalone
+ * display mode and BOTH of those report false. The condition was never true
+ * on the device it was written for, the old branch ran, and the bug was
+ * unchanged. A fix that depends on a signal the page does not emit is not a
+ * fix.
+ *
+ * The original reason for scoping it to the tab was a real one — somebody
  * demonstrating this on a borrowed laptop should not leave their account
- * behind — and it still holds in a browser tab, where it still applies. An
- * app somebody deliberately installed on their own phone is the case it was
- * never about.
+ * behind. That case is served by `?ephemeral=1`, which is a deliberate act by
+ * the person doing the demonstrating, rather than by a guess about the
+ * environment that quietly breaks everybody else.
  */
 
 declare const __FIREBASE_CONFIG__: string;
@@ -91,6 +101,17 @@ export interface Session {
    * rewritten for, arrived at from the other side.
    */
   trouble(): Promise<string | null>;
+  /**
+   * What this browser reported, and what was chosen because of it.
+   *
+   * Put on the page rather than kept for a console, because the failure this
+   * module exists to fix happens on a phone opened from a Home Screen icon —
+   * no console, no address bar, and nothing to distinguish "signed out" from
+   * "signed in somewhere you cannot see". Two rounds of this were diagnosed
+   * from guesses about what iOS reports; one line of what it ACTUALLY reports
+   * would have settled it immediately.
+   */
+  diagnostics(): string;
   signIn(): Promise<void>;
   signOut(): Promise<void>;
   /** A fresh ID token for the relay, or null when nobody is signed in. */
@@ -115,6 +136,14 @@ function parseConfig(): Record<string, string> | null {
  * true means there is no useful popup and no reason to forget the sign-in when
  * the app is closed.
  */
+export function ephemeral(): boolean {
+  try {
+    return new URL(window.location.href).searchParams.get("ephemeral") === "1";
+  } catch {
+    return false;
+  }
+}
+
 export function isInstalled(): boolean {
   try {
     if ((navigator as unknown as { standalone?: boolean }).standalone === true) return true;
@@ -150,9 +179,9 @@ class FirebaseSession implements Session {
      * that will not give us IndexedDB (a private window, mostly).
      */
     this.auth = initializeAuth(this.app, {
-      persistence: this.installed
-        ? [indexedDBLocalPersistence, browserLocalPersistence]
-        : [browserSessionPersistence],
+      persistence: ephemeral()
+        ? [browserSessionPersistence]
+        : [indexedDBLocalPersistence, browserLocalPersistence],
     });
 
     this.settled = new Promise<void>((resolve) => {
@@ -192,6 +221,22 @@ class FirebaseSession implements Session {
 
   ready(): Promise<void> {
     return this.settled;
+  }
+
+  diagnostics(): string {
+    const standalone = (navigator as unknown as { standalone?: boolean }).standalone;
+    const mode =
+      typeof matchMedia === "function" && matchMedia("(display-mode: standalone)").matches
+        ? "standalone"
+        : "browser";
+    return [
+      `kept: ${ephemeral() ? "for this tab only" : "on this device"}`,
+      `sign-in: ${this.installed ? "redirect" : "popup"}`,
+      `display: ${mode}`,
+      `navigator.standalone: ${standalone === undefined ? "absent" : String(standalone)}`,
+      `authDomain: ${this.auth.config.authDomain ?? "?"}`,
+      `origin: ${window.location.origin}`,
+    ].join(" · ");
   }
 
   async trouble(): Promise<string | null> {
@@ -257,6 +302,9 @@ const unavailable: Session = {
   async ready() {},
   async trouble() {
     return null;
+  },
+  diagnostics() {
+    return "no Firebase project configured in this build";
   },
   async signIn() {
     throw new Error("this build has no Firebase project configured, so it cannot sign anybody in");

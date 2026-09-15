@@ -15,9 +15,17 @@ function installedFrom(env: { standalone?: boolean; displayMode?: boolean }): bo
   return env.displayMode === true;
 }
 
-/** The decisions that follow from it. */
-const persistenceFor = (installed: boolean) =>
-  installed ? ["indexedDBLocal", "browserLocal"] : ["browserSession"];
+/**
+ * The decisions that follow.
+ *
+ * Persistence deliberately does NOT depend on `installed`. A first attempt
+ * made it conditional on the app reporting itself standalone; this page ships
+ * no manifest and no `apple-mobile-web-app-capable`, so iOS reports it as an
+ * ordinary browser, the condition was never true on the device it was written
+ * for, and the bug was unchanged.
+ */
+const persistenceFor = (opts: { ephemeral: boolean }) =>
+  opts.ephemeral ? ["browserSession"] : ["indexedDBLocal", "browserLocal"];
 const methodFor = (installed: boolean) => (installed ? "redirect" : "popup");
 
 describe("whether this is an installed app or a tab", () => {
@@ -34,37 +42,38 @@ describe("whether this is an installed app or a tab", () => {
   });
 });
 
-describe("what an installed app gets", () => {
-  it("keeps the sign-in across the app being closed", () => {
-    // sessionStorage is emptied when the context goes away, and iOS reclaims
-    // standalone web apps constantly — every return to the icon was a fresh
-    // context and an empty store.
-    expect(persistenceFor(true)).toContain("indexedDBLocal");
-    expect(persistenceFor(true)).not.toContain("browserSession");
+describe("keeping the sign-in", () => {
+  it("is durable whatever the browser says it is", () => {
+    // THE REGRESSION TEST. A Home Screen icon opens a fresh browsing context
+    // every time, so sessionStorage is empty on every launch — and this page
+    // reports itself as an ordinary browser, so any rule keyed on "installed"
+    // never fires. Durability cannot be conditional on that signal.
+    for (const installed of [true, false]) {
+      void installed;
+      expect(persistenceFor({ ephemeral: false })).toEqual(["indexedDBLocal", "browserLocal"]);
+    }
   });
 
   it("falls back to local storage where IndexedDB is refused", () => {
     // A private window, mostly. Losing the sign-in is better than failing to
     // start at all.
-    expect(persistenceFor(true)).toEqual(["indexedDBLocal", "browserLocal"]);
+    expect(persistenceFor({ ephemeral: false })[1]).toBe("browserLocal");
   });
 
-  it("signs in by redirect, because a standalone app has no popup", () => {
-    // A popup needs a second window to talk back to the first. iOS hands the
-    // URL to Safari instead: the sign-in succeeds in Safari's container and
-    // the app that asked is never told.
-    expect(methodFor(true)).toBe("redirect");
+  it("is forgotten only when somebody deliberately asks", () => {
+    // The borrowed-laptop case the original was protecting, served by an act
+    // rather than by a guess about the environment.
+    expect(persistenceFor({ ephemeral: true })).toEqual(["browserSession"]);
   });
 });
 
-describe("what a browser tab still gets", () => {
-  it("forgets the sign-in when the tab goes, as it always did", () => {
-    // The borrowed-laptop case the original was written for, which still
-    // holds in a tab and was never about an app somebody installed.
-    expect(persistenceFor(false)).toEqual(["browserSession"]);
+describe("how it asks", () => {
+  it("redirects from a genuinely standalone app, which has no popup", () => {
+    // A popup needs a second window to talk back to the first.
+    expect(methodFor(true)).toBe("redirect");
   });
 
-  it("uses a popup, which is the nicer thing where it works", () => {
+  it("uses a popup in a tab, which is the nicer thing where it works", () => {
     expect(methodFor(false)).toBe("popup");
   });
 });
