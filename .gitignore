@@ -8,3 +8,6 @@ dist/
 # step of getting a key working failed with "No such file or directory".
 !.env.example
 coverage/
+# Playwright's own output. Traces are large and are uploaded by CI on failure.
+test-results/
+playwright-report/

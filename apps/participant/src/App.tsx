@@ -21,7 +21,8 @@ import {
   type SessionRow,
   type StoredSessionCounts,
 } from "./lib/db.js";
-import { buildDeviceExport, downloadExport } from "./lib/export.js";
+import { buildSealedExport, downloadExport } from "./lib/export.js";
+import { passphraseComplaint } from "@myself/store";
 import {
   applyAccessibilityPreferences,
   DEFAULT_ACCESSIBILITY_PREFERENCES,
@@ -29,6 +30,7 @@ import {
 } from "./lib/accessibility.js";
 import { checkpointRunningSessions, synchroniseCompletedSessions } from "./lib/sync.js";
 import { currentDevice, enrolDevice, syncAvailable, withdrawDevice } from "./lib/device.js";
+import { updates } from "./lib/updates.js";
 import { SessionTiming, wordCount } from "./lib/timing.js";
 import { ReviewScreen } from "./components/ReviewScreen.js";
 import { SurveyScreen } from "./components/SurveyScreen.js";
@@ -105,6 +107,9 @@ export default function App() {
   const [syncBusy, setSyncBusy] = useState(false);
   const [device, setDevice] = useState<Enrolment | null>(null);
   const [enrolToken, setEnrolToken] = useState("");
+  // Typed at export and never stored: an iPad that is lost surrenders no way to
+  // read the files it wrote.
+  const [passphrase, setPassphrase] = useState("");
   const [syncNote, setSyncNote] = useState<string | null>(null);
   const [codeError, setCodeError] = useState<string | null>(null);
   const [accessibility, setAccessibility] = useState<AccessibilityPreferences>(DEFAULT_ACCESSIBILITY_PREFERENCES);
@@ -210,6 +215,19 @@ export default function App() {
     void refreshDeviceStatus();
     void navigator.storage?.persist?.();
   }, [phase.kind, refreshDeviceStatus]);
+
+  /**
+   * Keep a new build out until this participant has finished.
+   *
+   * A service worker taking over reloads the page, and a reload part-way through
+   * a questionnaire puts somebody back on the start screen — so an update that
+   * arrives mid-sitting waits for the start screen, which is where a device sits
+   * between participants anyway.
+   */
+  useEffect(() => {
+    if (phase.kind === "start") updates.release();
+    else updates.hold();
+  }, [phase.kind]);
 
   useEffect(() => {
     if (online && (phase.kind === "start" || phase.kind === "finished")) void runSync();
@@ -728,16 +746,39 @@ export default function App() {
                   </button>
                 </div>
               )}
+              {/*
+                The passphrase is the STUDY's, not this device's, so a researcher
+                with six iPads on a table types one phrase six times rather than
+                keeping six secrets — and the researcher view needs one phrase to
+                read whatever arrives. Never stored here.
+              */}
+              <label className="field">
+                <span className="field-label">Study passphrase, to encrypt the file</span>
+                <input
+                  className="text-input"
+                  type="password"
+                  value={passphrase}
+                  autoComplete="off"
+                  onChange={(event) => setPassphrase(event.target.value)}
+                />
+              </label>
               <div className="handover-actions">
                 <button
                   type="button"
                   className="secondary"
-                  disabled={counts.completed === 0}
+                  disabled={counts.completed === 0 || passphraseComplaint(passphrase) !== null}
+                  title={passphraseComplaint(passphrase) ?? undefined}
                   onClick={() => {
                     void (async () => {
-                      const data = await buildDeviceExport();
-                      downloadExport(data);
-                      setHandoverNote(`${data.sessions.length} session${data.sessions.length === 1 ? "" : "s"} written`);
+                      try {
+                        const { envelope } = await buildSealedExport(passphrase);
+                        downloadExport(envelope);
+                        setHandoverNote(
+                          `${envelope.sittings} session${envelope.sittings === 1 ? "" : "s"} written, encrypted. Keep the sitting${envelope.sittings === 1 ? "" : "s"} on this device until the file is stored and checked.`,
+                        );
+                      } catch (error) {
+                        setHandoverNote(error instanceof Error ? error.message : "Could not write the file.");
+                      }
                     })();
                   }}
                 >
@@ -746,18 +787,28 @@ export default function App() {
                 <button
                   type="button"
                   className="secondary"
-                  disabled={counts.completed + counts.inProgress === 0}
+                  disabled={counts.completed + counts.inProgress === 0 || passphraseComplaint(passphrase) !== null}
+                  title={passphraseComplaint(passphrase) ?? undefined}
                   onClick={() => {
                     void (async () => {
-                      const data = await buildDeviceExport({ includeInProgress: true });
-                      downloadExport(data, "device-all");
-                      setHandoverNote(`${data.sessions.length} session${data.sessions.length === 1 ? "" : "s"} written, unfinished included`);
+                      try {
+                        const { envelope } = await buildSealedExport(passphrase, { includeInProgress: true });
+                        downloadExport(envelope, "device-all");
+                        setHandoverNote(
+                          `${envelope.sittings} session${envelope.sittings === 1 ? "" : "s"} written, encrypted, unfinished included.`,
+                        );
+                      } catch (error) {
+                        setHandoverNote(error instanceof Error ? error.message : "Could not write the file.");
+                      }
                     })();
                   }}
                 >
                   Include unfinished
                 </button>
               </div>
+              {passphrase.length > 0 && passphraseComplaint(passphrase) && (
+                <p className="hint">{passphraseComplaint(passphrase)}</p>
+              )}
               <div className="handover-actions">
                 {/*
                   The only delete in the app, and it cannot reach an unconfirmed

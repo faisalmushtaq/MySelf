@@ -8,10 +8,16 @@ import {
   searchPeople,
   setUpn,
   withdrawCorrection,
+  createIdentityVault,
+  identityIsUnlocked,
+  identityVaultExists,
+  lockIdentity,
+  unlockIdentity,
   type AccessRecord,
   type CodeCorrection,
   type PersonRecord,
 } from "../lib/db.js";
+import { passphraseComplaint } from "../lib/vault.js";
 
 /**
  * Linkage — the only screen in this tool that shows a name.
@@ -26,6 +32,19 @@ import {
  * reason is stored with the lookup. That does not stop anybody — it means
  * there is an account of what was looked at and why, which is the achievable
  * goal and the one an ethics committee will ask about.
+ *
+ * AND IT IS LOCKED. The names, dates of birth, UPNs and NHS numbers behind this
+ * screen used to sit in IndexedDB in the clear, in a browser with no sign-in and
+ * no lock, on a laptop that goes home in a bag — while the participant app has
+ * encrypted its far less sensitive storage since the first version. They are now
+ * sealed under a study passphrase that is never written to the machine, so a
+ * closed laptop holds names it cannot read.
+ *
+ * The lock is here rather than over the whole app on purpose: the sittings are
+ * keyed by participant code and carry no names, so the overview, the table and
+ * the export all work locked. Only this screen needs the passphrase, which means
+ * it is typed when somebody actually has linkage work to do rather than every
+ * morning as a matter of routine.
  */
 
 export function Linkage({ onCorrectionsChanged }: { onCorrectionsChanged: () => void }) {
@@ -40,6 +59,7 @@ export function Linkage({ onCorrectionsChanged }: { onCorrectionsChanged: () => 
   const [live, setLive] = useState<CodeCorrection[]>([]);
   const [log, setLog] = useState<AccessRecord[]>([]);
   const [showLog, setShowLog] = useState(false);
+  const [unlocked, setUnlocked] = useState(identityIsUnlocked());
 
   const refresh = () => {
     void corrections().then(setLive);
@@ -47,11 +67,69 @@ export function Linkage({ onCorrectionsChanged }: { onCorrectionsChanged: () => 
   };
   useEffect(refresh, []);
 
+  /**
+   * Lock it again when nobody is there.
+   *
+   * A laptop left open on a staffroom table with the names on screen is the
+   * ordinary case, not the paranoid one. Fifteen minutes of the tab being hidden
+   * or the window being unfocused is long enough not to interrupt somebody
+   * cross-checking a spreadsheet, and short enough to matter over a lunch break.
+   */
+  useEffect(() => {
+    if (!unlocked) return;
+    let timer: number | undefined;
+    const lock = () => {
+      lockIdentity();
+      setUnlocked(false);
+      setFound(null);
+      setHits(null);
+    };
+    const arm = () => {
+      window.clearTimeout(timer);
+      if (document.hidden) timer = window.setTimeout(lock, 15 * 60 * 1000);
+    };
+    document.addEventListener("visibilitychange", arm);
+    arm();
+    return () => {
+      window.clearTimeout(timer);
+      document.removeEventListener("visibilitychange", arm);
+    };
+  }, [unlocked]);
+
   const ready = why.trim().length >= 12;
+
+  if (!unlocked) {
+    return (
+      <VaultGate
+        onUnlocked={() => {
+          setUnlocked(true);
+          refresh();
+          // Names are derived from the sittings on every load and skipped while
+          // the vault is locked, so unlocking has to ask for that derivation
+          // again — otherwise the table is empty until the page is reloaded.
+          onCorrectionsChanged();
+        }}
+      />
+    );
+  }
 
   return (
     <section className="panel linkage">
       <h2>Linkage</h2>
+      <div className="handover-actions">
+        <button
+          type="button"
+          className="secondary"
+          onClick={() => {
+            lockIdentity();
+            setUnlocked(false);
+            setFound(null);
+            setHits(null);
+          }}
+        >
+          Lock
+        </button>
+      </div>
       <p className="note">
         The only place this tool shows a name. Use it to repair a code somebody gave wrongly, or to record the UPN
         a school has provided. Every lookup is recorded below with the reason you give — including the ones that
@@ -325,6 +403,91 @@ export function Linkage({ onCorrectionsChanged }: { onCorrectionsChanged: () => 
           </tbody>
         </table>
       )}
+    </section>
+  );
+}
+
+/**
+ * The passphrase screen.
+ *
+ * Two states rather than one, because "set a passphrase" and "type the
+ * passphrase" are different situations and a single prompt would silently let
+ * somebody create a second vault by mistyping the first — which would read as
+ * every name in the study having vanished.
+ */
+function VaultGate({ onUnlocked }: { onUnlocked: () => void }) {
+  const [exists, setExists] = useState<boolean | null>(null);
+  const [passphrase, setPassphrase] = useState("");
+  const [again, setAgain] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    void identityVaultExists().then(setExists);
+  }, []);
+
+  if (exists === null) return <section className="panel linkage" />;
+
+  const complaint = passphraseComplaint(passphrase);
+  const mismatched = !exists && again !== passphrase;
+
+  const submit = () => {
+    setBusy(true);
+    setError(null);
+    void (async () => {
+      try {
+        if (exists) await unlockIdentity(passphrase);
+        else await createIdentityVault(passphrase);
+        setPassphrase("");
+        setAgain("");
+        onUnlocked();
+      } catch (problem) {
+        setError(problem instanceof Error ? problem.message : "could not unlock");
+      } finally {
+        setBusy(false);
+      }
+    })();
+  };
+
+  return (
+    <section className="panel linkage">
+      <h2>{exists ? "Unlock linkage" : "Set the linkage passphrase"}</h2>
+      <p className="note">
+        {exists
+          ? "The names behind this screen are encrypted on this laptop. The passphrase is the study's, shared with whoever does linkage, and is not stored here — so if it is lost the names are rebuilt from the sittings the next time a new one is set."
+          : "Choose the study's linkage passphrase. It encrypts every name, date of birth, UPN and NHS number this laptop holds, and it is not stored anywhere on the machine. Keep it where the study keeps its other credentials, not in this browser."}
+      </p>
+      <label className="field">
+        <span className="field-label">Passphrase</span>
+        <input
+          className="search wide"
+          type="password"
+          value={passphrase}
+          autoComplete="off"
+          onChange={(e) => setPassphrase(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !complaint && !mismatched) submit();
+          }}
+        />
+      </label>
+      {!exists && (
+        <label className="field">
+          <span className="field-label">Passphrase again</span>
+          <input
+            className="search wide"
+            type="password"
+            value={again}
+            autoComplete="off"
+            onChange={(e) => setAgain(e.target.value)}
+          />
+        </label>
+      )}
+      {passphrase.length > 0 && complaint && <p className="note">{complaint}</p>}
+      {mismatched && again.length > 0 && <p className="note warn">Those two do not match.</p>}
+      {error && <p className="note warn">{error}</p>}
+      <button type="button" className="secondary" disabled={busy || complaint !== null || mismatched} onClick={submit}>
+        {exists ? "Unlock" : "Set passphrase"}
+      </button>
     </section>
   );
 }

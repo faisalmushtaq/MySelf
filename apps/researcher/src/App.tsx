@@ -65,6 +65,9 @@ export default function App() {
   const [user, setUser] = useState<StudyUser | null>(null);
   const [pulling, setPulling] = useState(false);
   const [pullNote, setPullNote] = useState<string | null>(null);
+  // The study passphrase the iPads encrypted their handover files with. Held in
+  // memory for the length of a sitting at the laptop, never written down here.
+  const [passphrase, setPassphrase] = useState("");
 
   const reload = useCallback(async () => {
     setBusy(true);
@@ -133,7 +136,7 @@ export default function App() {
     setBusy(true);
     const next: ImportReport[] = [];
     for (const file of Array.from(files)) {
-      next.push(await importExportFile(file.name, await file.text()));
+      next.push(await importExportFile(file.name, await file.text(), passphrase));
     }
     setReports((r) => [...next, ...r].slice(0, 8));
     await reload();
@@ -352,6 +355,16 @@ export default function App() {
             sittings are matched on their identifier — so it is safe to re-import when you are not sure, and a sitting
             that arrives by both roads is one sitting.
           </p>
+          <label className="field">
+            <span className="field-label">Study passphrase, to open encrypted handover files</span>
+            <input
+              className="text-input"
+              type="password"
+              value={passphrase}
+              autoComplete="off"
+              onChange={(e) => setPassphrase(e.target.value)}
+            />
+          </label>
           <input
             id="import-file"
             type="file"

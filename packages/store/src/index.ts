@@ -1,6 +1,7 @@
 export * from "./bids.js";
 export * from "./dataset.js";
 export * from "./demo.js";
+export * from "./envelope.js";
 export * from "./identity.js";
 export * from "./ingest.js";
 export * from "./narratives.js";

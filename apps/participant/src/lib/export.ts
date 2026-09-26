@@ -1,5 +1,6 @@
 import { db, deviceKey } from "./db.js";
 import { unseal } from "./crypto.js";
+import { sealExport, type EncryptedEnvelope } from "@myself/store";
 
 /**
  * Handover: taking the sittings off this iPad.
@@ -11,9 +12,15 @@ import { unseal } from "./crypto.js";
  * about what the record contains; that is what makes a re-ingest years later
  * able to fix a bug in the reader rather than being stuck with its output.
  *
- * The file is plaintext responses and must be treated as such: it goes to
- * approved storage, not a personal folder, and the device copy is only deleted
- * once the transfer has been confirmed.
+ * THE FILE IS ENCRYPTED UNDER THE STUDY PASSPHRASE. It used to be plaintext, with
+ * a comment here asking for it to be treated carefully — which made the device's
+ * own AES-GCM storage largely decorative, since the data left by the unlocked
+ * door. A handover file crosses a room on a USB stick or an AirDrop and is the
+ * copy most likely to end up somewhere nobody planned.
+ *
+ * Losing the passphrase is recoverable: exporting removes nothing from the
+ * device, so a file nobody can open can simply be written again. That is what
+ * makes encryption the only format here rather than an option for careful days.
  */
 
 export const EXPORT_FORMAT = "myself.device.export.v1";
@@ -99,18 +106,35 @@ export async function buildDeviceExport(options: ExportOptions = {}): Promise<De
   };
 }
 
-/** Offer the export as a download, named so a folder of them sorts by date. */
-export function downloadExport(data: DeviceExport, deviceLabel = "device"): void {
+/**
+ * Offer the export as a download, named so a folder of them sorts by date.
+ *
+ * Takes an already-sealed envelope rather than sealing here, so that there is no
+ * overload of this function that writes a plaintext file — the thing that must
+ * not exist is easier to prevent by leaving nowhere to put it.
+ */
+export function downloadExport(envelope: EncryptedEnvelope, deviceLabel = "device"): void {
+  const data = envelope;
   const stamp = data.exportedAt.slice(0, 19).replace(/[:T]/g, "").replace(/-/g, "");
   const blob = new Blob([JSON.stringify(data)], { type: "application/json" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `myself_${deviceLabel}_${stamp}.json`;
+  a.download = `myself_${deviceLabel}_${stamp}.myself.json`;
   document.body.appendChild(a);
   a.click();
   a.remove();
   // Revoke on the next tick: Safari has not necessarily started the download
   // by the time click() returns.
   setTimeout(() => URL.revokeObjectURL(url), 30_000);
+}
+
+/** Build and seal in one step, which is the only way the app offers a file. */
+export async function buildSealedExport(
+  passphrase: string,
+  options: ExportOptions = {},
+): Promise<{ envelope: EncryptedEnvelope; sessionIds: string[] }> {
+  const data = await buildDeviceExport(options);
+  const envelope = await sealExport(data, passphrase, data.sessions.length);
+  return { envelope, sessionIds: data.sessions.map((session) => session.sessionId) };
 }

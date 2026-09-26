@@ -2,7 +2,7 @@
   "name": "myself",
   "version": "0.1.0",
   "private": true,
-  "description": "MySelf — research platform for self-report surveys and LLM-supported micro-narrative research",
+  "description": "MySelf \u2014 research platform for self-report surveys and LLM-supported micro-narrative research",
   "engines": {
     "node": ">=22",
     "pnpm": ">=10"
@@ -11,9 +11,11 @@
     "build": "pnpm -r build",
     "test": "pnpm -r test",
     "typecheck": "pnpm -r typecheck",
-    "lint": "pnpm -r lint"
+    "lint": "pnpm -r lint",
+    "test:e2e": "playwright test"
   },
   "devDependencies": {
+    "@playwright/test": "^1.62.1",
     "playwright-core": "^1.62.1",
     "typescript": "^5.6.0"
   }
