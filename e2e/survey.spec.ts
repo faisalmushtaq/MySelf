@@ -211,8 +211,12 @@ async function chooseAnOption(page: Page, selector: string): Promise<boolean> {
  */
 async function position(page: Page): Promise<string> {
   return page.evaluate(() => {
-    const finished = document.querySelector(".screen.finished, .finish");
-    if (finished) return "finished";
+    // The app's own phase, read off the outermost screen's class list. Matching
+    // on a bare `.finish` risked a false positive from any element that happened
+    // to carry the class; the wrapper is unambiguous.
+    const screen = document.querySelector(".screen");
+    if (screen?.classList.contains("finish")) return "finished";
+    if (screen?.classList.contains("start")) return "start";
     const heading = document.querySelector(".survey h1, .screen h1");
     const segments = document.querySelector(".segments")?.getAttribute("aria-label") ?? "";
     /**
@@ -224,12 +228,16 @@ async function position(page: Page): Promise<string> {
      * moved at all, and the walk fails on a screen that is working perfectly.
      */
     const step = document.querySelector(".survey-body p")?.textContent?.slice(0, 60) ?? "";
-    // How many options are currently chosen, so ticking one more counts as
-    // progress on a screen that needs several.
-    const chosen = document.querySelectorAll(
-      '.survey-body .selected, .survey-body .on, .survey-body [aria-pressed="true"], .survey-body [aria-checked="true"]',
-    ).length;
-    return `${segments}|${heading?.textContent?.slice(0, 80) ?? ""}|${step}|${chosen}`;
+    /**
+     * Deliberately NOT including how many options are selected.
+     *
+     * It was here so that ticking a box counted as progress, and that made the
+     * walk loop: `step` treats any change as "the survey moved on", so selecting
+     * a second option on a multi-select looked like advancing and the walker
+     * stayed on one screen until it ran out of screens. Progress is a new
+     * question or a new step in one — not a changed answer to the same question.
+     */
+    return `${segments}|${heading?.textContent?.slice(0, 80) ?? ""}|${step}`;
   });
 }
 
@@ -260,13 +268,43 @@ async function advance(page: Page): Promise<void> {
     await button.click({ timeout: 5_000 });
     return;
   }
-  throw new Error("no way forward from this screen: nothing enabled to click");
+  const where = await page.evaluate(() => ({
+    classes: document.querySelector(".screen")?.className ?? "(no .screen)",
+    heading: document.querySelector("h1")?.textContent?.slice(0, 60) ?? "",
+    buttons: [...document.querySelectorAll("button")]
+      .filter((b) => !(b as HTMLButtonElement).disabled)
+      .map((b) => `${b.className}:${b.textContent?.slice(0, 24) ?? ""}`)
+      .slice(0, 8),
+  }));
+  throw new Error(
+    `no way forward from this screen: nothing recognised to click. ${JSON.stringify(where)}`,
+  );
 }
 
-/** Answer and advance, and insist that the screen actually changed. */
+/**
+ * Answer, advance, and insist that the screen actually changed.
+ *
+ * SOME CONTROLS ADVANCE THEMSELVES. Tapping a tile or a card can move the survey
+ * on without Next being touched — which is right for a child answering a battery
+ * of single-choice items, and it means the screen may already have changed by the
+ * time this would have clicked anything. Clicking anyway lands on the NEXT
+ * screen's Next button, skipping an item; on the last item it lands on the finish
+ * screen, where there is no Next at all and the walk reported being stuck one
+ * screen short of the end.
+ *
+ * So the move is checked for before it is asked for.
+ */
 async function step(page: Page): Promise<void> {
   const before = await position(page);
   await answerCurrentScreen(page);
+
+  // A short grace period: an auto-advancing control needs a moment to re-render,
+  // and this must not be long enough to make a several-hundred-screen walk slow.
+  for (let waited = 0; waited < 600; waited += 100) {
+    if ((await position(page)) !== before) return;
+    await page.waitForTimeout(100);
+  }
+
   await advance(page);
   await expect
     .poll(() => position(page), { timeout: 10_000, message: `the survey did not move on from ${before}` })
