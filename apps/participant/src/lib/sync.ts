@@ -10,6 +10,13 @@ import {
   type SyncSession,
 } from "./db.js";
 import { syncTarget, type SyncTarget } from "./device.js";
+import {
+  confirmationProblem,
+  sittingsResponse,
+  type SittingOutcome,
+  type SittingsResponse,
+  type SittingUpload,
+} from "@myself/store";
 
 /**
  * Getting a sitting off this iPad and into the study.
@@ -36,25 +43,15 @@ import { syncTarget, type SyncTarget } from "./device.js";
  * launch, on connectivity returning, and from the explicit operator control.
  */
 
-export interface SittingsRequest {
-  deviceId: string;
-  sittings: SyncSession[];
-}
-
-/** One sitting's fate, exactly as `saveSitting` reports it. */
-export interface SittingOutcome {
-  sessionId: string;
-  stored: boolean;
-  events: number;
-  chunks: number;
-  quarantined: boolean;
-  reason?: string;
-}
-
-export interface SittingsResponse {
-  stored: number;
-  outcomes: SittingOutcome[];
-}
+/**
+ * The wire format is `@myself/store`'s, not this file's.
+ *
+ * It used to be declared here as well as in the function, which is two descriptions
+ * of one protocol with nothing making them agree — and the failure is silent: a
+ * device that reads a field the server stopped sending confirms sittings the study
+ * does not have, and then deletes them.
+ */
+export type { SittingOutcome, SittingsResponse } from "@myself/store";
 
 export type SyncOutcome =
   | { kind: "synced"; sessionId: string; events: number }
@@ -245,7 +242,7 @@ async function post(
       // The installation id travels in the body as well as being proved by the
       // credential, so a handover file — which carries no credential — files
       // under the same device as a network upload from the same iPad.
-      body: JSON.stringify({ deviceId: target.installId, sittings: [session] } satisfies SittingsRequest),
+      body: JSON.stringify({ deviceId: target.installId, sittings: [session] } satisfies SittingUpload),
       signal: controller.signal,
     });
     const body: unknown = await response.json().catch(() => null);
@@ -262,47 +259,30 @@ async function post(
 /**
  * Did the study actually take everything this device sent?
  *
- * The event count is the check, because it is the one thing the server reports
- * that a truncated or partially-written upload cannot fake: `saveSitting`
- * answers with the count on the document it wrote, read back from its own split.
- * Fewer events stored than sent means some did not land, and the only safe
- * reading of that is that this sitting is not yet safe to stop holding.
+ * The rule itself lives in `@myself/store` beside the wire format, because it is the
+ * rule that decides whether a sitting may be deleted from an iPad and both ends
+ * should be reading the same one. This is the throwing wrapper the sync loop wants.
  */
 export function verifyOutcome(outcome: SittingOutcome, session: SyncSession): void {
-  if (!outcome.stored) {
-    throw new Error(outcome.reason ?? "the server did not store this sitting");
-  }
-  if (outcome.events !== session.events.length) {
-    throw new Error(
-      `the server stored ${outcome.events} of the ${session.events.length} events this sitting holds`,
-    );
-  }
+  const problem = confirmationProblem(outcome, session.events.length);
+  if (problem) throw new Error(problem);
 }
 
 function parseResponse(value: unknown): SittingsResponse {
-  if (!isRecord(value)) throw new Error("sync server returned an invalid response");
-  if (!Array.isArray(value["outcomes"])) throw new Error("sync server returned no outcomes");
-  const outcomes = value["outcomes"].map((entry) => {
-    if (
-      !isRecord(entry) ||
-      typeof entry["sessionId"] !== "string" ||
-      typeof entry["stored"] !== "boolean" ||
-      typeof entry["quarantined"] !== "boolean" ||
-      !Number.isInteger(entry["events"]) ||
-      !Number.isInteger(entry["chunks"])
-    ) {
-      throw new Error("sync server returned an outcome this app cannot read");
-    }
-    return {
-      sessionId: entry["sessionId"],
-      stored: entry["stored"],
-      events: entry["events"] as number,
-      chunks: entry["chunks"] as number,
-      quarantined: entry["quarantined"],
-      ...(typeof entry["reason"] === "string" ? { reason: entry["reason"] } : {}),
-    };
-  });
-  return { stored: typeof value["stored"] === "number" ? value["stored"] : outcomes.filter((o) => o.stored).length, outcomes };
+  const parsed = sittingsResponse.safeParse(value);
+  if (!parsed.success) {
+    /**
+     * A captive portal is the reason this message is about the response rather than
+     * about a field.
+     *
+     * A school's guest network answers 200 with an HTML login page, or with JSON of
+     * its own. Naming the first failing key would send whoever reads the panel looking
+     * for a bug in the study's server, when what happened is that the iPad never
+     * reached it.
+     */
+    throw new Error("the reply did not come from the study — this network may need signing in to");
+  }
+  return parsed.data;
 }
 
 function detailOf(body: unknown): string {

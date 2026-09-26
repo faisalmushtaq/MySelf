@@ -1,7 +1,6 @@
 import { FieldValue } from "firebase-admin/firestore";
 import * as logger from "firebase-functions/logger";
 import { onRequest } from "firebase-functions/v2/https";
-import { z } from "zod";
 import {
   conflictWith,
   paths,
@@ -10,7 +9,7 @@ import {
   type SessionDoc,
   type SittingConflict,
 } from "@myself/firebase";
-import type { DeviceSession } from "@myself/store";
+import { sittingUpload, type DeviceSession, type SittingOutcome } from "@myself/store";
 import { STUDY, research } from "./apps.js";
 import { RelayError, type Caller } from "./relay-policy.js";
 import { authenticate, cors } from "./relay.js";
@@ -99,64 +98,6 @@ async function meterUploads(caller: Caller): Promise<void> {
  * winner, which is precisely what the rules above exist to prevent.
  */
 
-/**
- * One event, as the device wrote it.
- *
- * Generous about payloads and strict about shape, the same discipline as the
- * narrative records: a sitting refused because one payload had an unexpected
- * key would lose everything a child answered, which is worse than storing
- * something odd. Payloads are opaque here — the reader interprets them, and a
- * device that knows about an event type this deployment does not must still be
- * able to hand it over.
- */
-const deviceEvent = z.object({
-  seq: z.number().int().min(0),
-  type: z.string().min(1).max(80),
-  itemKey: z.string().max(200).optional(),
-  payload: z.record(z.unknown()).optional(),
-  tWall: z.string().min(1).max(40),
-  tMono: z.number(),
-});
-
-/**
- * A sitting. The caps are guards rather than budgets: a full YBM sitting is
- * about 900 events and 54 kB, so nothing legitimate comes close.
- */
-const sitting = z.object({
-  sessionId: z.string().min(1).max(120),
-  studyCode: z.string().min(1).max(120),
-  releaseKey: z.string().min(1).max(120),
-  releaseHash: z.string().min(1).max(200),
-  startedAt: z.string().min(1).max(40),
-  completedAt: z.string().max(40).optional(),
-  complete: z.boolean(),
-  events: z.array(deviceEvent).max(20_000),
-});
-
-export const sittingUpload = z.object({
-  /**
-   * Which device these came off.
-   *
-   * Taken from the caller when the caller IS a device, and only read from the
-   * body when a member of the research team is importing a file — where the
-   * originating iPad is a fact about the data that would otherwise be lost.
-   * A device cannot claim to be a different device.
-   */
-  deviceId: z.string().min(1).max(120).optional(),
-  sittings: z.array(sitting).min(1).max(50),
-});
-
-export type SittingUpload = z.infer<typeof sittingUpload>;
-
-/** One sitting's outcome, so a device knows what to delete and what to retry. */
-export interface SittingOutcome {
-  sessionId: string;
-  stored: boolean;
-  events: number;
-  chunks: number;
-  quarantined: boolean;
-  reason?: string;
-}
 
 /**
  * Who the sitting is recorded as coming from.

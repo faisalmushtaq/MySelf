@@ -12,10 +12,11 @@ survey only: the micro-narrative module is not fielded (docs/14 §4).
 | **MySelf Go** (participant app) | iPad, added to the Home Screen | Runs the questionnaire offline. Stores every answer encrypted on the device. Needs no setting up beyond the URL. |
 | **`saveSitting`** | Cloud Function, europe-west2 | The only write path into the study. Idempotent, and refuses anything that contradicts a copy it already holds. |
 | **Firestore** | `myself-research`, europe-west2 | One document per sitting, plus chunks for an unusually long one. |
-| **Researcher view** | A laptop browser | Enrols iPads, pulls sittings, derives the dataset, exports BIDS. |
+| **Researcher view** | A laptop browser | Pulls sittings, derives the dataset, exports BIDS, and can stop a device. |
 
-A device never reads the study back. A person never writes a sitting. Both are
-enforced server-side, not by the apps.
+A device never reads the study back. A person never writes a sitting. A device that
+can file a sitting still cannot make a model call. All three are enforced
+server-side, not by the apps.
 
 ---
 
@@ -54,25 +55,31 @@ relationship — names themselves are re-derived from the sittings.
 
 Open `https://faisalmushtaq.github.io/MySelf/` in Safari, then **Share → Add to
 Home Screen**. Launch it from the Home Screen icon from now on. That is the whole
-setup.
+setup, and it needs no network beyond loading the page once.
 
-Any iPad with the URL can collect and file sittings. The device signs itself in
-the first time it uploads — anonymously, without asking the participant anything
-— and that identity is what the study files its sittings under. Nobody mints a
-token and nobody types one in.
+The iPad gives itself an identity on first launch: an id to be known by and a
+secret to prove it, both generated on the device, **before it has ever reached the
+study**. The first upload registers that secret, and from then on the study accepts
+that id only from a device that can present the same one. First writer wins,
+permanently — which is what makes "the same device" mean something a second device
+cannot claim, and therefore what makes the no-overwrite rules hold.
 
-Two things follow from that, both worth knowing:
+You will see the id in the handover panel. It is also written into every handover
+file, so a sitting that arrives by file and the same sitting arriving later over
+wifi are recognised as one sitting from one device rather than two.
 
-- **Anonymous sign-in has to be switched on once for the project**: Firebase
-  console → Authentication → Sign-in method → Anonymous → Enable. Until it is,
-  devices collect normally and cannot upload, and the app says so in plain words
-  rather than failing silently.
-- **The endpoint is open to whoever has the URL.** That is the trade the open
-  model makes. A sitting records whether it came from an open device or a
-  registered one, so a stray one can be told apart; an upload ceiling per device
-  bounds a runaway client; and a specific device can be stopped (§8). If the URL
-  is ever circulated further than intended, **App Check** is the real control and
-  is a project setting rather than a code change.
+**There is no console switch to find and nothing to enable.** An earlier version
+signed devices in anonymously, which needed both a project setting and a network
+round trip before a device had any identity at all — and the device that most needs
+an identity is the one in a hall with no signal.
+
+**The trade:** the write endpoint is reachable by whoever has the URL. That is the
+cost of a device being able to take part without being registered. Three things
+bound it: every sitting records whether it came from an open device or a registered
+one, so a stray one can be told apart in the dataset; an upload ceiling per device
+stops a runaway client, which is the likely accident; and a specific device can be
+stopped (§8). If the URL ever circulates further than intended, **App Check** is the
+real control and is a project setting rather than a code change.
 
 **Adding a device mid-study needs no action at all.** Open the URL on it.
 
@@ -83,20 +90,39 @@ begins. Nothing else is required of the operator.
 
 What is happening underneath:
 
-- Every answer is written to encrypted storage on the device **before** the
-  screen advances.
-- Every two minutes, a copy of the sitting **so far** is sent to the study, so a
+- Every answer is written to encrypted storage on the device **before** the screen
+  advances. If a write ever fails — an iPad out of space, or one whose database iOS
+  has evicted — **the survey stops** and asks the participant to put their hand up.
+  It does not carry on, because a sitting with gaps nobody knows about is worse than
+  a sitting that stopped. Free some space and tap Try again, or hand over what is on
+  the device and use another iPad.
+- Every two minutes, a copy of the sitting **so far** goes to the study, so a
   dropped iPad or a flat battery costs at most the answers since the last
-  checkpoint rather than the whole morning.
-- A finished sitting is queued, sent, and only marked confirmed once the study
-  has reported back that it stored **every event the device sent**.
+  checkpoint rather than the whole morning. The same tick also uploads any earlier
+  participants' finished sittings, so a morning of back-to-back handovers does not
+  hold them all until the end.
+- A finished sitting is queued, sent, and marked confirmed only once the study has
+  reported back that it stored **every event the device sent**. A 200 is not an
+  answer; the event count is.
 - With no network, all of it still works and the queue drains when a network
-  returns.
+  returns. **Wifi coming back is acted on immediately** rather than waited out — the
+  device drops whatever retry delay it had chosen and tries at once.
 
-**A new build never interrupts a sitting.** If one arrives mid-morning it waits
-for the start screen, between participants.
+**A new build never interrupts a sitting.** If one arrives mid-morning it waits for
+the start screen, between participants.
 
----
+### What a bad network looks like from the iPad
+
+| What happens | What the device does |
+|---|---|
+| No signal at all | Collects normally. Nothing is attempted, nothing is lost. |
+| Saturated access point, requests hang | Gives up on each after 30 seconds and retries later. |
+| Guest network with a **captive portal** | Refuses the portal's reply rather than mistaking a login page for a successful upload, and says the network may need signing in to. |
+| Connection drops mid-response | Treats it as a failure and re-sends. The study's write path is idempotent, so a sitting that did land is not duplicated. |
+| Repeated failures | Backs off, thirty seconds doubling to a ten-minute ceiling, jittered so a rack of iPads that failed together does not retry together. |
+
+The one thing the device will never do is mark a sitting confirmed on anything less
+than the study saying it stored every event.
 
 ## 4. End of the day
 
@@ -191,10 +217,11 @@ to do with that is a judgement rather than a button.
 
 | Symptom | Where to look |
 |---|---|
-| "anonymous sign-in is switched off" | §2. One switch in the Firebase console. |
-| The panel says the iPad has not reached the study yet | It has not been online since it was installed. It uploads by itself when it has a connection. |
+| "Let's pause a moment" on the participant's screen | The iPad could not save an answer — usually out of space. Free some and tap Try again, or hand over and swap devices. The survey has deliberately stopped. |
+| "this network may need signing in to" | A captive portal answered instead of the study. Sign the device in to the wifi, or hand over by file. |
+| "another device is already registered under this installation id" | Two devices have the same installation id — a restored backup, almost always. Hand that device's sittings over as a file; they are not lost. |
+| Sittings stay *awaiting upload* on a good network | Check the device was not revoked, and that the build was deployed with a project configured. A build with none says so in the handover panel. |
 | "you are signed in, but this account has no role" | §1a. An owner grants a role. |
-| Sittings stay *awaiting upload* on a good network | Check the device was not revoked, and that the build was deployed with a Firebase project configured. A build with none says so in the handover panel. |
 | The researcher view shows an empty study | Either no role (§1a), or nothing has been pulled yet. |
 | Linkage shows no names | The vault is locked, or was unlocked after the last derive — unlocking triggers one. |
 | A name looks like nonsense | Wrong passphrase. It should have been refused; report it. |

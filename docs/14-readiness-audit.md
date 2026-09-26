@@ -408,6 +408,16 @@ Now 541 unit tests and 5 end-to-end.
 **§7's two traps.** Pages deploys from `main` alone. The root `lint` script is
 gone rather than always failing.
 
+**Devices log themselves in, offline (§8's second correction).** Anonymous Firebase
+sign-in replaced the pasted token, and then was itself replaced: it needed a network
+round trip before a device had any identity, a project-level switch somebody had to
+find, and the whole Auth SDK inside a bundle whose first job is to work offline. An
+iPad now issues its own credential at first launch — an id and a secret, generated
+before it has ever reached the network — and the first upload registers the secret's
+hash. First writer wins permanently, so an installation cannot be taken over, which
+is what the no-overwrite rule needs from an identity. The participant bundle dropped
+to 143 KB gzipped and there is no console switch at all.
+
 **No device registration (§8's own correction).** An earlier version of this work
 had an owner mint a token per iPad and a researcher paste it in. That is a barrier
 in front of the one thing the platform exists to do, and it was removed: any iPad
@@ -455,3 +465,67 @@ was found within an hour of there being one.
 | **Component tests (§5)** | The end-to-end suite is the floor, not the target. The React components still have no unit tests. |
 | **`apps/api`** | Still present and still called by nothing. Firebase is the backend. Parking or deleting it is a decision, not a task. |
 | **mystory-lab's plaintext `localStorage` (§7)** | Untouched, because nothing fields the narrative module. Before it is fielded, it needs a test proving the next participant cannot see the previous one's conversation. |
+
+---
+
+## 9. Hardening after the first fielding pass
+
+Written after the audit's §8 work, while stress-testing for the conditions a school
+actually provides. Everything here was found by a test that did not exist before.
+
+### Found and fixed
+
+**A failed write to the device was swallowed.** `record` is invoked as `void
+record(...)`, so a rejected IndexedDB write went nowhere: the answer stayed in the
+in-memory store, "Saved" never appeared, and the participant carried on. On an iPad
+low on space — or one whose database iOS had evicted under storage pressure — that
+produced a sitting with gaps that **nothing downstream could detect**. This is the
+worst failure the platform can produce, because a sitting that stopped is visible and
+a sitting missing answers is not. The survey now stops on a failed write, refuses to
+be advanced past it, and asks for a person.
+
+**The retry ceiling was an hour.** Right for a background job on a server, wrong for a
+six-hour school day: a device that had backed off had effectively stopped trying for a
+sixth of the study. Ten minutes.
+
+**Wifi returning was waited out.** A backoff is a guess about how long a problem will
+last, and the network coming back is evidence the guess is stale. A device that had
+backed off to ten minutes would sit on a hall's newly working wifi holding a child's
+answers. The scheduled waits are now dropped on the online transition and the queue is
+attempted at once; the attempt count is kept, so a genuinely broken endpoint still
+backs off from where it was.
+
+**Finished sittings waited for the start screen.** A class of thirty is continuous
+handovers, so earlier participants' sittings could be held until the end of the
+morning. The two-minute tick now drains the finished queue as well as checkpointing
+the sitting in progress.
+
+**The wire format was described three times** — in the function, in the participant
+app, and in `@myself/store` — with nothing making them agree, and they had already
+drifted (an event payload was `unknown` on the client and an object in the contract).
+One definition now, imported by both ends, so a breaking change fails to compile on
+the side that did not change.
+
+### Verified, not assumed
+
+| What | How |
+|---|---|
+| The dataset says what the participant answered | `e2e/accuracy.spec.ts` walks the questionnaire recording every visible stem and option label tapped, exports, decrypts, and resolves each stored code back through the release manifest. An off-by-one in an option list fails here and nowhere else. |
+| Two iPads cannot overwrite each other | Real Firestore. Six devices racing for one session id settle on exactly one winner; six racing to claim one installation id likewise. |
+| A retry overlapping itself | Three concurrent uploads of a 200-event sitting leave it intact and in order. |
+| A checkpoint racing the finished sitting | The complete copy is what stays stored. |
+| A captive portal | Refused rather than mistaken for a successful upload — the failure mode that would otherwise have a device delete data nobody holds. |
+| Dropped connections, hangs, truncated replies, nine gateway statuses | None may end with a sitting marked confirmed. Each case asserts exactly that. |
+| A 900-event sitting | Spills into chunks and reads back whole. |
+| Twenty sittings at once | Keep their own lengths and their own participant codes. |
+
+582 unit tests, 23 integration tests against a real Firestore, 6 browser tests.
+
+### Still open
+
+Unchanged from §8: withdrawal is manual, the narrative module is deferred (and
+safeguarding notification with it), the identity Firebase project is not stood up,
+`apps/api` is unused, and the React components have no unit tests beneath the
+end-to-end suite. The WebKit half of the browser suite has never run here, because
+only Chromium is installed in this container — CI is where it gets its first
+exercise, and WebKit is the engine an iPad actually uses.

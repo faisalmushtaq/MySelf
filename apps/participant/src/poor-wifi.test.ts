@@ -135,7 +135,10 @@ describe("a captive portal, which is what a school guest network is", () => {
     );
 
     await synchroniseCompletedSessions({ storage: store(calls), transport: transport as unknown as typeof fetch });
-    expect(calls.errors[0]).toContain("no outcomes");
+    // The message names the network rather than a missing field, because that is
+    // what actually went wrong and what the operator can act on.
+    expect(calls.errors[0]).toContain("did not come from the study");
+    expect(calls.errors[0]).toContain("signing in");
     notConfirmed(calls);
   });
 

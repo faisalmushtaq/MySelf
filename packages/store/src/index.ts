@@ -6,4 +6,5 @@ export * from "./identity.js";
 export * from "./ingest.js";
 export * from "./narratives.js";
 export * from "./summary.js";
+export * from "./sync-contract.js";
 export * from "./zip.js";

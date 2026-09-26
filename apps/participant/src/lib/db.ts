@@ -8,6 +8,7 @@ import {
   type AccessibilityPreferences,
 } from "./accessibility.js";
 import { ulid } from "./ulid.js";
+import type { DeviceEventUpload, SittingUploadItem } from "@myself/store";
 
 /**
  * Local storage, backed by IndexedDB. Research payloads and the device sync
@@ -104,25 +105,17 @@ export interface Enrolment {
 }
 
 
-export interface SyncEvent {
-  seq: number;
-  type: string;
-  itemKey?: string;
-  payload?: unknown;
-  tWall: string;
-  tMono: number;
-}
-
-export interface SyncSession {
-  sessionId: string;
-  studyCode: string;
-  releaseKey: string;
-  releaseHash: string;
-  startedAt: string;
-  completedAt?: string;
-  complete: boolean;
-  events: SyncEvent[];
-}
+/**
+ * What an upload looks like, which is the shared wire contract and not this file's
+ * own idea of it.
+ *
+ * This was declared here as well as in `@myself/store` and in the function — three
+ * descriptions of one protocol. They had already drifted: the payload was `unknown`
+ * here and an object in the contract, so this end would have compiled while sending
+ * something the server refuses.
+ */
+export type SyncEvent = DeviceEventUpload;
+export type SyncSession = SittingUploadItem;
 
 export interface StoredSessionCounts {
   inProgress: number;
@@ -393,7 +386,16 @@ async function materialise(rows: readonly SessionRow[], complete: boolean): Prom
     const events = await db.events.where("sessionId").equals(session.sessionId).sortBy("seq");
     const output: SyncEvent[] = [];
     for (const event of events) {
-      const payload = event.payload ? await unseal<unknown>(key, event.payload) : undefined;
+      /**
+       * Unsealed as an object, which is what every payload this app writes is.
+       *
+       * Typed rather than `unknown` because the wire contract says `Record<string,
+       * unknown>`, and the loose type here was hiding that: this end compiled while
+       * being able to send a bare string the server's schema refuses.
+       */
+      const payload = event.payload
+        ? await unseal<Record<string, unknown>>(key, event.payload)
+        : undefined;
       output.push({
         seq: event.seq,
         type: event.type,

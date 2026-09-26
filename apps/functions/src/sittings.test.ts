@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { joinSession, paths, splitSession, type ChunkDoc, type SessionDoc } from "@myself/firebase";
 import type { DeviceSession } from "@myself/store";
-import { deviceIdFor, sittingRefusal, sittingUpload, storeSitting } from "./sittings.js";
+import { deviceIdFor, sittingRefusal, storeSitting } from "./sittings.js";
+// The upload shape is the shared wire contract, not this function's own idea of it.
+import { sittingUpload } from "@myself/store";
 import { RelayError, type Caller } from "./relay-policy.js";
 
 /**
