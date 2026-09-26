@@ -8,6 +8,7 @@ import {
   accessibilityPreferences,
   appendEvent,
   completeSession,
+  clearBackoff,
   countStoredSessions,
   createSession,
   findResumableSession,
@@ -107,6 +108,22 @@ export default function App() {
   // Typed at export and never stored: an iPad that is lost surrenders no way to
   // read the files it wrote.
   const [passphrase, setPassphrase] = useState("");
+  /**
+   * A write to this device's storage that did not land.
+   *
+   * THE BUG THIS EXISTS FOR. `record` is called as `void record(...)`, so a
+   * rejected write was swallowed: the answer stayed in the in-memory store, "Saved"
+   * never appeared, and the participant carried on. On an iPad low on space — or one
+   * whose database iOS had evicted under storage pressure — that produced a sitting
+   * with gaps that nothing downstream could detect. A dataset missing answers nobody
+   * knows are missing is worse than a sitting that stopped.
+   *
+   * So a failed write stops the survey where it is and asks for a person. The
+   * participant sees a calm screen rather than an error, because a child should not
+   * be made to feel they broke it.
+   */
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const unsaved = useRef<(() => Promise<void>) | null>(null);
   const [syncNote, setSyncNote] = useState<string | null>(null);
   const [codeError, setCodeError] = useState<string | null>(null);
   const [accessibility, setAccessibility] = useState<AccessibilityPreferences>(DEFAULT_ACCESSIBILITY_PREFERENCES);
@@ -191,7 +208,22 @@ export default function App() {
   );
 
   useEffect(() => {
-    const on = () => setOnline(true);
+    /**
+     * Wifi returning is news, so it is acted on rather than waited out.
+     *
+     * A backoff is a guess about how long a problem will last. A hall whose wifi
+     * comes back at 11am makes that guess stale, and a device that had backed off to
+     * ten minutes would otherwise sit on working wifi holding a child's answers.
+     * So the scheduled waits are dropped and the queue is attempted at once.
+     *
+     * The attempt count is kept, so an endpoint that is genuinely broken still backs
+     * off from where it was rather than restarting at thirty seconds every time a
+     * school's access point flaps.
+     */
+    const on = () => {
+      setOnline(true);
+      void clearBackoff().then(() => runSync(true));
+    };
     const off = () => setOnline(false);
     addEventListener("online", on);
     addEventListener("offline", off);
@@ -199,7 +231,7 @@ export default function App() {
       removeEventListener("online", on);
       removeEventListener("offline", off);
     };
-  }, []);
+  }, [runSync]);
 
   useEffect(() => {
     void refreshDeviceStatus();
@@ -246,7 +278,23 @@ export default function App() {
    */
   useEffect(() => {
     if (!online || !device || phase.kind !== "running") return;
-    const tick = () => void checkpointRunningSessions().catch(() => undefined);
+    /**
+     * Also drains the finished queue, not only the sitting in progress.
+     *
+     * Otherwise a device that collects back-to-back — which is what a class of
+     * thirty looks like — holds every earlier participant's sitting until it next
+     * reaches the start screen for long enough. On a morning of continuous
+     * handovers that can be the whole morning, and the point of syncing at all is
+     * that the study has the data before the iPad leaves the room.
+     *
+     * Neither call can block the screen: both are fetches with their own timeout,
+     * and a failure is silent because a participant answering questions is not the
+     * person to tell about an upload.
+     */
+    const tick = () => {
+      void checkpointRunningSessions().catch(() => undefined);
+      void synchroniseCompletedSessions().catch(() => undefined);
+    };
     const timer = window.setInterval(tick, 120_000);
     return () => window.clearInterval(timer);
   }, [online, device, phase.kind]);
@@ -325,6 +373,40 @@ export default function App() {
     }
   }, [code, busy]);
 
+  /**
+   * Do a write, and stop the survey if it fails.
+   *
+   * Returns whether it landed, so a caller can decline to advance. The failed write
+   * is kept so that "Try again" retries the actual work rather than just clearing
+   * the message — a retry that dismissed the warning without saving anything would
+   * be the same silent loss with an extra step.
+   */
+  const persist = useCallback(async (write: () => Promise<void>): Promise<boolean> => {
+    try {
+      await write();
+      unsaved.current = null;
+      setSaveError(null);
+      return true;
+    } catch (error) {
+      unsaved.current = write;
+      setSaveError(
+        error instanceof Error && /quota|storage|space/i.test(error.message)
+          ? "This iPad has run out of space to save answers."
+          : "This iPad could not save that answer.",
+      );
+      return false;
+    }
+  }, []);
+
+  const retrySave = useCallback(() => {
+    const write = unsaved.current;
+    if (!write) {
+      setSaveError(null);
+      return;
+    }
+    void persist(write);
+  }, [persist]);
+
   const record = useCallback(
     async (unit: PresentableUnit, value: AnswerValue) => {
       if (phase.kind !== "running") return;
@@ -334,34 +416,37 @@ export default function App() {
       storeRef.current.set(ref, { status: "answered", value });
       bumpAnswers();
       const t = timing.current.recordResponse(itemKey, had);
-      await appendEvent(
-        phase.session,
-        had ? "response.changed" : "response.recorded",
-        itemKey,
-        // Timing rides with the response so a single event carries both what
-        // was answered and how long it took to answer it.
-        { value, timing: t },
-        phase.index,
-        tMono(),
-      );
-      // The answer stands either way — this only records that it arrived
-      // faster than the question could have been read.
-      if (t.tooFast) {
-        fastRun.current += 1;
+      const landed = await persist(async () => {
         await appendEvent(
           phase.session,
-          "response.too_fast",
+          had ? "response.changed" : "response.recorded",
           itemKey,
-          { sinceShownMs: t.sinceShownMs, thresholdMs: t.thresholdMs, run: fastRun.current },
+          // Timing rides with the response so a single event carries both what
+          // was answered and how long it took to answer it.
+          { value, timing: t },
           phase.index,
           tMono(),
         );
-      } else {
-        fastRun.current = 0;
-      }
+        // The answer stands either way — this only records that it arrived
+        // faster than the question could have been read.
+        if (t.tooFast) {
+          fastRun.current += 1;
+          await appendEvent(
+            phase.session,
+            "response.too_fast",
+            itemKey,
+            { sinceShownMs: t.sinceShownMs, thresholdMs: t.thresholdMs, run: fastRun.current },
+            phase.index,
+            tMono(),
+          );
+        } else {
+          fastRun.current = 0;
+        }
+      });
+      if (!landed) return;
       setSavedAt(new Date().toLocaleTimeString());
     },
-    [phase],
+    [phase, persist],
   );
 
   const emit = useCallback(
@@ -408,19 +493,29 @@ export default function App() {
   const advance = useCallback(
     async (from: number, kind: "next" | "skip" | "decline") => {
       if (phase.kind !== "running") return;
+      /**
+       * Never walk past an answer that did not save.
+       *
+       * Without this the participant could carry on from the screen that failed, and
+       * the sitting would be missing exactly the answer nobody was told about.
+       */
+      if (saveError) return;
       const unit = flattened.units[from];
       if (unit && (kind === "skip" || kind === "decline")) {
         const ref = { instrument: unit.instrument, item: unit.item.key, revision: unit.item.revision };
         storeRef.current.set(ref, { status: kind === "skip" ? "skipped" : "declined" });
         bumpAnswers();
-        await appendEvent(
-          phase.session,
-          kind === "skip" ? "item.skipped" : "item.declined",
-          `${unit.instrument}.${unit.item.key}`,
-          undefined,
-          from,
-          tMono(),
+        const landed = await persist(() =>
+          appendEvent(
+            phase.session,
+            kind === "skip" ? "item.skipped" : "item.declined",
+            `${unit.instrument}.${unit.item.key}`,
+            undefined,
+            from,
+            tMono(),
+          ),
         );
+        if (!landed) return;
         setSavedAt(new Date().toLocaleTimeString());
       }
       // Track runs of consecutive skips/declines so we can check in gently.
@@ -479,7 +574,7 @@ export default function App() {
         setPhase({ kind: "running", session: phase.session, index: next });
       }
     },
-    [phase],
+    [phase, persist, saveError],
   );
 
   const goBack = useCallback(
@@ -769,7 +864,30 @@ export default function App() {
         </div>
       )}
 
-      {phase.kind === "running" && (
+      {/*
+        A write that did not land, in front of everything else.
+        Calm on purpose: a child should not be made to feel they broke it, and the
+        one thing that must not happen is carrying on as though the answer was saved.
+        `advance` refuses while this is up, so the survey cannot be walked past it.
+      */}
+      {saveError && (
+        <div className="screen save-failed" role="alertdialog" aria-label="Answers are not being saved">
+          <h1>Let&apos;s pause a moment</h1>
+          <p>{saveError} Nothing you have already answered is lost.</p>
+          <p>Please put your hand up so somebody from the team can help.</p>
+          <div className="checkin-actions">
+            <button type="button" className="next big" onClick={retrySave}>
+              Try again
+            </button>
+          </div>
+          <p className="hint">
+            For the team: this iPad refused a write to its own storage, so the survey has stopped rather than carry on
+            without recording answers. Free space on the device, or hand over what is on it and use another iPad.
+          </p>
+        </div>
+      )}
+
+      {phase.kind === "running" && !saveError && (
         <SurveyScreen
           units={flattened.units}
           scales={scaleMap}

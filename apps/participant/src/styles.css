@@ -337,6 +337,25 @@ textarea {
   gap: 0;
 }
 
+/*
+ * A write that did not land.
+ *
+ * Laid out like the check-in screens rather than styled as an error: no red, no
+ * warning triangle, nothing that reads as the child's fault. It occupies the whole
+ * screen because the one behaviour that matters is that the survey cannot be carried
+ * on from here, and a dismissible banner would be carried on from.
+ */
+.screen.save-failed {
+  justify-content: center;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+
+.screen.save-failed .hint {
+  margin-top: 2rem;
+  max-width: 40rem;
+}
+
 /* Start / finish — editorial masthead */
 .brand {
   font-family: var(--font-ui);

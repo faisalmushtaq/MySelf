@@ -585,9 +585,52 @@ async function requiredSession(sessionId: string): Promise<SessionRow> {
   return session;
 }
 
-function retryDelayMs(attempt: number): number {
-  const ceiling = 60 * 60 * 1000;
-  const base = Math.min(30_000 * 2 ** Math.max(0, attempt - 1), ceiling);
-  return Math.round(base * (0.75 + Math.random() * 0.5));
+/**
+ * How long to wait before trying an upload again.
+ *
+ * Exponential from 30 seconds, jittered, and capped — the cap is the part that
+ * matters in a school. A hall where the wifi is saturated at 9am produces a run of
+ * failures on every device at once, and an uncapped schedule would have them all
+ * retrying in lockstep forever. The jitter spreads a rack of iPads that failed
+ * together so they do not all come back at the same instant and fail together again.
+ *
+ * THE CEILING IS TEN MINUTES, not an hour. An hour is the right ceiling for a
+ * background job on a server and the wrong one here: a school day is six hours, an
+ * iPad is handed back at the end of it, and a device that has backed off to an hour
+ * has effectively stopped trying for a sixth of the study. Ten minutes bounds the
+ * cost of a hopeless retry at six attempts an hour while keeping a device that is
+ * merely between wifi cells from waiting out the morning.
+ *
+ * And it is only ever the floor on waiting. Wifi returning, or the operator asking,
+ * bypasses it — see `clearBackoff`.
+ */
+export const RETRY_CEILING_MS = 10 * 60 * 1000;
+
+export function retryDelayMs(attempt: number, random = Math.random): number {
+  const base = Math.min(30_000 * 2 ** Math.max(0, attempt - 1), RETRY_CEILING_MS);
+  return Math.round(base * (0.75 + random() * 0.5));
+}
+
+/**
+ * Forget every scheduled wait, because something changed.
+ *
+ * Called when the device comes back online. A backoff is a guess about how long a
+ * problem will last, and the network returning is direct evidence that the guess is
+ * stale — a device that had backed off to ten minutes should not sit on a hall's
+ * newly working wifi waiting out a delay it chose while there was none.
+ *
+ * The attempt COUNT is kept, so a genuinely broken endpoint still backs off again
+ * from where it was rather than restarting at thirty seconds on every flap.
+ */
+export async function clearBackoff(): Promise<number> {
+  const waiting = await db.sync_state.filter((row) => row.nextAttemptAt !== undefined).toArray();
+  if (waiting.length === 0) return 0;
+  await db.transaction("rw", db.sync_state, async () => {
+    for (const row of waiting) {
+      const { nextAttemptAt: _dropped, ...rest } = row;
+      await db.sync_state.put(rest);
+    }
+  });
+  return waiting.length;
 }
 

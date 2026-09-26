@@ -8,6 +8,12 @@ importers:
 
   .:
     devDependencies:
+      '@myself/schema':
+        specifier: workspace:*
+        version: link:packages/schema
+      '@myself/store':
+        specifier: workspace:*
+        version: link:packages/store
       '@playwright/test':
         specifier: ^1.62.1
         version: 1.63.0
