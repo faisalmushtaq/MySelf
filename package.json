@@ -11,12 +11,16 @@
     "build": "pnpm -r build",
     "test": "pnpm -r test",
     "typecheck": "pnpm -r typecheck",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "test:e2e:sync": "firebase emulators:exec --only firestore --project demo-myself --config infra/firebase/firebase.test.json \"playwright test --config playwright.sync.config.ts\""
   },
   "devDependencies": {
+    "@myself/firebase": "workspace:*",
     "@myself/schema": "workspace:*",
     "@myself/store": "workspace:*",
     "@playwright/test": "^1.62.1",
+    "firebase-admin": "^13.0.0",
+    "firebase-tools": "^14.19.0",
     "playwright-core": "^1.62.1",
     "typescript": "^5.6.0"
   }

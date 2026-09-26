@@ -8,6 +8,9 @@ importers:
 
   .:
     devDependencies:
+      '@myself/firebase':
+        specifier: workspace:*
+        version: link:packages/firebase
       '@myself/schema':
         specifier: workspace:*
         version: link:packages/schema
@@ -17,6 +20,12 @@ importers:
       '@playwright/test':
         specifier: ^1.62.1
         version: 1.63.0
+      firebase-admin:
+        specifier: ^13.0.0
+        version: 13.10.0(@firebase/app-compat@0.4.2)(@firebase/app@0.13.2)
+      firebase-tools:
+        specifier: ^14.19.0
+        version: 14.27.0(@types/node@22.20.1)(typescript@5.9.3)
       playwright-core:
         specifier: ^1.62.1
         version: 1.62.1

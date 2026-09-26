@@ -30,6 +30,7 @@ import {
 import { checkpointRunningSessions, synchroniseCompletedSessions } from "./lib/sync.js";
 import { currentDevice, syncAvailable } from "./lib/device.js";
 import { updates } from "./lib/updates.js";
+import { deviceSpace, readableBytes, type Space } from "./lib/space.js";
 import { SessionTiming, wordCount } from "./lib/timing.js";
 import { ReviewScreen } from "./components/ReviewScreen.js";
 import { SurveyScreen } from "./components/SurveyScreen.js";
@@ -123,6 +124,7 @@ export default function App() {
    * be made to feel they broke it.
    */
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [space, setSpace] = useState<Space | null>(null);
   const unsaved = useRef<(() => Promise<void>) | null>(null);
   const [syncNote, setSyncNote] = useState<string | null>(null);
   const [codeError, setCodeError] = useState<string | null>(null);
@@ -175,6 +177,7 @@ export default function App() {
     const [stored] = await Promise.all([countStoredSessions(), currentDevice().catch(() => null)]);
     setCounts(stored);
     setDevice(await deviceSummary());
+    setSpace(await deviceSpace());
   }, []);
 
   const runSync = useCallback(
@@ -295,7 +298,10 @@ export default function App() {
       void checkpointRunningSessions().catch(() => undefined);
       void synchroniseCompletedSessions().catch(() => undefined);
     };
-    const timer = window.setInterval(tick, 120_000);
+    // Runs once immediately as well as on the interval: a sitting that begins just
+    // after a tick would otherwise wait a whole cadence before the study had any of it.
+    tick();
+    const timer = window.setInterval(tick, Math.max(1, __CHECKPOINT_SECONDS__) * 1000);
     return () => window.clearInterval(timer);
   }, [online, device, phase.kind]);
 
@@ -732,6 +738,19 @@ export default function App() {
           {handoverOpen && (
             <div className="handover">
               <h2>Handover</h2>
+              {/*
+                Room left, before a write fails rather than after.
+                A failed write is handled — the survey stops and asks for staff — but
+                that is a recovery, and swapping an iPad between participants costs
+                nothing. Advisory, because Safari's numbers are.
+              */}
+              {space?.known && (
+                <p className={space.low ? "hint warn" : "hint"}>
+                  {space.low
+                    ? `Only about ${readableBytes(space.remaining)} of room left on this iPad — use another one for the next participant if you can. Nothing already answered is at risk.`
+                    : `About ${readableBytes(space.remaining)} of room left, holding ${readableBytes(space.used)}.`}
+                </p>
+              )}
               <p className="hint">
                 {counts.awaitingSync + counts.syncFailed} completed session{counts.awaitingSync + counts.syncFailed === 1 ? "" : "s"} awaiting upload, {counts.syncedVerified} confirmed by the study, {counts.quarantined} needing review, and {counts.inProgress} unfinished on this device. A sitting stays here until the study has confirmed it stored every event this device sent.
               </p>

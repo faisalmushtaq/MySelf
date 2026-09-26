@@ -78,6 +78,36 @@ jobs:
       - run: pnpm -r build
       - run: pnpm --filter @myself/functions test:integration
 
+  # The whole chain: a real browser, over HTTP, into a real Firestore. Every other
+  # suite stops at a seam — shapes agree, the write path keeps devices apart, the app
+  # collects and resumes — and this is the one that puts a real request on a socket in
+  # front of the real handler and then reads the sitting back out of the database.
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm -r build
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm test:e2e:sync
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: sync-trace
+          path: test-results/
+          retention-days: 7
+
   # Security rules are the access control on Firebase, so an untested rules
   # change is an untested security change. This runs them against the real
   # Firestore emulator, from both sides of every rule.

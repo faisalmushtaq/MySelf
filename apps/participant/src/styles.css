@@ -1859,3 +1859,14 @@ input[type="range"] {
 .narrative-after p {
   margin: 0;
 }
+
+/*
+ * Something the operator should notice, in the handover panel only.
+ *
+ * Never shown to a participant: the one message a child sees about storage is the
+ * save-failed screen, which is deliberately calm. This is for whoever is holding the
+ * iPad between sittings, so it is allowed to be emphatic.
+ */
+.hint.warn {
+  font-weight: 600;
+}

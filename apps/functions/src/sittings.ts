@@ -267,7 +267,17 @@ async function refuse(
   conflict: SittingConflict,
   now: Date,
 ): Promise<SittingOutcome> {
-  logger.error("a sitting was refused rather than allowed to replace one already stored", {
+  /**
+   * ERROR only when the two copies are genuinely ambiguous.
+   *
+   * A second device claiming a session id, or two copies collected under different
+   * releases, needs a person to look at it. A shorter or reopened log from the SAME
+   * device does not: it is what a retry racing its own earlier attempt produces, and
+   * the rule handled it correctly by keeping the longer copy. Logging that at ERROR
+   * trains whoever reads production logs to ignore the line that matters.
+   */
+  const note = conflict.storedIsSuspect ? logger.error : logger.warn;
+  note("a sitting was refused rather than allowed to replace one already stored", {
     sessionId: session.sessionId,
     reason: conflict.reason,
     heldDeviceId: stored?.deviceId ?? null,

@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   checkpointRunningSessions,
+  resetInFlightForTests,
   synchroniseCompletedSessions,
   type SyncPersistence,
 } from "./lib/sync.js";
@@ -397,5 +398,98 @@ describe("how long a device waits before trying again", () => {
         expect(retryDelayMs(attempt, () => random)).toBeGreaterThan(0);
       }
     }
+  });
+});
+
+describe("a device talking over itself", () => {
+  /**
+   * FOUND BY A STRESS TEST, and a real flaw rather than a test artefact.
+   *
+   * A sitting grows while it is being answered, so two overlapping checkpoints send two
+   * different lengths of the same log. The longer lands first and the shorter is then
+   * refused — correctly, by the rule that a sitting never gets shorter — but the device
+   * learns nothing, records no checkpoint, and sends again. On a connection slower than
+   * the interval between checkpoints, that is a device racing itself indefinitely.
+   *
+   * There are now three callers of the sync between them (launch, the timer during a
+   * sitting, and the network returning), which is why the guard is in the protocol
+   * rather than in any one of them.
+   */
+  it("does not start a second checkpoint while one is in flight", async () => {
+    resetInFlightForTests();
+    const calls = noCalls();
+    const { completedAt: _done, ...running } = session;
+    let inFlight = 0;
+    let overlapped = false;
+    const transport = vi.fn(async () => {
+      inFlight += 1;
+      if (inFlight > 1) overlapped = true;
+      await new Promise((resolve) => setTimeout(resolve, 30));
+      inFlight -= 1;
+      return ok();
+    });
+
+    const storage = store(calls, { running: [{ ...running, complete: false }] });
+    await Promise.all([
+      checkpointRunningSessions({ storage, transport: transport as unknown as typeof fetch }),
+      checkpointRunningSessions({ storage, transport: transport as unknown as typeof fetch }),
+      checkpointRunningSessions({ storage, transport: transport as unknown as typeof fetch }),
+    ]);
+
+    expect(overlapped).toBe(false);
+    expect(transport).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not start a second drain of the queue while one is in flight", async () => {
+    resetInFlightForTests();
+    const calls = noCalls();
+    let inFlight = 0;
+    let overlapped = false;
+    const transport = vi.fn(async () => {
+      inFlight += 1;
+      if (inFlight > 1) overlapped = true;
+      await new Promise((resolve) => setTimeout(resolve, 30));
+      inFlight -= 1;
+      return ok();
+    });
+
+    const storage = store(calls);
+    await Promise.all([
+      synchroniseCompletedSessions({ storage, transport: transport as unknown as typeof fetch }),
+      synchroniseCompletedSessions({ storage, transport: transport as unknown as typeof fetch }),
+    ]);
+
+    expect(overlapped).toBe(false);
+    // And the sitting was confirmed exactly once, not twice.
+    expect(calls.receipts).toEqual(["ses_01:2"]);
+  });
+
+  it("lets the next pass through once the first has finished", async () => {
+    // The guard must not latch: a device that stopped syncing after one pass would hold
+    // everything for the rest of the day.
+    resetInFlightForTests();
+    const calls = noCalls();
+    const transport = vi.fn(async () => ok());
+    const storage = store(calls);
+
+    await synchroniseCompletedSessions({ storage, transport: transport as unknown as typeof fetch });
+    await synchroniseCompletedSessions({ storage, transport: transport as unknown as typeof fetch });
+
+    expect(transport).toHaveBeenCalledTimes(2);
+  });
+
+  it("clears the guard even when the upload throws", async () => {
+    resetInFlightForTests();
+    const calls = noCalls();
+    const failing = vi.fn(async () => {
+      throw new TypeError("Load failed");
+    });
+    const working = vi.fn(async () => ok());
+    const storage = store(calls);
+
+    await synchroniseCompletedSessions({ storage, transport: failing as unknown as typeof fetch });
+    await synchroniseCompletedSessions({ storage, transport: working as unknown as typeof fetch });
+
+    expect(working).toHaveBeenCalledTimes(1);
   });
 });

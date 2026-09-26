@@ -29,10 +29,16 @@ what is not, and what is deliberately left undone. Read §8 first.
 
 ```sh
 pnpm install
-pnpm -r build && pnpm -r test   # 541 tests across the packages and apps
-pnpm test:e2e                   # 5 browser tests: the whole questionnaire, offline, resumed
+pnpm -r build && pnpm -r test   # unit tests across the packages and apps
+pnpm test:e2e                   # browser: the questionnaire, offline, resumed, and the
+                                #   dataset cross-referenced against what was tapped
+pnpm --filter @myself/functions test:integration   # the write path, real Firestore
+pnpm test:e2e:sync              # the whole chain: browser → HTTP → real Firestore
 cd apps/participant && pnpm dev # local participant app
 ```
+
+The two emulator suites need Java 17 and download the Firestore emulator on first run.
+`test:e2e` needs neither and stays offline.
 
 `pnpm test:e2e` builds the participant app and drives it in a real browser. On a
 machine whose browsers were installed elsewhere and where `playwright install` is

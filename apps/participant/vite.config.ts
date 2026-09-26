@@ -56,6 +56,18 @@ export default defineConfig({
      */
     __MYSTORY_URL__: JSON.stringify(process.env["MYSELF_MYSTORY_URL"] ?? ""),
     __SITTINGS_URL__: JSON.stringify(deriveSittingsUrl()),
+    /**
+     * How often a sitting still being answered is copied to the study.
+     *
+     * A fielding decision rather than a constant: it trades how much a dropped iPad
+     * costs against how much traffic a hall of thirty devices puts on one access
+     * point. Two minutes is the default because a lost two minutes of answers is
+     * recoverable by asking the participant, and a lost morning is not.
+     *
+     * It is also the seam that makes checkpointing testable — the alternative is a
+     * test that waits two real minutes to watch a timer fire.
+     */
+    __CHECKPOINT_SECONDS__: JSON.stringify(Number(process.env["MYSELF_CHECKPOINT_SECONDS"] ?? 120)),
   },
   plugins: [
     react(),
