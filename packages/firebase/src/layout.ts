@@ -114,6 +114,20 @@ export interface SessionDoc {
    * A field that is always present cannot be walked into that way.
    */
   quarantined: boolean;
+  /**
+   * How the device that filed this was authenticated.
+   *
+   * `"open"` — it signed itself in, which is what happens when a participant
+   * opens the study's URL on any iPad. This is the normal case.
+   * `"enrolled"` — an owner registered that device and named it.
+   *
+   * Recorded because the alternative is a dataset that cannot tell the two apart.
+   * It is NOT a quality judgement and nothing filters on it by default: an
+   * open-URL sitting from a school hall is exactly as real as any other. It is
+   * here so that a study which DOES care — one fielding on known devices, or one
+   * checking whether a stray sitting came from outside the room — can ask.
+   */
+  enrolment: "open" | "enrolled";
 }
 
 export interface ChunkDoc {
@@ -154,7 +168,18 @@ export interface SplitSession {
  * upload overwrites identical documents rather than producing a second,
  * differently-shaped copy of the same sitting.
  */
-export function splitSession(session: DeviceSession, deviceId: string, study: string, now = new Date()): SplitSession {
+export function splitSession(
+  session: DeviceSession,
+  deviceId: string,
+  study: string,
+  now = new Date(),
+  /**
+   * Defaults to `"open"` on purpose. A caller that forgets is then pessimistic
+   * about its own sitting rather than quietly labelling an open-URL one as having
+   * come from a device somebody vouched for.
+   */
+  enrolment: SessionDoc["enrolment"] = "open",
+): SplitSession {
   const ordered = [...session.events].sort((a, b) => a.seq - b.seq);
   const base: Omit<SessionDoc, "events" | "chunkCount"> = {
     sessionId: session.sessionId,
@@ -169,6 +194,7 @@ export function splitSession(session: DeviceSession, deviceId: string, study: st
     eventCount: ordered.length,
     receivedAt: now.toISOString(),
     quarantined: false,
+    enrolment,
   };
 
   if (byteLength({ ...base, events: ordered }) <= MAX_DOCUMENT_BYTES) {

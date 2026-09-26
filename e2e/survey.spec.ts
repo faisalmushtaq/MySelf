@@ -425,13 +425,25 @@ test.describe("a sitting on a device with no study configured", () => {
     expect(envelope.data.length).toBeGreaterThan(2_000);
   });
 
-  test("offers no enrolment on a build with no study, rather than one that could not work", async ({ page }) => {
+  test("asks the operator to set nothing up, and says where the data stays", async ({ page }) => {
+    // Nothing is registered: an iPad with the URL collects and files sittings by
+    // itself. So the handover panel must not present a setup step, and on a build
+    // with no study behind it — which is what this suite runs — it must say
+    // plainly that everything stays on the device rather than implying an upload
+    // that cannot happen.
     await page.goto("./");
     const buildLine = page.locator("p.demo-note");
     for (let i = 0; i < 5; i += 1) await buildLine.click();
-    await expect(page.locator(".handover")).toBeVisible();
-    await expect(page.locator(".handover")).toContainText("no study configured");
-    await expect(page.locator("input", { hasText: "Enrolment token" })).toHaveCount(0);
+
+    const handover = page.locator(".handover");
+    await expect(handover).toBeVisible();
+    await expect(handover).toContainText("no study configured");
+    await expect(handover).toContainText("stays on this device");
+
+    // No token to paste, and no enrolment to perform. The only password field
+    // here is the study passphrase that encrypts the handover file.
+    await expect(handover.getByRole("button", { name: /enrol/i })).toHaveCount(0);
+    await expect(handover.locator('input[type="password"]')).toHaveCount(1);
   });
 });
 

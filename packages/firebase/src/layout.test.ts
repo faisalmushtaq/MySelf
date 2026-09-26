@@ -188,6 +188,33 @@ describe("conflicts", () => {
   });
 });
 
+/**
+ * Where a sitting came from, which is now a question worth asking.
+ *
+ * Any iPad with the study's URL can file one — nobody registers a device — so a
+ * dataset that could not tell an open-URL sitting from one collected on a named
+ * device would have lost a distinction it may later need.
+ */
+describe("how the device was authenticated", () => {
+  it("defaults to open, which is pessimistic rather than flattering", () => {
+    // A caller that forgets should understate its own sitting, not quietly label
+    // it as having come from a device somebody vouched for.
+    expect(splitSession(session([event(0)]), "anon_1", "ybm").doc.enrolment).toBe("open");
+  });
+
+  it("records a registered device when it is told about one", () => {
+    expect(splitSession(session([event(0)]), "dev_1", "ybm", new Date(0), "enrolled").doc.enrolment).toBe("enrolled");
+  });
+
+  it("is not something conflictWith has an opinion about", () => {
+    // An iPad that was registered part way through a study must not have its own
+    // earlier sittings treated as contradicting its later ones.
+    const open = splitSession(session([event(0)]), "dev_1", "ybm", new Date(0), "open").doc;
+    const enrolled = splitSession(session([event(0), event(1)]), "dev_1", "ybm", new Date(0), "enrolled").doc;
+    expect(conflictWith(open, enrolled)).toBeNull();
+  });
+});
+
 describe("paths", () => {
   it("keeps the two projects' collections apart by name as well as by project", () => {
     expect(paths.session("ybm", "s1")).toBe("studies/ybm/sessions/s1");

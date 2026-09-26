@@ -9,7 +9,7 @@ survey only: the micro-narrative module is not fielded (docs/14 §4).
 
 | Part | Where it runs | What it does |
 |---|---|---|
-| **MySelf Go** (participant app) | iPad, added to the Home Screen | Runs the questionnaire offline. Stores every answer encrypted on the device. |
+| **MySelf Go** (participant app) | iPad, added to the Home Screen | Runs the questionnaire offline. Stores every answer encrypted on the device. Needs no setting up beyond the URL. |
 | **`saveSitting`** | Cloud Function, europe-west2 | The only write path into the study. Idempotent, and refuses anything that contradicts a copy it already holds. |
 | **Firestore** | `myself-research`, europe-west2 | One document per sitting, plus chunks for an unusually long one. |
 | **Researcher view** | A laptop browser | Enrols iPads, pulls sittings, derives the dataset, exports BIDS. |
@@ -50,23 +50,31 @@ relationship — names themselves are re-derived from the sittings.
 
 ---
 
-## 2. Once per iPad
+## 2. Once per iPad — nothing to register
 
-1. In Safari open `https://faisalmushtaq.github.io/MySelf/`, then **Share → Add
-   to Home Screen**. Launch it from the Home Screen icon from now on.
-2. In the researcher view, **Data → Enrol an iPad**. Name it something you will
-   recognise on a table of six ("iPad 3, blue case"). Copy the token.
-3. On the iPad, tap the small grey build line at the bottom of the start screen
-   **five times** to open the handover panel. Paste the token into *Enrolment
-   token* and tap **Enrol this device**.
-4. The panel should now read *Enrolled as iPad 3, blue case*. That is the check —
-   do not take a blank field as success.
+Open `https://faisalmushtaq.github.io/MySelf/` in Safari, then **Share → Add to
+Home Screen**. Launch it from the Home Screen icon from now on. That is the whole
+setup.
 
-The token is valid for an hour and is spent on use. What the iPad keeps
-afterwards is a refresh token held by the Firebase SDK, which **Revoke** takes
-away if a device goes missing. Enrolment needs a network; collecting does not.
+Any iPad with the URL can collect and file sittings. The device signs itself in
+the first time it uploads — anonymously, without asking the participant anything
+— and that identity is what the study files its sittings under. Nobody mints a
+token and nobody types one in.
 
----
+Two things follow from that, both worth knowing:
+
+- **Anonymous sign-in has to be switched on once for the project**: Firebase
+  console → Authentication → Sign-in method → Anonymous → Enable. Until it is,
+  devices collect normally and cannot upload, and the app says so in plain words
+  rather than failing silently.
+- **The endpoint is open to whoever has the URL.** That is the trade the open
+  model makes. A sitting records whether it came from an open device or a
+  registered one, so a stray one can be told apart; an upload ceiling per device
+  bounds a runaway client; and a specific device can be stopped (§8). If the URL
+  is ever circulated further than intended, **App Check** is the real control and
+  is a project setting rather than a code change.
+
+**Adding a device mid-study needs no action at all.** Open the URL on it.
 
 ## 3. On the day
 
@@ -169,11 +177,22 @@ by hand and record that they did.
 
 ---
 
-## 8. If something looks wrong
+## 8. Stopping one device
+
+A device filing something it should not — a stray iPad, an obvious test run from
+outside the room — is dealt with by taking its identity away. Its device id is on
+every sitting in the table. Paste it into **Data → Stop a device** (owners only).
+It cannot post again; nothing it already filed is removed, because deciding what
+to do with that is a judgement rather than a button.
+
+---
+
+## 9. If something looks wrong
 
 | Symptom | Where to look |
 |---|---|
-| The iPad says it is not enrolled | The token expired (an hour) or was already spent. Issue another. |
+| "anonymous sign-in is switched off" | §2. One switch in the Firebase console. |
+| The panel says the iPad has not reached the study yet | It has not been online since it was installed. It uploads by itself when it has a connection. |
 | "you are signed in, but this account has no role" | §1a. An owner grants a role. |
 | Sittings stay *awaiting upload* on a good network | Check the device was not revoked, and that the build was deployed with a Firebase project configured. A build with none says so in the handover panel. |
 | The researcher view shows an empty study | Either no role (§1a), or nothing has been pulled yet. |

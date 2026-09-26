@@ -40,8 +40,19 @@ export function mayCall(claims: { device?: unknown; role?: unknown }): boolean {
 
 export interface Caller {
   uid: string;
-  /** An enrolled iPad, as opposed to a signed-in member of the research team. */
+  /** An iPad, as opposed to a signed-in member of the research team. */
   device: boolean;
+  /**
+   * Whether this device just signed itself in rather than being enrolled by an
+   * owner.
+   *
+   * A participant opens the URL and takes part; nobody registers the iPad first.
+   * So most devices arrive this way, and the flag is not a suspicion — it is
+   * recorded on the sitting so an analysis can tell an open-URL sitting from one
+   * collected on a named device, which is the distinction a dataset needs and
+   * which "everybody is anonymous" would lose.
+   */
+  anonymous: boolean;
 }
 
 /**

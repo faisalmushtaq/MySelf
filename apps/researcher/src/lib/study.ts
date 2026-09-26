@@ -167,40 +167,20 @@ export async function pullSittings(): Promise<StudyPull> {
 
 // ── Devices ────────────────────────────────────────────────────────────────
 
-export interface EnrolledDevice {
-  deviceId: string;
-  label: string;
-  /** The one-time token to paste into that iPad. Shown once and never stored. */
-  token: string;
-}
-
 /**
- * Enrol an iPad, and hand back the token to paste into it.
+ * Stop one device filing anything more.
  *
- * WHY THIS IS HERE AT ALL. `enrolDevice` existed in the functions and nothing
- * called it, so there was no way to enrol a device — which made the whole sync
- * path unusable however correct it was. A capability with no caller is a
- * capability the study does not have.
+ * NOTHING IS ENROLLED ANY MORE — a participant opens the URL on any iPad and takes
+ * part, and the device signs itself in. So there is no enrolment panel here, and
+ * `enrolDevice` in the functions is kept only for a study that wants named
+ * devices; it is not part of fielding one.
  *
- * OWNER ONLY, enforced server-side. This UI hides the panel from anyone else as
- * a courtesy, not as the control: minting a credential is not something a browser
- * decides it may do, and the function checks the claim itself.
- *
- * The token is returned once, is valid for an hour, and is spent the moment the
- * iPad uses it. Nothing here writes it down.
- */
-export async function enrolDevice(label: string): Promise<EnrolledDevice> {
-  const call = httpsCallable<{ label: string }, EnrolledDevice>(firebase().fns, "enrolDevice");
-  const { data } = await call({ label: label.trim() });
-  return data;
-}
-
-/**
- * Stop an iPad posting anything more.
- *
- * For a device that has gone missing rather than one handed back: it disables the
- * account and revokes the refresh token, so the session the device already holds
- * stops working too.
+ * Revoking still matters, and arguably more: the way to deal with a device posting
+ * something it should not — a stray iPad, a duplicate, an obvious test run from
+ * outside the room — is to take its identity away. The device id is on every
+ * sitting in the table, so it can be read off the row and pasted here. It disables
+ * the account and revokes the refresh token, so the session the device already
+ * holds stops working too.
  */
 export async function revokeDevice(deviceId: string): Promise<void> {
   const call = httpsCallable<{ deviceId: string }, unknown>(firebase().fns, "revokeDevice");

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { AnswerStore, Walker, type AnswerValue, type PresentableUnit } from "@myself/engine";
 import { releaseManifest, responseScale, scoringDefinition, type ReleaseManifest, type ResponseScale } from "@myself/schema";
-import rawManifest from "../../../releases/ybm_nd2026_standard_r7.0.0.manifest.json";
+import rawManifest from "../../../releases/ybm_nd2026_standard_r7.0.1.manifest.json";
 import { flattenManifest } from "./lib/flatten.js";
 import { resolveText, useScoringDefinitions } from "./lib/pipes.js";
 import {
@@ -29,7 +29,7 @@ import {
   type AccessibilityPreferences,
 } from "./lib/accessibility.js";
 import { checkpointRunningSessions, synchroniseCompletedSessions } from "./lib/sync.js";
-import { currentDevice, enrolDevice, syncAvailable, withdrawDevice } from "./lib/device.js";
+import { currentDevice, syncAvailable } from "./lib/device.js";
 import { updates } from "./lib/updates.js";
 import { SessionTiming, wordCount } from "./lib/timing.js";
 import { ReviewScreen } from "./components/ReviewScreen.js";
@@ -37,7 +37,7 @@ import { SurveyScreen } from "./components/SurveyScreen.js";
 
 /**
  * MySelf Go — participant application (preview build).
- * Renders the frozen YBM r7.0.0 release entirely from its manifest, saves
+ * Renders the frozen YBM r7.0.1 release entirely from its manifest, saves
  * every response to encrypted IndexedDB before advancing, works offline via
  * the service worker, and returns to a neutral start screen on handover.
  */
@@ -106,7 +106,6 @@ export default function App() {
   const [busy, setBusy] = useState(false);
   const [syncBusy, setSyncBusy] = useState(false);
   const [device, setDevice] = useState<Enrolment | null>(null);
-  const [enrolToken, setEnrolToken] = useState("");
   // Typed at export and never stored: an iPad that is lost surrenders no way to
   // read the files it wrote.
   const [passphrase, setPassphrase] = useState("");
@@ -156,15 +155,15 @@ export default function App() {
     const [stored, enrolled] = await Promise.all([countStoredSessions(), enrolment()]);
     setCounts(stored);
     /**
-     * The SDK is the authority on whether this iPad is still enrolled, not the
-     * row this app wrote. An owner revoking a device leaves the row behind, and
-     * a panel reporting "enrolled" for an account that can no longer post is the
-     * one thing worse than reporting nothing.
+     * The SDK is the authority on which device this is, not the row this app
+     * wrote. A revoked device leaves the row behind, and a panel naming an
+     * identity that can no longer post is worse than naming none.
      */
     const live = syncAvailable ? await currentDevice().catch(() => null) : null;
-    if (live && enrolled) setDevice(enrolled);
-    else if (live) setDevice(await recordEnrolment(live.deviceId, live.label));
+    if (live) setDevice(enrolled?.deviceId === live.deviceId ? enrolled : await recordEnrolment(live.deviceId));
     else {
+      // No identity yet: this device has not been online since it was installed.
+      // It will get one the first time it uploads.
       setDevice(null);
       if (enrolled) await clearEnrolment();
     }
@@ -666,85 +665,21 @@ export default function App() {
                   export below.
                 </p>
               )}
-              {syncAvailable && device && (
-                <div className="sync-provisioning">
-                  <p className="hint">
-                    Enrolled as <strong>{device.label ?? device.deviceId}</strong> ({device.deviceId}) since{" "}
-                    {device.enrolledAt.slice(0, 10)}. Sittings upload under this name, and the study refuses any that
-                    contradict a copy it already holds.
-                  </p>
-                  <button
-                    type="button"
-                    className="secondary"
-                    disabled={counts.awaitingSync + counts.syncFailed + counts.inProgress > 0}
-                    title={
-                      counts.awaitingSync + counts.syncFailed + counts.inProgress > 0
-                        ? "Sync or export everything on this device first"
-                        : undefined
-                    }
-                    onClick={() => {
-                      void (async () => {
-                        try {
-                          await withdrawDevice();
-                          await clearEnrolment();
-                          setSyncNote("This device is no longer enrolled.");
-                          await refreshDeviceStatus();
-                        } catch (error) {
-                          setSyncNote(error instanceof Error ? error.message : "Could not un-enrol this device.");
-                        }
-                      })();
-                    }}
-                  >
-                    Un-enrol this device
-                  </button>
-                </div>
-              )}
-              {syncAvailable && !device && (
-                <div className="sync-provisioning">
-                  {/*
-                    One field, and it is not a password.
-                    An enrolment token is spent once and is valid for an hour;
-                    what the iPad keeps afterwards is held by the Firebase SDK and
-                    revoked from the console when a device goes missing. So there
-                    is no long-lived secret to be careful with here, and nothing
-                    for an operator to copy twice.
-                  */}
-                  <p className="hint">
-                    Enrol this iPad once. In the researcher console choose <strong>Enrol a device</strong>, give it a
-                    name you will recognise on a table of six, and paste the token it shows here. It is valid for an
-                    hour and is spent as soon as it is used.
-                  </p>
-                  <label className="field">
-                    <span className="field-label">Enrolment token</span>
-                    <input
-                      className="text-input"
-                      value={enrolToken}
-                      autoComplete="off"
-                      spellCheck={false}
-                      onChange={(event) => setEnrolToken(event.target.value)}
-                    />
-                  </label>
-                  <button
-                    type="button"
-                    className="secondary"
-                    disabled={enrolToken.trim().length === 0 || !online}
-                    onClick={() => {
-                      void (async () => {
-                        try {
-                          const enrolled = await enrolDevice(enrolToken);
-                          setEnrolToken("");
-                          await recordEnrolment(enrolled.deviceId, enrolled.label);
-                          setSyncNote(`Enrolled as ${enrolled.label ?? enrolled.deviceId}.`);
-                          await refreshDeviceStatus();
-                        } catch (error) {
-                          setSyncNote(error instanceof Error ? error.message : "Could not enrol this device.");
-                        }
-                      })();
-                    }}
-                  >
-                    {online ? "Enrol this device" : "Enrolment needs a connection"}
-                  </button>
-                </div>
+              {syncAvailable && (
+                <p className="hint">
+                  {device ? (
+                    <>
+                      This iPad files sittings as <strong>{device.deviceId}</strong>, since{" "}
+                      {device.firstSyncedAt.slice(0, 10)}. Nothing needs setting up — the study refuses any sitting that
+                      contradicts a copy it already holds.
+                    </>
+                  ) : (
+                    <>
+                      This iPad has not reached the study yet. Sittings are saved here and upload by themselves the
+                      first time it has a connection; nothing needs setting up.
+                    </>
+                  )}
+                </p>
               )}
               {/*
                 The passphrase is the STUDY's, not this device's, so a researcher

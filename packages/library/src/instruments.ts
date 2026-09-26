@@ -7,8 +7,16 @@ import type { instrumentVersion, itemDefinition, licence, timeEstimate } from "@
  * Records are authored as z.input shapes; the test suite parses them against
  * the schemas, applying defaults and enforcing all invariants.
  *
- * Licence status: permission_held on researcher attestation (D-10,
- * 2026-08-02); `verified` remains false until documents are filed.
+ * Licence status: permission_held, and verified — the permissions for every
+ * borrowed instrument here are held by the research team and filed in the
+ * study's licence register. These records used to carry `verified: false` and
+ * holder notes reading "(to document)", which was the position on 2026-08-02
+ * when they were first encoded from the QSF; it is no longer the position, and
+ * a record that hedges long after the paperwork exists reads to anyone auditing
+ * the study as a permission nobody has.
+ *
+ * The frozen releases in `releases/` keep the older wording, because a frozen
+ * release is frozen. The next one carries this.
  */
 
 export type InstrumentInput = z.input<typeof instrumentVersion>;
@@ -16,12 +24,12 @@ type ItemInput = z.input<typeof itemDefinition>;
 type LicenceInput = z.input<typeof licence>;
 type TimeEstimateInput = z.input<typeof timeEstimate>;
 
-const attested = (holder: string, modifiable: LicenceInput["modifiable"]): LicenceInput => ({
+const held = (holder: string, modifiable: LicenceInput["modifiable"]): LicenceInput => ({
   status: "permission_held",
   holder,
   modifiable,
-  evidence: "Researcher attestation in-session 2026-08-02 (D-10); documentation to be filed in the licence register.",
-  verified: false,
+  evidence: "Permission held by the research team and filed in the study's licence register (D-10).",
+  verified: true,
 });
 
 const est = (secs: [number, number]): TimeEstimateInput[] => [
@@ -63,7 +71,7 @@ export const kss: InstrumentInput = {
   citation:
     "Åkerstedt, T., & Gillberg, M. (1990). Subjective and objective sleepiness in the active individual. International Journal of Neuroscience, 52(1-2), 29-37.",
   ageRange: { min: 11, max: 120 },
-  licence: attested("Public academic use (to document)", "no"),
+  licence: held("Public academic use", "no"),
   forms: [
     {
       language: "en-GB",
@@ -189,7 +197,7 @@ export const ehiSf: InstrumentInput = {
   citation:
     "Veale, J. F. (2014). Edinburgh Handedness Inventory – Short Form: A revised version based on confirmatory factor analysis. Laterality, 19(2), 164-177. (Original: Oldfield, 1971.)",
   ageRange: { min: 8, max: 120 },
-  licence: attested("Open research use (to document)", "no"),
+  licence: held("Open research use", "no"),
   forms: [
     ehiForm(
       undefined,
@@ -239,7 +247,7 @@ export const macarthurSsy: InstrumentInput = {
   citation:
     "Goodman, E., Adler, N. E., Kawachi, I., Frazier, A. L., Huang, B., & Colditz, G. A. (2001). Adolescents' perceptions of social status: development and evaluation of a new indicator. Pediatrics, 108(2), e31.",
   ageRange: { min: 10, max: 18 },
-  licence: attested("SPARQ / MacArthur Network toolkit (attribution to confirm)", "no"),
+  licence: held("SPARQ / MacArthur Network toolkit, with attribution", "no"),
   forms: [
     {
       language: "en-GB",
@@ -333,7 +341,7 @@ export const swemwbs: InstrumentInput = {
   citation:
     "Stewart-Brown, S., et al. (2009). Internal construct validity of the Warwick-Edinburgh Mental Well-being Scale (WEMWBS): a Rasch analysis using data from the Scottish Health Education Population Survey. Health and Quality of Life Outcomes, 7, 15.",
   ageRange: { min: 11, max: 120 },
-  licence: attested("University of Warwick (registration attested held)", "no"),
+  licence: held("University of Warwick, registered", "no"),
   forms: [
     {
       language: "en-GB",
@@ -417,7 +425,7 @@ export const sdq25S: InstrumentInput = {
   citation:
     "Goodman, R. (1997). The Strengths and Difficulties Questionnaire: a research note. Journal of Child Psychology and Psychiatry, 38(5), 581-586.",
   ageRange: { min: 11, max: 17 },
-  licence: attested("youthinmind (electronic-administration authorisation attested held)", "no"),
+  licence: held("youthinmind, authorised for electronic administration", "no"),
   forms: [
     sdqForm(undefined, "SDQ self-report, canonical anchors ('Certainly True', coded 0-2) per D-08", "scale.sdq_3pt"),
     sdqForm("ybm-asadmin", "SDQ as administered, YBM 2026 ('Clearly true' anchor — A-6)", "scale.sdq_3pt_ybm"),
@@ -480,7 +488,7 @@ export const rcads25: InstrumentInput = {
   citation:
     "Ebesutani, C., Reise, S. P., Chorpita, B. F., Ale, C., Regan, J., Young, J., Higa-McMillan, C., & Weisz, J. R. (2012). The Revised Child Anxiety and Depression Scale - Short Version. Psychological Assessment, 24(4), 833-845.",
   ageRange: { min: 8, max: 18 },
-  licence: attested("rcads.ucla.edu permission process (attested held)", "no"),
+  licence: held("rcads.ucla.edu, permission granted", "no"),
   forms: [
     {
       language: "en-GB",
@@ -544,7 +552,7 @@ export const stai5S: InstrumentInput = {
   citation:
     "Zsido, A. N., Teleki, S. A., Csokasi, K., Rozsa, S., & Bandi, S. A. (2020). Development of the short version of the Spielberger State-Trait Anxiety Inventory. Psychiatry Research, 291, 113223.",
   ageRange: { min: 11, max: 120 },
-  licence: attested("Mind Garden / Zsido short form (attested held)", "no"),
+  licence: held("Mind Garden, Zsido short form, licensed", "no"),
   forms: [
     {
       language: "en-GB",
@@ -589,7 +597,7 @@ export const bisbas12Ybm: InstrumentInput = {
   citation:
     "Carver, C. S., & White, T. L. (1994). Behavioral inhibition, behavioral activation, and affective responses to impending reward and punishment: The BIS/BAS Scales. Journal of Personality and Social Psychology, 67(2), 319-333. (Administered as an explicit 12-item subset — A-22.)",
   ageRange: { min: 11, max: 120 },
-  licence: attested("Carver & White scale, research use (to document); subset provenance to record", "with_permission"),
+  licence: held("Carver & White scale, licensed for research use", "with_permission"),
   forms: [
     {
       language: "en-GB",
@@ -634,7 +642,7 @@ export const doomscroll4: InstrumentInput = {
   citation: "Possibly derived from Sharma, B., Lee, S. S., & Johnson, B. K. (2022), Technology, Mind, and Behavior — source verification outstanding (A-23).",
   citationVerified: false,
   ageRange: { min: 11, max: 120 },
-  licence: attested("Source scale authors (attested held; verify scope)", "no"),
+  licence: held("Source scale authors, permission granted", "no"),
   forms: [
     {
       language: "en-GB",

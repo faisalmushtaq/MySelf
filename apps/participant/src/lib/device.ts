@@ -4,7 +4,7 @@ import {
   indexedDBLocalPersistence,
   onAuthStateChanged,
   setPersistence,
-  signInWithCustomToken,
+  signInAnonymously,
   signOut,
   type Auth,
   type User,
@@ -13,48 +13,44 @@ import {
 /**
  * The iPad's own identity on the study.
  *
- * A device that posts sittings has to be somebody, because the server's whole
- * no-overwrite rule turns on which device a sitting came from: two copies of one
- * session id from two devices are quarantined, and the same device's own retry
- * is idempotent. An anonymous upload cannot be told apart from either.
+ * NOBODY REGISTERS A DEVICE. A participant opens the study's URL on whatever iPad
+ * is in front of them and takes part; the app signs itself in on first upload and
+ * that is the whole setup. An earlier version had a researcher mint a token in a
+ * console and paste it into each device, which is a barrier in front of the one
+ * thing this exists to do.
  *
- * NOT GOOGLE SIGN-IN, AND THAT IS THE POINT. The lab page signs a researcher in
- * with `signInWithPopup`, and popups do not work in a page added to the iOS Home
- * Screen — which is how this app is installed. Three commits tried to make that
- * work and were reverted (#91, #92, #93, #94). None of it is needed here: the
- * backend already mints the right credential. `enrolDevice` returns a Firebase
- * CUSTOM TOKEN, `signInWithCustomToken` involves no popup, no redirect and no
- * third-party cookie, and it is exchanged once for a session the SDK then keeps
- * refreshed by itself.
+ * SO WHY SIGN IN AT ALL? Because the server's no-overwrite rule turns on which
+ * device a sitting came from: two copies of one session id from two devices are
+ * quarantined rather than merged, and the same device's own retry is idempotent.
+ * That decision has to rest on something the device cannot simply claim, so it
+ * rests on an anonymous Firebase identity — which the participant never sees, is
+ * created without asking them anything, and carries no permission beyond filing
+ * sittings. It cannot make a model call or read the study back.
  *
- * SO THE TOKEN IN A RESEARCHER'S HANDS IS SHORT-LIVED. A custom token is valid
- * for an hour and is spent at enrolment; what the iPad keeps afterwards is a
- * refresh token in the SDK's own storage, revocable from the console with
- * `revokeDevice` when an iPad goes missing. The researcher never types a
- * long-lived secret into a device that spends its day in children's hands.
+ * ITS LIFETIME IS EXACTLY THE DATA'S LIFETIME, which is what makes it safe to
+ * rely on. The identity is held in this origin's IndexedDB, next to the AES key
+ * that the sittings are encrypted with. Clear one and you have cleared the other,
+ * so there is no state in which a device has readable sittings but has forgotten
+ * who it is — the case that would otherwise send a re-upload in under a new
+ * identity and have it quarantined as a second device.
  *
- * PERSISTENCE IS `indexedDBLocalPersistence`, DELIBERATELY. The default would
- * do, but the lab page's `browserSessionPersistence` would not: it is scoped to
- * the tab, and an iPad that forgot which device it was every time Safari
- * discarded the page would stop syncing halfway through a school day with
- * nothing on screen to say why.
+ * NO POPUP, NO REDIRECT, NO THIRD-PARTY COOKIE, which is what makes it work in a
+ * page added to the iOS Home Screen. The lab page's `signInWithPopup` does not,
+ * and the four reverted commits at the top of main were that.
  *
  * NONE OF THE CONFIGURATION IS SECRET. A Firebase web config is a set of public
- * identifiers — the `apiKey` names a project, it does not authorise anything.
- * What authorises is the `device` claim on the enrolled account. It is baked in
- * at build time rather than typed into the page for the same reason the relay
- * URL is: the survey must not be a place where somebody can point a child's
- * answers at a host of their choosing.
+ * identifiers — the `apiKey` names a project, it does not authorise anything. It
+ * is baked in at build time rather than typed into the page so that the survey is
+ * not a place where somebody can point a child's answers at a host of their
+ * choosing.
  */
 
 declare const __FIREBASE_CONFIG__: string;
 declare const __SITTINGS_URL__: string;
 
 export interface DeviceIdentity {
-  /** The enrolled account's uid, which IS the device id the server files under. */
+  /** The signed-in account's uid, which IS the device id the server files under. */
   deviceId: string;
-  /** What the researcher called this iPad when they enrolled it. */
-  label: string | null;
 }
 
 export interface SyncTarget {
@@ -89,7 +85,7 @@ let cachedAuth: Auth | null = null;
 
 function firebaseAuth(): Auth {
   if (cachedAuth) return cachedAuth;
-  if (!config) throw new Error("this build has no study configured, so it cannot enrol a device");
+  if (!config) throw new Error("this build has no study configured, so it cannot reach one");
   app ??= initializeApp(config);
   const instance = getAuth(app);
   // Awaited nowhere on purpose: the SDK queues work behind it, and a failure
@@ -100,48 +96,52 @@ function firebaseAuth(): Auth {
 }
 
 /**
- * Exchange the enrolment token for this device's identity.
+ * This device's identity, creating one if it has none.
  *
- * THE `device` CLAIM IS CHECKED HERE rather than left to the first upload. A
- * researcher who pastes their own sign-in token, or a token from another
- * project, would otherwise enrol apparently successfully and discover at the end
- * of a school day that nothing had been accepted. It fails now, while somebody
- * is still looking at the screen.
+ * Called from the sync path rather than at start-up, deliberately: signing in
+ * needs a network, and a survey must open and run in a hall with no usable wifi.
+ * A device that has never been online simply has no identity yet, collects
+ * normally, and gets one the first time it uploads.
  */
-export async function enrolDevice(customToken: string): Promise<DeviceIdentity> {
-  const token = customToken.trim();
-  if (token.length === 0) throw new Error("paste the enrolment token from the researcher console");
-
+export async function deviceIdentity(): Promise<DeviceIdentity> {
   const auth = firebaseAuth();
-  const credential = await signInWithCustomToken(auth, token);
-  const claims = await credential.user.getIdTokenResult(true);
-  if (claims.claims["device"] !== true) {
-    await signOut(auth).catch(() => undefined);
-    throw new Error(
-      "that token signs in an account rather than enrolling an iPad. Use the token from Enrol a device in the researcher console.",
-    );
+  const existing = await firstAuthState();
+  if (existing) return { deviceId: existing.uid };
+
+  try {
+    const credential = await signInAnonymously(auth);
+    return { deviceId: credential.user.uid };
+  } catch (error) {
+    /**
+     * The one failure worth naming precisely.
+     *
+     * Anonymous sign-in is off until somebody turns it on in the Firebase console,
+     * and the SDK's own answer is `auth/admin-restricted-operation`, which reads
+     * like a permissions bug in this code. It is one switch, and saying where it
+     * is saves an afternoon.
+     */
+    const code = (error as { code?: string } | null)?.code ?? "";
+    if (code === "auth/admin-restricted-operation" || code === "auth/operation-not-allowed") {
+      throw new Error(
+        "this study's Firebase project has anonymous sign-in switched off, so devices cannot file sittings. Firebase console → Authentication → Sign-in method → Anonymous → Enable.",
+      );
+    }
+    throw error;
   }
-  return { deviceId: credential.user.uid, label: credential.user.displayName ?? null };
 }
 
-/** Forget which device this is. Used on handover to a different study. */
-export async function withdrawDevice(): Promise<void> {
+/** Forget this identity. For handing a device to a different study. */
+export async function forgetIdentity(): Promise<void> {
   if (!config) return;
+  settled = null;
   await signOut(firebaseAuth());
 }
 
-/**
- * Who this iPad currently is, once the SDK has finished looking.
- *
- * `onAuthStateChanged` fires with `null` before it has read its own storage, so
- * a naive read of `auth.currentUser` at start-up reports an enrolled device as
- * unenrolled. Resolved on the first callback instead.
- */
+/** Who this iPad is, if it has been online at least once. Never creates one. */
 export async function currentDevice(): Promise<DeviceIdentity | null> {
   if (!config) return null;
   const user = await firstAuthState();
-  if (!user) return null;
-  return { deviceId: user.uid, label: user.displayName ?? null };
+  return user ? { deviceId: user.uid } : null;
 }
 
 let settled: Promise<User | null> | null = null;
@@ -167,7 +167,8 @@ function firstAuthState(): Promise<User | null> {
  */
 export async function syncTarget(): Promise<SyncTarget | null> {
   if (!syncAvailable) return null;
-  const user = await firstAuthState();
+  await deviceIdentity();
+  const user = await firebaseAuth().currentUser;
   if (!user) return null;
   return { url: __SITTINGS_URL__, token: await user.getIdToken() };
 }

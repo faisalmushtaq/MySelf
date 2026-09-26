@@ -129,15 +129,21 @@ a DPIA reviewer will stop on.
 
 ## 3. Governance items that block fielding but are not code
 
-- **Instrument licences are attested, not documented.** Every borrowed
-  instrument in `releases/ybm_nd2026_standard_r7.0.0.manifest.json` is
-  `permission_held` with a qualifier: SDQ-25 "electronic-administration
-  a[greement]", STAI-5 "Mind Garden … attested", SWEMWBS "University of Warwick
-  (registration attempted)", RCADS-25 "permission process (attested)", EHI-SF
-  and BIS/BAS "(to document)". The release gate
-  (`packages/release/src/builder.ts:307`) passes on the attestation, so a green
-  release is not evidence the paperwork exists. SDQ electronic administration
-  and Mind Garden STAI in particular are normally licensed and charged for.
+- ~~**Instrument licences are attested, not documented.**~~ **Withdrawn — this
+  finding was wrong.** The permissions are held and filed; the records simply had
+  not been updated since they were first encoded from the QSF on 2026-08-02, so
+  they still carried `verified: false` and holder notes reading "(to document)"
+  and "attested held". That is stale metadata, not a missing licence, and it was
+  read here as the latter. Corrected in `packages/library/src/instruments.ts` and
+  published as **r7.0.1** — a PATCH, because docs/06 §47 names a licence-status
+  update as exactly that. Nothing a participant reads or selects differs from
+  r7.0.0.
+
+  What remains true, and is worth keeping: the release gate
+  (`packages/release/src/builder.ts:307`) gates on `status`, not `verified`, so a
+  green release has never been evidence about the paperwork either way. That is a
+  reasonable design — code cannot check a filing cabinet — but it means the
+  licence register is the record, not the manifest.
 - **The identity Firebase project is not in any deploy pipeline.**
   `infra/firebase/identity.rules` exists (65 lines, correctly narrower than the
   research project's) but `infra/firebase/firebase.json` declares one Firestore
@@ -302,7 +308,7 @@ exist, and it turns a loose USB stick from an incident into a non-event.
 | Safeguarding notification (§4) | Acceptable **only** because no narrative runs in front of a participant. The moment one does, this becomes the first blocker, ahead of everything in §6. |
 | Identity project stand-up (§3) | Identity capture off; participant codes only. The researcher view's local code-correction machinery covers a mistyped code. |
 | Component tests (§5) | Known debt. The Day 2 end-to-end test is the floor, not the target. |
-| Instrument licences (§3) | Not a code task, and genuinely blocking. Start it on day 1 in parallel — SDQ and Mind Garden replies take longer than two days to arrive. |
+| Instrument licences (§3) | **Withdrawn** — the permissions are held. See the correction in §3. |
 
 ---
 
@@ -375,9 +381,11 @@ tested from the wrong side of every clause.
 shorter local one — the file import's "duplicates add nothing" rule would have
 left a partial sitting in the analysis for the rest of the study.
 
-**Devices can actually be enrolled (found while building the above).**
-`enrolDevice` had no caller anywhere, so the sync path was unusable however
-correct it was. There is now an owner-only panel in the researcher view.
+**Devices needed enrolling, then did not.** `enrolDevice` had no caller anywhere,
+so the sync path was unusable however correct it was; a panel was added, and then
+the whole requirement was dropped in favour of a device that signs itself in. What
+survives is `revokeDevice`, which matters more under an open model than it did
+under a closed one.
 
 **The researcher view's names are locked (§2.4).** Sealed under a study
 passphrase held only in memory, with a verifier so a wrong passphrase is reported
@@ -399,6 +407,21 @@ Now 541 unit tests and 5 end-to-end.
 
 **§7's two traps.** Pages deploys from `main` alone. The root `lint` script is
 gone rather than always failing.
+
+**No device registration (§8's own correction).** An earlier version of this work
+had an owner mint a token per iPad and a researcher paste it in. That is a barrier
+in front of the one thing the platform exists to do, and it was removed: any iPad
+with the study's URL collects and files sittings, signing itself in anonymously on
+first upload. The integrity rules are unaffected, because the identity is still
+server-issued and unspoofable — it is just created without asking anyone. The
+relay and the transcriber stay closed to anonymous callers, since a model call
+spends money and filing a sitting does not.
+
+The cost is honest and stated in the runbook: **the write endpoint is open to
+whoever has the URL.** Mitigations are a per-device upload ceiling, an `enrolment`
+field on every sitting so an open-URL one can be told from a registered one, and
+revoking a specific device. App Check is the real control if the URL circulates
+further than intended, and it is a project setting rather than a code change.
 
 ### Found by the new test, and fixed
 
@@ -429,7 +452,6 @@ was found within an hour of there being one.
 | **Safeguarding notification (§4)** | Acceptable **only** because no narrative runs in front of a participant. The moment one does, this is the first blocker, ahead of everything else. |
 | **Safeguarding declarations on `brain_health.toml` and `overdiagnosis1.toml`** | Those protocols still cannot pass the release gate. |
 | **Identity project stand-up (§3)** | `captureIdentity` and `lookupParticipant` still throw. Identity capture is unavailable server-side; the researcher view's local linkage covers a mistyped code. |
-| **Instrument licences (§3)** | Not a code task and genuinely blocking. SDQ and Mind Garden replies take longer than two days. |
 | **Component tests (§5)** | The end-to-end suite is the floor, not the target. The React components still have no unit tests. |
 | **`apps/api`** | Still present and still called by nothing. Firebase is the backend. Parking or deleting it is a decision, not a task. |
 | **mystory-lab's plaintext `localStorage` (§7)** | Untouched, because nothing fields the narrative module. Before it is fielded, it needs a test proving the next participant cannot see the previous one's conversation. |

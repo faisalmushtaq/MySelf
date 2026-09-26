@@ -17,9 +17,10 @@ Open it on an iPad in Safari, then Share → *Add to Home Screen* to install it;
 
 ## Fielding a study
 
-**[docs/15-fielding-runbook.md](docs/15-fielding-runbook.md)** — enrolling iPads,
-what happens on the day, handover, and getting the data out. Written to be
-followed on the morning.
+**[docs/15-fielding-runbook.md](docs/15-fielding-runbook.md)** — what happens on
+the day, handover, and getting the data out. Written to be followed on the
+morning. There is nothing to set up per iPad: open the URL, add it to the Home
+Screen, and it collects and files sittings by itself.
 
 **[docs/14-readiness-audit.md](docs/14-readiness-audit.md)** — what is ready,
 what is not, and what is deliberately left undone. Read §8 first.

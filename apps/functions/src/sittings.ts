@@ -16,6 +16,40 @@ import { RelayError, type Caller } from "./relay-policy.js";
 import { authenticate, cors } from "./relay.js";
 
 /**
+ * How many uploads one device may make in a day.
+ *
+ * Generous, because a device legitimately posts a lot: a sitting is checkpointed
+ * every couple of minutes while it is being answered, so twenty sittings in a
+ * school day is a few hundred uploads before anything has gone wrong.
+ *
+ * NOT A SECURITY BOUNDARY, and worth being honest about which one it is. Anyone
+ * with the study's URL can obtain an anonymous identity, so this does not stop a
+ * determined stranger — App Check is the control for that, and it is a project
+ * setting rather than a line of code. What this stops is the accident: a loop in
+ * a page, a device left syncing on a windowsill, a retry that never backs off.
+ * Those cost the same as an attack and are far more likely.
+ */
+export const UPLOADS_PER_DEVICE_PER_DAY = 2_000;
+
+async function meterUploads(caller: Caller): Promise<void> {
+  const day = new Date().toISOString().slice(0, 10);
+  const ref = research().doc(`${paths.audit(STUDY)}_uploads/${day}_${caller.uid}`);
+  const used = await research().runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    const count = ((snap.data()?.["uploads"] as number | undefined) ?? 0) + 1;
+    tx.set(ref, { uploads: count, uid: caller.uid, day, at: FieldValue.serverTimestamp() }, { merge: true });
+    return count;
+  });
+  if (used > UPLOADS_PER_DEVICE_PER_DAY) {
+    throw new RelayError(
+      429,
+      "rate_limit",
+      `${used - 1} uploads today is the limit for one device. The sittings are still on the device and nothing is lost.`,
+    );
+  }
+}
+
+/**
  * Storing a survey sitting.
  *
  * The gap this closes: `splitSession`, `joinSession` and the nightly export
@@ -144,7 +178,15 @@ export function deviceIdFor(caller: Caller, claimed: string | undefined): string
   return claimed;
 }
 
-/** Whether this caller may write survey sittings at all, and why not. */
+/**
+ * Whether this caller may write survey sittings at all, and why not.
+ *
+ * An anonymous iPad may. A tester link may not, and that distinction survives
+ * opening the study to any device: a link is a URL handed to somebody to PILOT
+ * the narrative module before a study is fielded, its runs are stored as test
+ * provenance and kept out of the dataset, and a sitting arriving on one would
+ * contradict that on purpose. A participant's iPad is not in that position.
+ */
 export function sittingRefusal(caller: Caller): string | null {
   if (caller.uid.startsWith("link_")) {
     return "a tester link can try the module out, but it cannot file a survey sitting into the study's dataset";
@@ -164,8 +206,9 @@ export async function storeSitting(
   session: DeviceSession,
   deviceId: string,
   now = new Date(),
+  enrolment: SessionDoc["enrolment"] = "open",
 ): Promise<SittingOutcome> {
-  const { doc, chunks } = splitSession(session, deviceId, study, now);
+  const { doc, chunks } = splitSession(session, deviceId, study, now, enrolment);
 
   const parentRef = db.doc(paths.session(study, session.sessionId));
 
@@ -334,7 +377,9 @@ export const saveSitting = onRequest(
     const started = Date.now();
     let caller: Caller | null = null;
     try {
-      caller = await authenticate(req.headers.authorization);
+      // An iPad that signed itself in may file a sitting. That is the whole
+      // participation model: somebody opens the URL and takes part.
+      caller = await authenticate(req.headers.authorization, { allowAnonymous: true });
       const refusal = sittingRefusal(caller);
       if (refusal) throw new RelayError(403, "auth", refusal);
 
@@ -348,6 +393,7 @@ export const saveSitting = onRequest(
         );
       }
       const deviceId = deviceIdFor(caller, parsed.data.deviceId);
+      await meterUploads(caller);
       const db = research();
       const now = new Date();
 
@@ -363,7 +409,9 @@ export const saveSitting = onRequest(
       const outcomes: SittingOutcome[] = [];
       for (const one of parsed.data.sittings) {
         try {
-          outcomes.push(await storeSitting(db, STUDY, one as DeviceSession, deviceId, now));
+          outcomes.push(
+            await storeSitting(db, STUDY, one as DeviceSession, deviceId, now, caller.anonymous ? "open" : "enrolled"),
+          );
         } catch (error) {
           logger.error("a sitting could not be stored", { sessionId: one.sessionId, error: String(error) });
           outcomes.push({

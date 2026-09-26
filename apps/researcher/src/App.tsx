@@ -19,14 +19,12 @@ import {
   type ImportReport,
 } from "./lib/db.js";
 import {
-  enrolDevice,
   pullSittings,
   revokeDevice,
   signIn,
   signOutOfStudy,
   studyAvailable,
   watchUser,
-  type EnrolledDevice,
   type StudyUser,
 } from "./lib/study.js";
 import { defaultColumns } from "./lib/filter.js";
@@ -68,12 +66,11 @@ export default function App() {
   const [user, setUser] = useState<StudyUser | null>(null);
   const [pulling, setPulling] = useState(false);
   const [pullNote, setPullNote] = useState<string | null>(null);
+  const [revoking, setRevoking] = useState("");
+  const [deviceNote, setDeviceNote] = useState<string | null>(null);
   // The study passphrase the iPads encrypted their handover files with. Held in
   // memory for the length of a sitting at the laptop, never written down here.
   const [passphrase, setPassphrase] = useState("");
-  const [deviceLabel, setDeviceLabel] = useState("");
-  const [enrolled, setEnrolled] = useState<EnrolledDevice | null>(null);
-  const [deviceNote, setDeviceNote] = useState<string | null>(null);
 
   const reload = useCallback(async () => {
     setBusy(true);
@@ -356,83 +353,49 @@ export default function App() {
           )}
 
           {/*
-            Enrolling an iPad. Owner only, and the function checks that itself —
-            hiding the panel is a courtesy, not the control.
+            No enrolment panel: a participant opens the URL on any iPad and the
+            device signs itself in. Revoking is the control that remains, and it
+            matters more for being open — the device id is on every sitting in the
+            table, so it can be read off the row.
           */}
           {user?.role === "owner" && (
             <div className="panel study-pull">
-              <h3>Enrol an iPad</h3>
+              <h3>Stop a device</h3>
               <p className="note">
-                Give the device a name you will recognise on a table of six. You get a token to paste into that iPad&apos;s
-                handover panel once; it is valid for an hour and is spent as soon as the device uses it.
+                For an iPad filing something it should not — a stray device, an obvious test run from outside the room.
+                Copy its device id from the table and paste it here. It cannot post again, and nothing it already filed
+                is removed.
               </p>
               <label className="field">
-                <span className="field-label">What to call this iPad</span>
+                <span className="field-label">Device id</span>
                 <input
                   className="search wide"
-                  value={deviceLabel}
-                  placeholder="e.g. iPad 3 (blue case)"
-                  onChange={(e) => setDeviceLabel(e.target.value)}
+                  value={revoking}
+                  placeholder="the deviceId shown against its sittings"
+                  onChange={(e) => setRevoking(e.target.value)}
                 />
               </label>
               <div className="handover-actions">
                 <button
                   type="button"
                   className="secondary"
-                  disabled={deviceLabel.trim().length === 0}
+                  disabled={revoking.trim().length === 0}
                   onClick={() => {
+                    const id = revoking.trim();
                     setDeviceNote(null);
-                    setEnrolled(null);
-                    void enrolDevice(deviceLabel)
-                      .then((device) => {
-                        setEnrolled(device);
-                        setDeviceLabel("");
+                    void revokeDevice(id)
+                      .then(() => {
+                        setRevoking("");
+                        setDeviceNote(`${id} can post nothing further.`);
                       })
                       .catch((error: unknown) =>
-                        setDeviceNote(error instanceof Error ? error.message : "Could not enrol that device."),
+                        setDeviceNote(error instanceof Error ? error.message : "Could not revoke that device."),
                       );
                   }}
                 >
-                  Enrol a device
+                  Revoke this device
                 </button>
               </div>
-              {enrolled && (
-                <div className="sync-provisioning">
-                  <p className="note">
-                    <strong>{enrolled.label}</strong> is enrolled as {enrolled.deviceId}. Paste this into that iPad now —
-                    it is not shown again, and a fresh one can be issued if it is lost.
-                  </p>
-                  <textarea className="search wide" readOnly rows={4} value={enrolled.token} />
-                  <div className="handover-actions">
-                    <button
-                      type="button"
-                      className="secondary"
-                      onClick={() => void navigator.clipboard?.writeText(enrolled.token)}
-                    >
-                      Copy token
-                    </button>
-                    <button type="button" className="secondary" onClick={() => setEnrolled(null)}>
-                      Done
-                    </button>
-                    <button
-                      type="button"
-                      className="secondary"
-                      onClick={() => {
-                        void revokeDevice(enrolled.deviceId)
-                          .then(() => {
-                            setDeviceNote(`${enrolled.label} is revoked and can post nothing further.`);
-                            setEnrolled(null);
-                          })
-                          .catch((error: unknown) =>
-                            setDeviceNote(error instanceof Error ? error.message : "Could not revoke that device."),
-                          );
-                      }}
-                    >
-                      Revoke instead
-                    </button>
-                  </div>
-                </div>
-              )}
               {deviceNote && <p className="note">{deviceNote}</p>}
             </div>
           )}

@@ -48,16 +48,15 @@ interface DeviceRow {
 /**
  * Which iPad this is, for the operator to read off the screen.
  *
- * The CREDENTIAL is not here: the Firebase SDK holds the refresh token in its
- * own storage, and duplicating it into a row this app writes would be inventing
- * a long-lived secret that nothing needs. This is the label and the id, so a
- * researcher can confirm the right device is enrolled without signing anything in.
+ * The CREDENTIAL is not here: the Firebase SDK holds the refresh token in its own
+ * storage, and duplicating it into a row this app writes would be inventing a
+ * long-lived secret that nothing needs. This is only the id, so that a researcher
+ * looking at a sitting in the dataset can match it to the iPad in their hand.
  */
 interface EnrolmentRow {
   id: "device";
   deviceId: string;
-  label: string | null;
-  enrolledAt: string;
+  firstSyncedAt: string;
 }
 
 /** How much of a still-running sitting the server has a copy of. */
@@ -99,8 +98,7 @@ interface AccessibilityRow extends AccessibilityPreferences {
 
 export interface Enrolment {
   deviceId: string;
-  label: string | null;
-  enrolledAt: string;
+  firstSyncedAt: string;
 }
 
 export interface SyncEvent {
@@ -336,13 +334,19 @@ export async function loadAnswers(sessionId: string): Promise<Map<string, Record
 /**
  * Remember which iPad this is, for the operator's benefit.
  *
- * Called after `enrolDevice` has already exchanged the token, so by the time
- * this row is written the identity is real rather than claimed.
+ * Written after the device has actually signed in, so the id in this row is one
+ * the server issued rather than one this app made up.
  */
-export async function recordEnrolment(deviceId: string, label: string | null): Promise<Enrolment> {
-  const row: EnrolmentRow = { id: "device", deviceId, label, enrolledAt: new Date().toISOString() };
+export async function recordEnrolment(deviceId: string): Promise<Enrolment> {
+  // First seen wins, so the panel can say how long this iPad has been filing
+  // sittings rather than resetting the date on every sync.
+  const existing = await db.enrolment.get("device");
+  if (existing?.deviceId === deviceId) {
+    return { deviceId: existing.deviceId, firstSyncedAt: existing.firstSyncedAt };
+  }
+  const row: EnrolmentRow = { id: "device", deviceId, firstSyncedAt: new Date().toISOString() };
   await db.enrolment.put(row);
-  return { deviceId: row.deviceId, label: row.label, enrolledAt: row.enrolledAt };
+  return { deviceId: row.deviceId, firstSyncedAt: row.firstSyncedAt };
 }
 
 export async function clearEnrolment(): Promise<void> {
@@ -351,7 +355,7 @@ export async function clearEnrolment(): Promise<void> {
 
 export async function enrolment(): Promise<Enrolment | null> {
   const row = await db.enrolment.get("device");
-  return row ? { deviceId: row.deviceId, label: row.label, enrolledAt: row.enrolledAt } : null;
+  return row ? { deviceId: row.deviceId, firstSyncedAt: row.firstSyncedAt } : null;
 }
 
 /** Materialise queued sittings only when their retry window allows another attempt. */

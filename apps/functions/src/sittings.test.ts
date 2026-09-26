@@ -13,9 +13,11 @@ import { RelayError, type Caller } from "./relay-policy.js";
  * runs before deploying.
  */
 
-const device: Caller = { uid: "dev_ipad_1", device: true };
-const researcher: Caller = { uid: "res_1", device: false };
-const tester: Caller = { uid: "link_abc123", device: false };
+const device: Caller = { uid: "dev_ipad_1", device: true, anonymous: false };
+/** The normal case now: an iPad that opened the URL and signed itself in. */
+const openDevice: Caller = { uid: "anon_abc123", device: true, anonymous: true };
+const researcher: Caller = { uid: "res_1", device: false, anonymous: false };
+const tester: Caller = { uid: "link_abc123", device: false, anonymous: false };
 
 /** Enough Firestore to record what was written, in what order. */
 function fakeDb() {
@@ -156,6 +158,39 @@ describe("who may file a survey sitting", () => {
   it("makes an importing researcher say which iPad it came off", () => {
     expect(deviceIdFor(researcher, "dev_ipad_7")).toBe("dev_ipad_7");
     expect(() => deviceIdFor(researcher, undefined)).toThrow(RelayError);
+  });
+});
+
+describe("an iPad that nobody registered", () => {
+  it("may file a sitting, because that is how somebody takes part", () => {
+    // Requiring an owner to register each device first is a barrier in front of
+    // the one thing this exists to do.
+    expect(sittingRefusal(openDevice)).toBeNull();
+  });
+
+  it("is its own device, so the no-overwrite rules still apply to it", () => {
+    // The whole reason it signs in at all: the collision rule turns on which
+    // device a sitting came from, and that cannot rest on something claimable.
+    expect(deviceIdFor(openDevice, undefined)).toBe("anon_abc123");
+    expect(deviceIdFor(openDevice, "dev_somebody_elses_ipad")).toBe("anon_abc123");
+  });
+
+  it("is recorded as an open-URL sitting rather than a registered one", async () => {
+    // Not a quality judgement, and nothing filters on it by default. It is here so
+    // a study that cares can tell the two apart at all.
+    const { db, docs } = fakeDb();
+    await storeSitting(db, "ybm", session([event(0)]), openDevice.uid, new Date(), "open");
+    expect((docs.get(paths.session("ybm", "ses_1")) as unknown as SessionDoc).enrolment).toBe("open");
+  });
+
+  it("records a registered device as registered", async () => {
+    const { db, docs } = fakeDb();
+    await storeSitting(db, "ybm", session([event(0)]), device.uid, new Date(), "enrolled");
+    expect((docs.get(paths.session("ybm", "ses_1")) as unknown as SessionDoc).enrolment).toBe("enrolled");
+  });
+
+  it("is still not a tester link, which may not file one", async () => {
+    expect(sittingRefusal(tester)).toMatch(/cannot file a survey sitting/);
   });
 });
 
