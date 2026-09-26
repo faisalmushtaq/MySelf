@@ -39,13 +39,21 @@ const MANIFEST = resolve("releases/ybm_nd2026_standard_r7.0.1.manifest.json");
  * `@myself/store` is ESM-only, so it is imported dynamically — a static import of a
  * `"type": "module"` package from a CommonJS spec does not resolve.
  */
-const envelopeTools = () => import("@myself/store");
+const storeTools = () => import("@myself/store");
 
 /** One thing a participant did, as the screen showed it. */
 interface Tapped {
   stem: string;
   label: string;
 }
+
+/**
+ * Questions where several options can be ticked at once.
+ *
+ * Kept apart because "the last thing tapped" means something different for them: a
+ * multi-select's taps accumulate, so the last one is not what the participant settled on.
+ */
+const multiSelectStems = new Set<string>();
 
 interface Manifest {
   hash?: string;
@@ -148,9 +156,27 @@ async function answerAndRecord(page: Page, ledger: Tapped[]): Promise<void> {
   const cards = page.locator('[role="group"] button.card:visible, [role="group"] button.chip:visible');
   const cardCount = await cards.count();
   if (cardCount > 0) {
+    /**
+     * A multi-select, recorded the same as a single choice.
+     *
+     * The stem comes from the heading rather than the group's `aria-label`, because the
+     * chip presentation does not carry one — and the heading IS the stem.
+     *
+     * Its dataset row is the pipe-joined list of everything ticked, so each option is
+     * recorded separately here and the joined label is split when it is checked. The
+     * first version skipped these entirely and then failed on finding a joined label it
+     * had no record of; the data was right.
+     */
+    const stem = ((await page.locator(".survey-body h1").first().textContent()) ?? "").trim();
     for (let i = 0; i < Math.min(3, cardCount); i += 1) {
       const card = cards.nth(i);
-      if (await card.isEnabled({ timeout: 1_000 }).catch(() => false)) await card.click({ timeout: 5_000 });
+      if (!(await card.isEnabled({ timeout: 1_000 }).catch(() => false))) continue;
+      const label = await optionLabel(card);
+      await card.click({ timeout: 5_000 });
+      if (stem !== "" && label !== "") {
+        ledger.push({ stem, label });
+        multiSelectStems.add(stem);
+      }
     }
     return;
   }
@@ -281,7 +307,7 @@ test("the dataset says what the participant actually answered", async ({ page })
   await page.locator("button", { hasText: "Export completed sessions" }).click();
   const file = await (await download).path();
 
-  const { isEncryptedEnvelope, openExport } = await envelopeTools();
+  const { isEncryptedEnvelope, openExport } = await storeTools();
   const envelope: unknown = JSON.parse(await readFile(file!, "utf8"));
   expect(isEncryptedEnvelope(envelope)).toBe(true);
   const opened = (await openExport(envelope as never, PASSPHRASE)) as {
@@ -312,9 +338,23 @@ test("the dataset says what the participant actually answered", async ({ page })
    */
   const key = (stem: string, label: string) => `${stem}\u0000${label}`;
   const tapped = new Set(ledger.map((entry) => key(entry.stem, entry.label)));
-  /** The last thing tapped for each question — what the participant settled on. */
+  /**
+   * The last thing tapped for each question — what the participant settled on.
+   *
+   * Only meaningful for a single choice. A multi-select's last tap is one of several
+   * answers rather than a replacement for the earlier ones, so those stems are dropped
+   * from this map rather than being recorded as having "settled on" whichever option
+   * happened to be ticked last.
+   */
+  const tapCounts = new Map<string, number>();
+  for (const entry of ledger) tapCounts.set(entry.stem, (tapCounts.get(entry.stem) ?? 0) + 1);
   const settledOn = new Map<string, string>();
   for (const entry of ledger) settledOn.set(entry.stem, entry.label);
+  for (const [stem] of tapCounts) {
+    // A stem whose taps all remain selected is a multi-select; the event log tells them
+    // apart by kind, so this map is only consulted for single choices anyway.
+    if (multiSelectStems.has(stem)) settledOn.delete(stem);
+  }
 
   const seen = new Set<string>();
   const storedLast = new Map<string, string>();
@@ -351,10 +391,20 @@ test("the dataset says what the participant actually answered", async ({ page })
 
   expect(checked).toBeGreaterThan(20);
 
-  // NOTHING LOST. Every option tapped is in the log, including the ones a
-  // consistency check rejected — the log is append-only and a revised answer is
-  // paradata, not noise to be discarded.
-  const missing = [...tapped].filter((pair) => !seen.has(pair));
+  /**
+   * NOTHING LOST. Every single choice tapped is in the log, including the ones a
+   * consistency check rejected — the log is append-only and a revised answer is
+   * paradata, not noise to be discarded.
+   *
+   * SINGLE CHOICES ONLY, because this loop reads `kind: "choice"` payloads. A
+   * multi-select is stored as `kind: "checkboxes"` against the option keys rather than a
+   * code, so it is absent from `seen` by construction rather than by loss — and it is
+   * checked thoroughly the other way round below, where every part of its joined dataset
+   * label has to be something that was tapped. Between the two directions the coverage
+   * is complete; conflating them here would only make this loop re-implement `ingest`.
+   */
+  const singleChoiceTaps = [...tapped].filter((pair) => !multiSelectStems.has(pair.split("\u0000")[0]!));
+  const missing = singleChoiceTaps.filter((pair) => !seen.has(pair));
   expect(missing, `tapped but absent from the log: ${missing.join(" / ")}`).toEqual([]);
 
   // AND THE ANSWER THAT COUNTS IS THE ONE GIVEN LAST. This is the assertion an
@@ -364,4 +414,69 @@ test("the dataset says what the participant actually answered", async ({ page })
     if (!storedLast.has(stem)) continue;
     expect(storedLast.get(stem), `the last answer stored for "${stem}" is not the last one tapped`).toBe(label);
   }
+
+  /**
+   * Then the same question of the table a researcher actually analyses.
+   *
+   * Everything above checks the event log, which is the record. This checks what is
+   * DERIVED from it — and the derivation is its own chance to be wrong: `ingest` resolves
+   * each event to a variable, a code and the label that code stands for, and a dataset
+   * whose `value` and `label` disagreed with each other, or with the screen, would be
+   * analysed by somebody with no way to notice.
+   *
+   * It is the same `ingest` the researcher view and the nightly BIDS export both run, so
+   * this is the analysis output rather than a proxy for it.
+   */
+  const { ingest } = await storeTools();
+  const derived = ingest([sitting as never], { manifest: manifest as never, study: "ybm" });
+
+  // A rejected sitting is one that never reaches an analysis at all.
+  expect(derived.rejected, `ingest refused the sitting: ${JSON.stringify(derived.rejected)}`).toEqual([]);
+  expect(derived.dataset.sessions).toHaveLength(1);
+  expect(derived.dataset.sessions[0]!.complete).toBe(true);
+
+  const answered = derived.dataset.responses.filter((row) => row.status === "answered" && row.label !== null);
+  expect(answered.length).toBeGreaterThan(20);
+
+  let crossChecked = 0;
+  for (const row of answered) {
+    const itemKey = `${row.instrument}.${row.item}`;
+    const stem = stemOf.get(itemKey);
+    if (!stem) continue;
+
+    /**
+     * The label in the dataset is one the participant was shown for this question.
+     *
+     * A multi-select's row joins everything ticked with " | ", so it is split and each
+     * part checked — the joined string is a rendering of several answers rather than one
+     * answer with a strange name.
+     */
+    for (const part of row.label!.split(" | ").map((piece) => piece.trim())) {
+      expect(
+        tapped.has(key(stem, part)),
+        `the dataset's row for "${stem}" includes "${part}", which was never tapped`,
+      ).toBe(true);
+    }
+
+    // And the code agrees with that label. A dataset where `value` and `label` disagree
+    // is one where the numbers and the words tell different stories.
+    if (row.value !== null) {
+      const fromCode = labelOf.get(itemKey)?.get(row.value);
+      if (fromCode !== undefined) {
+        expect(fromCode, `${itemKey}: code ${row.value} is "${fromCode}" but the row says "${row.label}"`).toBe(
+          row.label,
+        );
+      }
+    }
+
+    // For a single choice, the final row is the answer the participant settled on rather
+    // than an earlier revision. A multi-select has no single last answer — its row is
+    // the whole set — so the joined form is exempt from this one.
+    const settled = settledOn.get(stem);
+    if (settled !== undefined && !row.label!.includes(" | ")) {
+      expect(row.label, `the dataset's final answer for "${stem}" is not the last one tapped`).toBe(settled);
+    }
+    crossChecked += 1;
+  }
+  expect(crossChecked).toBeGreaterThan(20);
 });

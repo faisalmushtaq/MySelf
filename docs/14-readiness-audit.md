@@ -510,7 +510,10 @@ the side that did not change.
 
 | What | How |
 |---|---|
-| The dataset says what the participant answered | `e2e/accuracy.spec.ts` walks the questionnaire recording every visible stem and option label tapped, exports, decrypts, and resolves each stored code back through the release manifest. An off-by-one in an option list fails here and nowhere else. |
+| The dataset says what the participant answered | `e2e/accuracy.spec.ts` walks the questionnaire recording every visible stem and option label tapped, exports, decrypts, resolves each stored code back through the release manifest, **and then runs the same `ingest` the researcher view and the BIDS export run** and checks the analysis rows too — that every label is one that was shown, that each row's code and label agree with each other, and that the final value is what the participant settled on. An off-by-one in an option list, or a derivation that mapped a code to the wrong word, fails here and nowhere else. |
+| The whole chain, browser to database | `e2e-sync` drives the real app in a real browser, over HTTP, through the deployed handler code onto a real Firestore, then reads the sitting back. A finished sitting arrives with its answers in order; a sitting in progress is already there and grows without duplicating; a sitting survives the study being unreachable for its whole duration and lands when the operator syncs; the device keeps one identity across participants. |
+| A device cannot talk over itself | Overlapping checkpoints raced and the shorter was refused — correct, but churn. One upload at a time, guarded in the protocol rather than in any caller. |
+| A full iPad is noticed at handover | Storage is reported in the handover panel before a write can fail, and a browser that will not answer is not treated as a device that is out of space. |
 | Two iPads cannot overwrite each other | Real Firestore. Six devices racing for one session id settle on exactly one winner; six racing to claim one installation id likewise. |
 | A retry overlapping itself | Three concurrent uploads of a 200-event sitting leave it intact and in order. |
 | A checkpoint racing the finished sitting | The complete copy is what stays stored. |
@@ -519,7 +522,16 @@ the side that did not change.
 | A 900-event sitting | Spills into chunks and reads back whole. |
 | Twenty sittings at once | Keep their own lengths and their own participant codes. |
 
-582 unit tests, 23 integration tests against a real Firestore, 6 browser tests.
+608 unit tests, 23 integration tests against a real Firestore, 6 browser tests, and 5
+full-chain tests that put a real request on a socket in front of the real handler.
+
+Three of those were written wrong before they were written right, and each time the
+platform was correct and the test was not: the event log holds options a consistency
+check rejected (append-only, and a revised answer is paradata); a selected option's
+visible text carries a tick (decoration, not the answer); a multi-select's dataset row
+joins everything ticked with a pipe (a rendering of several answers, not one answer with
+a strange name). Recorded here because the next person to read a failure in that file
+needs to know which side to doubt.
 
 ### Still open
 
