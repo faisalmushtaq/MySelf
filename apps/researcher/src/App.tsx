@@ -19,11 +19,14 @@ import {
   type ImportReport,
 } from "./lib/db.js";
 import {
+  enrolDevice,
   pullSittings,
+  revokeDevice,
   signIn,
   signOutOfStudy,
   studyAvailable,
   watchUser,
+  type EnrolledDevice,
   type StudyUser,
 } from "./lib/study.js";
 import { defaultColumns } from "./lib/filter.js";
@@ -68,6 +71,9 @@ export default function App() {
   // The study passphrase the iPads encrypted their handover files with. Held in
   // memory for the length of a sitting at the laptop, never written down here.
   const [passphrase, setPassphrase] = useState("");
+  const [deviceLabel, setDeviceLabel] = useState("");
+  const [enrolled, setEnrolled] = useState<EnrolledDevice | null>(null);
+  const [deviceNote, setDeviceNote] = useState<string | null>(null);
 
   const reload = useCallback(async () => {
     setBusy(true);
@@ -346,6 +352,88 @@ export default function App() {
                 </>
               )}
               {pullNote && <p className="note">{pullNote}</p>}
+            </div>
+          )}
+
+          {/*
+            Enrolling an iPad. Owner only, and the function checks that itself —
+            hiding the panel is a courtesy, not the control.
+          */}
+          {user?.role === "owner" && (
+            <div className="panel study-pull">
+              <h3>Enrol an iPad</h3>
+              <p className="note">
+                Give the device a name you will recognise on a table of six. You get a token to paste into that iPad&apos;s
+                handover panel once; it is valid for an hour and is spent as soon as the device uses it.
+              </p>
+              <label className="field">
+                <span className="field-label">What to call this iPad</span>
+                <input
+                  className="search wide"
+                  value={deviceLabel}
+                  placeholder="e.g. iPad 3 (blue case)"
+                  onChange={(e) => setDeviceLabel(e.target.value)}
+                />
+              </label>
+              <div className="handover-actions">
+                <button
+                  type="button"
+                  className="secondary"
+                  disabled={deviceLabel.trim().length === 0}
+                  onClick={() => {
+                    setDeviceNote(null);
+                    setEnrolled(null);
+                    void enrolDevice(deviceLabel)
+                      .then((device) => {
+                        setEnrolled(device);
+                        setDeviceLabel("");
+                      })
+                      .catch((error: unknown) =>
+                        setDeviceNote(error instanceof Error ? error.message : "Could not enrol that device."),
+                      );
+                  }}
+                >
+                  Enrol a device
+                </button>
+              </div>
+              {enrolled && (
+                <div className="sync-provisioning">
+                  <p className="note">
+                    <strong>{enrolled.label}</strong> is enrolled as {enrolled.deviceId}. Paste this into that iPad now —
+                    it is not shown again, and a fresh one can be issued if it is lost.
+                  </p>
+                  <textarea className="search wide" readOnly rows={4} value={enrolled.token} />
+                  <div className="handover-actions">
+                    <button
+                      type="button"
+                      className="secondary"
+                      onClick={() => void navigator.clipboard?.writeText(enrolled.token)}
+                    >
+                      Copy token
+                    </button>
+                    <button type="button" className="secondary" onClick={() => setEnrolled(null)}>
+                      Done
+                    </button>
+                    <button
+                      type="button"
+                      className="secondary"
+                      onClick={() => {
+                        void revokeDevice(enrolled.deviceId)
+                          .then(() => {
+                            setDeviceNote(`${enrolled.label} is revoked and can post nothing further.`);
+                            setEnrolled(null);
+                          })
+                          .catch((error: unknown) =>
+                            setDeviceNote(error instanceof Error ? error.message : "Could not revoke that device."),
+                          );
+                      }}
+                    >
+                      Revoke instead
+                    </button>
+                  </div>
+                </div>
+              )}
+              {deviceNote && <p className="note">{deviceNote}</p>}
             </div>
           )}
 

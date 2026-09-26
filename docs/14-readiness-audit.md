@@ -4,6 +4,13 @@ Audited 2026-09-26 against `claude/myself-code-audit-ub9yhx` at `b848ec8`.
 Verified by reading the code, not the documents: install, build, typecheck and
 the full test suite were run, and every claim below cites the file it came from.
 
+> **This document is the audit as found.** It is deliberately not rewritten as
+> work lands, because a record of what was wrong is worth keeping. What has since
+> been built, and what has not, is in **§8 — what changed after the audit** at
+> the end. Read that before acting on anything above it. Operational
+> instructions for fielding a study live in
+> [15-fielding-runbook.md](15-fielding-runbook.md).
+
 **Verdict.** The engineering is well above the norm for a research platform.
 The definition layer, the survey engine, the release gate, the Firestore rules,
 the relay's authorisation model and the BIDS export are all genuinely good, and
@@ -314,3 +321,115 @@ Neither is a blocker; both are cheap and both are traps.
   one storage that outlives the child. Whatever guard restores it needs a test
   that proves the next participant cannot be shown the previous one's
   conversation.
+
+---
+
+## 8. What changed after the audit
+
+Everything below landed on `claude/myself-code-audit-ub9yhx` after the audit
+above was written. Withdrawal was taken out of scope by the researcher, to be
+handled manually; the micro-narrative module stays deferred.
+
+### Built
+
+**Multi-iPad integrity (§2.2's hard half).** `conflictWith` in
+`packages/firebase/src/layout.ts` is now the single decision point, with four
+rules rather than two, and `storeSitting` has none of its own. Two of the four
+were silent data loss:
+
+- a log that had got **shorter** overwrote the longer copy, because the parent
+  document is replaced outright and unused chunks are deleted — so a device
+  restored from a backup, or one re-sending a checkpoint after the full sitting
+  had arrived, truncated a complete log with a successful response and nothing
+  downstream able to tell;
+- a **differing release hash** from the same device overwrote silently;
+  `conflictWith` had the rule and nothing called it.
+
+It also decides whether the *stored* copy is suspect, which is the difference
+between flagging a genuine ambiguity and dropping a complete sitting out of the
+export to punish a bad retry. The decision now happens **inside a transaction**,
+because read-then-decide-then-write let two iPads handed over at the same moment
+both read "nothing stored" and the second overwrite the first.
+
+**A device→server path that exists (§2.2).** The participant app posts to
+`saveSitting` as an enrolled device. `enrolDevice` already returned a Firebase
+custom token and nothing called it — `signInWithCustomToken` needs no popup, so
+it works in a Home Screen web app, which is what the four reverted sign-in
+commits on `main` were failing to do. A sitting is confirmed only when the
+server reports back that it stored **every event the device sent**; a 200 is not
+an answer.
+
+**Half-finished sittings are uploaded (new).** Before, the only sittings the
+study ever held were the ones that reached the end, so an abandoned sitting, a
+flat battery or a dropped iPad was a morning nobody had a record of. A checkpoint
+every two minutes bounds that. It never moves the sitting out of `in_progress`,
+and it is silent.
+
+**A device can be cleared (§2.3).** `forgetConfirmedSessions` cannot reach an
+unconfirmed sitting: it selects on state, on a receipt existing, and on the
+receipt's count matching what is on the device now. The rule is a pure function
+tested from the wrong side of every clause.
+
+**The researcher view reads the study (§2.2's other half).** Directly, under the
+`read: if isPerson()` rule that already existed. A pulled copy supersedes a
+shorter local one — the file import's "duplicates add nothing" rule would have
+left a partial sitting in the analysis for the rest of the study.
+
+**Devices can actually be enrolled (found while building the above).**
+`enrolDevice` had no caller anywhere, so the sync path was unusable however
+correct it was. There is now an owner-only panel in the researcher view.
+
+**The researcher view's names are locked (§2.4).** Sealed under a study
+passphrase held only in memory, with a verifier so a wrong passphrase is reported
+as wrong, and an auto-lock after fifteen minutes hidden. Nothing got slower: the
+`familyName` and `upn` indexes were declared and never used, which is why this
+was a small change. The lock is on the linkage tab alone — sittings carry codes
+and no names, so the overview, table and export work locked.
+
+**The handover file is encrypted (§2.5).** PBKDF2 at 600k iterations, fresh salt
+and iv per file, under the study passphrase. Only the timestamp and sitting count
+stay in the clear. Losing the passphrase is recoverable, because exporting
+removes nothing from the device — which is what makes it the only format rather
+than an option for careful days.
+
+**An end-to-end suite (§5).** Five tests that walk the whole questionnaire in a
+real browser, cut the network mid-sitting, reload and resume, and read the
+encrypted file back. CI runs Chromium and WebKit; WebKit is the one that matters.
+Now 541 unit tests and 5 end-to-end.
+
+**§7's two traps.** Pages deploys from `main` alone. The root `lint` script is
+gone rather than always failing.
+
+### Found by the new test, and fixed
+
+**The app reloaded itself under a participant.** `main.tsx` reloaded on every
+service-worker `controllerchange`, unconditionally, and that fires in two
+situations that are not "a new build arrived":
+
+- on a device's **first ever load**, so the first participant on every new iPad
+  was returned to the start screen with the code field empty moments after
+  tapping Start;
+- **mid-sitting**, whenever a deploy landed, because the registration is polled
+  every sixty seconds and the update was applied at once — so a child answering
+  question forty was put back on the code screen.
+
+Neither lost data, because a sitting is resumable, and both look exactly like the
+app crashing with a researcher at the front of the room. A build now waits for
+the start screen, and a first install does not reload at all.
+
+This is the defect the audit predicted from having no browser-level test, and it
+was found within an hour of there being one.
+
+### Still not done, deliberately
+
+| Not built | Consequence |
+|---|---|
+| **Withdrawal / erasure (§2.1)** | Handled manually by arrangement. The consent form promises removal within 24 hours, so whoever fields the study must be able to honour that by hand and record it. Still the largest open risk in this document. |
+| **Micro-narrative fielding (§4)** | Survey-only study. The module stays a lab tool for signed-in researchers. |
+| **Safeguarding notification (§4)** | Acceptable **only** because no narrative runs in front of a participant. The moment one does, this is the first blocker, ahead of everything else. |
+| **Safeguarding declarations on `brain_health.toml` and `overdiagnosis1.toml`** | Those protocols still cannot pass the release gate. |
+| **Identity project stand-up (§3)** | `captureIdentity` and `lookupParticipant` still throw. Identity capture is unavailable server-side; the researcher view's local linkage covers a mistyped code. |
+| **Instrument licences (§3)** | Not a code task and genuinely blocking. SDQ and Mind Garden replies take longer than two days. |
+| **Component tests (§5)** | The end-to-end suite is the floor, not the target. The React components still have no unit tests. |
+| **`apps/api`** | Still present and still called by nothing. Firebase is the backend. Parking or deleting it is a decision, not a task. |
+| **mystory-lab's plaintext `localStorage` (§7)** | Untouched, because nothing fields the narrative module. Before it is fielded, it needs a test proving the next participant cannot see the previous one's conversation. |

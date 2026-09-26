@@ -9,6 +9,7 @@ import {
   type User,
 } from "firebase/auth";
 import { collection, getDocs, getFirestore, type Firestore } from "firebase/firestore";
+import { getFunctions, httpsCallable, type Functions } from "firebase/functions";
 import { joinSession, paths, type ChunkDoc, type SessionDoc } from "@myself/firebase";
 import type { DeviceSession } from "@myself/store";
 
@@ -57,10 +58,19 @@ export const STUDY = __STUDY__ || "ybm";
 
 let app: FirebaseApp | null = null;
 
-function firebase(): { auth: Auth; db: Firestore } {
+/**
+ * The region has to match where the functions are deployed.
+ *
+ * `getFunctions(app)` defaults to us-central1 and fails with a CORS error that
+ * looks like a permissions problem, which sends whoever reads it to the IAM
+ * console rather than to this line.
+ */
+const REGION = "europe-west2";
+
+function firebase(): { auth: Auth; db: Firestore; fns: Functions } {
   if (!config) throw new Error("this build has no study configured");
   app ??= initializeApp(config);
-  return { auth: getAuth(app), db: getFirestore(app) };
+  return { auth: getAuth(app), db: getFirestore(app), fns: getFunctions(app, REGION) };
 }
 
 export async function signIn(): Promise<void> {
@@ -153,4 +163,46 @@ export async function pullSittings(): Promise<StudyPull> {
   }
 
   return { sessions, quarantined, unreadable };
+}
+
+// ── Devices ────────────────────────────────────────────────────────────────
+
+export interface EnrolledDevice {
+  deviceId: string;
+  label: string;
+  /** The one-time token to paste into that iPad. Shown once and never stored. */
+  token: string;
+}
+
+/**
+ * Enrol an iPad, and hand back the token to paste into it.
+ *
+ * WHY THIS IS HERE AT ALL. `enrolDevice` existed in the functions and nothing
+ * called it, so there was no way to enrol a device — which made the whole sync
+ * path unusable however correct it was. A capability with no caller is a
+ * capability the study does not have.
+ *
+ * OWNER ONLY, enforced server-side. This UI hides the panel from anyone else as
+ * a courtesy, not as the control: minting a credential is not something a browser
+ * decides it may do, and the function checks the claim itself.
+ *
+ * The token is returned once, is valid for an hour, and is spent the moment the
+ * iPad uses it. Nothing here writes it down.
+ */
+export async function enrolDevice(label: string): Promise<EnrolledDevice> {
+  const call = httpsCallable<{ label: string }, EnrolledDevice>(firebase().fns, "enrolDevice");
+  const { data } = await call({ label: label.trim() });
+  return data;
+}
+
+/**
+ * Stop an iPad posting anything more.
+ *
+ * For a device that has gone missing rather than one handed back: it disables the
+ * account and revokes the refresh token, so the session the device already holds
+ * stops working too.
+ */
+export async function revokeDevice(deviceId: string): Promise<void> {
+  const call = httpsCallable<{ deviceId: string }, unknown>(firebase().fns, "revokeDevice");
+  await call({ deviceId });
 }

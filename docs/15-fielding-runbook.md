@@ -1,0 +1,181 @@
+# MySelf — fielding a survey on several iPads
+
+Written to be followed on the morning, not read in advance. It covers the
+survey only: the micro-narrative module is not fielded (docs/14 §4).
+
+---
+
+## 0. What the parts are
+
+| Part | Where it runs | What it does |
+|---|---|---|
+| **MySelf Go** (participant app) | iPad, added to the Home Screen | Runs the questionnaire offline. Stores every answer encrypted on the device. |
+| **`saveSitting`** | Cloud Function, europe-west2 | The only write path into the study. Idempotent, and refuses anything that contradicts a copy it already holds. |
+| **Firestore** | `myself-research`, europe-west2 | One document per sitting, plus chunks for an unusually long one. |
+| **Researcher view** | A laptop browser | Enrols iPads, pulls sittings, derives the dataset, exports BIDS. |
+
+A device never reads the study back. A person never writes a sitting. Both are
+enforced server-side, not by the apps.
+
+---
+
+## 1. Once per study
+
+**a. Give yourself a role.** Sign in to the researcher view once so the account
+exists, then from a machine with the service-account key:
+
+```sh
+cd apps/functions
+node grant-role.mjs you@leeds.ac.uk owner --project myself-research --key-file sa.json
+```
+
+This is the bootstrap and only the bootstrap: a fresh project has no owner, so
+the first one cannot be granted through a permission check nobody can yet pass.
+Every account after that is administered from the researcher view.
+
+Signing in is not a permission. An account with no role sees an empty study, and
+the view says so rather than looking broken.
+
+**b. Choose the study passphrase.** One phrase for the whole study, at least 12
+characters, real words rather than punctuation — it gets typed on an iPad
+keyboard. It does two jobs:
+
+- encrypts handover files written by an iPad that had no network;
+- encrypts the names, dates of birth, UPNs and NHS numbers the researcher view
+  holds.
+
+Keep it where the study keeps its other credentials. It is never stored on any
+device or laptop, so **losing it costs** any hand-entered UPN, NHS number or
+relationship — names themselves are re-derived from the sittings.
+
+---
+
+## 2. Once per iPad
+
+1. In Safari open `https://faisalmushtaq.github.io/MySelf/`, then **Share → Add
+   to Home Screen**. Launch it from the Home Screen icon from now on.
+2. In the researcher view, **Data → Enrol an iPad**. Name it something you will
+   recognise on a table of six ("iPad 3, blue case"). Copy the token.
+3. On the iPad, tap the small grey build line at the bottom of the start screen
+   **five times** to open the handover panel. Paste the token into *Enrolment
+   token* and tap **Enrol this device**.
+4. The panel should now read *Enrolled as iPad 3, blue case*. That is the check —
+   do not take a blank field as success.
+
+The token is valid for an hour and is spent on use. What the iPad keeps
+afterwards is a refresh token held by the Firebase SDK, which **Revoke** takes
+away if a device goes missing. Enrolment needs a network; collecting does not.
+
+---
+
+## 3. On the day
+
+Hand the iPad over on the start screen. The participant types their code and
+begins. Nothing else is required of the operator.
+
+What is happening underneath:
+
+- Every answer is written to encrypted storage on the device **before** the
+  screen advances.
+- Every two minutes, a copy of the sitting **so far** is sent to the study, so a
+  dropped iPad or a flat battery costs at most the answers since the last
+  checkpoint rather than the whole morning.
+- A finished sitting is queued, sent, and only marked confirmed once the study
+  has reported back that it stored **every event the device sent**.
+- With no network, all of it still works and the queue drains when a network
+  returns.
+
+**A new build never interrupts a sitting.** If one arrives mid-morning it waits
+for the start screen, between participants.
+
+---
+
+## 4. End of the day
+
+On each iPad, open the handover panel (five taps on the build line). It reads,
+in plain numbers, how many sittings are awaiting upload, confirmed by the study,
+needing review, and unfinished.
+
+**If the numbers say everything is confirmed:** tap **Clear N confirmed
+sittings**. This cannot touch a sitting the study has not confirmed — it checks
+the stored receipt against what is on the device — so there is no wrong way to
+press it.
+
+**If some are still awaiting upload:** tap **Sync completed sessions** on a
+working network. If there is no usable network at all:
+
+1. Type the study passphrase into the handover panel.
+2. Tap **Export completed sessions**. You get one encrypted file.
+3. Put the file in approved storage and check it opens in the researcher view.
+4. **Leave the sittings on the device** until you have. Exporting deletes
+   nothing, deliberately.
+
+Never clear Safari's data or delete the app to tidy an iPad up. That destroys
+the device's encryption key along with it, and anything not yet handed over
+becomes permanently unreadable.
+
+---
+
+## 5. Getting the data
+
+In the researcher view, **Data → Pull sittings from the study**. Safe to repeat:
+a sitting already held is left alone unless the study has a longer copy of it,
+which is what happens when a device uploaded one mid-sitting and finished later.
+
+The report tells you four things, and the last two matter:
+
+- how many are new, superseded, or already current;
+- **held for review** — the study has two copies of a sitting that contradict
+  each other and will not choose between them. Go and look (§6).
+- **could not reassemble** — a spilled sitting is missing a chunk. The device may
+  still hold it; re-sync that device.
+
+For a file instead, type the study passphrase first, then drop the file in.
+
+Names are locked. The overview, the table and the BIDS export all work without
+the passphrase, because sittings carry codes and no names. Only the **Linkage**
+tab asks for it, and it re-locks itself after fifteen minutes hidden.
+
+---
+
+## 6. When a sitting is held for review
+
+The study refuses to overwrite a stored sitting with one that contradicts it. It
+keeps both and flags it. Four reasons, in
+`studies/ybm/quarantine`, each row naming both event counts:
+
+| Reason | What it usually means |
+|---|---|
+| received from a second device | A session id collided, or an iPad was restored from a backup. |
+| release hash differs | The two copies were collected under different versions of the questionnaire. |
+| the stored copy is finished, this one is in progress | A stale checkpoint arrived after the real sitting. Usually harmless. |
+| a sitting never gets shorter | A device sent fewer events than the study holds. The longer copy is kept. |
+
+Only the first two also flag the stored copy, because only those two leave
+genuine doubt about which copy is real. The other two keep the good copy in the
+dataset.
+
+A quarantined sitting is excluded from the dataset and from the export until a
+person clears it.
+
+---
+
+## 7. Withdrawal
+
+Handled manually, by arrangement, outside this platform. There is no delete path
+in the code — see docs/14 §2.1. The consent form promises removal within 24
+hours of submission, so whoever fields the study has to be able to honour that
+by hand and record that they did.
+
+---
+
+## 8. If something looks wrong
+
+| Symptom | Where to look |
+|---|---|
+| The iPad says it is not enrolled | The token expired (an hour) or was already spent. Issue another. |
+| "you are signed in, but this account has no role" | §1a. An owner grants a role. |
+| Sittings stay *awaiting upload* on a good network | Check the device was not revoked, and that the build was deployed with a Firebase project configured. A build with none says so in the handover panel. |
+| The researcher view shows an empty study | Either no role (§1a), or nothing has been pulled yet. |
+| Linkage shows no names | The vault is locked, or was unlocked after the last derive — unlocking triggers one. |
+| A name looks like nonsense | Wrong passphrase. It should have been refused; report it. |

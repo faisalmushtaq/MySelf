@@ -15,12 +15,30 @@ The participant PWA deploys automatically via the `pages.yml` workflow.
 
 Open it on an iPad in Safari, then Share → *Add to Home Screen* to install it; it works fully offline after first load. Preview sessions are stored encrypted on the device only — no data leaves it.
 
+## Fielding a study
+
+**[docs/15-fielding-runbook.md](docs/15-fielding-runbook.md)** — enrolling iPads,
+what happens on the day, handover, and getting the data out. Written to be
+followed on the morning.
+
+**[docs/14-readiness-audit.md](docs/14-readiness-audit.md)** — what is ready,
+what is not, and what is deliberately left undone. Read §8 first.
+
 ## Development
 
 ```sh
 pnpm install
-pnpm -r build && pnpm -r test   # 65 tests across schema/engine/library/scoring/release/app
+pnpm -r build && pnpm -r test   # 541 tests across the packages and apps
+pnpm test:e2e                   # 5 browser tests: the whole questionnaire, offline, resumed
 cd apps/participant && pnpm dev # local participant app
 ```
 
-Monorepo layout: `packages/schema` (definition layer), `packages/engine` (pure survey runtime), `packages/library` (YBM instruments + modules), `packages/scoring`, `packages/release` (manifest builder + publish gate), `apps/participant` (MySelf Go PWA).
+`pnpm test:e2e` builds the participant app and drives it in a real browser. On a
+machine whose browsers were installed elsewhere and where `playwright install` is
+not allowed, point it at the binary:
+`PLAYWRIGHT_CHROMIUM_EXECUTABLE=/path/to/chromium pnpm test:e2e --project=chromium`.
+
+Monorepo layout: `packages/schema` (definition layer), `packages/engine` (pure survey runtime), `packages/library` (YBM instruments + modules), `packages/scoring`, `packages/store` (dataset, BIDS export, handover encryption), `packages/firebase` (Firestore layout and the no-overwrite rule), `packages/release` (manifest builder + publish gate), `apps/participant` (MySelf Go PWA), `apps/researcher` (researcher view), `apps/functions` (the backend).
+
+`apps/api` is a self-hosted Postgres alternative to `apps/functions`. Nothing
+deployed calls it — Firebase is the backend (docs/14 §8).
