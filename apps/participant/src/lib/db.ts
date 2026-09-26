@@ -46,17 +46,17 @@ interface DeviceRow {
 }
 
 /**
- * Which iPad this is, for the operator to read off the screen.
+ * This device's self-issued credential — see `identity.ts`.
  *
- * The CREDENTIAL is not here: the Firebase SDK holds the refresh token in its own
- * storage, and duplicating it into a row this app writes would be inventing a
- * long-lived secret that nothing needs. This is only the id, so that a researcher
- * looking at a sitting in the dataset can match it to the iPad in their hand.
+ * Stored beside the AES key on purpose. The two have the same lifetime, and that
+ * is what makes the identity safe to rely on: there is no way to lose the
+ * credential while keeping readable sittings.
  */
-interface EnrolmentRow {
-  id: "device";
-  deviceId: string;
-  firstSyncedAt: string;
+interface InstallRow {
+  id: "install";
+  installId: string;
+  secret: string;
+  createdAt: string;
 }
 
 /** How much of a still-running sitting the server has a copy of. */
@@ -96,10 +96,13 @@ interface AccessibilityRow extends AccessibilityPreferences {
   updatedAt: string;
 }
 
+/** How the handover panel names this device. */
 export interface Enrolment {
   deviceId: string;
+  /** When the device issued itself an identity, which is its first launch. */
   firstSyncedAt: string;
 }
+
 
 export interface SyncEvent {
   seq: number;
@@ -135,7 +138,7 @@ class MySelfDb extends Dexie {
   sessions!: EntityTable<SessionRow, "sessionId">;
   events!: EntityTable<EventRow, "eventId">;
   device!: EntityTable<DeviceRow, "id">;
-  enrolment!: EntityTable<EnrolmentRow, "id">;
+  install!: EntityTable<InstallRow, "id">;
   sync_state!: EntityTable<SyncStateRow, "sessionId">;
   sync_receipts!: EntityTable<SyncReceiptRow, "sessionId">;
   checkpoints!: EntityTable<CheckpointRow, "sessionId">;
@@ -182,7 +185,7 @@ class MySelfDb extends Dexie {
         events: "eventId, sessionId, [sessionId+seq]",
         device: "id",
         sync_config: null,
-        enrolment: "id",
+        install: "id",
         sync_state: "sessionId, nextAttemptAt, syncedAt, quarantinedAt",
         sync_receipts: "sessionId, verifiedAt",
         checkpoints: "sessionId, at",
@@ -337,25 +340,16 @@ export async function loadAnswers(sessionId: string): Promise<Map<string, Record
  * Written after the device has actually signed in, so the id in this row is one
  * the server issued rather than one this app made up.
  */
-export async function recordEnrolment(deviceId: string): Promise<Enrolment> {
-  // First seen wins, so the panel can say how long this iPad has been filing
-  // sittings rather than resetting the date on every sync.
-  const existing = await db.enrolment.get("device");
-  if (existing?.deviceId === deviceId) {
-    return { deviceId: existing.deviceId, firstSyncedAt: existing.firstSyncedAt };
-  }
-  const row: EnrolmentRow = { id: "device", deviceId, firstSyncedAt: new Date().toISOString() };
-  await db.enrolment.put(row);
-  return { deviceId: row.deviceId, firstSyncedAt: row.firstSyncedAt };
-}
-
-export async function clearEnrolment(): Promise<void> {
-  await db.enrolment.delete("device");
-}
-
-export async function enrolment(): Promise<Enrolment | null> {
-  const row = await db.enrolment.get("device");
-  return row ? { deviceId: row.deviceId, firstSyncedAt: row.firstSyncedAt } : null;
+/**
+ * What this device is, for the operator to read off the screen.
+ *
+ * Derived from the credential rather than stored twice. The panel shows it so a
+ * researcher looking at a sitting in the dataset can match it to the iPad in their
+ * hand, and so "has this device ever reached the study" has a visible answer.
+ */
+export async function deviceSummary(): Promise<Enrolment | null> {
+  const row = await db.install.get("install");
+  return row ? { deviceId: row.installId, firstSyncedAt: row.createdAt } : null;
 }
 
 /** Materialise queued sittings only when their retry window allows another attempt. */

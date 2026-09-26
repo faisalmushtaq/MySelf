@@ -8,14 +8,12 @@ const base = process.env["MYSELF_BASE"] ?? "/MySelf/";
 const buildStamp = new Date().toISOString().slice(0, 16).replace("T", " ");
 
 /**
- * The study this build files its sittings into.
+ * The project this build files its sittings into.
  *
- * None of it is secret — a Firebase web config is a set of public identifiers,
- * and the `apiKey` names a project rather than authorising anything. What
- * authorises is the `device` claim on an enrolled iPad, checked server-side. It
- * is baked in at build time rather than typed into the page for the same reason
- * the narrative module's URL is: a survey must not be a place where somebody can
- * point a child's answers at a host of their choosing.
+ * Only used to work out the endpoint below — the app carries no Firebase SDK and
+ * signs in to nothing, because a device presents a credential it issued itself.
+ * That keeps the whole auth library out of a bundle whose first requirement is to
+ * work with no network.
  *
  * Absent, this build stores everything on the device and sends nothing anywhere,
  * which is exactly what the public preview should be.
@@ -57,7 +55,6 @@ export default defineConfig({
      * empty frame.
      */
     __MYSTORY_URL__: JSON.stringify(process.env["MYSELF_MYSTORY_URL"] ?? ""),
-    __FIREBASE_CONFIG__: JSON.stringify(firebaseConfig),
     __SITTINGS_URL__: JSON.stringify(deriveSittingsUrl()),
   },
   plugins: [

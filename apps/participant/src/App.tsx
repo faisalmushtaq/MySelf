@@ -8,15 +8,13 @@ import {
   accessibilityPreferences,
   appendEvent,
   completeSession,
-  clearEnrolment,
   countStoredSessions,
   createSession,
   findResumableSession,
   loadAnswers,
   saveAccessibilityPreferences,
-  enrolment,
+  deviceSummary,
   forgetConfirmedSessions,
-  recordEnrolment,
   type Enrolment,
   type SessionRow,
   type StoredSessionCounts,
@@ -152,21 +150,14 @@ export default function App() {
   }, []);
 
   const refreshDeviceStatus = useCallback(async () => {
-    const [stored, enrolled] = await Promise.all([countStoredSessions(), enrolment()]);
-    setCounts(stored);
     /**
-     * The SDK is the authority on which device this is, not the row this app
-     * wrote. A revoked device leaves the row behind, and a panel naming an
-     * identity that can no longer post is worse than naming none.
+     * The device knows who it is from its own storage, with no network involved.
+     * `currentDevice` creates the credential if this is a first launch, so the
+     * panel can name the iPad before it has ever reached the study.
      */
-    const live = syncAvailable ? await currentDevice().catch(() => null) : null;
-    if (live) setDevice(enrolled?.deviceId === live.deviceId ? enrolled : await recordEnrolment(live.deviceId));
-    else {
-      // No identity yet: this device has not been online since it was installed.
-      // It will get one the first time it uploads.
-      setDevice(null);
-      if (enrolled) await clearEnrolment();
-    }
+    const [stored] = await Promise.all([countStoredSessions(), currentDevice().catch(() => null)]);
+    setCounts(stored);
+    setDevice(await deviceSummary());
   }, []);
 
   const runSync = useCallback(
@@ -659,26 +650,13 @@ export default function App() {
                   {syncBusy ? "Synchronising…" : "Sync completed sessions"}
                 </button>
               </div>
-              {!syncAvailable && (
+              {device && (
                 <p className="hint">
-                  This build has no study configured, so everything stays on this device. Hand sittings over with the
-                  export below.
-                </p>
-              )}
-              {syncAvailable && (
-                <p className="hint">
-                  {device ? (
-                    <>
-                      This iPad files sittings as <strong>{device.deviceId}</strong>, since{" "}
-                      {device.firstSyncedAt.slice(0, 10)}. Nothing needs setting up — the study refuses any sitting that
-                      contradicts a copy it already holds.
-                    </>
-                  ) : (
-                    <>
-                      This iPad has not reached the study yet. Sittings are saved here and upload by themselves the
-                      first time it has a connection; nothing needs setting up.
-                    </>
-                  )}
+                  This iPad is <strong>{device.deviceId}</strong>, since {device.firstSyncedAt.slice(0, 10)}. It chose
+                  that itself on first launch, so it works with no network from the start.{" "}
+                  {syncAvailable
+                    ? "Sittings upload by themselves whenever it has a connection; nothing needs setting up."
+                    : "This build has no study configured, so everything stays on this device."}
                 </p>
               )}
               {/*

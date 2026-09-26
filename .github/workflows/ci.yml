@@ -55,6 +55,29 @@ jobs:
             playwright-report/
           retention-days: 7
 
+  # The write path against a real Firestore. The unit suite runs it against a
+  # stand-in, which cannot have real transaction contention — and the promise this
+  # platform makes is that two iPads handed over at the same instant cannot
+  # overwrite each other. Only a database can prove that.
+  integration:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm -r build
+      - run: pnpm --filter @myself/functions test:integration
+
   # Security rules are the access control on Firebase, so an untested rules
   # change is an untested security change. This runs them against the real
   # Firestore emulator, from both sides of every rule.

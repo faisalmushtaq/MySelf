@@ -20,7 +20,8 @@ import type { SyncTarget } from "./lib/device.js";
 
 const target: SyncTarget = {
   url: "https://europe-west2-myself-research.cloudfunctions.net/saveSitting",
-  token: "id-token-for-dev_ipad_1",
+  installId: "ipad_01JABCDEF",
+  credential: "Device ipad_01JABCDEF.a-secret-this-device-generated",
 };
 
 const session: SyncSession = {
@@ -129,10 +130,13 @@ describe("handing a finished sitting over to the study", () => {
     expect(transport).toHaveBeenCalledTimes(1);
     const [url, init] = transport.mock.calls[0] as unknown as [string, RequestInit];
     expect(url).toBe(target.url);
-    expect((init.headers as Record<string, string>)["authorization"]).toBe(`Bearer ${target.token}`);
-    const body = JSON.parse(init.body as string) as { sittings: SyncSession[] };
+    expect((init.headers as Record<string, string>)["authorization"]).toBe(target.credential);
+    const body = JSON.parse(init.body as string) as { deviceId: string; sittings: SyncSession[] };
     expect(body.sittings).toHaveLength(1);
     expect(body.sittings[0]).toMatchObject({ sessionId: "ses_01", complete: true });
+    // The installation id travels in the body too, so a handover file from this
+    // same iPad — which carries no credential — files under the same device.
+    expect(body.deviceId).toBe("ipad_01JABCDEF");
   });
 
   it("refuses to believe a reply that stored fewer events than were sent", async () => {

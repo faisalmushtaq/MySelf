@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash, timingSafeEqual } from "node:crypto";
 import { FieldValue } from "firebase-admin/firestore";
 import * as logger from "firebase-functions/logger";
 import { defineSecret } from "firebase-functions/params";
@@ -128,6 +128,92 @@ async function spendLink(key: string): Promise<Caller> {
   return { uid, device: false, anonymous: false };
 }
 
+/**
+ * A device presenting the credential it issued itself.
+ *
+ * `Authorization: Device <installId>.<secret>`
+ *
+ * FIRST WRITER WINS, PERMANENTLY. The first upload from an installation id
+ * registers the hash of its secret; every upload after that must present a secret
+ * hashing to the same thing. So a stranger can register a NEW installation — the
+ * write endpoint is open by design, because anyone with the URL takes part — and
+ * can never take over an existing one. That is exactly what the no-overwrite rule
+ * needs from an identity: "the same device" has to mean something a second device
+ * cannot claim.
+ *
+ * WHY NOT REQUIRE ENROLMENT INSTEAD. Because a device that has to be registered
+ * before it can collect is a device that cannot be handed to a participant in a
+ * hall with no signal, and that is the normal case rather than the exception. The
+ * trade is stated in the runbook.
+ *
+ * THE COMPARISON IS TIMING-SAFE. A secret checked with `===` leaks its prefix to
+ * anyone who can time the response, and while guessing 32 random bytes a byte at a
+ * time is not the likely attack on a study, a constant-time compare costs one line.
+ */
+export async function registerDevice(
+  db: FirebaseFirestore.Firestore,
+  study: string,
+  raw: string,
+): Promise<Caller> {
+  const at = raw.indexOf(".");
+  if (at <= 0 || at === raw.length - 1) {
+    throw new RelayError(401, "auth", "that device credential is not the right shape");
+  }
+  const installId = raw.slice(0, at);
+  const secret = raw.slice(at + 1);
+  if (!/^[A-Za-z0-9_-]{4,120}$/.test(installId) || secret.length < 32) {
+    throw new RelayError(401, "auth", "that device credential is not the right shape");
+  }
+
+  const digest = createHash("sha256").update(secret).digest("hex");
+  const ref = db.doc(paths.device(study, installId));
+
+  const known = await db.runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    if (!snap.exists) {
+      tx.set(ref, {
+        deviceId: installId,
+        study,
+        secretHash: digest,
+        selfRegistered: true,
+        enrolledAt: FieldValue.serverTimestamp(),
+        revokedAt: null,
+      });
+      return { secretHash: digest, revokedAt: null as unknown };
+    }
+    const data = snap.data() as { secretHash?: string; revokedAt?: unknown };
+    return { secretHash: data.secretHash ?? "", revokedAt: data.revokedAt ?? null };
+  });
+
+  if (known.revokedAt) {
+    throw new RelayError(403, "auth", "this device has been withdrawn from the study");
+  }
+  if (!timingSafeMatch(known.secretHash, digest)) {
+    /**
+     * Another device is already this installation.
+     *
+     * Almost always an id collision or a restored backup rather than anything
+     * deliberate, but the response is the same either way: the sittings stay on
+     * the device, and the message says what to do rather than what happened.
+     */
+    throw new RelayError(
+      403,
+      "auth",
+      "another device is already registered under this installation id, so this one cannot file sittings under it. The sittings are safe on the device — hand them over as a file.",
+    );
+  }
+
+  return { uid: installId, device: true, anonymous: true };
+}
+
+function timingSafeMatch(a: string, b: string): boolean {
+  const left = Buffer.from(a, "utf8");
+  const right = Buffer.from(b, "utf8");
+  // timingSafeEqual throws on a length mismatch, which would itself be a signal.
+  if (left.length !== right.length) return false;
+  return timingSafeEqual(left, right);
+}
+
 export interface AuthOptions {
   /**
    * Whether a device that signed itself in anonymously may pass.
@@ -158,6 +244,20 @@ export interface AuthOptions {
  */
 export async function authenticate(header: string | undefined, options: AuthOptions = {}): Promise<Caller> {
   if (header?.startsWith("Link ")) return spendLink(header.slice(5).trim());
+
+  /**
+   * A self-registered device, and only where anonymous callers are permitted.
+   *
+   * The relay does not permit them, so this scheme cannot buy a model call however
+   * well-formed the credential is: filing a sitting costs a Firestore write, and a
+   * model call spends the study's money.
+   */
+  if (header?.startsWith("Device ")) {
+    if (!options.allowAnonymous) {
+      throw new RelayError(403, "auth", "a device credential cannot be used for this");
+    }
+    return registerDevice(research(), STUDY, header.slice(7).trim());
+  }
 
   const token = header?.startsWith("Bearer ") ? header.slice(7) : null;
   if (!token) throw new RelayError(401, "auth", "this request carried no credential");

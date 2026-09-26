@@ -37,6 +37,7 @@ import { syncTarget, type SyncTarget } from "./device.js";
  */
 
 export interface SittingsRequest {
+  deviceId: string;
   sittings: SyncSession[];
 }
 
@@ -238,10 +239,13 @@ async function post(
     const response = await transport(target.url, {
       method: "POST",
       headers: {
-        authorization: `Bearer ${target.token}`,
+        authorization: target.credential,
         "content-type": "application/json",
       },
-      body: JSON.stringify({ sittings: [session] } satisfies SittingsRequest),
+      // The installation id travels in the body as well as being proved by the
+      // credential, so a handover file — which carries no credential — files
+      // under the same device as a network upload from the same iPad.
+      body: JSON.stringify({ deviceId: target.installId, sittings: [session] } satisfies SittingsRequest),
       signal: controller.signal,
     });
     const body: unknown = await response.json().catch(() => null);
