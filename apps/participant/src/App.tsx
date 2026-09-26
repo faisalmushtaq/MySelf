@@ -8,13 +8,16 @@ import {
   accessibilityPreferences,
   appendEvent,
   completeSession,
-  configureSync,
+  clearEnrolment,
   countStoredSessions,
   createSession,
   findResumableSession,
   loadAnswers,
   saveAccessibilityPreferences,
-  syncConfiguration,
+  enrolment,
+  forgetConfirmedSessions,
+  recordEnrolment,
+  type Enrolment,
   type SessionRow,
   type StoredSessionCounts,
 } from "./lib/db.js";
@@ -24,7 +27,8 @@ import {
   DEFAULT_ACCESSIBILITY_PREFERENCES,
   type AccessibilityPreferences,
 } from "./lib/accessibility.js";
-import { synchroniseCompletedSessions } from "./lib/sync.js";
+import { checkpointRunningSessions, synchroniseCompletedSessions } from "./lib/sync.js";
+import { currentDevice, enrolDevice, syncAvailable, withdrawDevice } from "./lib/device.js";
 import { SessionTiming, wordCount } from "./lib/timing.js";
 import { ReviewScreen } from "./components/ReviewScreen.js";
 import { SurveyScreen } from "./components/SurveyScreen.js";
@@ -99,9 +103,8 @@ export default function App() {
   });
   const [busy, setBusy] = useState(false);
   const [syncBusy, setSyncBusy] = useState(false);
-  const [syncConfigured, setSyncConfigured] = useState(false);
-  const [syncEndpoint, setSyncEndpoint] = useState("");
-  const [syncToken, setSyncToken] = useState("");
+  const [device, setDevice] = useState<Enrolment | null>(null);
+  const [enrolToken, setEnrolToken] = useState("");
   const [syncNote, setSyncNote] = useState<string | null>(null);
   const [codeError, setCodeError] = useState<string | null>(null);
   const [accessibility, setAccessibility] = useState<AccessibilityPreferences>(DEFAULT_ACCESSIBILITY_PREFERENCES);
@@ -145,11 +148,22 @@ export default function App() {
   }, []);
 
   const refreshDeviceStatus = useCallback(async () => {
-    const [stored, configuration] = await Promise.all([countStoredSessions(), syncConfiguration()]);
+    const [stored, enrolled] = await Promise.all([countStoredSessions(), enrolment()]);
     setCounts(stored);
-    setSyncConfigured(configuration !== null);
-    if (configuration && !syncEndpoint) setSyncEndpoint(configuration.endpoint);
-  }, [syncEndpoint]);
+    /**
+     * The SDK is the authority on whether this iPad is still enrolled, not the
+     * row this app wrote. An owner revoking a device leaves the row behind, and
+     * a panel reporting "enrolled" for an account that can no longer post is the
+     * one thing worse than reporting nothing.
+     */
+    const live = syncAvailable ? await currentDevice().catch(() => null) : null;
+    if (live && enrolled) setDevice(enrolled);
+    else if (live) setDevice(await recordEnrolment(live.deviceId, live.label));
+    else {
+      setDevice(null);
+      if (enrolled) await clearEnrolment();
+    }
+  }, []);
 
   const runSync = useCallback(
     async (force = false) => {
@@ -205,10 +219,43 @@ export default function App() {
   // the foreground, this checks the durable retry deadline once a minute; the
   // queue itself applies exponential back-off and jitter before selecting work.
   useEffect(() => {
-    if (!online || !syncConfigured || (phase.kind !== "start" && phase.kind !== "finished")) return;
+    if (!online || !device || (phase.kind !== "start" && phase.kind !== "finished")) return;
     const timer = window.setInterval(() => void runSync(), 60_000);
     return () => window.clearInterval(timer);
-  }, [online, phase.kind, runSync, syncConfigured]);
+  }, [online, phase.kind, runSync, device]);
+
+  /**
+   * A copy of the sitting in progress, on the server, every couple of minutes.
+   *
+   * Otherwise the only sittings the study ever holds are the ones that reached
+   * the end, and a dropped iPad or a flat battery halfway through is a morning
+   * nobody has a record of.
+   *
+   * SILENT AND NON-BLOCKING, deliberately. It runs while a child is answering
+   * questions, so it never touches the screen, never reports an error, and never
+   * moves the sitting out of `in_progress`. A missed checkpoint costs the next
+   * attempt and nothing else.
+   */
+  useEffect(() => {
+    if (!online || !device || phase.kind !== "running") return;
+    const tick = () => void checkpointRunningSessions().catch(() => undefined);
+    const timer = window.setInterval(tick, 120_000);
+    return () => window.clearInterval(timer);
+  }, [online, device, phase.kind]);
+
+  /**
+   * And one when the sitting ends, before anything is queued.
+   *
+   * The gap this closes: a participant who finishes and hands the iPad straight
+   * back, on a device that then goes offline for the rest of the day. The
+   * ordinary queue covers it eventually; this means the study has the sitting
+   * within seconds of it being finished rather than whenever the device next
+   * sees a network.
+   */
+  useEffect(() => {
+    if (!online || !device || phase.kind !== "finished") return;
+    void checkpointRunningSessions().catch(() => undefined);
+  }, [online, device, phase.kind]);
 
   const walker = useMemo(
     () => new Walker(flattened.units, storeRef.current, manifest.composition.allowBackNavigation),
@@ -583,7 +630,7 @@ export default function App() {
             <div className="handover">
               <h2>Handover</h2>
               <p className="hint">
-                {counts.awaitingSync + counts.syncFailed} completed session{counts.awaitingSync + counts.syncFailed === 1 ? "" : "s"} awaiting upload, {counts.syncedVerified} verified, and {counts.inProgress} unfinished on this device. Sessions stay here until the server acknowledgement has been verified.
+                {counts.awaitingSync + counts.syncFailed} completed session{counts.awaitingSync + counts.syncFailed === 1 ? "" : "s"} awaiting upload, {counts.syncedVerified} confirmed by the study, {counts.quarantined} needing review, and {counts.inProgress} unfinished on this device. A sitting stays here until the study has confirmed it stored every event this device sent.
               </p>
               <div className="handover-actions">
                 <button
@@ -595,35 +642,89 @@ export default function App() {
                   {syncBusy ? "Synchronising…" : "Sync completed sessions"}
                 </button>
               </div>
-              {!syncConfigured && (
+              {!syncAvailable && (
+                <p className="hint">
+                  This build has no study configured, so everything stays on this device. Hand sittings over with the
+                  export below.
+                </p>
+              )}
+              {syncAvailable && device && (
                 <div className="sync-provisioning">
-                  <p className="hint">Enrol this research device once with its API address and one-time device token. The token is encrypted in device storage and is never shown again.</p>
-                  <label className="field">
-                    <span className="field-label">API address</span>
-                    <input className="text-input" value={syncEndpoint} placeholder="https://research.example.org" onChange={(event) => setSyncEndpoint(event.target.value)} />
-                  </label>
-                  <label className="field">
-                    <span className="field-label">Device token</span>
-                    <input className="text-input" type="password" value={syncToken} autoComplete="off" onChange={(event) => setSyncToken(event.target.value)} />
-                  </label>
+                  <p className="hint">
+                    Enrolled as <strong>{device.label ?? device.deviceId}</strong> ({device.deviceId}) since{" "}
+                    {device.enrolledAt.slice(0, 10)}. Sittings upload under this name, and the study refuses any that
+                    contradict a copy it already holds.
+                  </p>
                   <button
                     type="button"
                     className="secondary"
-                    disabled={syncEndpoint.trim().length === 0 || syncToken.trim().length < 32}
+                    disabled={counts.awaitingSync + counts.syncFailed + counts.inProgress > 0}
+                    title={
+                      counts.awaitingSync + counts.syncFailed + counts.inProgress > 0
+                        ? "Sync or export everything on this device first"
+                        : undefined
+                    }
                     onClick={() => {
                       void (async () => {
                         try {
-                          await configureSync(syncEndpoint, syncToken);
-                          setSyncToken("");
-                          setSyncNote("Device enrolment saved. Completed sessions can now synchronise.");
+                          await withdrawDevice();
+                          await clearEnrolment();
+                          setSyncNote("This device is no longer enrolled.");
                           await refreshDeviceStatus();
                         } catch (error) {
-                          setSyncNote(error instanceof Error ? error.message : "Could not save device enrolment.");
+                          setSyncNote(error instanceof Error ? error.message : "Could not un-enrol this device.");
                         }
                       })();
                     }}
                   >
-                    Save device enrolment
+                    Un-enrol this device
+                  </button>
+                </div>
+              )}
+              {syncAvailable && !device && (
+                <div className="sync-provisioning">
+                  {/*
+                    One field, and it is not a password.
+                    An enrolment token is spent once and is valid for an hour;
+                    what the iPad keeps afterwards is held by the Firebase SDK and
+                    revoked from the console when a device goes missing. So there
+                    is no long-lived secret to be careful with here, and nothing
+                    for an operator to copy twice.
+                  */}
+                  <p className="hint">
+                    Enrol this iPad once. In the researcher console choose <strong>Enrol a device</strong>, give it a
+                    name you will recognise on a table of six, and paste the token it shows here. It is valid for an
+                    hour and is spent as soon as it is used.
+                  </p>
+                  <label className="field">
+                    <span className="field-label">Enrolment token</span>
+                    <input
+                      className="text-input"
+                      value={enrolToken}
+                      autoComplete="off"
+                      spellCheck={false}
+                      onChange={(event) => setEnrolToken(event.target.value)}
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    className="secondary"
+                    disabled={enrolToken.trim().length === 0 || !online}
+                    onClick={() => {
+                      void (async () => {
+                        try {
+                          const enrolled = await enrolDevice(enrolToken);
+                          setEnrolToken("");
+                          await recordEnrolment(enrolled.deviceId, enrolled.label);
+                          setSyncNote(`Enrolled as ${enrolled.label ?? enrolled.deviceId}.`);
+                          await refreshDeviceStatus();
+                        } catch (error) {
+                          setSyncNote(error instanceof Error ? error.message : "Could not enrol this device.");
+                        }
+                      })();
+                    }}
+                  >
+                    {online ? "Enrol this device" : "Enrolment needs a connection"}
                   </button>
                 </div>
               )}
@@ -655,6 +756,39 @@ export default function App() {
                   }}
                 >
                   Include unfinished
+                </button>
+              </div>
+              <div className="handover-actions">
+                {/*
+                  The only delete in the app, and it cannot reach an unconfirmed
+                  sitting. `forgetConfirmedSessions` selects on a stored receipt
+                  whose event count matches what is on the device, so there is no
+                  version of this button that loses data — which is why it can sit
+                  next to the export rather than behind a second confirmation
+                  nobody reads.
+
+                  It matters because the alternative is deleting the app or
+                  clearing Safari's data, and that destroys the device key along
+                  with it: every sitting not yet handed over becomes permanently
+                  unreadable.
+                */}
+                <button
+                  type="button"
+                  className="secondary"
+                  disabled={counts.syncedVerified === 0}
+                  onClick={() => {
+                    void (async () => {
+                      const erased = await forgetConfirmedSessions();
+                      setHandoverNote(
+                        erased.sessions === 0
+                          ? "Nothing to clear — no sitting on this device has been confirmed by the study yet."
+                          : `${erased.sessions} confirmed sitting${erased.sessions === 1 ? "" : "s"} cleared from this device. ${counts.awaitingSync + counts.syncFailed + counts.quarantined + counts.inProgress} still held here.`,
+                      );
+                      await refreshDeviceStatus();
+                    })();
+                  }}
+                >
+                  Clear {counts.syncedVerified} confirmed sitting{counts.syncedVerified === 1 ? "" : "s"}
                 </button>
               </div>
               {syncNote && <p className="hint">{syncNote}</p>}

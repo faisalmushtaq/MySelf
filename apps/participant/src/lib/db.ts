@@ -45,11 +45,26 @@ interface DeviceRow {
   createdAt: string;
 }
 
-interface SyncConfigRow {
-  id: "sync";
-  endpoint: string;
-  token: Sealed;
-  configuredAt: string;
+/**
+ * Which iPad this is, for the operator to read off the screen.
+ *
+ * The CREDENTIAL is not here: the Firebase SDK holds the refresh token in its
+ * own storage, and duplicating it into a row this app writes would be inventing
+ * a long-lived secret that nothing needs. This is the label and the id, so a
+ * researcher can confirm the right device is enrolled without signing anything in.
+ */
+interface EnrolmentRow {
+  id: "device";
+  deviceId: string;
+  label: string | null;
+  enrolledAt: string;
+}
+
+/** How much of a still-running sitting the server has a copy of. */
+interface CheckpointRow {
+  sessionId: string;
+  events: number;
+  at: string;
 }
 
 interface SyncStateRow {
@@ -63,11 +78,17 @@ interface SyncStateRow {
   quarantineReason?: string;
 }
 
+/**
+ * The server's confirmation, kept.
+ *
+ * A sitting is only deleted from this device once a row exists here saying the
+ * study stored it and how many events it stored — so "has this been handed over"
+ * is answerable from the device itself, months later, without asking the server.
+ */
 interface SyncReceiptRow {
-  batchId: string;
   sessionId: string;
-  accepted: { sessionId: string; events: number[] }[];
-  ackHash: string;
+  events: number;
+  chunks: number;
   verifiedAt: string;
 }
 
@@ -76,10 +97,10 @@ interface AccessibilityRow extends AccessibilityPreferences {
   updatedAt: string;
 }
 
-export interface SyncConfiguration {
-  endpoint: string;
-  token: string;
-  configuredAt: string;
+export interface Enrolment {
+  deviceId: string;
+  label: string | null;
+  enrolledAt: string;
 }
 
 export interface SyncEvent {
@@ -116,9 +137,10 @@ class MySelfDb extends Dexie {
   sessions!: EntityTable<SessionRow, "sessionId">;
   events!: EntityTable<EventRow, "eventId">;
   device!: EntityTable<DeviceRow, "id">;
-  sync_config!: EntityTable<SyncConfigRow, "id">;
+  enrolment!: EntityTable<EnrolmentRow, "id">;
   sync_state!: EntityTable<SyncStateRow, "sessionId">;
-  sync_receipts!: EntityTable<SyncReceiptRow, "batchId">;
+  sync_receipts!: EntityTable<SyncReceiptRow, "sessionId">;
+  checkpoints!: EntityTable<CheckpointRow, "sessionId">;
   accessibility!: EntityTable<AccessibilityRow, "id">;
 
   constructor() {
@@ -145,6 +167,37 @@ class MySelfDb extends Dexie {
       sync_receipts: "batchId, sessionId, verifiedAt",
       accessibility: "id, updatedAt",
     });
+    /**
+     * Version 4: enrolment instead of a pasted endpoint, and checkpoints.
+     *
+     * `sync_config` held an endpoint and a bearer token for a server that was
+     * never deployed, and `sync_receipts` was keyed on a batch id the study's
+     * actual write path does not issue. Both are dropped rather than migrated:
+     * nothing was ever successfully synchronised through them, so there is no
+     * record here worth carrying forward, and a receipt keyed on the wrong thing
+     * is worse than none. Sittings and their event logs are untouched — an iPad
+     * upgraded mid-study keeps everything a child answered.
+     */
+    this.version(4)
+      .stores({
+        sessions: "sessionId, participantCode, state, updatedAt",
+        events: "eventId, sessionId, [sessionId+seq]",
+        device: "id",
+        sync_config: null,
+        enrolment: "id",
+        sync_state: "sessionId, nextAttemptAt, syncedAt, quarantinedAt",
+        sync_receipts: "sessionId, verifiedAt",
+        checkpoints: "sessionId, at",
+        accessibility: "id, updatedAt",
+      })
+      .upgrade(async (tx) => {
+        // Receipts from the old shape cannot be re-keyed — they carry a batch id
+        // and a list of accepted sequences, not a stored-event count — so an
+        // upgraded device treats its queued sittings as not yet confirmed and
+        // sends them again. `saveSitting` is idempotent, so that costs one
+        // upload and nothing else.
+        await tx.table("sync_receipts").clear();
+      });
   }
 }
 
@@ -280,27 +333,28 @@ export async function loadAnswers(sessionId: string): Promise<Map<string, Record
   return answers;
 }
 
-/** Store the enrolment configuration locally. The bearer token is encrypted at rest. */
-export async function configureSync(endpointInput: string, tokenInput: string): Promise<void> {
-  const endpoint = normaliseEndpoint(endpointInput);
-  const token = tokenInput.trim();
-  if (token.length < 32) throw new Error("device token is too short");
-  const key = await deviceKey();
-  await db.sync_config.put({ id: "sync", endpoint, token: await seal(key, token), configuredAt: new Date().toISOString() });
+/**
+ * Remember which iPad this is, for the operator's benefit.
+ *
+ * Called after `enrolDevice` has already exchanged the token, so by the time
+ * this row is written the identity is real rather than claimed.
+ */
+export async function recordEnrolment(deviceId: string, label: string | null): Promise<Enrolment> {
+  const row: EnrolmentRow = { id: "device", deviceId, label, enrolledAt: new Date().toISOString() };
+  await db.enrolment.put(row);
+  return { deviceId: row.deviceId, label: row.label, enrolledAt: row.enrolledAt };
 }
 
-export async function clearSyncConfiguration(): Promise<void> {
-  await db.sync_config.delete("sync");
+export async function clearEnrolment(): Promise<void> {
+  await db.enrolment.delete("device");
 }
 
-export async function syncConfiguration(): Promise<SyncConfiguration | null> {
-  const row = await db.sync_config.get("sync");
-  if (!row) return null;
-  const token = await unseal<string>(await deviceKey(), row.token);
-  return { endpoint: row.endpoint, token, configuredAt: row.configuredAt };
+export async function enrolment(): Promise<Enrolment | null> {
+  const row = await db.enrolment.get("device");
+  return row ? { deviceId: row.deviceId, label: row.label, enrolledAt: row.enrolledAt } : null;
 }
 
-/** Materialise queued sessions only when their retry window allows another attempt. */
+/** Materialise queued sittings only when their retry window allows another attempt. */
 export async function completedSessionsForSync(force: boolean): Promise<SyncSession[]> {
   const now = Date.now();
   const queued = await db.sessions
@@ -311,9 +365,33 @@ export async function completedSessionsForSync(force: boolean): Promise<SyncSess
     const state = await db.sync_state.get(session.sessionId);
     if (force || !state?.nextAttemptAt || Date.parse(state.nextAttemptAt) <= now) allowed.push(session);
   }
+  return materialise(allowed.sort((a, b) => a.startedAt.localeCompare(b.startedAt)), true);
+}
+
+/**
+ * Sittings still being answered that have moved on since their last checkpoint.
+ *
+ * Only ones that have actually grown: re-sending an unchanged log would cost a
+ * request per pass per open sitting and tell the server nothing it does not
+ * already hold. The oldest go first, because a sitting that has been open longest
+ * is the one with most to lose.
+ */
+export async function runningSessionsForCheckpoint(): Promise<SyncSession[]> {
+  const running = await db.sessions.where("state").equals("in_progress").toArray();
+  const behind: SessionRow[] = [];
+  for (const session of running) {
+    if (session.eventCount === 0) continue;
+    const checkpoint = await db.checkpoints.get(session.sessionId);
+    if ((checkpoint?.events ?? 0) < session.eventCount) behind.push(session);
+  }
+  return materialise(behind.sort((a, b) => a.startedAt.localeCompare(b.startedAt)), false);
+}
+
+/** Decrypt a set of sittings into the shape the server accepts. */
+async function materialise(rows: readonly SessionRow[], complete: boolean): Promise<SyncSession[]> {
   const key = await deviceKey();
-  const materialised: SyncSession[] = [];
-  for (const session of allowed.sort((a, b) => a.startedAt.localeCompare(b.startedAt))) {
+  const out: SyncSession[] = [];
+  for (const session of rows) {
     const events = await db.events.where("sessionId").equals(session.sessionId).sortBy("seq");
     const output: SyncEvent[] = [];
     for (const event of events) {
@@ -327,18 +405,22 @@ export async function completedSessionsForSync(force: boolean): Promise<SyncSess
         tMono: event.tMono,
       });
     }
-    materialised.push({
+    out.push({
       sessionId: session.sessionId,
       studyCode: session.participantCode,
       releaseKey: session.releaseKey,
       releaseHash: session.releaseHash,
       startedAt: session.startedAt,
       ...(session.completedAt ? { completedAt: session.completedAt } : {}),
-      complete: true,
+      complete,
       events: output,
     });
   }
-  return materialised;
+  return out;
+}
+
+export async function recordCheckpoint(sessionId: string, events: number, at: string): Promise<void> {
+  await db.checkpoints.put({ sessionId, events, at });
 }
 
 export async function markSessionSyncing(sessionId: string): Promise<void> {
@@ -401,17 +483,6 @@ export async function markSessionQuarantined(sessionId: string, reason: string, 
   });
 }
 
-export async function acknowledgedEventSequences(sessionId: string): Promise<number[]> {
-  const receipts = await db.sync_receipts.where("sessionId").equals(sessionId).toArray();
-  const sequences = new Set<number>();
-  for (const receipt of receipts) {
-    for (const entry of receipt.accepted) {
-      if (entry.sessionId === sessionId) for (const sequence of entry.events) sequences.add(sequence);
-    }
-  }
-  return [...sequences].sort((a, b) => a - b);
-}
-
 export async function recordSyncReceipt(receipt: SyncReceiptRow): Promise<void> {
   await db.sync_receipts.put(receipt);
 }
@@ -430,6 +501,86 @@ export async function countStoredSessions(): Promise<StoredSessionCounts> {
   };
 }
 
+/**
+ * Sittings this device is still the only copy of.
+ *
+ * What the handover panel counts down to zero. A sitting is "held" until the
+ * study has confirmed it — so a quarantined one counts, because the server
+ * refused it and a person has to look, and a `synced_verified` one does not.
+ */
+export async function heldSessionCount(): Promise<number> {
+  const all = await db.sessions.toArray();
+  return all.filter((s) => s.state !== "synced_verified").length;
+}
+
+export interface Erasure {
+  sessions: number;
+  events: number;
+}
+
+/**
+ * May this device stop being the only copy of this sitting?
+ *
+ * Pure, and separate from the deletion it authorises, because this is the one
+ * decision in the app whose failure mode is silent and permanent. Three things
+ * must all hold, and each rules out a real way a sitting could otherwise be lost:
+ *
+ *   - the sitting's own state says the study confirmed it, so a queued, failed
+ *     or quarantined sitting can never be selected;
+ *   - a receipt exists, so a state written by some other path is not enough;
+ *   - and the receipt's event count matches what is on the device NOW, so a
+ *     sitting that grew after it was confirmed — a checkpoint confirmed, then
+ *     more answers recorded — is held until the longer version is confirmed too.
+ */
+export function safeToForget(
+  session: Pick<SessionRow, "state" | "eventCount">,
+  receipt: { events: number } | undefined,
+): boolean {
+  if (session.state !== "synced_verified") return false;
+  if (!receipt) return false;
+  return receipt.events === session.eventCount;
+}
+
+/**
+ * Delete the sittings the study has confirmed it holds, and nothing else.
+ *
+ * WHY THIS EXISTS. Without it an iPad accumulates every child's answers for the
+ * whole study, and the only way to clear one is to delete the app or clear
+ * Safari's data — which also destroys the AES key in `device`, making any
+ * sitting that had NOT been handed over permanently unreadable. So the blunt
+ * instrument is not just untidy, it is the one that loses data.
+ *
+ * SAFE BY CONSTRUCTION, not by the caller being careful. It deletes a sitting
+ * only where a receipt exists for it AND the receipt's event count matches what
+ * is on the device AND the row says `synced_verified`. There is no argument for
+ * "delete everything" and no way to ask for one: a sitting the server has not
+ * confirmed cannot be selected by this function at all, whatever the operator
+ * taps.
+ *
+ * The receipt is KEPT. It is small, it is the evidence that this device handed
+ * that sitting over, and a device that forgot would have no way to answer "did
+ * this one ever arrive" months later.
+ */
+export async function forgetConfirmedSessions(): Promise<Erasure> {
+  const confirmed: SessionRow[] = [];
+  for (const session of await db.sessions.toArray()) {
+    const receipt = await db.sync_receipts.get(session.sessionId);
+    if (safeToForget(session, receipt)) confirmed.push(session);
+  }
+  if (confirmed.length === 0) return { sessions: 0, events: 0 };
+
+  let events = 0;
+  await db.transaction("rw", db.sessions, db.events, db.sync_state, db.checkpoints, async () => {
+    for (const session of confirmed) {
+      events += await db.events.where("sessionId").equals(session.sessionId).delete();
+      await db.sessions.delete(session.sessionId);
+      await db.sync_state.delete(session.sessionId);
+      await db.checkpoints.delete(session.sessionId);
+    }
+  });
+  return { sessions: confirmed.length, events };
+}
+
 async function requiredSession(sessionId: string): Promise<SessionRow> {
   const session = await db.sessions.get(sessionId);
   if (!session) throw new Error(`session '${sessionId}' does not exist`);
@@ -442,17 +593,3 @@ function retryDelayMs(attempt: number): number {
   return Math.round(base * (0.75 + Math.random() * 0.5));
 }
 
-function normaliseEndpoint(input: string): string {
-  let url: URL;
-  try {
-    url = new URL(input.trim());
-  } catch {
-    throw new Error("sync endpoint must be a complete URL");
-  }
-  const isLocal = url.hostname === "localhost" || url.hostname === "127.0.0.1" || url.hostname === "::1";
-  if (url.protocol !== "https:" && !(isLocal && url.protocol === "http:")) {
-    throw new Error("sync endpoint must use HTTPS outside local development");
-  }
-  url.pathname = url.pathname.replace(/\/$/, "");
-  return url.toString().replace(/\/$/, "");
-}

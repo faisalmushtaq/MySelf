@@ -7,6 +7,42 @@ const base = process.env["MYSELF_BASE"] ?? "/MySelf/";
 
 const buildStamp = new Date().toISOString().slice(0, 16).replace("T", " ");
 
+/**
+ * The study this build files its sittings into.
+ *
+ * None of it is secret — a Firebase web config is a set of public identifiers,
+ * and the `apiKey` names a project rather than authorising anything. What
+ * authorises is the `device` claim on an enrolled iPad, checked server-side. It
+ * is baked in at build time rather than typed into the page for the same reason
+ * the narrative module's URL is: a survey must not be a place where somebody can
+ * point a child's answers at a host of their choosing.
+ *
+ * Absent, this build stores everything on the device and sends nothing anywhere,
+ * which is exactly what the public preview should be.
+ */
+const firebaseConfig = process.env["MYSELF_FIREBASE_CONFIG"] ?? "";
+
+/**
+ * Where sittings go.
+ *
+ * Derived from the project rather than copied: a function deployed to
+ * europe-west2 answers at
+ * `https://europe-west2-<project>.cloudfunctions.net/saveSitting`, so knowing
+ * the project is knowing the URL, and one fewer value to carry between a console
+ * and a build is one fewer place to get it wrong. `MYSELF_SITTINGS_URL`
+ * overrides it for an emulator or a function deployed elsewhere.
+ */
+function deriveSittingsUrl(): string {
+  const explicit = process.env["MYSELF_SITTINGS_URL"];
+  if (explicit) return explicit;
+  try {
+    const projectId = (JSON.parse(firebaseConfig || "null") as { projectId?: string } | null)?.projectId;
+    return projectId ? `https://europe-west2-${projectId}.cloudfunctions.net/saveSitting` : "";
+  } catch {
+    return "";
+  }
+}
+
 export default defineConfig({
   base,
   define: {
@@ -21,6 +57,8 @@ export default defineConfig({
      * empty frame.
      */
     __MYSTORY_URL__: JSON.stringify(process.env["MYSELF_MYSTORY_URL"] ?? ""),
+    __FIREBASE_CONFIG__: JSON.stringify(firebaseConfig),
+    __SITTINGS_URL__: JSON.stringify(deriveSittingsUrl()),
   },
   plugins: [
     react(),

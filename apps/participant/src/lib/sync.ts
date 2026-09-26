@@ -1,33 +1,62 @@
 import {
   completedSessionsForSync,
-  acknowledgedEventSequences,
   markSessionQuarantined,
   markSessionSyncFailed,
   markSessionSynced,
   markSessionSyncing,
+  recordCheckpoint,
   recordSyncReceipt,
-  syncConfiguration,
-  type SyncConfiguration,
+  runningSessionsForCheckpoint,
   type SyncSession,
 } from "./db.js";
+import { syncTarget, type SyncTarget } from "./device.js";
 
-export interface SyncBatch {
-  format: "myself.device.export.v1";
-  exportedAt: string;
-  app: string;
-  sessions: SyncSession[];
+/**
+ * Getting a sitting off this iPad and into the study.
+ *
+ * ONE SITTING PER REQUEST. A handover is twenty sittings at the end of a school
+ * day over school wifi, and a single request carrying all of them is one dropped
+ * connection away from having achieved nothing. One at a time means the
+ * nineteenth failing costs the nineteenth.
+ *
+ * A SITTING IS KEPT LOCALLY UNTIL THE SERVER HAS CONFIRMED IT. Not until the
+ * request returned 200 — until the response says, for this session id, that it
+ * was stored and how many events it stored. `verifyOutcome` compares that count
+ * against what was sent and refuses anything short. That comparison is the whole
+ * guarantee: without it a truncated upload reads as a success on both ends and
+ * the missing events are discovered by nobody.
+ *
+ * THE SERVER MAY REFUSE, AND REFUSAL IS NOT FAILURE. `quarantined` means the
+ * study already holds a copy of this sitting that this one contradicts — a
+ * second device, a different release, a log that has got shorter. Retrying
+ * cannot help and deleting would lose evidence, so the sitting stops here in a
+ * state a researcher can see, and the server keeps both copies.
+ *
+ * Safari cannot run any of this in the background, so callers invoke it on
+ * launch, on connectivity returning, and from the explicit operator control.
+ */
+
+export interface SittingsRequest {
+  sittings: SyncSession[];
 }
 
-export interface SyncAck {
-  batchId: string;
-  accepted: { sessionId: string; events: number[] }[];
-  quarantined: { sessionId: string; reason: string }[];
-  ackHash: string;
-  duplicate: boolean;
+/** One sitting's fate, exactly as `saveSitting` reports it. */
+export interface SittingOutcome {
+  sessionId: string;
+  stored: boolean;
+  events: number;
+  chunks: number;
+  quarantined: boolean;
+  reason?: string;
+}
+
+export interface SittingsResponse {
+  stored: number;
+  outcomes: SittingOutcome[];
 }
 
 export type SyncOutcome =
-  | { kind: "synced"; sessionId: string; batchId: string; duplicate: boolean }
+  | { kind: "synced"; sessionId: string; events: number }
   | { kind: "quarantined"; sessionId: string; reason: string }
   | { kind: "failed"; sessionId: string; reason: string }
   | { kind: "not_configured" }
@@ -41,31 +70,32 @@ export interface SyncReport {
 }
 
 export interface SyncPersistence {
-  configuration(): Promise<SyncConfiguration | null>;
+  target(): Promise<SyncTarget | null>;
   completedSessions(force: boolean): Promise<SyncSession[]>;
+  runningSessions(): Promise<SyncSession[]>;
   markSyncing(sessionId: string): Promise<void>;
   markSynced(sessionId: string, at: string): Promise<void>;
   markFailed(sessionId: string, reason: string, at: string): Promise<void>;
   markQuarantined(sessionId: string, reason: string, at: string): Promise<void>;
-  acknowledgedSequences(sessionId: string): Promise<number[]>;
   saveReceipt(receipt: {
-    batchId: string;
     sessionId: string;
-    accepted: { sessionId: string; events: number[] }[];
-    ackHash: string;
+    events: number;
+    chunks: number;
     verifiedAt: string;
   }): Promise<void>;
+  saveCheckpoint(sessionId: string, events: number, at: string): Promise<void>;
 }
 
 const persistence: SyncPersistence = {
-  configuration: syncConfiguration,
+  target: syncTarget,
   completedSessions: completedSessionsForSync,
+  runningSessions: runningSessionsForCheckpoint,
   markSyncing: markSessionSyncing,
   markSynced: markSessionSynced,
   markFailed: markSessionSyncFailed,
   markQuarantined: markSessionQuarantined,
-  acknowledgedSequences: acknowledgedEventSequences,
   saveReceipt: recordSyncReceipt,
+  saveCheckpoint: recordCheckpoint,
 };
 
 export interface SyncOptions {
@@ -82,10 +112,7 @@ export interface SyncOptions {
 }
 
 /**
- * Synchronise completed sessions one at a time. A completed sitting is retained
- * locally until the server acknowledgement has been checked and stored. Safari
- * cannot run this reliably in the background, so callers invoke it on launch,
- * connectivity restoration and from the explicit operator control.
+ * Send every finished sitting that is waiting, one at a time.
  */
 export async function synchroniseCompletedSessions(options: SyncOptions = {}): Promise<SyncReport> {
   if (typeof navigator !== "undefined" && navigator.onLine === false) {
@@ -93,12 +120,10 @@ export async function synchroniseCompletedSessions(options: SyncOptions = {}): P
   }
 
   const storage = options.storage ?? persistence;
-  const configuration = await storage.configuration();
-  if (!configuration) return { outcomes: [{ kind: "not_configured" }], synced: 0, failed: 0, quarantined: 0 };
+  const target = await storage.target();
+  if (!target) return { outcomes: [{ kind: "not_configured" }], synced: 0, failed: 0, quarantined: 0 };
 
   const now = options.now ?? (() => new Date());
-  const transport = options.transport ?? fetch;
-  const timeoutMs = options.timeoutMs ?? 30_000;
   const sessions = await storage.completedSessions(options.force ?? false);
   const outcomes: SyncOutcome[] = [];
   let synced = 0;
@@ -109,32 +134,25 @@ export async function synchroniseCompletedSessions(options: SyncOptions = {}): P
     const at = now().toISOString();
     await storage.markSyncing(session.sessionId);
     try {
-      const acknowledged = await storage.acknowledgedSequences(session.sessionId);
-      const batch: SyncBatch = {
-        format: "myself.device.export.v1",
-        exportedAt: at,
-        app: "myself-participant",
-        sessions: [session],
-      };
-      const ack = await upload(configuration, batch, transport, timeoutMs);
-      const held = ack.quarantined.find((entry) => entry.sessionId === session.sessionId);
-      if (held) {
-        await storage.markQuarantined(session.sessionId, held.reason, at);
-        outcomes.push({ kind: "quarantined", sessionId: session.sessionId, reason: held.reason });
+      const outcome = await post(target, session, options);
+
+      if (outcome.quarantined) {
+        const reason = outcome.reason ?? "the study already holds a copy of this sitting that this one contradicts";
+        await storage.markQuarantined(session.sessionId, reason, at);
+        outcomes.push({ kind: "quarantined", sessionId: session.sessionId, reason });
         quarantined += 1;
         continue;
       }
 
-      await verifyAcknowledgement(ack, session, acknowledged);
+      verifyOutcome(outcome, session);
       await storage.saveReceipt({
-        batchId: ack.batchId,
         sessionId: session.sessionId,
-        accepted: ack.accepted,
-        ackHash: ack.ackHash,
+        events: outcome.events,
+        chunks: outcome.chunks,
         verifiedAt: at,
       });
       await storage.markSynced(session.sessionId, at);
-      outcomes.push({ kind: "synced", sessionId: session.sessionId, batchId: ack.batchId, duplicate: ack.duplicate });
+      outcomes.push({ kind: "synced", sessionId: session.sessionId, events: outcome.events });
       synced += 1;
     } catch (error) {
       const reason = explain(error);
@@ -147,94 +165,148 @@ export async function synchroniseCompletedSessions(options: SyncOptions = {}): P
   return { outcomes, synced, failed, quarantined };
 }
 
-async function upload(
-  configuration: SyncConfiguration,
-  batch: SyncBatch,
-  transport: typeof fetch,
-  timeoutMs: number,
-): Promise<SyncAck> {
+export interface CheckpointReport {
+  /** Sittings whose progress so far now has a copy on the server. */
+  saved: number;
+  /** Attempts that did not land. Nothing is lost; the next pass tries again. */
+  missed: number;
+}
+
+/**
+ * Put a copy of every sitting still in progress on the server.
+ *
+ * WHY A HALF-FINISHED SITTING IS WORTH UPLOADING. Without this, the only
+ * sittings the study ever holds are the ones that reached the end. A child who
+ * stops halfway, an iPad whose battery goes, a device that is dropped or lost, a
+ * session left open when the hall is packed up — every one of those is a
+ * morning's data that existed only on one device, and the first anyone knows of
+ * it is that there is no record. A checkpoint bounds the loss to whatever was
+ * answered since the last one.
+ *
+ * IT DOES NOT TOUCH THE SESSION'S STATE. A sitting being checkpointed is still
+ * `in_progress`: it is still resumable, it still finishes normally, and it still
+ * goes through the ordinary queue when it does. The upload says `complete:
+ * false`, and the server's rules make the later, longer copy supersede this one
+ * while refusing anything shorter — so a checkpoint can never come back to
+ * overwrite the finished sitting it preceded.
+ *
+ * AND IT IS SILENT. The participant is answering questions. A failed checkpoint
+ * is not their problem, is not an error anybody needs to see, and costs nothing
+ * but the next attempt.
+ */
+export async function checkpointRunningSessions(options: SyncOptions = {}): Promise<CheckpointReport> {
+  if (typeof navigator !== "undefined" && navigator.onLine === false) return { saved: 0, missed: 0 };
+
+  const storage = options.storage ?? persistence;
+  const target = await storage.target();
+  if (!target) return { saved: 0, missed: 0 };
+
+  const now = options.now ?? (() => new Date());
+  const sessions = await storage.runningSessions();
+  let saved = 0;
+  let missed = 0;
+
+  for (const session of sessions) {
+    try {
+      const outcome = await post(target, { ...session, complete: false }, options);
+      if (!outcome.stored) {
+        missed += 1;
+        continue;
+      }
+      verifyOutcome(outcome, session);
+      await storage.saveCheckpoint(session.sessionId, session.events.length, now().toISOString());
+      saved += 1;
+    } catch {
+      // Deliberately swallowed: see the note above. The events stay on the
+      // device and the next pass sends them.
+      missed += 1;
+    }
+  }
+
+  return { saved, missed };
+}
+
+async function post(
+  target: SyncTarget,
+  session: SyncSession,
+  options: SyncOptions,
+): Promise<SittingOutcome> {
+  const transport = options.transport ?? fetch;
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  const timer = setTimeout(() => controller.abort(), options.timeoutMs ?? 30_000);
   try {
-    const response = await transport(`${configuration.endpoint.replace(/\/$/, "")}/sync/batches`, {
+    const response = await transport(target.url, {
       method: "POST",
       headers: {
-        authorization: `Bearer ${configuration.token}`,
+        authorization: `Bearer ${target.token}`,
         "content-type": "application/json",
       },
-      body: JSON.stringify(batch),
+      body: JSON.stringify({ sittings: [session] } satisfies SittingsRequest),
       signal: controller.signal,
     });
     const body: unknown = await response.json().catch(() => null);
-    if (!response.ok) {
-      const detail = isRecord(body) && typeof body["error"] === "string" ? `: ${body["error"]}` : "";
-      throw new Error(`sync server returned ${response.status}${detail}`);
-    }
-    return parseAck(body);
+    if (!response.ok) throw new Error(`sync server returned ${response.status}${detailOf(body)}`);
+    const parsed = parseResponse(body);
+    const outcome = parsed.outcomes.find((entry) => entry.sessionId === session.sessionId);
+    if (!outcome) throw new Error("the server did not say what happened to this sitting");
+    return outcome;
   } finally {
     clearTimeout(timer);
   }
 }
 
-export async function acknowledgementHash(accepted: SyncAck["accepted"]): Promise<string> {
-  // This is intentionally byte-for-byte the acknowledgement spine used by the
-  // API. A client marks a session verified only after it independently derives
-  // the same digest from the response it received.
-  const text = JSON.stringify(accepted.map((entry) => [entry.sessionId, entry.events]).sort());
-  const bytes = new TextEncoder().encode(text);
-  const digest = await crypto.subtle.digest("SHA-256", bytes);
-  return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
-}
-
-export async function verifyAcknowledgement(ack: SyncAck, session: SyncSession, alreadyVerified: readonly number[] = []): Promise<void> {
-  if (!ack.batchId || !/^[a-zA-Z0-9_-]+$/.test(ack.batchId)) throw new Error("server acknowledgement has an invalid batch id");
-  if (await acknowledgementHash(ack.accepted) !== ack.ackHash) throw new Error("server acknowledgement checksum did not verify");
-
-  const accepted = ack.accepted.find((entry) => entry.sessionId === session.sessionId);
-  if (!accepted) throw new Error("server acknowledgement omitted the session");
-  const prior = new Set(alreadyVerified);
-  const expected = session.events
-    .map((event) => event.seq)
-    .filter((seq) => !prior.has(seq))
-    .sort((a, b) => a - b);
-  const received = [...accepted.events].sort((a, b) => a - b);
-  if (expected.length !== received.length || expected.some((seq, index) => seq !== received[index])) {
-    throw new Error("server acknowledgement did not confirm every event");
+/**
+ * Did the study actually take everything this device sent?
+ *
+ * The event count is the check, because it is the one thing the server reports
+ * that a truncated or partially-written upload cannot fake: `saveSitting`
+ * answers with the count on the document it wrote, read back from its own split.
+ * Fewer events stored than sent means some did not land, and the only safe
+ * reading of that is that this sitting is not yet safe to stop holding.
+ */
+export function verifyOutcome(outcome: SittingOutcome, session: SyncSession): void {
+  if (!outcome.stored) {
+    throw new Error(outcome.reason ?? "the server did not store this sitting");
+  }
+  if (outcome.events !== session.events.length) {
+    throw new Error(
+      `the server stored ${outcome.events} of the ${session.events.length} events this sitting holds`,
+    );
   }
 }
 
-function parseAck(value: unknown): SyncAck {
-  if (!isRecord(value)) throw new Error("sync server returned an invalid acknowledgement");
-  const accepted = Array.isArray(value["accepted"])
-    ? value["accepted"].map((entry) => {
-        if (!isRecord(entry) || typeof entry["sessionId"] !== "string" || !Array.isArray(entry["events"])) {
-          throw new Error("sync server acknowledgement contains an invalid accepted entry");
-        }
-        const events = entry["events"];
-        if (!events.every((event) => typeof event === "number" && Number.isInteger(event) && event >= 0)) {
-          throw new Error("sync server acknowledgement contains an invalid event sequence");
-        }
-        return { sessionId: entry["sessionId"], events: events as number[] };
-      })
-    : null;
-  const quarantined = Array.isArray(value["quarantined"])
-    ? value["quarantined"].map((entry) => {
-        if (!isRecord(entry) || typeof entry["sessionId"] !== "string" || typeof entry["reason"] !== "string") {
-          throw new Error("sync server acknowledgement contains an invalid quarantine entry");
-        }
-        return { sessionId: entry["sessionId"], reason: entry["reason"] };
-      })
-    : null;
-  if (
-    typeof value["batchId"] !== "string" ||
-    typeof value["ackHash"] !== "string" ||
-    typeof value["duplicate"] !== "boolean" ||
-    !accepted ||
-    !quarantined
-  ) {
-    throw new Error("sync server returned an incomplete acknowledgement");
-  }
-  return { batchId: value["batchId"], accepted, quarantined, ackHash: value["ackHash"], duplicate: value["duplicate"] };
+function parseResponse(value: unknown): SittingsResponse {
+  if (!isRecord(value)) throw new Error("sync server returned an invalid response");
+  if (!Array.isArray(value["outcomes"])) throw new Error("sync server returned no outcomes");
+  const outcomes = value["outcomes"].map((entry) => {
+    if (
+      !isRecord(entry) ||
+      typeof entry["sessionId"] !== "string" ||
+      typeof entry["stored"] !== "boolean" ||
+      typeof entry["quarantined"] !== "boolean" ||
+      !Number.isInteger(entry["events"]) ||
+      !Number.isInteger(entry["chunks"])
+    ) {
+      throw new Error("sync server returned an outcome this app cannot read");
+    }
+    return {
+      sessionId: entry["sessionId"],
+      stored: entry["stored"],
+      events: entry["events"] as number,
+      chunks: entry["chunks"] as number,
+      quarantined: entry["quarantined"],
+      ...(typeof entry["reason"] === "string" ? { reason: entry["reason"] } : {}),
+    };
+  });
+  return { stored: typeof value["stored"] === "number" ? value["stored"] : outcomes.filter((o) => o.stored).length, outcomes };
+}
+
+function detailOf(body: unknown): string {
+  if (!isRecord(body)) return "";
+  const error = body["error"];
+  if (typeof error === "string") return `: ${error}`;
+  if (isRecord(error) && typeof error["message"] === "string") return `: ${error["message"]}`;
+  return "";
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

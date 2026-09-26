@@ -1,8 +1,11 @@
 name: Deploy participant preview to GitHub Pages
 
+# ONE BRANCH, because this publishes to the URL an iPad in a school hall loads.
+# It used to deploy from a long-lived feature branch as well, so whichever
+# pushed last was what a device picked up, with nothing on screen to say which.
 on:
   push:
-    branches: [main, claude/myself-research-platform-foztm1]
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -29,9 +32,17 @@ jobs:
       - run: pnpm install --frozen-lockfile
       # The Firebase web config is a set of PUBLIC identifiers — the apiKey
       # names a project, it does not authorise anything. What authorises is a
-      # signed-in account carrying a role an owner granted, checked by the
-      # relay. It is here rather than in a secret because it ships inside the
-      # built JavaScript either way, and pretending otherwise would be theatre.
+      # signed-in account carrying a role an owner granted, or the `device`
+      # claim on an enrolled iPad, both checked server-side. It is here rather
+      # than in a secret because it ships inside the built JavaScript either
+      # way, and pretending otherwise would be theatre.
+      #
+      # THE PARTICIPANT APP GETS IT TOO, so one build serves both the public
+      # preview and a fielded iPad. Which one it is depends on enrolment, not on
+      # the build: an unenrolled device stores everything locally and sends
+      # nothing anywhere, and only an owner can mint the token that enrols one.
+      # A visitor to the public URL therefore gets the survey and no route into
+      # the study, which is what the preview has always been.
       - run: pnpm -r build
         env:
           MYSELF_FIREBASE_CONFIG: >-
