@@ -173,6 +173,64 @@ export async function addSessions(sessions: DeviceSession[], source: string): Pr
   return added;
 }
 
+export interface MergeReport {
+  added: number;
+  /** Local copies replaced by a longer one from the study. */
+  superseded: number;
+  unchanged: number;
+}
+
+/**
+ * Take in sittings pulled from the study, superseding shorter local copies.
+ *
+ * NOT `addSessions`, and the difference matters. A file import treats a sitting
+ * it already has as a duplicate and adds nothing, which is right: two exports of
+ * the same finished sitting are the same sitting.
+ *
+ * A pull is not that. Devices now upload a sitting WHILE IT IS STILL BEING
+ * ANSWERED, so the study's copy grows — pulled at four hundred events on Tuesday
+ * and complete at nine hundred on Wednesday. Skipping it as a duplicate would
+ * leave a partial sitting in the analysis for the rest of the study, and nothing
+ * on screen would say so.
+ *
+ * So the longer log wins, which is the same rule the server applies to uploads.
+ * A local copy is never replaced by a shorter one — that would be the truncation
+ * the write path refuses, arriving by the other road.
+ */
+export async function mergeFromStudy(sessions: DeviceSession[], source: string): Promise<MergeReport> {
+  const importedAt = new Date().toISOString();
+  const report: MergeReport = { added: 0, superseded: 0, unchanged: 0 };
+
+  for (const incoming of sessions) {
+    const existing = await db.sessions.get(incoming.sessionId);
+    if (!existing) {
+      await db.sessions.add({ ...incoming, importedAt, source });
+      report.added += 1;
+      continue;
+    }
+    if (supersedes(incoming, existing)) {
+      await db.sessions.put({ ...incoming, importedAt, source });
+      report.superseded += 1;
+      continue;
+    }
+    report.unchanged += 1;
+  }
+  return report;
+}
+
+/**
+ * Should the copy just pulled replace the copy already here?
+ *
+ * Only if it is longer. Pure and named so the rule can be tested without a
+ * database, because getting it wrong in either direction is a quiet analysis
+ * error rather than a crash: too eager and a complete sitting is replaced by a
+ * checkpoint of itself, too shy and a partial sitting stays in the analysis for
+ * the rest of the study with nothing on screen to say so.
+ */
+export function supersedes(incoming: { events: unknown[] }, existing: { events: unknown[] }): boolean {
+  return incoming.events.length > existing.events.length;
+}
+
 /** Remove everything. Used for clearing demonstration data before fieldwork. */
 export async function clearAll(): Promise<void> {
   await db.sessions.clear();
