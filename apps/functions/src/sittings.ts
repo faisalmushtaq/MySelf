@@ -2,7 +2,14 @@ import { FieldValue } from "firebase-admin/firestore";
 import * as logger from "firebase-functions/logger";
 import { onRequest } from "firebase-functions/v2/https";
 import { z } from "zod";
-import { paths, splitSession, type ChunkDoc, type SessionDoc } from "@myself/firebase";
+import {
+  conflictWith,
+  paths,
+  splitSession,
+  type ChunkDoc,
+  type SessionDoc,
+  type SittingConflict,
+} from "@myself/firebase";
 import type { DeviceSession } from "@myself/store";
 import { STUDY, research } from "./apps.js";
 import { RelayError, type Caller } from "./relay-policy.js";
@@ -34,8 +41,8 @@ import { authenticate, cors } from "./relay.js";
  * chunks nobody reads, which is invisible: the export walks parents. The other
  * order leaves a parent claiming chunks that never arrived, which `joinSession`
  * refuses — correctly, but it means a sitting sitting in the dataset that
- * cannot be read. Stale chunks from an earlier, longer upload are deleted after
- * the parent is written, for the same reason.
+ * cannot be read. Stale chunks left by a build that packed the same events
+ * differently are deleted after the parent is written, for the same reason.
  *
  * A TESTER LINK MAY NOT WRITE ONE. A link is a URL somebody was sent, and it
  * exists to pilot the narrative module before a study is fielded. Survey
@@ -44,10 +51,18 @@ import { authenticate, cors } from "./relay.js";
  * `provenance` can separate model calls, but a sitting is the unit of
  * analysis and there is no version of this where a stranger contributes one.
  *
- * THE SAME SITTING FROM TWO DEVICES IS QUARANTINED, not overwritten. It means
- * a session id collided or a device was restored from a backup, and either way
- * the honest response is to keep both facts and let a person look. The export
- * already skips quarantined sittings.
+ * A CONTRADICTED SITTING IS QUARANTINED, not overwritten. Two devices claiming
+ * one session id, two copies collected under different releases, a finished
+ * sitting arriving as a partial one again, or a log that has got SHORTER: each
+ * means something is wrong that a write cannot resolve, so the honest response
+ * is to keep both facts and let a person look. `conflictWith` holds the four
+ * rules and the write path has none of its own. The export already skips
+ * quarantined sittings.
+ *
+ * THE DECISION IS MADE INSIDE A TRANSACTION, because read-then-decide-then-write
+ * is three operations and two iPads handed over at the same moment is the normal
+ * way this platform is used. Without it the loser of the race overwrites the
+ * winner, which is precisely what the rules above exist to prevent.
  */
 
 /**
@@ -153,57 +168,18 @@ export async function storeSitting(
   const { doc, chunks } = splitSession(session, deviceId, study, now);
 
   const parentRef = db.doc(paths.session(study, session.sessionId));
-  const existing = await parentRef.get();
-  const before = existing.exists ? (existing.data() as SessionDoc) : null;
 
   /**
-   * The same sitting, from somewhere else.
+   * Is this sitting allowed to land at all?
    *
-   * The stored copy is NOT overwritten. Two devices holding one session id
-   * means the id collided or an iPad was restored from a backup, and in
-   * neither case does the second arrival have a better claim than the first —
-   * replacing one child's log with another's is the merge this platform exists
-   * to never make.
-   *
-   * So both facts survive: the copy already here is marked quarantined, which
-   * takes it out of the export, and the copy that just arrived is filed whole
-   * under `/quarantine` for a person to compare. That is the same outcome the
-   * Firestore rules produce for a device writing directly — they refuse the
-   * second device's update and the client files the copy it was holding — and
-   * the two write paths must not disagree about something this consequential.
+   * Asked once here, cheaply, so that an upload which is going to be refused
+   * does not first write a few hundred chunk documents. It is asked AGAIN
+   * inside the transaction below, because this answer can go stale.
    */
-  if (before !== null && before.deviceId !== deviceId) {
-    logger.error("the same sitting arrived from two devices", {
-      sessionId: session.sessionId,
-      firstDevice: before.deviceId,
-      thenDevice: deviceId,
-    });
-    await db.collection(paths.quarantine(study)).add({
-      reason: "the same session id arrived from a second device",
-      sessionId: session.sessionId,
-      heldDeviceId: before.deviceId,
-      arrivingDeviceId: deviceId,
-      arrivingSession: session,
-      at: now.toISOString(),
-    });
-    // Marked, and nothing else touched. `quarantined` is the only field a
-    // researcher may change on a sitting, and this is the machine doing the
-    // same thing for the same reason.
-    await parentRef.set({ quarantined: true }, { merge: true });
-    return {
-      sessionId: session.sessionId,
-      stored: false,
-      events: session.events.length,
-      chunks: 0,
-      quarantined: true,
-      reason: "another device has already filed this sitting — both copies are kept and flagged for review",
-    };
-  }
-
-  // Stays quarantined once it has been: a later upload from the original
-  // device must not clear a flag an earlier collision raised, because the
-  // thing worth knowing is that a collision happened at all.
-  const quarantined = before?.quarantined === true;
+  const first = await parentRef.get();
+  const firstDoc = first.exists ? (first.data() as SessionDoc) : null;
+  const early = conflictWith(firstDoc, doc);
+  if (early) return refuse(db, study, session, deviceId, doc, firstDoc, early, now);
 
   // Chunks first — see the note at the top of this file.
   if (chunks.length > 0) {
@@ -214,21 +190,61 @@ export async function storeSitting(
     await writing.commit();
   }
 
-  await parentRef.set({ ...doc, quarantined, receivedAt: now.toISOString() } satisfies SessionDoc, { merge: false });
+  /**
+   * The decision and the write, together, or neither.
+   *
+   * The check above is not enough on its own. Reading the parent, deciding, and
+   * then writing it is three separate operations, and two devices uploading the
+   * same session id at the same moment both read "nothing stored", both decide
+   * they may proceed, and the second silently overwrites the first — the exact
+   * outcome the collision rule exists to prevent, reachable precisely when two
+   * iPads are handed over together at the end of a school day, which is the
+   * normal way this platform is used.
+   *
+   * So the parent write happens in a transaction that re-reads the parent and
+   * re-applies the same rules. Firestore retries the transaction when the
+   * document changed underneath it, so the loser of a race sees the winner's
+   * document and is refused.
+   *
+   * Only the parent is in the transaction. The chunks are already written, and
+   * they are content-addressed by index off a deterministic split, so a refused
+   * upload leaves chunks nobody reads rather than data anybody misreads — the
+   * same trade the write ordering already makes.
+   */
+  const verdict = await db.runTransaction(async (tx) => {
+    const snap = await tx.get(parentRef);
+    const before = snap.exists ? (snap.data() as SessionDoc) : null;
+
+    const conflict = conflictWith(before, doc);
+    if (conflict) return { conflict, before };
+
+    // Stays quarantined once it has been: a later upload from the original
+    // device must not clear a flag an earlier collision raised, because the
+    // thing worth knowing is that a collision happened at all.
+    const quarantined = before?.quarantined === true;
+    tx.set(parentRef, { ...doc, quarantined, receivedAt: now.toISOString() } satisfies SessionDoc, { merge: false });
+    return { conflict: null, before };
+  });
+
+  if (verdict.conflict) return refuse(db, study, session, deviceId, doc, verdict.before, verdict.conflict, now);
 
   /**
    * Anything a longer earlier upload left behind.
    *
-   * A sitting re-uploaded after events were pruned, or split differently by a
-   * later build, would otherwise leave chunk 3 sitting next to a parent that
-   * claims three chunks — and `joinSession` counts, so the sitting would read
-   * as complete while carrying a stale tail. Deleted after the parent is
-   * written, so a failure here leaves the readable state rather than a gap.
+   * A sitting split differently by a later build — a change to the byte budget
+   * or the per-chunk cap repacks the same events into fewer documents — would
+   * otherwise leave chunk 3 sitting next to a parent that claims three chunks,
+   * and `joinSession` counts, so the sitting would read as complete while
+   * carrying a stale tail. Deleted after the parent is written, so a failure
+   * here leaves the readable state rather than a gap.
+   *
+   * This can no longer be reached by a log getting shorter: `conflictWith`
+   * refuses that above, which is what makes deleting chunks here safe.
    */
-  const stale = (before?.chunkCount ?? 0) - chunks.length;
+  const stale = (verdict.before?.chunkCount ?? 0) - chunks.length;
   if (stale > 0) {
     const clearing = db.batch();
-    for (let i = chunks.length; i < (before?.chunkCount ?? 0); i += 1) {
+    for (let i = chunks.length; i < (verdict.before?.chunkCount ?? 0); i += 1) {
       clearing.delete(db.doc(paths.sessionChunk(study, session.sessionId, i)));
     }
     await clearing.commit();
@@ -239,7 +255,70 @@ export async function storeSitting(
     stored: true,
     events: doc.eventCount,
     chunks: chunks.length,
-    quarantined,
+    quarantined: verdict.before?.quarantined === true,
+  };
+}
+
+/**
+ * A sitting that may not land, kept anyway.
+ *
+ * Nothing is ever dropped on the floor: the copy that arrived is filed whole
+ * under `/quarantine` so a person can compare it against what is stored, and
+ * the device is told not to keep retrying.
+ *
+ * WHETHER THE STORED COPY IS FLAGGED TOO is `conflictWith`'s decision, not
+ * this function's, and it is the difference between flagging a genuine
+ * ambiguity and throwing away a complete sitting because a device sent a stale
+ * checkpoint after it. `quarantined` is the only field a researcher may change
+ * on a sitting, and this is the machine doing the same thing for the same
+ * reason — so it is set with a merge, never replacing the sitting it marks.
+ */
+async function refuse(
+  db: FirebaseFirestore.Firestore,
+  study: string,
+  session: DeviceSession,
+  deviceId: string,
+  doc: SessionDoc,
+  stored: SessionDoc | null,
+  conflict: SittingConflict,
+  now: Date,
+): Promise<SittingOutcome> {
+  logger.error("a sitting was refused rather than allowed to replace one already stored", {
+    sessionId: session.sessionId,
+    reason: conflict.reason,
+    heldDeviceId: stored?.deviceId ?? null,
+    thenDevice: deviceId,
+    heldEvents: stored?.eventCount ?? null,
+    arrivingEvents: doc.eventCount,
+    storedIsSuspect: conflict.storedIsSuspect,
+  });
+
+  // Both sides of the comparison, in the row itself. A reason without the two
+  // event counts beside it sends whoever reads it back to the sittings to work
+  // out what actually differed.
+  await db.collection(paths.quarantine(study)).add({
+    reason: conflict.reason,
+    sessionId: session.sessionId,
+    heldDeviceId: stored?.deviceId ?? null,
+    heldEvents: stored?.eventCount ?? null,
+    arrivingDeviceId: deviceId,
+    arrivingEvents: doc.eventCount,
+    arrivingSession: session,
+    storedFlagged: conflict.storedIsSuspect,
+    at: now.toISOString(),
+  });
+
+  if (conflict.storedIsSuspect) {
+    await db.doc(paths.session(study, session.sessionId)).set({ quarantined: true }, { merge: true });
+  }
+
+  return {
+    sessionId: session.sessionId,
+    stored: false,
+    events: session.events.length,
+    chunks: 0,
+    quarantined: true,
+    reason: conflict.reason,
   };
 }
 

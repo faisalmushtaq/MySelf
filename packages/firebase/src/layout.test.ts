@@ -126,8 +126,17 @@ describe("splitting is deterministic", () => {
   });
 });
 
+/**
+ * The four ways one sitting can contradict another.
+ *
+ * This is the only place the rule lives, so the write path cannot disagree with
+ * it, and every rule here is one that used to let a stored sitting be silently
+ * replaced by a worse copy of itself.
+ */
 describe("conflicts", () => {
-  const stored = splitSession(session([event(0)]), "dev_a", "ybm").doc;
+  const stored = splitSession(session([event(0), event(1), event(2)]), "dev_a", "ybm").doc;
+  const from = (events: number, deviceId = "dev_a") =>
+    splitSession(session(Array.from({ length: events }, (_, i) => event(i))), deviceId, "ybm").doc;
 
   it("passes a first arrival", () => {
     expect(conflictWith(null, stored)).toBeNull();
@@ -137,13 +146,45 @@ describe("conflicts", () => {
     expect(conflictWith(stored, stored)).toBeNull();
   });
 
-  it("catches a second device claiming the sitting", () => {
-    const other = splitSession(session([event(0)]), "dev_b", "ybm").doc;
-    expect(conflictWith(stored, other)).toMatch(/second device/);
+  it("passes a sitting that has grown since the last upload", () => {
+    // A checkpoint being superseded by a longer one is the normal path, not an
+    // exception to be tolerated.
+    expect(conflictWith(from(3), from(9))).toBeNull();
   });
 
-  it("catches a contradicting release", () => {
-    expect(conflictWith(stored, { ...stored, releaseHash: "sha256:other" })).toMatch(/release hash/);
+  it("catches a second device claiming the sitting, and distrusts both copies", () => {
+    const verdict = conflictWith(stored, from(1, "dev_b"));
+    expect(verdict?.reason).toMatch(/second device/);
+    expect(verdict?.storedIsSuspect).toBe(true);
+  });
+
+  it("catches a contradicting release, and distrusts both copies", () => {
+    const verdict = conflictWith(stored, { ...stored, releaseHash: "sha256:other" });
+    expect(verdict?.reason).toMatch(/release hash/);
+    expect(verdict?.storedIsSuspect).toBe(true);
+  });
+
+  it("catches a log that has got shorter, and keeps trusting the longer one", () => {
+    // The stored copy is the complete one. Flagging it would drop a whole
+    // sitting out of the export to punish a bad retry.
+    const verdict = conflictWith(stored, from(1));
+    expect(verdict?.reason).toMatch(/never gets shorter/);
+    expect(verdict?.storedIsSuspect).toBe(false);
+  });
+
+  it("names both counts, so the row says what actually differed", () => {
+    expect(conflictWith(from(9), from(2))?.reason).toMatch(/2 events.*9/);
+  });
+
+  it("catches a finished sitting being reopened as a partial one", () => {
+    const partial = { ...stored, complete: false };
+    const verdict = conflictWith(stored, partial);
+    expect(verdict?.reason).toMatch(/still in progress/);
+    expect(verdict?.storedIsSuspect).toBe(false);
+  });
+
+  it("passes a partial sitting being finished, which is the other direction", () => {
+    expect(conflictWith({ ...stored, complete: false }, stored)).toBeNull();
   });
 });
 

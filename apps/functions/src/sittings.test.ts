@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { joinSession, paths, type ChunkDoc, type SessionDoc } from "@myself/firebase";
+import { joinSession, paths, splitSession, type ChunkDoc, type SessionDoc } from "@myself/firebase";
 import type { DeviceSession } from "@myself/store";
 import { deviceIdFor, sittingRefusal, sittingUpload, storeSitting } from "./sittings.js";
 import { RelayError, type Caller } from "./relay-policy.js";
@@ -22,6 +22,7 @@ function fakeDb() {
   const docs = new Map<string, Record<string, unknown>>();
   const order: string[] = [];
   let failParentWrite = false;
+  let beforeTransaction: (() => void) | null = null;
 
   const ref = (path: string) => ({
     get: async () => ({ exists: docs.has(path), data: () => docs.get(path) }),
@@ -62,6 +63,10 @@ function fakeDb() {
     fail: (on: boolean) => {
       failParentWrite = on;
     },
+    /** Run something the instant before the transaction body reads the parent. */
+    raceIn: (f: () => void) => {
+      beforeTransaction = f;
+    },
     db: {
       doc: (path: string) => ({ ...ref(path), path }),
       batch,
@@ -70,6 +75,41 @@ function fakeDb() {
           (collections[path] ??= []).push(value);
         },
       }),
+      /**
+       * Enough of a transaction to test the decision, not the isolation.
+       *
+       * Firestore's own guarantee — re-run the body when the document moved
+       * underneath it — is the provider's to keep, and a stand-in that pretended
+       * to reproduce it would be testing the stand-in. What IS worth proving
+       * here is that the conflict rules are applied to the document read inside
+       * the body rather than to a stale one, so `beforeTransaction` lets a test
+       * make the parent appear between the early check and the transaction. That
+       * is exactly the interleaving a second iPad produces.
+       */
+      runTransaction: async <T>(body: (tx: unknown) => Promise<T>): Promise<T> => {
+        beforeTransaction?.();
+        // `set` is synchronous and the write is not visible until commit, the
+        // same as the real one — a stub whose `set` applied immediately would
+        // hide a body that reads back its own uncommitted write, and one whose
+        // `set` rejected would report a write failure in the wrong place.
+        const queued: (() => void)[] = [];
+        const tx = {
+          get: async (r: { path: string }) => ({ exists: docs.has(r.path), data: () => docs.get(r.path) }),
+          set: (r: { path: string }, value: Record<string, unknown>, options?: { merge?: boolean }) => {
+            queued.push(() => {
+              docs.set(r.path, options?.merge ? { ...(docs.get(r.path) ?? {}), ...value } : value);
+              order.push(`set ${r.path}`);
+            });
+            return tx;
+          },
+        };
+        const result = await body(tx);
+        // Commit. A refused write fails here, after the body has run, which is
+        // where Firestore reports it too.
+        if (queued.length > 0 && failParentWrite) throw new Error("write refused");
+        queued.forEach((f) => f());
+        return result;
+      },
     } as unknown as FirebaseFirestore.Firestore,
   };
 }
@@ -92,6 +132,10 @@ const session = (events: ReturnType<typeof event>[], id = "ses_1"): DeviceSessio
   complete: true,
   events,
 });
+
+/** The document the write path would produce, for seeding a race. */
+const splitOf = (s: DeviceSession, deviceId: string): SessionDoc =>
+  splitSession(s, deviceId, "ybm").doc;
 
 describe("who may file a survey sitting", () => {
   it("refuses a tester link, which belongs to nobody", () => {
@@ -175,20 +219,37 @@ describe("storing one", () => {
     expect(lastChunkAt).toBeLessThan(parentAt);
   });
 
-  it("leaves no stale chunk behind when a re-upload splits smaller", async () => {
+  it("leaves no stale chunk behind when a later build packs the same events into fewer", async () => {
+    // The legitimate way a re-upload produces fewer chunks: the events are the
+    // same, but a change to the byte budget or the per-chunk cap repacks them.
+    // A parent claiming ten chunks with eight present reads as complete to
+    // `joinSession` — which counts — while carrying a stale tail.
+    //
+    // A log getting SHORTER cannot reach this path any more; that is refused as
+    // a conflict, and it is what makes deleting chunks here safe.
     const { db, docs } = fakeDb();
     const long = Array.from({ length: 400 }, (_, i) => event(i, 4000));
     await storeSitting(db, "ybm", session(long), "dev_ipad_1");
-    const chunked = [...docs.keys()].filter((k) => k.includes("/chunks/")).length;
-    expect(chunked).toBeGreaterThan(1);
 
-    // The same sitting, now short enough to fit inline.
-    await storeSitting(db, "ybm", session([event(0)]), "dev_ipad_1");
+    const written = [...docs.keys()].filter((k) => k.includes("/chunks/")).length;
+    expect(written).toBeGreaterThan(1);
+
+    // Pretend the previous build had spread the same sitting over more chunks.
+    const parent = docs.get(paths.session("ybm", "ses_1")) as unknown as SessionDoc;
+    docs.set(paths.session("ybm", "ses_1"), { ...parent, chunkCount: written + 3 });
+    for (let i = written; i < written + 3; i += 1) {
+      docs.set(paths.sessionChunk("ybm", "ses_1", i), { sessionId: "ses_1", index: i, events: [] });
+    }
+
+    await storeSitting(db, "ybm", session(long), "dev_ipad_1");
+
     const left = [...docs.keys()].filter((k) => k.includes("/chunks/"));
-    expect(left).toEqual([]);
-
-    const doc = docs.get(paths.session("ybm", "ses_1")) as unknown as SessionDoc;
-    expect(() => joinSession(doc, [])).not.toThrow();
+    expect(left).toHaveLength(written);
+    const after = docs.get(paths.session("ybm", "ses_1")) as unknown as SessionDoc;
+    const chunks = [...docs.entries()]
+      .filter(([k]) => k.includes("/chunks/"))
+      .map(([, v]) => v as unknown as ChunkDoc);
+    expect(joinSession(after, chunks).events).toHaveLength(400);
   });
 
   it("reads back a chunked sitting whole", async () => {
@@ -245,6 +306,116 @@ describe("the same sitting from two devices", () => {
     await storeSitting(db, "ybm", session([event(0)]), "dev_ipad_1");
     await storeSitting(db, "ybm", session([event(0)]), "dev_ipad_1");
     expect((docs.get(paths.session("ybm", "ses_1")) as unknown as SessionDoc).quarantined).toBe(false);
+  });
+});
+
+/**
+ * The failures that would have cost real data, and did not look like failures.
+ *
+ * Every one of these used to return `stored: true` and leave a shorter or
+ * contradicted log in the dataset, with nothing downstream able to tell.
+ */
+describe("a sitting that contradicts the one already stored", () => {
+  it("refuses a log that has got shorter, and keeps the longer one", async () => {
+    // An iPad restored from a backup, or a checkpoint re-sent after the full
+    // sitting already arrived. The parent is replaced outright and unused chunks
+    // are deleted, so without this rule a complete sitting silently truncates.
+    const { db, docs } = fakeDb();
+    const whole = Array.from({ length: 9 }, (_, i) => event(i));
+    await storeSitting(db, "ybm", session(whole), "dev_ipad_1");
+
+    const outcome = await storeSitting(db, "ybm", session([event(0), event(1)]), "dev_ipad_1");
+
+    expect(outcome).toMatchObject({ stored: false, quarantined: true });
+    expect(outcome.reason).toMatch(/never gets shorter/);
+    const doc = docs.get(paths.session("ybm", "ses_1")) as unknown as SessionDoc;
+    expect(doc.eventCount).toBe(9);
+  });
+
+  it("leaves the good copy in the dataset rather than flagging it too", async () => {
+    // The stored copy is the complete one. Quarantining it would drop a whole
+    // sitting out of the export to punish a bad retry — the export skips
+    // anything flagged.
+    const { db, docs, collections } = fakeDb();
+    await storeSitting(db, "ybm", session([event(0), event(1), event(2)]), "dev_ipad_1");
+    await storeSitting(db, "ybm", session([event(0)]), "dev_ipad_1");
+
+    expect((docs.get(paths.session("ybm", "ses_1")) as unknown as SessionDoc).quarantined).toBe(false);
+    // Nothing is dropped, though: the short copy is filed with both counts.
+    expect(collections[paths.quarantine("ybm")]?.[0]).toMatchObject({
+      heldEvents: 3,
+      arrivingEvents: 1,
+      storedFlagged: false,
+    });
+  });
+
+  it("accepts a sitting that has grown, which is what a checkpoint does", async () => {
+    // The whole point of uploading a sitting while it is still running: the log
+    // only ever gets longer, and each upload supersedes the last.
+    const { db, docs } = fakeDb();
+    await storeSitting(db, "ybm", { ...session([event(0), event(1)]), complete: false }, "dev_ipad_1");
+    const outcome = await storeSitting(db, "ybm", session([event(0), event(1), event(2), event(3)]), "dev_ipad_1");
+
+    expect(outcome).toMatchObject({ stored: true, events: 4, quarantined: false });
+    const doc = docs.get(paths.session("ybm", "ses_1")) as unknown as SessionDoc;
+    expect(doc.complete).toBe(true);
+    expect(joinSession(doc, []).events).toHaveLength(4);
+  });
+
+  it("will not reopen a sitting that has already been finished", async () => {
+    // A stale checkpoint arriving after the finished sitting must not turn a
+    // complete sitting back into a partial one.
+    const { db, docs } = fakeDb();
+    const whole = [event(0), event(1), event(2)];
+    await storeSitting(db, "ybm", session(whole), "dev_ipad_1");
+
+    const outcome = await storeSitting(db, "ybm", { ...session(whole), complete: false }, "dev_ipad_1");
+
+    expect(outcome).toMatchObject({ stored: false, quarantined: true });
+    expect((docs.get(paths.session("ybm", "ses_1")) as unknown as SessionDoc).complete).toBe(true);
+  });
+
+  it("refuses a copy collected under a different release, and flags both", async () => {
+    // Two copies of one sitting under different releases are not the same
+    // instrument. Reading one through the other is how a renamed option code
+    // becomes a silently wrong answer, so neither is trusted.
+    const { db, docs } = fakeDb();
+    const one = session([event(0), event(1)]);
+    await storeSitting(db, "ybm", one, "dev_ipad_1");
+
+    const outcome = await storeSitting(db, "ybm", { ...one, releaseHash: "sha256-different" }, "dev_ipad_1");
+
+    expect(outcome).toMatchObject({ stored: false, quarantined: true });
+    expect(outcome.reason).toMatch(/release hash/);
+    const doc = docs.get(paths.session("ybm", "ses_1")) as unknown as SessionDoc;
+    expect(doc.releaseHash).toBe("sha256-abc");
+    expect(doc.quarantined).toBe(true);
+  });
+});
+
+describe("two iPads handed over at the same moment", () => {
+  it("refuses the loser of the race instead of letting it overwrite the winner", async () => {
+    // The reason the decision is inside a transaction. Reading the parent,
+    // deciding, and then writing it is three operations: both devices read
+    // "nothing stored", both decide they may proceed, and the second silently
+    // replaces the first. `raceIn` makes the other device's sitting appear in
+    // exactly that window.
+    const { db, docs, collections, raceIn } = fakeDb();
+    const mine = session([event(0), event(1)]);
+
+    raceIn(() => {
+      raceIn(() => undefined);
+      docs.set(paths.session("ybm", "ses_1"), {
+        ...splitOf(session([event(0), event(1), event(2)]), "dev_ipad_2"),
+      });
+    });
+
+    const outcome = await storeSitting(db, "ybm", mine, "dev_ipad_1");
+
+    expect(outcome).toMatchObject({ stored: false, quarantined: true });
+    const doc = docs.get(paths.session("ybm", "ses_1")) as unknown as SessionDoc;
+    expect(doc.deviceId).toBe("dev_ipad_2");
+    expect(collections[paths.quarantine("ybm")]).toHaveLength(1);
   });
 });
 

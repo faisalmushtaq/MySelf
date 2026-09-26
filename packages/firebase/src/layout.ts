@@ -249,16 +249,74 @@ export function joinSession(doc: SessionDoc, chunks: ChunkDoc[] = []): DeviceSes
 }
 
 /**
+ * Why an incoming sitting may not replace the one already stored.
+ */
+export interface SittingConflict {
+  /** Said plainly enough to appear in a device's own sync panel. */
+  reason: string;
+  /**
+   * Whether the copy ALREADY STORED is now suspect as well.
+   *
+   * This is the field that decides whether good data stays in the dataset, so
+   * it is worth being explicit about. Two devices claiming one session id, or
+   * two copies collected under different releases, mean nothing can say which
+   * copy is the real one — so the stored copy is flagged too and a person
+   * looks. A shorter or reopened log from the SAME device is different: there
+   * the stored copy is the more complete one, and flagging it would drop a
+   * whole sitting out of the export to punish a bad retry.
+   */
+  storedIsSuspect: boolean;
+}
+
+/**
  * Whether an incoming sitting conflicts with one already stored.
  *
- * The same rule as the Postgres server: a sitting arriving from a second
- * device, or contradicting the release it was collected under, is quarantined
- * rather than merged. Kept as a pure function so the decision is identical
- * whether it is made in a Cloud Function, in the browser, or in a test.
+ * The same rule as the Postgres server: a sitting that contradicts the copy
+ * already held is quarantined rather than merged. Kept as a pure function so
+ * the decision is identical whether it is made in a Cloud Function, in the
+ * browser, or in a test — and so that the four ways a sitting can be
+ * contradicted are in one readable list rather than spread across a write path.
+ *
+ * FOUR RULES, AND THE LAST TWO ARE WHY THIS EXISTS.
+ *
+ * A SECOND DEVICE has no better claim than the first. Replacing one child's log
+ * with another's is the merge this platform exists to never make.
+ *
+ * A DIFFERENT RELEASE means the two copies are not the same instrument. Reading
+ * one through the other is how a renamed option code becomes a silently wrong
+ * answer, so neither is trusted until a person has looked.
+ *
+ * A COMPLETE SITTING IS NEVER REOPENED. A device re-sending an earlier, still
+ * running copy of a sitting it has since finished must not turn a finished
+ * sitting back into a partial one.
+ *
+ * AND A LOG NEVER GETS SHORTER. This is the one that would have cost real data.
+ * The write path replaces the stored document outright and deletes any chunks
+ * the new split does not use, so a device that had been restored from a backup,
+ * or that re-sent a checkpoint after the full sitting had already arrived,
+ * would have quietly truncated a complete log to a partial one — with a
+ * successful response, nothing in the export looking wrong, and the shorter
+ * version analysed. Event counts only ever rise, so a fall is a fault.
  */
-export function conflictWith(stored: SessionDoc | null, incoming: SessionDoc): string | null {
+export function conflictWith(stored: SessionDoc | null, incoming: SessionDoc): SittingConflict | null {
   if (!stored) return null;
-  if (stored.deviceId !== incoming.deviceId) return "same sitting received from a second device";
-  if (stored.releaseHash !== incoming.releaseHash) return "release hash differs from the copy already stored";
+  if (stored.deviceId !== incoming.deviceId) {
+    return { reason: "same sitting received from a second device", storedIsSuspect: true };
+  }
+  if (stored.releaseHash !== incoming.releaseHash) {
+    return { reason: "release hash differs from the copy already stored", storedIsSuspect: true };
+  }
+  if (stored.complete && !incoming.complete) {
+    return {
+      reason: "the copy already stored is a finished sitting and this one is still in progress",
+      storedIsSuspect: false,
+    };
+  }
+  if (incoming.eventCount < stored.eventCount) {
+    return {
+      reason: `this copy carries ${incoming.eventCount} events and the copy already stored carries ${stored.eventCount} — a sitting never gets shorter`,
+      storedIsSuspect: false,
+    };
+  }
   return null;
 }
