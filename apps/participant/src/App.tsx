@@ -1,37 +1,50 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { AnswerStore, Walker, type AnswerValue, type PresentableUnit } from "@myself/engine";
 import { releaseManifest, responseScale, scoringDefinition, type ReleaseManifest, type ResponseScale } from "@myself/schema";
-import rawManifest from "../../../releases/ybm_nd2026_standard_r7.0.0.manifest.json";
+import rawManifest from "../../../releases/ybm_nd2026_standard_r7.0.1.manifest.json";
 import { flattenManifest } from "./lib/flatten.js";
 import { resolveText, useScoringDefinitions } from "./lib/pipes.js";
 import {
   accessibilityPreferences,
   appendEvent,
   completeSession,
-  configureSync,
+  clearBackoff,
   countStoredSessions,
   createSession,
   findResumableSession,
   loadAnswers,
   saveAccessibilityPreferences,
-  syncConfiguration,
+  deviceSummary,
+  forgetConfirmedSessions,
+  type Enrolment,
   type SessionRow,
   type StoredSessionCounts,
 } from "./lib/db.js";
-import { buildDeviceExport, downloadExport } from "./lib/export.js";
+import { buildSealedExport, downloadExport } from "./lib/export.js";
+import { passphraseComplaint } from "@myself/store";
 import {
   applyAccessibilityPreferences,
   DEFAULT_ACCESSIBILITY_PREFERENCES,
   type AccessibilityPreferences,
 } from "./lib/accessibility.js";
-import { synchroniseCompletedSessions } from "./lib/sync.js";
+import { checkpointRunningSessions, synchroniseCompletedSessions } from "./lib/sync.js";
+import { currentDevice, syncAvailable } from "./lib/device.js";
+import { updates } from "./lib/updates.js";
+import { deviceSpace, readableBytes, type Space } from "./lib/space.js";
+import {
+  EVICTION_CAP_DAYS,
+  HELD_TOO_LONG_DAYS,
+  heldForDays,
+  storageDurability,
+  type Durability,
+} from "./lib/durability.js";
 import { SessionTiming, wordCount } from "./lib/timing.js";
 import { ReviewScreen } from "./components/ReviewScreen.js";
 import { SurveyScreen } from "./components/SurveyScreen.js";
 
 /**
  * MySelf Go — participant application (preview build).
- * Renders the frozen YBM r7.0.0 release entirely from its manifest, saves
+ * Renders the frozen YBM r7.0.1 release entirely from its manifest, saves
  * every response to encrypted IndexedDB before advancing, works offline via
  * the service worker, and returns to a neutral start screen on handover.
  */
@@ -99,9 +112,45 @@ export default function App() {
   });
   const [busy, setBusy] = useState(false);
   const [syncBusy, setSyncBusy] = useState(false);
-  const [syncConfigured, setSyncConfigured] = useState(false);
-  const [syncEndpoint, setSyncEndpoint] = useState("");
-  const [syncToken, setSyncToken] = useState("");
+  const [device, setDevice] = useState<Enrolment | null>(null);
+  // Typed at export and never stored: an iPad that is lost surrenders no way to
+  // read the files it wrote.
+  const [passphrase, setPassphrase] = useState("");
+  /**
+   * A write to this device's storage that did not land.
+   *
+   * THE BUG THIS EXISTS FOR. `record` is called as `void record(...)`, so a
+   * rejected write was swallowed: the answer stayed in the in-memory store, "Saved"
+   * never appeared, and the participant carried on. On an iPad low on space — or one
+   * whose database iOS had evicted under storage pressure — that produced a sitting
+   * with gaps that nothing downstream could detect. A dataset missing answers nobody
+   * knows are missing is worse than a sitting that stopped.
+   *
+   * So a failed write stops the survey where it is and asks for a person. The
+   * participant sees a calm screen rather than an error, because a child should not
+   * be made to feel they broke it.
+   */
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [space, setSpace] = useState<Space | null>(null);
+  /**
+   * Whether this iPad's browser has promised to keep what it is holding, and how long
+   * it has been holding it. See `lib/durability.ts`: on an iPad that is not on the
+   * Home Screen, WebKit deletes everything after a week of the site not being opened,
+   * and a device in a cupboard between school visits is exactly that case.
+   */
+  const [durability, setDurability] = useState<Durability | null>(null);
+  const [heldDays, setHeldDays] = useState<number | null>(null);
+  /**
+   * Writes that did not land, in the order they were meant to.
+   *
+   * A QUEUE, NOT ONE WRITE. Keeping only the first failure meant a retry replayed that one
+   * and silently abandoned everything after it: a response saved with its timing paradata
+   * dropped, or a completion event written without the row that queues the sitting for
+   * upload. Each entry is a single Dexie transaction, so it either committed or it did
+   * not — which is what makes replaying the list safe rather than a way to duplicate
+   * events.
+   */
+  const unsaved = useRef<(() => Promise<void>)[]>([]);
   const [syncNote, setSyncNote] = useState<string | null>(null);
   const [codeError, setCodeError] = useState<string | null>(null);
   const [accessibility, setAccessibility] = useState<AccessibilityPreferences>(DEFAULT_ACCESSIBILITY_PREFERENCES);
@@ -145,11 +194,18 @@ export default function App() {
   }, []);
 
   const refreshDeviceStatus = useCallback(async () => {
-    const [stored, configuration] = await Promise.all([countStoredSessions(), syncConfiguration()]);
+    /**
+     * The device knows who it is from its own storage, with no network involved.
+     * `currentDevice` creates the credential if this is a first launch, so the
+     * panel can name the iPad before it has ever reached the study.
+     */
+    const [stored] = await Promise.all([countStoredSessions(), currentDevice().catch(() => null)]);
     setCounts(stored);
-    setSyncConfigured(configuration !== null);
-    if (configuration && !syncEndpoint) setSyncEndpoint(configuration.endpoint);
-  }, [syncEndpoint]);
+    setDevice(await deviceSummary());
+    setSpace(await deviceSpace());
+    setDurability(await storageDurability());
+    setHeldDays(await heldForDays());
+  }, []);
 
   const runSync = useCallback(
     async (force = false) => {
@@ -182,7 +238,22 @@ export default function App() {
   );
 
   useEffect(() => {
-    const on = () => setOnline(true);
+    /**
+     * Wifi returning is news, so it is acted on rather than waited out.
+     *
+     * A backoff is a guess about how long a problem will last. A hall whose wifi
+     * comes back at 11am makes that guess stale, and a device that had backed off to
+     * ten minutes would otherwise sit on working wifi holding a child's answers.
+     * So the scheduled waits are dropped and the queue is attempted at once.
+     *
+     * The attempt count is kept, so an endpoint that is genuinely broken still backs
+     * off from where it was rather than restarting at thirty seconds every time a
+     * school's access point flaps.
+     */
+    const on = () => {
+      setOnline(true);
+      void clearBackoff().then(() => runSync(true));
+    };
     const off = () => setOnline(false);
     addEventListener("online", on);
     addEventListener("offline", off);
@@ -190,12 +261,33 @@ export default function App() {
       removeEventListener("online", on);
       removeEventListener("offline", off);
     };
-  }, []);
+  }, [runSync]);
 
   useEffect(() => {
+    /**
+     * Persistence used to be requested here as a bare `void navigator.storage?.persist?.()`
+     * on every phase change, with the answer thrown away. That is three problems in one
+     * line: nothing ever found out whether the browser agreed, a refusal looked identical
+     * to a grant, and on an iPad — where Safari does not implement the method at all — the
+     * call was a no-op that read like protection. `refreshDeviceStatus` now goes through
+     * `storageDurability`, which asks once per launch, keeps the answer, and reports what
+     * to do when there is no promise to be had.
+     */
     void refreshDeviceStatus();
-    void navigator.storage?.persist?.();
   }, [phase.kind, refreshDeviceStatus]);
+
+  /**
+   * Keep a new build out until this participant has finished.
+   *
+   * A service worker taking over reloads the page, and a reload part-way through
+   * a questionnaire puts somebody back on the start screen — so an update that
+   * arrives mid-sitting waits for the start screen, which is where a device sits
+   * between participants anyway.
+   */
+  useEffect(() => {
+    if (phase.kind === "start") updates.release();
+    else updates.hold();
+  }, [phase.kind]);
 
   useEffect(() => {
     if (online && (phase.kind === "start" || phase.kind === "finished")) void runSync();
@@ -205,10 +297,73 @@ export default function App() {
   // the foreground, this checks the durable retry deadline once a minute; the
   // queue itself applies exponential back-off and jitter before selecting work.
   useEffect(() => {
-    if (!online || !syncConfigured || (phase.kind !== "start" && phase.kind !== "finished")) return;
+    if (!online || !device || (phase.kind !== "start" && phase.kind !== "finished")) return;
     const timer = window.setInterval(() => void runSync(), 60_000);
     return () => window.clearInterval(timer);
-  }, [online, phase.kind, runSync, syncConfigured]);
+  }, [online, phase.kind, runSync, device]);
+
+  /**
+   * A copy of the sitting in progress, on the server, every couple of minutes.
+   *
+   * Otherwise the only sittings the study ever holds are the ones that reached
+   * the end, and a dropped iPad or a flat battery halfway through is a morning
+   * nobody has a record of.
+   *
+   * SILENT AND NON-BLOCKING, deliberately. It runs while a child is answering
+   * questions, so it never touches the screen, never reports an error, and never
+   * moves the sitting out of `in_progress`. A missed checkpoint costs the next
+   * attempt and nothing else.
+   */
+  useEffect(() => {
+    if (!online || !device || phase.kind !== "running") return;
+    /**
+     * Also drains the finished queue, not only the sitting in progress.
+     *
+     * Otherwise a device that collects back-to-back — which is what a class of
+     * thirty looks like — holds every earlier participant's sitting until it next
+     * reaches the start screen for long enough. On a morning of continuous
+     * handovers that can be the whole morning, and the point of syncing at all is
+     * that the study has the data before the iPad leaves the room.
+     *
+     * Neither call can block the screen: both are fetches with their own timeout,
+     * and a failure is silent because a participant answering questions is not the
+     * person to tell about an upload.
+     */
+    /**
+     * In sequence, not side by side.
+     *
+     * They share one lock — both send the same documents, so overlapping them makes a
+     * device race itself. Started together, the checkpoint takes the lock synchronously
+     * and the drain becomes a permanent no-op: the finished queue would never be sent
+     * during a sitting, which is the whole reason this tick does two things. Awaiting the
+     * first is what makes the second happen at all.
+     */
+    const tick = () => {
+      void (async () => {
+        await checkpointRunningSessions().catch(() => undefined);
+        await synchroniseCompletedSessions().catch(() => undefined);
+      })();
+    };
+    // Runs once immediately as well as on the interval: a sitting that begins just
+    // after a tick would otherwise wait a whole cadence before the study had any of it.
+    tick();
+    const timer = window.setInterval(tick, Math.max(1, __CHECKPOINT_SECONDS__) * 1000);
+    return () => window.clearInterval(timer);
+  }, [online, device, phase.kind]);
+
+  /**
+   * And one when the sitting ends, before anything is queued.
+   *
+   * The gap this closes: a participant who finishes and hands the iPad straight
+   * back, on a device that then goes offline for the rest of the day. The
+   * ordinary queue covers it eventually; this means the study has the sitting
+   * within seconds of it being finished rather than whenever the device next
+   * sees a network.
+   */
+  useEffect(() => {
+    if (!online || !device || phase.kind !== "finished") return;
+    void checkpointRunningSessions().catch(() => undefined);
+  }, [online, device, phase.kind]);
 
   const walker = useMemo(
     () => new Walker(flattened.units, storeRef.current, manifest.composition.allowBackNavigation),
@@ -270,6 +425,61 @@ export default function App() {
     }
   }, [code, busy]);
 
+  /**
+   * Do a write, and stop the survey if it fails.
+   *
+   * Returns whether it landed, so a caller can decline to advance. A failed write is
+   * KEPT, so that "Try again" retries the actual work rather than just clearing the
+   * message — a retry that dismissed the warning without saving anything would be the
+   * same silent loss with an extra step.
+   *
+   * Anything that arrives while something is already waiting joins the queue rather than
+   * being attempted, so a retry can never reorder a log.
+   */
+  const persist = useCallback(async (write: () => Promise<void>): Promise<boolean> => {
+    if (unsaved.current.length > 0) {
+      unsaved.current.push(write);
+      return false;
+    }
+    try {
+      await write();
+      setSaveError(null);
+      return true;
+    } catch (error) {
+      unsaved.current = [write];
+      setSaveError(
+        error instanceof Error && /quota|storage|space/i.test(error.message)
+          ? "This iPad has run out of space to save answers."
+          : "This iPad could not save that answer.",
+      );
+      return false;
+    }
+  }, []);
+
+  /**
+   * Replay everything waiting, in order, stopping at the first that still fails.
+   *
+   * Retrying one write and abandoning the rest was its own kind of silent loss: a
+   * response saved with its timing paradata dropped, or a completion event written
+   * without the row that queues the sitting for upload. Each entry is a single Dexie
+   * transaction — it either committed or it did not — which is what makes replaying the
+   * list safe rather than a way to duplicate events.
+   */
+  const retrySave = useCallback(() => {
+    void (async () => {
+      while (unsaved.current.length > 0) {
+        try {
+          await unsaved.current[0]!();
+        } catch {
+          // Still failing. Leave it, and everything behind it, where they are.
+          return;
+        }
+        unsaved.current.shift();
+      }
+      setSaveError(null);
+    })();
+  }, []);
+
   const record = useCallback(
     async (unit: PresentableUnit, value: AnswerValue) => {
       if (phase.kind !== "running") return;
@@ -279,34 +489,57 @@ export default function App() {
       storeRef.current.set(ref, { status: "answered", value });
       bumpAnswers();
       const t = timing.current.recordResponse(itemKey, had);
-      await appendEvent(
-        phase.session,
-        had ? "response.changed" : "response.recorded",
-        itemKey,
-        // Timing rides with the response so a single event carries both what
-        // was answered and how long it took to answer it.
-        { value, timing: t },
-        phase.index,
-        tMono(),
-      );
-      // The answer stands either way — this only records that it arrived
-      // faster than the question could have been read.
-      if (t.tooFast) {
-        fastRun.current += 1;
-        await appendEvent(
+      /**
+       * ONE WRITE PER `persist`, and the reason is the retry.
+       *
+       * A closure containing two writes can half-succeed: the response lands, the
+       * paradata does not, and "Try again" re-runs both — appending the answer a second
+       * time and double-counting the pace run. `appendEvent` is a Dexie transaction, so a
+       * single write either commits or does not, which makes retrying exactly one of them
+       * safe.
+       *
+       * The counter is also moved out of the closure, so a retry cannot advance it twice.
+       */
+      const landed = await persist(() =>
+        appendEvent(
           phase.session,
-          "response.too_fast",
+          had ? "response.changed" : "response.recorded",
           itemKey,
-          { sinceShownMs: t.sinceShownMs, thresholdMs: t.thresholdMs, run: fastRun.current },
+          // Timing rides with the response so a single event carries both what
+          // was answered and how long it took to answer it.
+          { value, timing: t },
           phase.index,
           tMono(),
-        );
+        ),
+      );
+      if (!landed) return;
+
+      // The answer stands either way — this only records that it arrived faster than the
+      // question could have been read. Paradata rather than an answer, so a failure here
+      // is worth reporting but the response above is already safely stored.
+      if (t.tooFast) {
+        fastRun.current += 1;
+        const run = fastRun.current;
+        if (
+          !(await persist(() =>
+            appendEvent(
+              phase.session,
+              "response.too_fast",
+              itemKey,
+              { sinceShownMs: t.sinceShownMs, thresholdMs: t.thresholdMs, run },
+              phase.index,
+              tMono(),
+            ),
+          ))
+        ) {
+          return;
+        }
       } else {
         fastRun.current = 0;
       }
       setSavedAt(new Date().toLocaleTimeString());
     },
-    [phase],
+    [phase, persist],
   );
 
   const emit = useCallback(
@@ -353,19 +586,29 @@ export default function App() {
   const advance = useCallback(
     async (from: number, kind: "next" | "skip" | "decline") => {
       if (phase.kind !== "running") return;
+      /**
+       * Never walk past an answer that did not save.
+       *
+       * Without this the participant could carry on from the screen that failed, and
+       * the sitting would be missing exactly the answer nobody was told about.
+       */
+      if (saveError) return;
       const unit = flattened.units[from];
       if (unit && (kind === "skip" || kind === "decline")) {
         const ref = { instrument: unit.instrument, item: unit.item.key, revision: unit.item.revision };
         storeRef.current.set(ref, { status: kind === "skip" ? "skipped" : "declined" });
         bumpAnswers();
-        await appendEvent(
-          phase.session,
-          kind === "skip" ? "item.skipped" : "item.declined",
-          `${unit.instrument}.${unit.item.key}`,
-          undefined,
-          from,
-          tMono(),
+        const landed = await persist(() =>
+          appendEvent(
+            phase.session,
+            kind === "skip" ? "item.skipped" : "item.declined",
+            `${unit.instrument}.${unit.item.key}`,
+            undefined,
+            from,
+            tMono(),
+          ),
         );
+        if (!landed) return;
         setSavedAt(new Date().toLocaleTimeString());
       }
       // Track runs of consecutive skips/declines so we can check in gently.
@@ -413,18 +656,32 @@ export default function App() {
       }
 
       if (next === null) {
-        // The last question leads to "you've finished" — not to a wall of
-        // everything they just answered. The review is offered there, for the
-        // minority who know they got something wrong (D-31).
-        await appendEvent(phase.session, "session.completed", undefined, timing.current.summary(), from, tMono());
-        await completeSession(phase.session);
+        /**
+         * The last question leads to "you've finished" — not to a wall of everything they
+         * just answered. The review is offered there, for the minority who know they got
+         * something wrong (D-31).
+         *
+         * THROUGH `persist`, LIKE EVERY OTHER WRITE. These two were the last ones that
+         * were not, and they are the worst pair to lose: `completeSession` is what moves
+         * a sitting into the upload queue, so a silent failure here left a finished
+         * sitting stuck `in_progress`, never queued, never uploaded, and the participant
+         * looking at a thank-you screen.
+         */
+        // Two writes, two `persist` calls: one closure containing both would, on a retry
+        // after a partial failure, append a second `session.completed` with a second
+        // timing summary.
+        const wrote = await persist(() =>
+          appendEvent(phase.session, "session.completed", undefined, timing.current.summary(), from, tMono()),
+        );
+        if (!wrote) return;
+        if (!(await persist(() => completeSession(phase.session)))) return;
         setPhase({ kind: "finished", session: phase.session });
       } else {
         void enterItem(next);
         setPhase({ kind: "running", session: phase.session, index: next });
       }
     },
-    [phase],
+    [phase, persist, saveError],
   );
 
   const goBack = useCallback(
@@ -565,6 +822,19 @@ export default function App() {
               <span>Dyslexia-friendly reading mode</span>
             </label>
           </details>
+          {/*
+            Addressed to whoever set this iPad up, on the screen they are looking at
+            when they do it — because the one action that prevents the loss has to be
+            taken before any data exists, and the panel that explains it is behind a
+            five-tap gesture only a researcher knows. It sits with the build line,
+            which is already staff-facing text on this screen, and it disappears the
+            moment either protection is in place.
+          */}
+          {durability?.atRisk && (
+            <p className="hint warn setup-note">
+              Before using this iPad for real sittings: tap Share, then <strong>Add to Home Screen</strong>, and open MySelf from there. Safari deletes a website's saved data after {EVICTION_CAP_DAYS} days of not being opened; an app on the Home Screen keeps it.
+            </p>
+          )}
           <p
             className="hint demo-note"
             onClick={() => {
@@ -582,8 +852,38 @@ export default function App() {
           {handoverOpen && (
             <div className="handover">
               <h2>Handover</h2>
+              {/*
+                Room left, before a write fails rather than after.
+                A failed write is handled — the survey stops and asks for staff — but
+                that is a recovery, and swapping an iPad between participants costs
+                nothing. Advisory, because Safari's numbers are.
+              */}
+              {space?.known && (
+                <p className={space.low ? "hint warn" : "hint"}>
+                  {space.low
+                    ? `Only about ${readableBytes(space.remaining)} of room left on this iPad — use another one for the next participant if you can. Nothing already answered is at risk.`
+                    : `About ${readableBytes(space.remaining)} of room left, holding ${readableBytes(space.used)}.`}
+                </p>
+              )}
+              {/*
+                The eviction risk, stated plainly, on the panel a researcher opens
+                when deciding whether a device can go back in the cupboard. See
+                `lib/durability.ts` for why this is not a theoretical concern on an
+                iPad. The held-for line is the part that turns it into a decision:
+                "holding Monday's data since Monday" is actionable, a count is not.
+              */}
+              {durability && (durability.atRisk || (heldDays !== null && heldDays >= HELD_TOO_LONG_DAYS)) && (
+                <p className="hint warn">
+                  {durability.atRisk
+                    ? `This iPad is running MySelf as a Safari tab, so its saved data will be deleted after ${EVICTION_CAP_DAYS} days without the site being opened. Add MySelf to the Home Screen and open it from there, and that stops applying.`
+                    : "This iPad's storage is protected from being cleared by the browser."}
+                  {heldDays !== null && heldDays >= HELD_TOO_LONG_DAYS
+                    ? ` It has been holding data the study has not confirmed for ${heldDays} day${heldDays === 1 ? "" : "s"} — sync it today.`
+                    : ""}
+                </p>
+              )}
               <p className="hint">
-                {counts.awaitingSync + counts.syncFailed} completed session{counts.awaitingSync + counts.syncFailed === 1 ? "" : "s"} awaiting upload, {counts.syncedVerified} verified, and {counts.inProgress} unfinished on this device. Sessions stay here until the server acknowledgement has been verified.
+                {counts.awaitingSync + counts.syncFailed} completed session{counts.awaitingSync + counts.syncFailed === 1 ? "" : "s"} awaiting upload, {counts.syncedVerified} confirmed by the study, {counts.quarantined} needing review, and {counts.inProgress} unfinished on this device. A sitting stays here until the study has confirmed it stored every event this device sent.
               </p>
               <div className="handover-actions">
                 <button
@@ -595,48 +895,48 @@ export default function App() {
                   {syncBusy ? "Synchronising…" : "Sync completed sessions"}
                 </button>
               </div>
-              {!syncConfigured && (
-                <div className="sync-provisioning">
-                  <p className="hint">Enrol this research device once with its API address and one-time device token. The token is encrypted in device storage and is never shown again.</p>
-                  <label className="field">
-                    <span className="field-label">API address</span>
-                    <input className="text-input" value={syncEndpoint} placeholder="https://research.example.org" onChange={(event) => setSyncEndpoint(event.target.value)} />
-                  </label>
-                  <label className="field">
-                    <span className="field-label">Device token</span>
-                    <input className="text-input" type="password" value={syncToken} autoComplete="off" onChange={(event) => setSyncToken(event.target.value)} />
-                  </label>
-                  <button
-                    type="button"
-                    className="secondary"
-                    disabled={syncEndpoint.trim().length === 0 || syncToken.trim().length < 32}
-                    onClick={() => {
-                      void (async () => {
-                        try {
-                          await configureSync(syncEndpoint, syncToken);
-                          setSyncToken("");
-                          setSyncNote("Device enrolment saved. Completed sessions can now synchronise.");
-                          await refreshDeviceStatus();
-                        } catch (error) {
-                          setSyncNote(error instanceof Error ? error.message : "Could not save device enrolment.");
-                        }
-                      })();
-                    }}
-                  >
-                    Save device enrolment
-                  </button>
-                </div>
+              {device && (
+                <p className="hint">
+                  This iPad is <strong>{device.deviceId}</strong>, since {device.firstSyncedAt.slice(0, 10)}. It chose
+                  that itself on first launch, so it works with no network from the start.{" "}
+                  {syncAvailable
+                    ? "Sittings upload by themselves whenever it has a connection; nothing needs setting up."
+                    : "This build has no study configured, so everything stays on this device."}
+                </p>
               )}
+              {/*
+                The passphrase is the STUDY's, not this device's, so a researcher
+                with six iPads on a table types one phrase six times rather than
+                keeping six secrets — and the researcher view needs one phrase to
+                read whatever arrives. Never stored here.
+              */}
+              <label className="field">
+                <span className="field-label">Study passphrase, to encrypt the file</span>
+                <input
+                  className="text-input"
+                  type="password"
+                  value={passphrase}
+                  autoComplete="off"
+                  onChange={(event) => setPassphrase(event.target.value)}
+                />
+              </label>
               <div className="handover-actions">
                 <button
                   type="button"
                   className="secondary"
-                  disabled={counts.completed === 0}
+                  disabled={counts.completed === 0 || passphraseComplaint(passphrase) !== null}
+                  title={passphraseComplaint(passphrase) ?? undefined}
                   onClick={() => {
                     void (async () => {
-                      const data = await buildDeviceExport();
-                      downloadExport(data);
-                      setHandoverNote(`${data.sessions.length} session${data.sessions.length === 1 ? "" : "s"} written`);
+                      try {
+                        const { envelope } = await buildSealedExport(passphrase);
+                        downloadExport(envelope);
+                        setHandoverNote(
+                          `${envelope.sittings} session${envelope.sittings === 1 ? "" : "s"} written, encrypted. Keep the sitting${envelope.sittings === 1 ? "" : "s"} on this device until the file is stored and checked.`,
+                        );
+                      } catch (error) {
+                        setHandoverNote(error instanceof Error ? error.message : "Could not write the file.");
+                      }
                     })();
                   }}
                 >
@@ -645,16 +945,59 @@ export default function App() {
                 <button
                   type="button"
                   className="secondary"
-                  disabled={counts.completed + counts.inProgress === 0}
+                  disabled={counts.completed + counts.inProgress === 0 || passphraseComplaint(passphrase) !== null}
+                  title={passphraseComplaint(passphrase) ?? undefined}
                   onClick={() => {
                     void (async () => {
-                      const data = await buildDeviceExport({ includeInProgress: true });
-                      downloadExport(data, "device-all");
-                      setHandoverNote(`${data.sessions.length} session${data.sessions.length === 1 ? "" : "s"} written, unfinished included`);
+                      try {
+                        const { envelope } = await buildSealedExport(passphrase, { includeInProgress: true });
+                        downloadExport(envelope, "device-all");
+                        setHandoverNote(
+                          `${envelope.sittings} session${envelope.sittings === 1 ? "" : "s"} written, encrypted, unfinished included.`,
+                        );
+                      } catch (error) {
+                        setHandoverNote(error instanceof Error ? error.message : "Could not write the file.");
+                      }
                     })();
                   }}
                 >
                   Include unfinished
+                </button>
+              </div>
+              {passphrase.length > 0 && passphraseComplaint(passphrase) && (
+                <p className="hint">{passphraseComplaint(passphrase)}</p>
+              )}
+              <div className="handover-actions">
+                {/*
+                  The only delete in the app, and it cannot reach an unconfirmed
+                  sitting. `forgetConfirmedSessions` selects on a stored receipt
+                  whose event count matches what is on the device, so there is no
+                  version of this button that loses data — which is why it can sit
+                  next to the export rather than behind a second confirmation
+                  nobody reads.
+
+                  It matters because the alternative is deleting the app or
+                  clearing Safari's data, and that destroys the device key along
+                  with it: every sitting not yet handed over becomes permanently
+                  unreadable.
+                */}
+                <button
+                  type="button"
+                  className="secondary"
+                  disabled={counts.syncedVerified === 0}
+                  onClick={() => {
+                    void (async () => {
+                      const erased = await forgetConfirmedSessions();
+                      setHandoverNote(
+                        erased.sessions === 0
+                          ? "Nothing to clear — no sitting on this device has been confirmed by the study yet."
+                          : `${erased.sessions} confirmed sitting${erased.sessions === 1 ? "" : "s"} cleared from this device. ${counts.awaitingSync + counts.syncFailed + counts.quarantined + counts.inProgress} still held here.`,
+                      );
+                      await refreshDeviceStatus();
+                    })();
+                  }}
+                >
+                  Clear {counts.syncedVerified} confirmed sitting{counts.syncedVerified === 1 ? "" : "s"}
                 </button>
               </div>
               {syncNote && <p className="hint">{syncNote}</p>}
@@ -671,7 +1014,30 @@ export default function App() {
         </div>
       )}
 
-      {phase.kind === "running" && (
+      {/*
+        A write that did not land, in front of everything else.
+        Calm on purpose: a child should not be made to feel they broke it, and the
+        one thing that must not happen is carrying on as though the answer was saved.
+        `advance` refuses while this is up, so the survey cannot be walked past it.
+      */}
+      {saveError && (
+        <div className="screen save-failed" role="alertdialog" aria-label="Answers are not being saved">
+          <h1>Let&apos;s pause a moment</h1>
+          <p>{saveError} Nothing you have already answered is lost.</p>
+          <p>Please put your hand up so somebody from the team can help.</p>
+          <div className="checkin-actions">
+            <button type="button" className="next big" onClick={retrySave}>
+              Try again
+            </button>
+          </div>
+          <p className="hint">
+            For the team: this iPad refused a write to its own storage, so the survey has stopped rather than carry on
+            without recording answers. Free space on the device, or hand over what is on it and use another iPad.
+          </p>
+        </div>
+      )}
+
+      {phase.kind === "running" && !saveError && (
         <SurveyScreen
           units={flattened.units}
           scales={scaleMap}
@@ -771,11 +1137,17 @@ export default function App() {
           }}
           onFinish={() => {
             void (async () => {
-              // Coming back from a change re-completes the session, so the
-              // completion event always follows the last edit in the log.
-              await appendEvent(phase.session, "session.completed", undefined, timing.current.summary(), 0, tMono());
-              await completeSession(phase.session);
-              setPhase({ kind: "finished", session: phase.session });
+              // Coming back from a change re-completes the session, so the completion
+              // event always follows the last edit in the log. Through `persist` for the
+              // same reason as the other completion path: this is the write that queues
+              // the sitting for upload.
+              const wrote = await persist(() =>
+                appendEvent(phase.session, "session.completed", undefined, timing.current.summary(), 0, tMono()),
+              );
+              if (!wrote) return;
+              if (await persist(() => completeSession(phase.session))) {
+                setPhase({ kind: "finished", session: phase.session });
+              }
             })();
           }}
         />

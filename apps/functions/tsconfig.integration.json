@@ -1,0 +1,11 @@
+{
+  "//": "The integration suite, typechecked. It cannot live in the main tsconfig because that one emits dist/ from rootDir src/, and a second rootDir would change every output path. Nine stale call sites survived a rename by hiding in a folder nothing checked, so `typecheck` runs this too.",
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "lib": ["ES2022"],
+    "types": ["node"],
+    "resolveJsonModule": true
+  },
+  "include": ["integration", "src"]
+}

@@ -8,3 +8,11 @@ dist/
 # step of getting a key working failed with "No such file or directory".
 !.env.example
 coverage/
+# Playwright's own output. Traces are large and are uploaded by CI on failure.
+test-results/
+playwright-report/
+
+# Emulator logs, written into whatever directory it is started from.
+firebase-debug.log
+firestore-debug.log
+ui-debug.log

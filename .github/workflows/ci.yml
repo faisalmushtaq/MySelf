@@ -22,6 +22,98 @@ jobs:
       - run: pnpm -r typecheck
       - run: pnpm -r test
 
+  # Everything above is a unit test, and they stop where the risk starts: the
+  # screens a child touches, the real IndexedDB, the AES round trip through it,
+  # the service worker, and resuming a sitting after a reload. This walks the
+  # whole questionnaire in a real browser and hands it over as a file.
+  #
+  # WEBKIT IS THE ONE THAT MATTERS — an iPad runs it, and this app's hard cases
+  # are Safari's storage and service-worker behaviour. Chromium runs too because
+  # it is what a developer has to hand.
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # The workspace packages first. The participant app imports `@myself/store`
+      # through its `dist`, and so does the accuracy spec — without this the
+      # build inside Playwright's webServer fails before a browser has started,
+      # and a WebKit job that never reaches WebKit tells nobody anything. Every
+      # other job here already does it; this one was written without it.
+      - run: pnpm -r build
+      - run: pnpm exec playwright install --with-deps chromium webkit
+      - run: pnpm test:e2e
+      # The trace is the only way to see what a failed walk actually did, and a
+      # run that fails without one costs a second run to find out.
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-trace
+          path: |
+            test-results/
+            playwright-report/
+          retention-days: 7
+
+  # The write path against a real Firestore. The unit suite runs it against a
+  # stand-in, which cannot have real transaction contention — and the promise this
+  # platform makes is that two iPads handed over at the same instant cannot
+  # overwrite each other. Only a database can prove that.
+  integration:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm -r build
+      - run: pnpm --filter @myself/functions test:integration
+
+  # The whole chain: a real browser, over HTTP, into a real Firestore. Every other
+  # suite stops at a seam — shapes agree, the write path keeps devices apart, the app
+  # collects and resumes — and this is the one that puts a real request on a socket in
+  # front of the real handler and then reads the sitting back out of the database.
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm -r build
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm test:e2e:sync
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: sync-trace
+          path: test-results/
+          retention-days: 7
+
   # Security rules are the access control on Firebase, so an untested rules
   # change is an untested security change. This runs them against the real
   # Firestore emulator, from both sides of every rule.

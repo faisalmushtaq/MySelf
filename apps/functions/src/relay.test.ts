@@ -22,8 +22,8 @@ import { extensionFor } from "./transcribe.js";
  * deployment configuration, not code.
  */
 
-const device: Caller = { uid: "dev_1", device: true };
-const researcher: Caller = { uid: "res_1", device: false };
+const device: Caller = { uid: "dev_1", device: true, anonymous: false };
+const researcher: Caller = { uid: "res_1", device: false, anonymous: false };
 
 describe("what a caller may ask for", () => {
   it("takes a model config key, and has nowhere to put model parameters", () => {
@@ -160,6 +160,22 @@ describe("who may spend the study's model budget", () => {
       expect(mayCall({ role })).toBe(true);
     }
   });
+
+  /**
+   * The asymmetry that opening the study up depends on.
+   *
+   * Any iPad with the URL can now sign itself in and file a sitting, because
+   * taking part must not need a researcher to register the device first. A model
+   * call is a different thing: it spends the study's money, so an anonymous
+   * identity must not buy one. `mayCall` is what the relay and the transcriber
+   * ask, and an anonymous token satisfies none of its clauses — it carries no
+   * `device` claim and no role. The sittings endpoint gets past this by passing
+   * `allowAnonymous`, which nothing else does.
+   */
+  it("still refuses a device that merely signed itself in", () => {
+    expect(mayCall({})).toBe(false);
+    expect(mayCall({ device: undefined, role: undefined })).toBe(false);
+  });
 });
 
 describe("a tester link, which stands in for signing in", () => {
@@ -254,9 +270,9 @@ describe("storing a narrative run", () => {
    * could set.
    */
   it("marks a link-holder's run as a test, whatever the page says", () => {
-    expect(provenanceOf({ uid: "link_abc123", device: true })).toBe("test");
-    expect(provenanceOf({ uid: "dev_ipad_4", device: true })).toBe("study");
-    expect(provenanceOf({ uid: "user_faisal", device: false })).toBe("study");
+    expect(provenanceOf({ uid: "link_abc123", device: true, anonymous: false })).toBe("test");
+    expect(provenanceOf({ uid: "dev_ipad_4", device: true, anonymous: false })).toBe("study");
+    expect(provenanceOf({ uid: "user_faisal", device: false, anonymous: false })).toBe("study");
   });
 
   it("keeps one copy of the conversation, not two", () => {
@@ -276,7 +292,7 @@ describe("what a tester link may actually run", () => {
    * a tester link was refused before it reached the provider, and the page
    * reported the interviewer as unreachable.
    */
-  const linkCaller: Caller = { uid: "link_abc123", device: false };
+  const linkCaller: Caller = { uid: "link_abc123", device: false, anonymous: false };
 
   it("can run a config a shipped protocol declares, before any release exists", () => {
     const key = protocols[0]!.models.find((m) => m.provider !== "mock")!.key;
@@ -297,7 +313,7 @@ describe("what a tester link may actually run", () => {
 
   it("keeps a real iPad held to what was published", () => {
     const key = protocols[0]!.models.find((m) => m.provider !== "mock")!.key;
-    expect(() => configFor(key, { uid: "dev_ipad_4", device: true })).toThrow(/published configurations/);
+    expect(() => configFor(key, { uid: "dev_ipad_4", device: true, anonymous: false })).toThrow(/published configurations/);
   });
 });
 

@@ -7,6 +7,40 @@ const base = process.env["MYSELF_BASE"] ?? "/MySelf/";
 
 const buildStamp = new Date().toISOString().slice(0, 16).replace("T", " ");
 
+/**
+ * The project this build files its sittings into.
+ *
+ * Only used to work out the endpoint below — the app carries no Firebase SDK and
+ * signs in to nothing, because a device presents a credential it issued itself.
+ * That keeps the whole auth library out of a bundle whose first requirement is to
+ * work with no network.
+ *
+ * Absent, this build stores everything on the device and sends nothing anywhere,
+ * which is exactly what the public preview should be.
+ */
+const firebaseConfig = process.env["MYSELF_FIREBASE_CONFIG"] ?? "";
+
+/**
+ * Where sittings go.
+ *
+ * Derived from the project rather than copied: a function deployed to
+ * europe-west2 answers at
+ * `https://europe-west2-<project>.cloudfunctions.net/saveSitting`, so knowing
+ * the project is knowing the URL, and one fewer value to carry between a console
+ * and a build is one fewer place to get it wrong. `MYSELF_SITTINGS_URL`
+ * overrides it for an emulator or a function deployed elsewhere.
+ */
+function deriveSittingsUrl(): string {
+  const explicit = process.env["MYSELF_SITTINGS_URL"];
+  if (explicit) return explicit;
+  try {
+    const projectId = (JSON.parse(firebaseConfig || "null") as { projectId?: string } | null)?.projectId;
+    return projectId ? `https://europe-west2-${projectId}.cloudfunctions.net/saveSitting` : "";
+  } catch {
+    return "";
+  }
+}
+
 export default defineConfig({
   base,
   define: {
@@ -21,6 +55,19 @@ export default defineConfig({
      * empty frame.
      */
     __MYSTORY_URL__: JSON.stringify(process.env["MYSELF_MYSTORY_URL"] ?? ""),
+    __SITTINGS_URL__: JSON.stringify(deriveSittingsUrl()),
+    /**
+     * How often a sitting still being answered is copied to the study.
+     *
+     * A fielding decision rather than a constant: it trades how much a dropped iPad
+     * costs against how much traffic a hall of thirty devices puts on one access
+     * point. Two minutes is the default because a lost two minutes of answers is
+     * recoverable by asking the participant, and a lost morning is not.
+     *
+     * It is also the seam that makes checkpointing testable — the alternative is a
+     * test that waits two real minutes to watch a timer fire.
+     */
+    __CHECKPOINT_SECONDS__: JSON.stringify(Number(process.env["MYSELF_CHECKPOINT_SECONDS"] ?? 120)),
   },
   plugins: [
     react(),

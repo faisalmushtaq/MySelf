@@ -337,6 +337,25 @@ textarea {
   gap: 0;
 }
 
+/*
+ * A write that did not land.
+ *
+ * Laid out like the check-in screens rather than styled as an error: no red, no
+ * warning triangle, nothing that reads as the child's fault. It occupies the whole
+ * screen because the one behaviour that matters is that the survey cannot be carried
+ * on from here, and a dismissible banner would be carried on from.
+ */
+.screen.save-failed {
+  justify-content: center;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+
+.screen.save-failed .hint {
+  margin-top: 2rem;
+  max-width: 40rem;
+}
+
 /* Start / finish — editorial masthead */
 .brand {
   font-family: var(--font-ui);
@@ -397,6 +416,19 @@ textarea {
   margin-top: 2.25rem;
   font-size: 0.78rem;
   color: var(--muted);
+}
+
+/* The one setup step on this screen, addressed to staff rather than to the child
+   holding the iPad: add MySelf to the Home Screen, because Safari deletes a plain
+   tab's saved data after a week and this device may hold a morning's sittings for
+   longer than that. Deliberately its own class rather than a `.demo-note`, which
+   is the build line and is what the handover gesture is aimed at. */
+.setup-note {
+  margin-top: 1.75rem;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  text-align: left;
+  max-width: 34rem;
 }
 
 /* Who to ask, at the foot of the first screen: quiet, always there, never in
@@ -1839,4 +1871,15 @@ input[type="range"] {
 
 .narrative-after p {
   margin: 0;
+}
+
+/*
+ * Something the operator should notice, in the handover panel only.
+ *
+ * Never shown to a participant: the one message a child sees about storage is the
+ * save-failed screen, which is deliberately calm. This is for whoever is holding the
+ * iPad between sittings, so it is allowed to be emphatic.
+ */
+.hint.warn {
+  font-weight: 600;
 }

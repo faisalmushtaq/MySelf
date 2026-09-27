@@ -2,7 +2,7 @@
   "name": "myself",
   "version": "0.1.0",
   "private": true,
-  "description": "MySelf — research platform for self-report surveys and LLM-supported micro-narrative research",
+  "description": "MySelf \u2014 research platform for self-report surveys and LLM-supported micro-narrative research",
   "engines": {
     "node": ">=22",
     "pnpm": ">=10"
@@ -11,9 +11,16 @@
     "build": "pnpm -r build",
     "test": "pnpm -r test",
     "typecheck": "pnpm -r typecheck",
-    "lint": "pnpm -r lint"
+    "test:e2e": "playwright test",
+    "test:e2e:sync": "firebase emulators:exec --only firestore --project demo-myself --config infra/firebase/firebase.test.json \"playwright test --config playwright.sync.config.ts\""
   },
   "devDependencies": {
+    "@myself/firebase": "workspace:*",
+    "@myself/schema": "workspace:*",
+    "@myself/store": "workspace:*",
+    "@playwright/test": "^1.62.1",
+    "firebase-admin": "^13.0.0",
+    "firebase-tools": "^14.19.0",
     "playwright-core": "^1.62.1",
     "typescript": "^5.6.0"
   }

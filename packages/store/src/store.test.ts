@@ -908,3 +908,100 @@ describe("which narrative runs may be exported", () => {
     expect(exportableNarratives([{ ...base, sessionId: "ses_missing" }], data)).toEqual([]);
   });
 });
+
+/**
+ * How long a sitting took, which is paradata a study screens on.
+ *
+ * Three numbers that mean different things, and the reason there are three is a real
+ * limitation rather than indecision. The device measures with a monotonic clock, so its
+ * durations survive an iPad's clock being wrong — but a monotonic clock does not survive
+ * the page being reloaded, so the device's timer starts fresh when a sitting is resumed
+ * and `durationMs` then covers only the last stretch.
+ *
+ * Screening on that without knowing would quietly drop the sittings that were
+ * interrupted, which are exactly the ones a school day produces.
+ */
+describe("the time a sitting took", () => {
+  const stamp = (minutes: number) => new Date(Date.UTC(2026, 8, 1, 9, minutes)).toISOString();
+
+
+  /**
+   * A sitting that ingests, with its timing events placed by hand.
+   *
+   * Reuses the secret-code answers the other tests use, because a sitting with no
+   * derivable participant code is rejected before any of this is computed — which is
+   * correct, and which made the first version of these tests assert against nothing.
+   */
+  const sittingWith = (
+    timing: { type: string; minutes: number; payload?: Record<string, unknown> }[],
+  ): DeviceSession => {
+    const one = session("ses_timing", { initials: "AB", digit: "1", month: 5, postcode: "LS" });
+    const base = one.events.filter((event) => event.type !== "session.completed");
+    return {
+      ...one,
+      events: [
+        ...base.map((event, index) => ({ ...event, tWall: stamp(0), tMono: index * 100 })),
+        ...timing.map((entry, index) => ({
+          seq: base.length + index,
+          type: entry.type,
+          tWall: stamp(entry.minutes),
+          tMono: (base.length + index) * 100,
+          ...(entry.payload ? { payload: entry.payload } : {}),
+        })),
+      ],
+    };
+  };
+
+  it("reports the whole span from the log, not only what the device timed", () => {
+    const one = sittingWith([
+      { type: "session.resumed", minutes: 40 },
+      { type: "session.completed", minutes: 52, payload: { totalMs: 12 * 60_000 } },
+    ]);
+
+    const { dataset } = ingest([one as never], { manifest, study: "ybm" });
+    const row = dataset.sessions[0]!;
+
+    // What the device timed: twelve minutes, the stretch after it was picked up again.
+    expect(row.durationMs).toBe(12 * 60_000);
+    // What actually elapsed: fifty-two, including the time the app was closed.
+    expect(row.wallClockMs).toBe(52 * 60_000);
+    // And the reason the two differ is on the row.
+    expect(row.resumedCount).toBe(1);
+  });
+
+  it("agrees with the device on a sitting that was never interrupted", () => {
+    const one = sittingWith([{ type: "session.completed", minutes: 11, payload: { totalMs: 11 * 60_000 } }]);
+
+    const { dataset } = ingest([one as never], { manifest, study: "ybm" });
+    const row = dataset.sessions[0]!;
+    expect(row.resumedCount).toBe(0);
+    expect(row.wallClockMs).toBe(row.durationMs);
+  });
+
+  it("counts every resume, because a flaky iPad produces several", () => {
+    const one = sittingWith([
+      { type: "session.resumed", minutes: 5 },
+      { type: "session.resumed", minutes: 9 },
+      { type: "session.resumed", minutes: 14 },
+      { type: "session.completed", minutes: 20, payload: { totalMs: 60_000 } },
+    ]);
+    expect(ingest([one as never], { manifest, study: "ybm" }).dataset.sessions[0]!.resumedCount).toBe(3);
+  });
+
+  it("says nothing rather than guessing when there is only one event", () => {
+    // Every event on the same instant: a span of nothing is reported as nothing rather
+    // than as a number somebody might screen on.
+    const one = sittingWith([{ type: "session.completed", minutes: 0, payload: { totalMs: 0 } }]);
+    expect(ingest([one as never], { manifest, study: "ybm" }).dataset.sessions[0]!.wallClockMs).toBe(0);
+  });
+
+  it("never reports a negative span, however out of order the timestamps are", () => {
+    // An iPad whose clock went backwards mid-sitting. The span is still a span.
+    const one = sittingWith([
+      { type: "session.resumed", minutes: 30 },
+      { type: "session.completed", minutes: 10, payload: { totalMs: 60_000 } },
+    ]);
+    const row = ingest([one as never], { manifest, study: "ybm" }).dataset.sessions[0]!;
+    expect(row.wallClockMs).toBeGreaterThanOrEqual(0);
+  });
+});

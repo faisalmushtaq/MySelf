@@ -17,6 +17,7 @@
     "@myself/engine": "workspace:*",
     "@myself/schema": "workspace:*",
     "@myself/scoring": "workspace:*",
+    "@myself/store": "workspace:*",
     "dexie": "^4.0.8",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",

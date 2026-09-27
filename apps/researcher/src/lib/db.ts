@@ -1,5 +1,13 @@
 import Dexie, { type EntityTable } from "dexie";
-import type { DeviceSession, IdentityRow } from "@myself/store";
+import { isEncryptedEnvelope, openExport, type DeviceSession, type IdentityRow } from "@myself/store";
+import {
+  createVault,
+  openVault,
+  openWith,
+  sealWith,
+  type Sealed,
+  type VaultRecord,
+} from "./vault.js";
 
 /**
  * The database behind the researcher view.
@@ -20,6 +28,13 @@ export interface StoredSession extends DeviceSession {
   /** When this sitting was imported, and from which file. */
   importedAt: string;
   source: string;
+  /**
+   * Which iPad collected it, where the file said.
+   *
+   * Absent for a sitting pulled from the study — the server holds that on its own record
+   * — and for handover files written before the format carried it.
+   */
+  deviceId?: string;
 }
 
 /**
@@ -81,13 +96,33 @@ export interface AccessRecord {
   justification: string;
 }
 
+/**
+ * A person as actually written to disk.
+ *
+ * The participant code stays in the clear as the key — it is already the join
+ * used in the sittings, the export and the filenames, so pretending it is a
+ * secret here would be theatre. Everything that names a child is in `sealed`.
+ */
+export interface StoredPerson {
+  participantCode: string;
+  study: string;
+  sealed: Sealed;
+}
+
+/** A relationship, with the two codes it joins sealed together. */
+export interface StoredRelationship {
+  id: string;
+  sealed: Sealed;
+}
+
 class ResearcherDb extends Dexie {
   sessions!: EntityTable<StoredSession, "sessionId">;
-  people!: EntityTable<PersonRecord, "participantCode">;
+  people!: EntityTable<StoredPerson, "participantCode">;
   corrections!: EntityTable<CodeCorrection, "id">;
   assignments!: EntityTable<Assignment, "sessionId">;
-  relationships!: EntityTable<Relationship, "id">;
+  relationships!: EntityTable<StoredRelationship, "id">;
   identityAccess!: EntityTable<AccessRecord, "id">;
+  vault!: EntityTable<VaultRecord, "id">;
 
   constructor() {
     super("myself-researcher");
@@ -108,6 +143,41 @@ class ResearcherDb extends Dexie {
       relationships: "id, participantCode, relatedCode",
       identityAccess: "id, at",
     });
+    /**
+     * Version 4: the identity tables are sealed.
+     *
+     * The `familyName` and `upn` indexes go, and nothing is lost by it — they
+     * were declared and never used, because every lookup in this file is either
+     * `get(code)` or a full scan filtered in memory. That is the only reason
+     * sealing these fields is a small change rather than a rewrite of the
+     * linkage tab.
+     *
+     * EXISTING ROWS ARE DELETED, NOT MIGRATED. A migration cannot run here: the
+     * passphrase does not exist yet, and there is nowhere to hold a key while
+     * Dexie upgrades. Nothing is lost that cannot be rebuilt — every person
+     * record is derived from the sittings on each load by `storeIdentity`, so
+     * the names come straight back the first time the vault is unlocked.
+     *
+     * What does NOT come back is a hand-entered UPN or NHS number, or a recorded
+     * relationship, because those were typed rather than derived. On a study that
+     * has not been fielded yet there are none. On one that has, they must be
+     * re-entered — which is the honest cost of having stored them in the clear,
+     * and cheaper than leaving them there.
+     */
+    this.version(4)
+      .stores({
+        sessions: "sessionId, startedAt, studyCode, importedAt",
+        people: "participantCode, study",
+        corrections: "id, wrongCode, withdrawnAt",
+        assignments: "sessionId, participantCode",
+        relationships: "id",
+        identityAccess: "id, at",
+        vault: "id",
+      })
+      .upgrade(async (tx) => {
+        await tx.table("people").clear();
+        await tx.table("relationships").clear();
+      });
   }
 }
 
@@ -123,16 +193,41 @@ export interface ImportReport {
 interface RawExport {
   format?: string;
   sessions?: unknown;
+  /**
+   * Which iPad wrote the file.
+   *
+   * Carried so a sitting imported from a handover file and the same sitting arriving later
+   * over wifi are recognised as one sitting from one device. Older files have none; they
+   * still import, and the sitting simply has no device recorded against it.
+   */
+  deviceId?: unknown;
 }
 
-/** Read one device export file into the database. */
-export async function importExportFile(name: string, text: string): Promise<ImportReport> {
+/**
+ * Read one device export file into the database.
+ *
+ * Handover files are encrypted under the study passphrase, so importing one needs
+ * it. Files written before that change are plaintext and still read — refusing
+ * them would strand data that has already been collected, and the way to stop
+ * plaintext files existing is to stop writing them, which the participant app now
+ * does.
+ */
+export async function importExportFile(name: string, text: string, passphrase = ""): Promise<ImportReport> {
   const report: ImportReport = { file: name, added: 0, duplicates: 0, errors: [] };
   let parsed: RawExport;
   try {
-    parsed = JSON.parse(text) as RawExport;
-  } catch {
-    report.errors.push("not a readable JSON file");
+    const raw: unknown = JSON.parse(text);
+    if (isEncryptedEnvelope(raw)) {
+      if (passphrase === "") {
+        report.errors.push("this file is encrypted — type the study passphrase above and import it again");
+        return report;
+      }
+      parsed = (await openExport(raw, passphrase)) as RawExport;
+    } else {
+      parsed = raw as RawExport;
+    }
+  } catch (error) {
+    report.errors.push(error instanceof Error ? error.message : "not a readable JSON file");
     return report;
   }
   if (!Array.isArray(parsed.sessions)) {
@@ -151,7 +246,12 @@ export async function importExportFile(name: string, text: string): Promise<Impo
       report.duplicates += 1;
       continue;
     }
-    await db.sessions.add({ ...raw, importedAt, source: name });
+    await db.sessions.add({
+      ...raw,
+      importedAt,
+      source: name,
+      ...(typeof parsed.deviceId === "string" ? { deviceId: parsed.deviceId } : {}),
+    });
     report.added += 1;
   }
   return report;
@@ -173,6 +273,64 @@ export async function addSessions(sessions: DeviceSession[], source: string): Pr
   return added;
 }
 
+export interface MergeReport {
+  added: number;
+  /** Local copies replaced by a longer one from the study. */
+  superseded: number;
+  unchanged: number;
+}
+
+/**
+ * Take in sittings pulled from the study, superseding shorter local copies.
+ *
+ * NOT `addSessions`, and the difference matters. A file import treats a sitting
+ * it already has as a duplicate and adds nothing, which is right: two exports of
+ * the same finished sitting are the same sitting.
+ *
+ * A pull is not that. Devices now upload a sitting WHILE IT IS STILL BEING
+ * ANSWERED, so the study's copy grows — pulled at four hundred events on Tuesday
+ * and complete at nine hundred on Wednesday. Skipping it as a duplicate would
+ * leave a partial sitting in the analysis for the rest of the study, and nothing
+ * on screen would say so.
+ *
+ * So the longer log wins, which is the same rule the server applies to uploads.
+ * A local copy is never replaced by a shorter one — that would be the truncation
+ * the write path refuses, arriving by the other road.
+ */
+export async function mergeFromStudy(sessions: DeviceSession[], source: string): Promise<MergeReport> {
+  const importedAt = new Date().toISOString();
+  const report: MergeReport = { added: 0, superseded: 0, unchanged: 0 };
+
+  for (const incoming of sessions) {
+    const existing = await db.sessions.get(incoming.sessionId);
+    if (!existing) {
+      await db.sessions.add({ ...incoming, importedAt, source });
+      report.added += 1;
+      continue;
+    }
+    if (supersedes(incoming, existing)) {
+      await db.sessions.put({ ...incoming, importedAt, source });
+      report.superseded += 1;
+      continue;
+    }
+    report.unchanged += 1;
+  }
+  return report;
+}
+
+/**
+ * Should the copy just pulled replace the copy already here?
+ *
+ * Only if it is longer. Pure and named so the rule can be tested without a
+ * database, because getting it wrong in either direction is a quiet analysis
+ * error rather than a crash: too eager and a complete sitting is replaced by a
+ * checkpoint of itself, too shy and a partial sitting stays in the analysis for
+ * the rest of the study with nothing on screen to say so.
+ */
+export function supersedes(incoming: { events: unknown[] }, existing: { events: unknown[] }): boolean {
+  return incoming.events.length > existing.events.length;
+}
+
 /** Remove everything. Used for clearing demonstration data before fieldwork. */
 export async function clearAll(): Promise<void> {
   await db.sessions.clear();
@@ -185,10 +343,118 @@ export async function clearSource(source: string): Promise<number> {
   return doomed.length;
 }
 
-// ── Identity: kept apart, and only ever written on purpose ────────────────
+// ── Identity: kept apart, sealed, and only ever written on purpose ────────
 
-/** File the identity partition ingest returned, keyed by participant code. */
+/**
+ * The key, while somebody is sitting at the laptop.
+ *
+ * In memory only. It goes when the tab does, which is the point: a closed laptop
+ * holds names it cannot read, and the passphrase that opens them is not written
+ * anywhere on the machine.
+ */
+let identityKey: CryptoKey | null = null;
+
+export function identityIsUnlocked(): boolean {
+  return identityKey !== null;
+}
+
+export async function identityVaultExists(): Promise<boolean> {
+  return (await db.vault.get("vault")) !== undefined;
+}
+
+/** Set the passphrase for a study whose vault has not been created yet. */
+export async function createIdentityVault(passphrase: string): Promise<void> {
+  if (await identityVaultExists()) throw new Error("this laptop already has a vault — unlock it instead");
+  const { record, key } = await createVault(passphrase);
+  await db.vault.put(record);
+  identityKey = key;
+}
+
+export async function unlockIdentity(passphrase: string): Promise<void> {
+  const record = await db.vault.get("vault");
+  if (!record) throw new Error("there is no vault on this laptop yet");
+  identityKey = await openVault(record, passphrase);
+}
+
+/**
+ * Lock it again.
+ *
+ * Called on request and when the tab has been hidden for a while. A laptop left
+ * open on a staffroom table is the ordinary case, not the paranoid one.
+ */
+export function lockIdentity(): void {
+  identityKey = null;
+}
+
+/**
+ * The key, or a refusal that names what to do about it.
+ *
+ * Every identity read and write goes through here, so there is no path to the
+ * names that forgets to check — the check is the only way to get the key.
+ */
+function requireKey(): CryptoKey {
+  if (!identityKey) throw new Error("the identity vault is locked — unlock it to see or change any of this");
+  return identityKey;
+}
+
+/** The identifying half of a person record, which is what actually gets sealed. */
+interface PersonSecrets {
+  givenName: string | null;
+  familyName: string | null;
+  dateOfBirth: string | null;
+  upn: string | null;
+  upnSource: string | null;
+  nhsNumber: string | null;
+  nhsSource: string | null;
+  claims: PersonRecord["claims"];
+}
+
+async function sealPerson(person: PersonRecord): Promise<StoredPerson> {
+  const secrets: PersonSecrets = {
+    givenName: person.givenName,
+    familyName: person.familyName,
+    dateOfBirth: person.dateOfBirth,
+    upn: person.upn,
+    upnSource: person.upnSource,
+    nhsNumber: person.nhsNumber,
+    nhsSource: person.nhsSource,
+    claims: person.claims,
+  };
+  return {
+    participantCode: person.participantCode,
+    study: person.study,
+    sealed: await sealWith(requireKey(), secrets),
+  };
+}
+
+async function openPerson(row: StoredPerson): Promise<PersonRecord> {
+  const secrets = await openWith<PersonSecrets>(requireKey(), row.sealed);
+  return { participantCode: row.participantCode, study: row.study, ...secrets };
+}
+
+/** Every person, opened. Used by the searches, which all scan in memory anyway. */
+async function allPeople(): Promise<PersonRecord[]> {
+  const key = requireKey();
+  void key;
+  const rows = await db.people.toArray();
+  return Promise.all(rows.map(openPerson));
+}
+
+
+/**
+ * File the identity partition ingest returned, keyed by participant code.
+ *
+ * SILENT WHEN LOCKED, and that is safe rather than lossy. This runs on every load
+ * as part of deriving the dataset, long before anybody has typed a passphrase, and
+ * throwing here would stop the whole view — overview, table and export included —
+ * on a screen nobody needs the names for.
+ *
+ * Nothing is lost by skipping: these rows are DERIVED from the sittings every
+ * time, so unlocking the vault and re-deriving brings them all back. That is also
+ * why a forgotten passphrase costs the typed-in fields and not the names.
+ */
 export async function storeIdentity(rows: IdentityRow[]): Promise<number> {
+  if (!identityIsUnlocked()) return 0;
   const bySession = new Map<string, { participantId: string; study: string; recordedAt: string; values: Record<string, string> }>();
   for (const row of rows) {
     const entry = bySession.get(row.sessionId) ?? {
@@ -206,32 +472,37 @@ export async function storeIdentity(rows: IdentityRow[]): Promise<number> {
     const given = entry.values["first_name"] ?? null;
     const family = entry.values["last_name"] ?? null;
     const dob = entry.values["dob"] ?? null;
-    const existing = await db.people.get(entry.participantId);
+    const row = await db.people.get(entry.participantId);
+    const existing = row ? await openPerson(row) : undefined;
     const claim = { sessionId, claimedCode: entry.participantId, givenName: given, familyName: family, recordedAt: entry.recordedAt };
     if (existing) {
       // The name first given stands. A later wave spelling it differently is
       // evidence to look at, not a reason to overwrite the record quietly.
       const claims = existing.claims.filter((c) => c.sessionId !== sessionId);
-      await db.people.put({
-        ...existing,
-        givenName: existing.givenName ?? given,
-        familyName: existing.familyName ?? family,
-        dateOfBirth: existing.dateOfBirth ?? dob,
-        claims: [...claims, claim].sort((a, b) => a.recordedAt.localeCompare(b.recordedAt)),
-      });
+      await db.people.put(
+        await sealPerson({
+          ...existing,
+          givenName: existing.givenName ?? given,
+          familyName: existing.familyName ?? family,
+          dateOfBirth: existing.dateOfBirth ?? dob,
+          claims: [...claims, claim].sort((a, b) => a.recordedAt.localeCompare(b.recordedAt)),
+        }),
+      );
     } else {
-      await db.people.put({
-        participantCode: entry.participantId,
-        study: entry.study,
-        givenName: given,
-        familyName: family,
-        dateOfBirth: dob,
-        upn: null,
-        upnSource: null,
-        nhsNumber: null,
-        nhsSource: null,
-        claims: [claim],
-      });
+      await db.people.put(
+        await sealPerson({
+          participantCode: entry.participantId,
+          study: entry.study,
+          givenName: given,
+          familyName: family,
+          dateOfBirth: dob,
+          upn: null,
+          upnSource: null,
+          nhsNumber: null,
+          nhsSource: null,
+          claims: [claim],
+        }),
+      );
     }
     written += 1;
   }
@@ -247,7 +518,8 @@ export async function noteAccess(action: string, participant: string, justificat
 
 export async function lookupByCode(code: string, justification: string): Promise<PersonRecord | undefined> {
   await noteAccess("lookup", code, justification);
-  return db.people.get(code);
+  const row = await db.people.get(code);
+  return row ? openPerson(row) : undefined;
 }
 
 /** Find every code a name has ever been filed under — how a mistype is caught. */
@@ -256,7 +528,7 @@ export async function searchPeople(
   justification: string,
 ): Promise<PersonRecord[]> {
   await noteAccess("search", query.upn ?? `${query.givenName ?? ""} ${query.familyName ?? ""}`.trim(), justification);
-  const all = await db.people.toArray();
+  const all = await allPeople();
   const like = (value: string | null, want: string | undefined) =>
     want === undefined || want === "" || (value ?? "").toLowerCase().includes(want.trim().toLowerCase());
   return all.filter((p) => {
@@ -269,12 +541,15 @@ export async function searchPeople(
 
 export async function setUpn(code: string, upn: string, source: string, justification: string): Promise<{ ok: boolean; conflict?: string }> {
   await noteAccess("link_upn", code, justification);
-  const clash = await db.people.filter((p) => p.upn === upn && p.participantCode !== code).first();
-  // One UPN, one pupil. Caught here rather than in an analysis.
+  // One UPN, one pupil. Caught here rather than in an analysis. The scan happens
+  // in memory because the UPN is sealed — the Dexie index it used to use was
+  // never actually used as an index, so nothing is slower than it was.
+  const clash = (await allPeople()).find((p) => p.upn === upn && p.participantCode !== code);
   if (clash) return { ok: false, conflict: `that UPN is already linked to ${clash.participantCode}` };
-  const person = await db.people.get(code);
-  if (!person) return { ok: false, conflict: "no record for that code" };
-  await db.people.put({ ...person, upn, upnSource: source });
+  const row = await db.people.get(code);
+  if (!row) return { ok: false, conflict: "no record for that code" };
+  const person = await openPerson(row);
+  await db.people.put(await sealPerson({ ...person, upn, upnSource: source }));
   return { ok: true };
 }
 
@@ -350,7 +625,8 @@ export async function recordRelationship(
 ): Promise<{ ok: boolean; error?: string }> {
   if (participantCode === relatedCode) return { ok: false, error: "a person cannot be related to themselves" };
   const at = new Date().toISOString();
-  await db.relationships.put({ id: id(), participantCode, relatedCode, kind, note, recordedAt: at });
+  const seal = async (row: Relationship) => ({ id: row.id, sealed: await sealWith(requireKey(), row) });
+  await db.relationships.put(await seal({ id: id(), participantCode, relatedCode, kind, note, recordedAt: at }));
   // Both directions are stored, so looking up either end finds the other. A
   // relationship recorded once and readable one way only is a relationship
   // somebody will miss.
@@ -360,24 +636,39 @@ export async function recordRelationship(
     sibling_of: "sibling_of",
     twin_of: "twin_of",
   };
-  await db.relationships.put({
-    id: id(),
-    participantCode: relatedCode,
-    relatedCode: participantCode,
-    kind: inverse[kind],
-    note,
-    recordedAt: at,
-  });
+  await db.relationships.put(
+    await seal({
+      id: id(),
+      participantCode: relatedCode,
+      relatedCode: participantCode,
+      kind: inverse[kind],
+      note,
+      recordedAt: at,
+    }),
+  );
   await noteAccess("record_relationship", `${participantCode} ${kind} ${relatedCode}`, note);
   return { ok: true };
 }
 
+/**
+ * Relationships are sealed whole, both codes included.
+ *
+ * A relationship between two participant codes is itself identifying — "these two
+ * are twins" narrows a pair of children considerably — so unlike a person record,
+ * where the code stays in the clear as the key, nothing here is readable without
+ * the vault. That costs the `participantCode` index, and since the only queries
+ * are "for this person" and "all of them", scanning in memory is no slower on a
+ * study-sized table.
+ */
 export async function relationshipsFor(participantCode: string): Promise<Relationship[]> {
-  return db.relationships.where("participantCode").equals(participantCode).toArray();
+  return (await allRelationships()).filter((r) => r.participantCode === participantCode);
 }
 
 export async function allRelationships(): Promise<Relationship[]> {
-  return (await db.relationships.toArray()).sort((a, b) => a.participantCode.localeCompare(b.participantCode));
+  const key = requireKey();
+  const rows = await db.relationships.toArray();
+  const opened = await Promise.all(rows.map((row) => openWith<Relationship>(key, row.sealed)));
+  return opened.sort((a, b) => a.participantCode.localeCompare(b.participantCode));
 }
 
 /**
@@ -394,7 +685,7 @@ export async function allRelationships(): Promise<Relationship[]> {
  */
 export async function identifierFile(justification: string): Promise<string> {
   await noteAccess("identifier_file", "all participants", justification);
-  const people = (await db.people.toArray()).sort((a, b) => a.participantCode.localeCompare(b.participantCode));
+  const people = (await allPeople()).sort((a, b) => a.participantCode.localeCompare(b.participantCode));
   const escape = (value: string | null) => {
     if (value === null || value === "") return "";
     return /[",\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
@@ -421,10 +712,11 @@ export async function setNhsNumber(
   justification: string,
 ): Promise<{ ok: boolean; conflict?: string }> {
   await noteAccess("link_nhs_number", code, justification);
-  const clash = await db.people.filter((p) => p.nhsNumber === nhsNumber && p.participantCode !== code).first();
+  const clash = (await allPeople()).find((p) => p.nhsNumber === nhsNumber && p.participantCode !== code);
   if (clash) return { ok: false, conflict: `that NHS number is already linked to ${clash.participantCode}` };
-  const person = await db.people.get(code);
-  if (!person) return { ok: false, conflict: "no record for that code" };
-  await db.people.put({ ...person, nhsNumber, nhsSource: source });
+  const row = await db.people.get(code);
+  if (!row) return { ok: false, conflict: "no record for that code" };
+  const person = await openPerson(row);
+  await db.people.put(await sealPerson({ ...person, nhsNumber, nhsSource: source }));
   return { ok: true };
 }

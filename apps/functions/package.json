@@ -9,10 +9,11 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.integration.json",
     "test": "vitest run",
     "package": "node build-deploy.mjs",
-    "grant": "node grant-role.mjs"
+    "grant": "node grant-role.mjs",
+    "test:integration": "firebase emulators:exec --only firestore --project demo-myself --config ../../infra/firebase/firebase.test.json \"vitest run --config vitest.integration.config.ts\""
   },
   "dependencies": {
     "@myself/firebase": "workspace:*",
@@ -27,6 +28,7 @@
   "devDependencies": {
     "@types/node": "^22.9.0",
     "esbuild": "^0.24.0",
+    "firebase-tools": "^14.19.0",
     "typescript": "^5.6.0",
     "vitest": "^2.1.0"
   }

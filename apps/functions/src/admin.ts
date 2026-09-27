@@ -40,54 +40,47 @@ async function audit(actor: string, action: string, subject: string, detail: unk
 }
 
 /**
- * Enrol an iPad.
+ * Withdraw an iPad from the study.
  *
- * The device becomes an authenticated identity in its own right, with a
- * `device` claim that every security rule keys off. It gets a custom token,
- * which the iPad exchanges once for a session the SDK then keeps refreshed —
- * so the token in the researcher's hands is short-lived and the device does not
- * hold a long-lived secret that a lost iPad would surrender.
- */
-export const enrolDevice = onCall(async (request) => {
-  const actor = requireOwner(request);
-  const { label } = (request.data ?? {}) as { label?: string };
-  if (!label || label.trim().length === 0) {
-    throw new HttpsError("invalid-argument", "give the iPad a label you will recognise on a table of six");
-  }
-
-  const deviceId = `dev_${research().collection("_").doc().id}`;
-  await auth().createUser({ uid: deviceId, displayName: label });
-  await auth().setCustomUserClaims(deviceId, { device: true, study: STUDY });
-  await research().doc(paths.device(STUDY, deviceId)).set({
-    deviceId,
-    label,
-    study: STUDY,
-    enrolledBy: actor,
-    enrolledAt: FieldValue.serverTimestamp(),
-    revokedAt: null,
-  });
-  await audit(actor, "device.enrolled", deviceId, { label });
-
-  const token = await auth().createCustomToken(deviceId, { device: true, study: STUDY });
-  logger.info("device enrolled", { deviceId, label });
-  return { deviceId, label, token };
-});
-
-/**
- * Revoke an iPad.
+ * There is no `enrolDevice` any more, and this is what took its place. A device
+ * registers itself on first upload — nobody registers it in advance — so the
+ * control that matters is not who may join but who may be stopped: a stray iPad, a
+ * duplicate, an obvious test run from outside the room.
  *
- * Disabling the account stops new sessions; revoking refresh tokens stops the
- * one it already holds, which is what makes this useful for a device that has
- * gone missing rather than one handed back.
+ * `revokedAt` on the device document is the whole mechanism, because that is what
+ * `registerDevice` checks on every upload. It is set with a merge rather than an
+ * update so that revoking an installation id the study has never seen still works —
+ * which is the case when somebody wants a device stopped BEFORE it has filed
+ * anything, and an `update` would have thrown "no document to update" at exactly
+ * that moment.
+ *
+ * NOTHING ALREADY FILED IS REMOVED. Deciding what to do with a sitting is a
+ * judgement, not a button, and the sittings are the record.
+ *
+ * A Firebase account is disabled too where one exists, for the older enrolled
+ * devices that were given one before self-registration replaced it.
  */
 export const revokeDevice = onCall(async (request) => {
   const actor = requireOwner(request);
   const { deviceId } = (request.data ?? {}) as { deviceId?: string };
   if (!deviceId) throw new HttpsError("invalid-argument", "deviceId is required");
 
-  await auth().updateUser(deviceId, { disabled: true });
-  await auth().revokeRefreshTokens(deviceId);
-  await research().doc(paths.device(STUDY, deviceId)).update({ revokedAt: FieldValue.serverTimestamp() });
+  await research()
+    .doc(paths.device(STUDY, deviceId))
+    .set(
+      { deviceId, study: STUDY, revokedAt: FieldValue.serverTimestamp(), revokedBy: actor },
+      { merge: true },
+    );
+
+  // Best effort: a self-registered device has no account, and its absence is the
+  // normal case rather than a failure.
+  try {
+    await auth().updateUser(deviceId, { disabled: true });
+    await auth().revokeRefreshTokens(deviceId);
+  } catch {
+    // No account under this id. The document is what stops it.
+  }
+
   await audit(actor, "device.revoked", deviceId, null);
   return { deviceId, revoked: true };
 });

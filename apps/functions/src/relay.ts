@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash, timingSafeEqual } from "node:crypto";
 import { FieldValue } from "firebase-admin/firestore";
 import * as logger from "firebase-functions/logger";
 import { defineSecret } from "firebase-functions/params";
@@ -125,25 +125,142 @@ async function spendLink(key: string): Promise<Caller> {
    * a link can run what a shipped protocol declares and cannot invent a model,
    * a temperature or a token ceiling.
    */
-  return { uid, device: false };
+  return { uid, device: false, anonymous: false };
+}
+
+/**
+ * A device presenting the credential it issued itself.
+ *
+ * `Authorization: Device <installId>.<secret>`
+ *
+ * FIRST WRITER WINS, PERMANENTLY. The first upload from an installation id
+ * registers the hash of its secret; every upload after that must present a secret
+ * hashing to the same thing. So a stranger can register a NEW installation — the
+ * write endpoint is open by design, because anyone with the URL takes part — and
+ * can never take over an existing one. That is exactly what the no-overwrite rule
+ * needs from an identity: "the same device" has to mean something a second device
+ * cannot claim.
+ *
+ * WHY NOT REQUIRE ENROLMENT INSTEAD. Because a device that has to be registered
+ * before it can collect is a device that cannot be handed to a participant in a
+ * hall with no signal, and that is the normal case rather than the exception. The
+ * trade is stated in the runbook.
+ *
+ * THE COMPARISON IS TIMING-SAFE. A secret checked with `===` leaks its prefix to
+ * anyone who can time the response, and while guessing 32 random bytes a byte at a
+ * time is not the likely attack on a study, a constant-time compare costs one line.
+ */
+export async function registerDevice(
+  db: FirebaseFirestore.Firestore,
+  study: string,
+  raw: string,
+): Promise<Caller> {
+  const at = raw.indexOf(".");
+  if (at <= 0 || at === raw.length - 1) {
+    throw new RelayError(401, "auth", "that device credential is not the right shape");
+  }
+  const installId = raw.slice(0, at);
+  const secret = raw.slice(at + 1);
+  if (!/^[A-Za-z0-9_-]{4,120}$/.test(installId) || secret.length < 32) {
+    throw new RelayError(401, "auth", "that device credential is not the right shape");
+  }
+
+  const digest = createHash("sha256").update(secret).digest("hex");
+  const ref = db.doc(paths.device(study, installId));
+
+  const known = await db.runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    if (!snap.exists) {
+      tx.set(ref, {
+        deviceId: installId,
+        study,
+        secretHash: digest,
+        selfRegistered: true,
+        enrolledAt: FieldValue.serverTimestamp(),
+        revokedAt: null,
+      });
+      return { secretHash: digest, revokedAt: null as unknown };
+    }
+    const data = snap.data() as { secretHash?: string; revokedAt?: unknown };
+    return { secretHash: data.secretHash ?? "", revokedAt: data.revokedAt ?? null };
+  });
+
+  if (known.revokedAt) {
+    throw new RelayError(403, "auth", "this device has been withdrawn from the study");
+  }
+  if (!timingSafeMatch(known.secretHash, digest)) {
+    /**
+     * Another device is already this installation.
+     *
+     * Almost always an id collision or a restored backup rather than anything
+     * deliberate, but the response is the same either way: the sittings stay on
+     * the device, and the message says what to do rather than what happened.
+     */
+    throw new RelayError(
+      403,
+      "auth",
+      "another device is already registered under this installation id, so this one cannot file sittings under it. The sittings are safe on the device — hand them over as a file.",
+    );
+  }
+
+  return { uid: installId, device: true, anonymous: true };
+}
+
+function timingSafeMatch(a: string, b: string): boolean {
+  const left = Buffer.from(a, "utf8");
+  const right = Buffer.from(b, "utf8");
+  // timingSafeEqual throws on a length mismatch, which would itself be a signal.
+  if (left.length !== right.length) return false;
+  return timingSafeEqual(left, right);
+}
+
+export interface AuthOptions {
+  /**
+   * Whether a device that signed itself in anonymously may pass.
+   *
+   * TRUE ONLY FOR FILING SITTINGS, and the asymmetry is the whole point. A
+   * participant opens the URL on any iPad and takes part; requiring an owner to
+   * register each device first is a barrier to taking part, and taking part is
+   * the thing this exists for. Filing a sitting costs a Firestore write.
+   *
+   * THE RELAY DOES NOT PASS THIS. A model call spends the study's money, and an
+   * endpoint that made one for anyone holding an anonymous token would be a page
+   * on the open web wired to an OpenAI bill. So the relay and the transcriber
+   * still require an enrolled device or a granted role, and a caller who may
+   * file a sitting is not thereby a caller who may spend anything.
+   */
+  allowAnonymous?: boolean;
 }
 
 /**
  * Who is asking, and whether they are anybody.
  *
- * Two ways in. A tester link, which is a bounded credential carried by a URL
- * and belongs to nobody. Or a signed-in account, where a verified token is
- * still not a permission: Google sign-in is open to the world by design, so
- * anyone can arrive holding a valid token for this project, and if that were
- * enough a page on the open web would be a stranger's route to the study's
- * model budget. A signed-in caller must be an enrolled device or carry a role
- * an owner granted.
+ * Three ways in. A tester link, which is a bounded credential carried by a URL
+ * and belongs to nobody. A signed-in account, where a verified token is still
+ * not a permission: Google sign-in is open to the world by design, so anyone can
+ * arrive holding a valid token for this project, and a role is how the study says
+ * it knows you. Or — where the caller is allowed to be anonymous — an iPad that
+ * signed itself in, which is how a participant with the URL takes part.
  */
-export async function authenticate(header: string | undefined): Promise<Caller> {
+export async function authenticate(header: string | undefined, options: AuthOptions = {}): Promise<Caller> {
   if (header?.startsWith("Link ")) return spendLink(header.slice(5).trim());
 
+  /**
+   * A self-registered device, and only where anonymous callers are permitted.
+   *
+   * The relay does not permit them, so this scheme cannot buy a model call however
+   * well-formed the credential is: filing a sitting costs a Firestore write, and a
+   * model call spends the study's money.
+   */
+  if (header?.startsWith("Device ")) {
+    if (!options.allowAnonymous) {
+      throw new RelayError(403, "auth", "a device credential cannot be used for this");
+    }
+    return registerDevice(research(), STUDY, header.slice(7).trim());
+  }
+
   const token = header?.startsWith("Bearer ") ? header.slice(7) : null;
-  if (!token) throw new RelayError(401, "auth", "sign in, or enrol this device, before asking for a model call");
+  if (!token) throw new RelayError(401, "auth", "this request carried no credential");
 
   let decoded;
   try {
@@ -152,15 +269,29 @@ export async function authenticate(header: string | undefined): Promise<Caller> 
     throw new RelayError(401, "auth", "that credential is not valid");
   }
 
-  const device = decoded["device"] === true;
-  if (!mayCall({ device: decoded["device"], role: decoded["role"] })) {
-    throw new RelayError(
-      403,
-      "auth",
-      "you are signed in, but this account has no role on this study. An owner grants one before it can make model calls.",
-    );
+  if (mayCall({ device: decoded["device"], role: decoded["role"] })) {
+    return { uid: decoded.uid, device: decoded["device"] === true, anonymous: false };
   }
-  return { uid: decoded.uid, device };
+
+  /**
+   * An iPad that signed itself in.
+   *
+   * Checked against the sign-in provider rather than the absence of a role,
+   * because "no role" is also what a stranger's ordinary Google account looks
+   * like, and those two should not be treated alike: one is a participant's
+   * device, the other is a person who has wandered in. Only the first is a
+   * device, and only where the caller was allowed to be anonymous at all.
+   */
+  const provider = (decoded.firebase as { sign_in_provider?: string } | undefined)?.sign_in_provider;
+  if (options.allowAnonymous && provider === "anonymous") {
+    return { uid: decoded.uid, device: true, anonymous: true };
+  }
+
+  throw new RelayError(
+    403,
+    "auth",
+    "you are signed in, but this account has no role on this study. An owner grants one before it can make model calls.",
+  );
 }
 
 /**

@@ -13,10 +13,20 @@ import {
   assignments,
   clearAll,
   importExportFile,
+  mergeFromStudy,
   storeIdentity,
   storedSessions,
   type ImportReport,
 } from "./lib/db.js";
+import {
+  pullSittings,
+  revokeDevice,
+  signIn,
+  signOutOfStudy,
+  studyAvailable,
+  watchUser,
+  type StudyUser,
+} from "./lib/study.js";
 import { defaultColumns } from "./lib/filter.js";
 import { latestRelease } from "./lib/releases.js";
 
@@ -53,6 +63,14 @@ export default function App() {
   const [selected, setSelected] = useState<string | null>(null);
   const [reports, setReports] = useState<ImportReport[]>([]);
   const [busy, setBusy] = useState(false);
+  const [user, setUser] = useState<StudyUser | null>(null);
+  const [pulling, setPulling] = useState(false);
+  const [pullNote, setPullNote] = useState<string | null>(null);
+  const [revoking, setRevoking] = useState("");
+  const [deviceNote, setDeviceNote] = useState<string | null>(null);
+  // The study passphrase the iPads encrypted their handover files with. Held in
+  // memory for the length of a sitting at the laptop, never written down here.
+  const [passphrase, setPassphrase] = useState("");
 
   const reload = useCallback(async () => {
     setBusy(true);
@@ -71,6 +89,34 @@ export default function App() {
 
   useEffect(() => {
     void reload();
+  }, [reload]);
+
+  useEffect(() => watchUser(setUser), []);
+
+  const pull = useCallback(async () => {
+    setPulling(true);
+    setPullNote(null);
+    try {
+      const { sessions, quarantined, unreadable } = await pullSittings();
+      const merged = await mergeFromStudy(sessions, "study");
+      const parts = [
+        `${plural(merged.added, "sitting")} new`,
+        `${merged.superseded} superseded by a longer copy`,
+        `${merged.unchanged} already current`,
+      ];
+      if (quarantined > 0) parts.push(`${plural(quarantined, "sitting")} held for review and left out`);
+      if (unreadable.length > 0) parts.push(`could not reassemble ${unreadable.join(", ")} — look at these`);
+      setPullNote(parts.join(" · "));
+      await reload();
+    } catch (error) {
+      setPullNote(
+        error instanceof Error
+          ? `Could not read the study: ${error.message}`
+          : "Could not read the study.",
+      );
+    } finally {
+      setPulling(false);
+    }
   }, [reload]);
 
   const table = useMemo(() => (dataset ? wideTable(dataset) : null), [dataset]);
@@ -93,7 +139,7 @@ export default function App() {
     setBusy(true);
     const next: ImportReport[] = [];
     for (const file of Array.from(files)) {
-      next.push(await importExportFile(file.name, await file.text()));
+      next.push(await importExportFile(file.name, await file.text(), passphrase));
     }
     setReports((r) => [...next, ...r].slice(0, 8));
     await reload();
@@ -264,10 +310,112 @@ export default function App() {
       {tab === "data" && (
         <section className="panel data-panel">
           <h2>Bring sittings in</h2>
+
+          {studyAvailable && (
+            <div className="panel study-pull">
+              <h3>From the study</h3>
+              {!user && (
+                <>
+                  <p className="note">
+                    Sign in to read the sittings the iPads have uploaded. Your account needs a role on this study — an
+                    owner grants one — and signing in on its own is not enough to see anything.
+                  </p>
+                  <button type="button" className="secondary" onClick={() => void signIn()}>
+                    Sign in
+                  </button>
+                </>
+              )}
+              {user && !user.role && (
+                <p className="note warn">
+                  Signed in as {user.email}, but this account has no role on the study, so it cannot read any sittings.
+                  An owner grants one before this will work.
+                </p>
+              )}
+              {user?.role && (
+                <>
+                  <p className="note">
+                    Signed in as {user.email} ({user.role}). Pulling is safe to repeat: a sitting already here is left
+                    alone unless the study holds a longer copy of it, which happens whenever a device uploaded one
+                    while it was still being answered.
+                  </p>
+                  <div className="handover-actions">
+                    <button type="button" className="secondary" disabled={pulling} onClick={() => void pull()}>
+                      {pulling ? "Reading the study…" : "Pull sittings from the study"}
+                    </button>
+                    <button type="button" className="secondary" onClick={() => void signOutOfStudy()}>
+                      Sign out
+                    </button>
+                  </div>
+                </>
+              )}
+              {pullNote && <p className="note">{pullNote}</p>}
+            </div>
+          )}
+
+          {/*
+            No enrolment panel: a participant opens the URL on any iPad and the
+            device signs itself in. Revoking is the control that remains, and it
+            matters more for being open — the device id is on every sitting in the
+            table, so it can be read off the row.
+          */}
+          {user?.role === "owner" && (
+            <div className="panel study-pull">
+              <h3>Stop a device</h3>
+              <p className="note">
+                For an iPad filing something it should not — a stray device, an obvious test run from outside the room.
+                Copy its device id from the table and paste it here. It cannot post again, and nothing it already filed
+                is removed.
+              </p>
+              <label className="field">
+                <span className="field-label">Device id</span>
+                <input
+                  className="search wide"
+                  value={revoking}
+                  placeholder="the deviceId shown against its sittings"
+                  onChange={(e) => setRevoking(e.target.value)}
+                />
+              </label>
+              <div className="handover-actions">
+                <button
+                  type="button"
+                  className="secondary"
+                  disabled={revoking.trim().length === 0}
+                  onClick={() => {
+                    const id = revoking.trim();
+                    setDeviceNote(null);
+                    void revokeDevice(id)
+                      .then(() => {
+                        setRevoking("");
+                        setDeviceNote(`${id} can post nothing further.`);
+                      })
+                      .catch((error: unknown) =>
+                        setDeviceNote(error instanceof Error ? error.message : "Could not revoke that device."),
+                      );
+                  }}
+                >
+                  Revoke this device
+                </button>
+              </div>
+              {deviceNote && <p className="note">{deviceNote}</p>}
+            </div>
+          )}
+
+          <h3>From a file</h3>
           <p className="note">
-            Each iPad writes one file from its handover panel. Importing the same file twice adds nothing — sittings
-            are matched on their identifier — so it is safe to re-import when you are not sure.
+            A device with no usable network hands over as a file instead. Importing the same file twice adds nothing —
+            sittings are matched on their identifier — so it is safe to re-import when you are not sure, and a sitting
+            that arrives by both roads is one sitting.
           </p>
+          <label className="field">
+            <span className="field-label">Study passphrase, to open encrypted handover files</span>
+            <input
+              className="text-input"
+              type="password"
+              value={passphrase}
+              autoComplete="off"
+              onChange={(e) => setPassphrase(e.target.value)}
+            />
+          </label>
           <input
             id="import-file"
             type="file"

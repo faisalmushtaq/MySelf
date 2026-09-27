@@ -8,7 +8,6 @@ import "./apps.js";
 initializeApp();
 
 export {
-  enrolDevice,
   revokeDevice,
   setRole,
   listPeople,
