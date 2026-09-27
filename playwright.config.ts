@@ -75,7 +75,14 @@ export default defineConfig({
    * that could reach a real project is not what should be driven by a robot.
    */
   webServer: {
-    command: "pnpm --filter @myself/participant build && pnpm --filter @myself/participant preview --port 4173 --strictPort",
+    // `--host 127.0.0.1` so preview binds the same address the health check below
+    // polls. Without it vite binds `localhost`, which on the ubuntu-24.04 CI runner
+    // resolves to IPv6 `::1` while Playwright waits on IPv4 `127.0.0.1` — the two
+    // never meet and the job dies with "Timed out waiting 180000ms from
+    // config.webServer" before a single test runs. Locally `localhost` happens to be
+    // 127.0.0.1 so it passed here and only ever failed in CI. The sync config already
+    // pins its host for the same reason.
+    command: "pnpm --filter @myself/participant build && pnpm --filter @myself/participant preview --port 4173 --strictPort --host 127.0.0.1",
     url: `http://127.0.0.1:${PORT}/MySelf/`,
     reuseExistingServer: !process.env["CI"],
     timeout: 180_000,
