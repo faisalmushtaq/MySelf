@@ -9,7 +9,7 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.integration.json",
     "test": "vitest run",
     "package": "node build-deploy.mjs",
     "grant": "node grant-role.mjs",

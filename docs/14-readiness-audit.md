@@ -541,3 +541,68 @@ safeguarding notification with it), the identity Firebase project is not stood u
 end-to-end suite. The WebKit half of the browser suite has never run here, because
 only Chromium is installed in this container — CI is where it gets its first
 exercise, and WebKit is the engine an iPad actually uses.
+
+---
+
+## 10. Two review passes over the night's own work
+
+After the hardening in §9 I reviewed the whole diff before adding anything else to it, and
+then reviewed the fixes. Both passes found real defects — eighteen between them — and the
+two worst were mine from that same night. Recorded because the pattern is the lesson: the
+code that had never been read by anything but its author was where the damage was.
+
+### The two that would have hurt
+
+**Every device that had opened the app would have failed to open its database.** The v4
+migration re-keyed a table's primary key, and Dexie refuses that outright — and throws
+before any `.upgrade()` callback, so there was no hook from which to clear the table
+first. Not a lost feature: a device holding sittings, with no way in. Found by reading the
+installed Dexie source rather than by any test, because no test starts from a v3 database.
+
+**A refused upload could corrupt the sitting it was refused against.** Chunks were written
+before the transaction that decides. That is safe only if the refused upload shares no
+chunk indexes with the stored sitting — and a chunk is identified by its index, so a
+refused 500-event upload over a stored 900-event one overwrote chunks 0 and 1 while the
+parent still claimed four. `chunksComplete` counts indexes, finds all four, and
+`joinSession` returns a blend of two logs reported as whole.
+
+My own test for this had passed against the broken code, because the shorter upload it
+used fitted inline and wrote no chunks at all. The replacement is chunked on both sides.
+
+### And one that quietly undid a fix
+
+Merging the upload and checkpoint mutexes into one flag was correct in itself and made the
+during-a-sitting tick a permanent no-op: it started both without awaiting, so the
+checkpoint took the lock synchronously and the queue drain never ran. The behaviour the
+tick exists for — getting earlier participants' sittings off a device during a morning of
+continuous handovers — was switched off by a guard added to protect it. A guard that
+disables what it protects is worse than none, because it is believed.
+
+### Three tests that could not fail
+
+Worth listing separately, because a test that cannot fail is counted as coverage:
+
+- the stale-chunk test passed against the corruption above;
+- the identity auto-lock test asserted against a copy of the rule it had declared itself,
+  so reverting the component left it green — the rule now lives in its own module and both
+  import it;
+- nine stale call sites survived a rename by sitting in an integration folder that
+  `typecheck` did not include. It does now.
+
+### The rest
+
+A save failure on the two `session.completed` writes was swallowed, leaving a finished
+sitting stuck in progress and never queued. The device identity cached its own rejection,
+so one transient IndexedDB failure would have stopped a device syncing for its whole life,
+silently. The retry replayed one write and abandoned the rest, so a response could be
+saved with its paradata dropped — it is an ordered queue now. `provenance` was derived from
+whether the caller was anonymous, which labelled a researcher's file import as having come
+from a vouched-for device. The quarantine row embedded the whole log, so a spilled sitting
+exceeded Firestore's document limit and lost the evidence the function promises to keep;
+it also measured size in UTF-16 units rather than bytes, and keyed on the sitting alone so
+a second device's copy overwrote the first's and Firestore's deep merge could blend one
+device's events with another's metadata. The idle lock re-armed on `visibilitychange`,
+which extended the unlocked window instead of shortening it. And the export did not carry
+the installation id its own docstring promised.
+
+633 unit tests, 30 integration, 6 browser, 5 full-chain.

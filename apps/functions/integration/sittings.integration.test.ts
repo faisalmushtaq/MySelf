@@ -209,6 +209,60 @@ describe("a refused upload must leave the stored sitting alone", () => {
   });
 });
 
+describe("what a refusal leaves behind for a person to read", () => {
+  it("keeps one row per device rather than letting the second overwrite the first", async () => {
+    // Keyed on the sitting alone, a second device's filed copy replaced the first's, which
+    // loses exactly the evidence this exists to keep.
+    await storeSitting(db, STUDY, sitting(many(20)), "ipad_a", new Date(), "device");
+    await storeSitting(db, STUDY, sitting(many(20)), "ipad_b", new Date(), "device");
+    await storeSitting(db, STUDY, sitting(many(20)), "ipad_c", new Date(), "device");
+
+    const filed = await db.collection(paths.quarantine(STUDY)).get();
+    expect(filed.size).toBe(2);
+    expect(new Set(filed.docs.map((d) => d.data()["arrivingDeviceId"]))).toEqual(
+      new Set(["ipad_b", "ipad_c"]),
+    );
+  });
+
+  it("counts repeated refusals from one device instead of storing the log again", async () => {
+    // A device on a bad connection refuses the same sitting by the dozen. Appending a copy
+    // each time is how a quarantine collection outgrows the dataset it guards.
+    await storeSitting(db, STUDY, sitting(many(40)), "ipad_a", new Date(), "device");
+    for (let i = 0; i < 4; i += 1) {
+      await storeSitting(db, STUDY, sitting(many(10)), "ipad_a", new Date(), "device");
+    }
+
+    const filed = await db.collection(paths.quarantine(STUDY)).get();
+    expect(filed.size).toBe(1);
+    expect(filed.docs[0]!.data()["refusals"]).toBe(4);
+  });
+
+  it("files a spilled sitting without exceeding the document limit", async () => {
+    // Embedding the whole log meant a spilled sitting produced a quarantine document over
+    // 1 MiB, so the write failed and the evidence was the one thing lost.
+    await storeSitting(db, STUDY, sitting(many(1_400, 900)), "ipad_a", new Date(), "device");
+    const refused = await storeSitting(db, STUDY, sitting(many(30)), "ipad_a", new Date(), "device");
+    expect(refused.stored).toBe(false);
+
+    const filed = await db.collection(paths.quarantine(STUDY)).get();
+    expect(filed.size).toBe(1);
+    // It landed, which is the assertion — a document over the limit would have thrown.
+    expect(filed.docs[0]!.data()["sessionId"]).toBe("ses_integration_1");
+  });
+
+  it("truncates an arriving log too big to store, and says that it did", async () => {
+    await storeSitting(db, STUDY, sitting(many(2_000, 900)), "ipad_a", new Date(), "device");
+    await storeSitting(db, STUDY, sitting(many(1_500, 900)), "ipad_b", new Date(), "device");
+
+    const filed = await db.collection(paths.quarantine(STUDY)).get();
+    const row = filed.docs.find((d) => d.data()["arrivingDeviceId"] === "ipad_b")!.data();
+    expect(row["arrivingSessionTruncated"]).toBe(true);
+    // Still says how long the real thing was, so nobody mistakes the head for all of it.
+    expect(row["arrivingEvents"]).toBe(1_500);
+    expect(JSON.parse(row["arrivingSessionJson"] as string).events).toHaveLength(50);
+  });
+});
+
 describe("two iPads, one session id", () => {
   it("keeps the first and files the second, in a real transaction", async () => {
     await storeSitting(db, STUDY, sitting(many(40)), "ipad_a", new Date(), "device");
@@ -223,6 +277,8 @@ describe("two iPads, one session id", () => {
     const filed = await db.collection(paths.quarantine(STUDY)).get();
     expect(filed.size).toBe(1);
     expect(filed.docs[0]!.data()).toMatchObject({ heldDeviceId: "ipad_a", arrivingDeviceId: "ipad_b" });
+    // Against a real Firestore, so the increment is a real increment.
+    expect(filed.docs[0]!.data()["refusals"]).toBe(1);
   });
 
   /**
@@ -236,8 +292,8 @@ describe("two iPads, one session id", () => {
    */
   it("resolves a genuine race to exactly one winner", async () => {
     const results = await Promise.all([
-      storeSitting(db, STUDY, sitting(many(40)), "ipad_a", new Date(), "open"),
-      storeSitting(db, STUDY, sitting(many(40)), "ipad_b", new Date(), "open"),
+      storeSitting(db, STUDY, sitting(many(40)), "ipad_a", new Date(), "device"),
+      storeSitting(db, STUDY, sitting(many(40)), "ipad_b", new Date(), "device"),
     ]);
 
     const stored = results.filter((r) => r.stored);
@@ -257,7 +313,7 @@ describe("two iPads, one session id", () => {
     // Exactly one may end up stored, and the log must be readable afterwards.
     const devices = ["a", "b", "c", "d", "e", "f"].map((d) => `ipad_${d}`);
     const results = await Promise.all(
-      devices.map((deviceId) => storeSitting(db, STUDY, sitting(many(25)), deviceId, new Date(), "open")),
+      devices.map((deviceId) => storeSitting(db, STUDY, sitting(many(25)), deviceId, new Date(), "device")),
     );
 
     expect(results.filter((r) => r.stored)).toHaveLength(1);
@@ -274,9 +330,9 @@ describe("one iPad, uploading twice at once", () => {
     // is a half-written sitting.
     const one = sitting(many(200, 200));
     const results = await Promise.all([
-      storeSitting(db, STUDY, one, "ipad_a", new Date(), "open"),
-      storeSitting(db, STUDY, one, "ipad_a", new Date(), "open"),
-      storeSitting(db, STUDY, one, "ipad_a", new Date(), "open"),
+      storeSitting(db, STUDY, one, "ipad_a", new Date(), "device"),
+      storeSitting(db, STUDY, one, "ipad_a", new Date(), "device"),
+      storeSitting(db, STUDY, one, "ipad_a", new Date(), "device"),
     ]);
 
     for (const result of results) expect(result.stored).toBe(true);
@@ -290,8 +346,8 @@ describe("one iPad, uploading twice at once", () => {
     // participant finishes and the full sitting is sent. Whichever lands second,
     // the stored copy must not be the shorter one.
     const results = await Promise.all([
-      storeSitting(db, STUDY, sitting(many(60), { complete: false }), "ipad_a", new Date(), "open"),
-      storeSitting(db, STUDY, sitting(many(140)), "ipad_a", new Date(), "open"),
+      storeSitting(db, STUDY, sitting(many(60), { complete: false }), "ipad_a", new Date(), "device"),
+      storeSitting(db, STUDY, sitting(many(140)), "ipad_a", new Date(), "device"),
     ]);
 
     // One of the two may be refused — a checkpoint arriving after the finished
@@ -311,7 +367,7 @@ describe("many sittings at once, as a handover produces", () => {
     );
 
     const outcomes = await Promise.all(
-      sittings.map((one) => storeSitting(db, STUDY, one, "ipad_a", new Date(), "open")),
+      sittings.map((one) => storeSitting(db, STUDY, one, "ipad_a", new Date(), "device")),
     );
     expect(outcomes.every((o) => o.stored)).toBe(true);
 

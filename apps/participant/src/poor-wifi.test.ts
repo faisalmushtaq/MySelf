@@ -540,3 +540,60 @@ describe("a checkpoint and a finished upload at the same time", () => {
     expect(transport).toHaveBeenCalledTimes(2);
   });
 });
+
+describe("the tick that runs during a sitting", () => {
+  /**
+   * The bug that came from sharing one lock.
+   *
+   * Both calls send the same documents, so they must not overlap — but started side by
+   * side, the checkpoint takes the lock synchronously and the drain becomes a permanent
+   * no-op. The finished queue would never be sent during a sitting, which is the entire
+   * reason the tick does two things rather than one.
+   *
+   * A guard that silently disables the behaviour it was protecting is worse than no
+   * guard, so the ordering is pinned here rather than left to a comment.
+   */
+  it("drains the finished queue as well as checkpointing, when run in sequence", async () => {
+    resetInFlightForTests();
+    const calls = noCalls();
+    const { completedAt: _done, ...running } = session;
+    const sent: boolean[] = [];
+    const transport = vi.fn(async (_url: string, init?: RequestInit) => {
+      const body = JSON.parse(init!.body as string) as { sittings: { complete: boolean }[] };
+      sent.push(body.sittings[0]!.complete);
+      return ok();
+    });
+
+    const storage = store(calls, { running: [{ ...running, complete: false }] });
+    await checkpointRunningSessions({ storage, transport: transport as unknown as typeof fetch });
+    await synchroniseCompletedSessions({ storage, transport: transport as unknown as typeof fetch });
+
+    // One incomplete copy and one finished one. Started together, the second never fired.
+    expect(sent).toEqual([false, true]);
+    expect(calls.receipts).toEqual(["ses_01:2"]);
+  });
+
+  it("skips a genuinely concurrent second caller rather than racing it", async () => {
+    // The guard still does its job: two independent triggers at the same instant.
+    resetInFlightForTests();
+    const calls = noCalls();
+    let inFlight = 0;
+    let overlapped = false;
+    const transport = vi.fn(async () => {
+      inFlight += 1;
+      if (inFlight > 1) overlapped = true;
+      await new Promise((resolve) => setTimeout(resolve, 30));
+      inFlight -= 1;
+      return ok();
+    });
+    const storage = store(calls);
+
+    await Promise.all([
+      synchroniseCompletedSessions({ storage, transport: transport as unknown as typeof fetch }),
+      synchroniseCompletedSessions({ storage, transport: transport as unknown as typeof fetch }),
+    ]);
+
+    expect(overlapped).toBe(false);
+    expect(transport).toHaveBeenCalledTimes(1);
+  });
+});

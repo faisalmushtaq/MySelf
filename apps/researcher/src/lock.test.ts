@@ -1,53 +1,59 @@
 import { describe, expect, it } from "vitest";
+import { IDLE_LOCK_MS, PRESENCE_EVENTS } from "./lib/idle.js";
 
 /**
  * When the names lock themselves again.
  *
- * The rule, not the wiring: React effects and timers are exercised by the browser suite,
- * and what is worth pinning here is the decision the first version got wrong.
+ * These assertions import the rule the component actually uses. The first version of this
+ * file declared its own copy of the list and asserted against that, so reverting the
+ * component to the broken timer left every test green — a test that cannot fail is worse
+ * than no test, because it is counted.
  *
- * That version armed the timer only while `document.hidden`. The case its own comment
- * described — a laptop left open on the linkage screen in a staffroom — has a visible tab
- * the whole time, so it never locked. An auto-lock that fires in every case except the one
- * it was written for is worse than none, because it is believed.
+ * The rule itself exists because of two failures. The component originally armed the
+ * countdown only while `document.hidden`, so the case its own comment described — a laptop
+ * left open on this screen in a staffroom — never locked at all. Then, once it was an idle
+ * timer, re-arming on `visibilitychange` EXTENDED the window: hide the tab at fourteen
+ * minutes and the countdown restarts, so half an hour of real absence leaves the names on
+ * screen.
  */
 
-/** Whether a fifteen-minute idle timer should be running, given what is happening. */
-function shouldBeCountingDown(state: { unlocked: boolean }): boolean {
-  return state.unlocked;
-}
-
-/** What counts as somebody being there. */
-const PRESENCE = ["keydown", "pointerdown", "pointermove", "scroll", "focus"] as const;
-
-describe("arming the idle lock", () => {
-  it("counts down whenever the vault is open, visible tab or not", () => {
-    // The bug: this used to be `unlocked && document.hidden`.
-    expect(shouldBeCountingDown({ unlocked: true })).toBe(true);
+describe("what counts as somebody being there", () => {
+  it("includes reading, not only typing", () => {
+    // Working through a list of names involves neither a keystroke nor a click. A lock
+    // that fired under somebody's hands would be worked around rather than tolerated.
+    expect(PRESENCE_EVENTS).toContain("pointermove");
+    expect(PRESENCE_EVENTS).toContain("scroll");
   });
 
-  it("does not count down when there is nothing unlocked", () => {
-    expect(shouldBeCountingDown({ unlocked: false })).toBe(false);
+  it("includes coming back to the window", () => {
+    expect(PRESENCE_EVENTS).toContain("focus");
+  });
+
+  it("excludes visibilitychange, because re-arming on it extends the window", () => {
+    // The second bug. Hiding the tab is the absence of presence, not an event.
+    expect(PRESENCE_EVENTS).not.toContain("visibilitychange");
+  });
+
+  it("excludes anything the page does to itself", () => {
+    // A timer, a render or a message must not keep the names open; only a person may.
+    for (const event of ["load", "message", "resize", "DOMContentLoaded", "visibilitychange"]) {
+      expect(PRESENCE_EVENTS).not.toContain(event);
+    }
   });
 });
 
-describe("what resets the countdown", () => {
-  it("treats every ordinary sign of a person as presence", () => {
-    // A researcher reading a long list of names moves a pointer and scrolls, and neither
-    // is a keystroke. Watching keydown alone would lock under somebody's hands.
-    expect(PRESENCE).toContain("pointermove");
-    expect(PRESENCE).toContain("scroll");
-    expect(PRESENCE).toContain("keydown");
+describe("how long it waits", () => {
+  it("is fifteen minutes", () => {
+    expect(IDLE_LOCK_MS).toBe(15 * 60 * 1000);
   });
 
-  it("includes focus, so coming back to the window counts", () => {
-    expect(PRESENCE).toContain("focus");
+  it("is long enough not to lock under somebody working", () => {
+    // Shorter and a researcher reading a list learns to leave it unlocked, which is worse
+    // than a longer timer.
+    expect(IDLE_LOCK_MS).toBeGreaterThanOrEqual(10 * 60 * 1000);
   });
 
-  it("does not include anything the page does to itself", () => {
-    // A timer or a render must not keep the vault open; only a person may.
-    for (const event of PRESENCE) {
-      expect(["load", "visibilitychange", "message", "resize"]).not.toContain(event);
-    }
+  it("is short enough to matter over a lunch break", () => {
+    expect(IDLE_LOCK_MS).toBeLessThanOrEqual(20 * 60 * 1000);
   });
 });

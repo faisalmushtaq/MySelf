@@ -18,6 +18,7 @@ import {
   type PersonRecord,
 } from "../lib/db.js";
 import { passphraseComplaint } from "../lib/vault.js";
+import { IDLE_LOCK_MS, PRESENCE_EVENTS } from "../lib/idle.js";
 
 /**
  * Linkage — the only screen in this tool that shows a name.
@@ -90,18 +91,23 @@ export function Linkage({ onCorrectionsChanged }: { onCorrectionsChanged: () => 
     };
     const arm = () => {
       window.clearTimeout(timer);
-      timer = window.setTimeout(lock, 15 * 60 * 1000);
+      timer = window.setTimeout(lock, IDLE_LOCK_MS);
     };
     // Anything that means a person is present. `passive` so a scroll listener cannot
     // make the page feel heavy.
-    const events = ["keydown", "pointerdown", "pointermove", "scroll", "focus"] as const;
-    for (const event of events) window.addEventListener(event, arm, { passive: true });
-    document.addEventListener("visibilitychange", arm);
+    for (const event of PRESENCE_EVENTS) window.addEventListener(event, arm, { passive: true });
+    /**
+     * `visibilitychange` is deliberately NOT one of them.
+     *
+     * Re-arming when the tab is hidden extends the unlocked window rather than shortening
+     * it — hide the tab at fourteen minutes and the countdown starts again, so half an
+     * hour of real absence leaves the names open. A hidden tab is the absence of presence,
+     * not an event. Coming back is covered by `focus`.
+     */
     arm();
     return () => {
       window.clearTimeout(timer);
-      for (const event of events) window.removeEventListener(event, arm);
-      document.removeEventListener("visibilitychange", arm);
+      for (const event of PRESENCE_EVENTS) window.removeEventListener(event, arm);
     };
   }, [unlocked]);
 

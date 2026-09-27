@@ -282,30 +282,48 @@ async function refuse(
    * device on a bad connection produces by the dozen — used to accumulate a full copy of
    * the log each time. One row per sitting, with a count of how often it has happened.
    */
-  const room = 700_000;
   const asJson = JSON.stringify(session);
-  const row: Record<string, unknown> = {
-    reason: conflict.reason,
-    sessionId: session.sessionId,
-    heldDeviceId: stored?.deviceId ?? null,
-    heldEvents: stored?.eventCount ?? null,
-    arrivingDeviceId: deviceId,
-    arrivingEvents: doc.eventCount,
-    storedFlagged: conflict.storedIsSuspect,
-    refusals: FieldValue.increment(1),
-    at: now.toISOString(),
-  };
-  if (asJson.length <= room) {
-    row["arrivingSession"] = session;
-    row["arrivingSessionTruncated"] = false;
-  } else {
-    // The metadata plus enough of the head to recognise it. The device still holds the
-    // whole thing, and the reason says to hand it over as a file.
-    const { events: _tooBig, ...withoutEvents } = session;
-    row["arrivingSession"] = { ...withoutEvents, events: session.events.slice(0, 50) };
-    row["arrivingSessionTruncated"] = true;
-  }
-  await db.doc(`${paths.quarantine(study)}/${session.sessionId}`).set(row, { merge: true });
+  // BYTES, not UTF-16 units. `length` counts code units, so a sitting full of non-ASCII
+  // free text could pass a 700,000 check and still exceed Firestore's 1 MiB document
+  // limit — the exact write failure the check exists to prevent.
+  const bytes = Buffer.byteLength(asJson, "utf8");
+  const room = 700_000;
+  const truncated = bytes > room;
+
+  /**
+   * ONE ROW PER SITTING PER DEVICE, and the log stored as a string.
+   *
+   * Keyed on the sitting alone, a second device's refusal overwrote the first's copy —
+   * losing the evidence this function exists to keep. Worse, Firestore deep-merges nested
+   * maps, so a merged `arrivingSession` could end up holding one device's events beside
+   * another's `completedAt`: a record of a sitting that never existed. Including the
+   * device in the key keeps each one's copy, and repeated refusals from the same device
+   * merge onto their own row and increment a counter instead of accumulating copies.
+   *
+   * The log goes in as JSON text rather than a map, which is what makes the merge safe:
+   * a string is replaced whole. It is evidence for a person to read, not something to
+   * query.
+   */
+  await db.doc(`${paths.quarantine(study)}/${session.sessionId}__${deviceId}`).set(
+    {
+      reason: conflict.reason,
+      sessionId: session.sessionId,
+      heldDeviceId: stored?.deviceId ?? null,
+      heldEvents: stored?.eventCount ?? null,
+      arrivingDeviceId: deviceId,
+      arrivingEvents: doc.eventCount,
+      storedFlagged: conflict.storedIsSuspect,
+      refusals: FieldValue.increment(1),
+      arrivingSessionTruncated: truncated,
+      // Truncated to the head when it will not fit. The device still holds the whole
+      // thing, and the refusal tells the operator to hand it over as a file.
+      arrivingSessionJson: truncated
+        ? JSON.stringify({ ...session, events: session.events.slice(0, 50) })
+        : asJson,
+      at: now.toISOString(),
+    },
+    { merge: true },
+  );
 
   if (conflict.storedIsSuspect) {
     await db.doc(paths.session(study, session.sessionId)).set({ quarantined: true }, { merge: true });

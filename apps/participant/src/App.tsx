@@ -125,7 +125,17 @@ export default function App() {
    */
   const [saveError, setSaveError] = useState<string | null>(null);
   const [space, setSpace] = useState<Space | null>(null);
-  const unsaved = useRef<(() => Promise<void>) | null>(null);
+  /**
+   * Writes that did not land, in the order they were meant to.
+   *
+   * A QUEUE, NOT ONE WRITE. Keeping only the first failure meant a retry replayed that one
+   * and silently abandoned everything after it: a response saved with its timing paradata
+   * dropped, or a completion event written without the row that queues the sitting for
+   * upload. Each entry is a single Dexie transaction, so it either committed or it did
+   * not — which is what makes replaying the list safe rather than a way to duplicate
+   * events.
+   */
+  const unsaved = useRef<(() => Promise<void>)[]>([]);
   const [syncNote, setSyncNote] = useState<string | null>(null);
   const [codeError, setCodeError] = useState<string | null>(null);
   const [accessibility, setAccessibility] = useState<AccessibilityPreferences>(DEFAULT_ACCESSIBILITY_PREFERENCES);
@@ -294,9 +304,20 @@ export default function App() {
      * and a failure is silent because a participant answering questions is not the
      * person to tell about an upload.
      */
+    /**
+     * In sequence, not side by side.
+     *
+     * They share one lock — both send the same documents, so overlapping them makes a
+     * device race itself. Started together, the checkpoint takes the lock synchronously
+     * and the drain becomes a permanent no-op: the finished queue would never be sent
+     * during a sitting, which is the whole reason this tick does two things. Awaiting the
+     * first is what makes the second happen at all.
+     */
     const tick = () => {
-      void checkpointRunningSessions().catch(() => undefined);
-      void synchroniseCompletedSessions().catch(() => undefined);
+      void (async () => {
+        await checkpointRunningSessions().catch(() => undefined);
+        await synchroniseCompletedSessions().catch(() => undefined);
+      })();
     };
     // Runs once immediately as well as on the interval: a sitting that begins just
     // after a tick would otherwise wait a whole cadence before the study had any of it.
@@ -382,19 +403,25 @@ export default function App() {
   /**
    * Do a write, and stop the survey if it fails.
    *
-   * Returns whether it landed, so a caller can decline to advance. The failed write
-   * is kept so that "Try again" retries the actual work rather than just clearing
-   * the message — a retry that dismissed the warning without saving anything would
-   * be the same silent loss with an extra step.
+   * Returns whether it landed, so a caller can decline to advance. A failed write is
+   * KEPT, so that "Try again" retries the actual work rather than just clearing the
+   * message — a retry that dismissed the warning without saving anything would be the
+   * same silent loss with an extra step.
+   *
+   * Anything that arrives while something is already waiting joins the queue rather than
+   * being attempted, so a retry can never reorder a log.
    */
   const persist = useCallback(async (write: () => Promise<void>): Promise<boolean> => {
+    if (unsaved.current.length > 0) {
+      unsaved.current.push(write);
+      return false;
+    }
     try {
       await write();
-      unsaved.current = null;
       setSaveError(null);
       return true;
     } catch (error) {
-      unsaved.current = write;
+      unsaved.current = [write];
       setSaveError(
         error instanceof Error && /quota|storage|space/i.test(error.message)
           ? "This iPad has run out of space to save answers."
@@ -404,14 +431,29 @@ export default function App() {
     }
   }, []);
 
+  /**
+   * Replay everything waiting, in order, stopping at the first that still fails.
+   *
+   * Retrying one write and abandoning the rest was its own kind of silent loss: a
+   * response saved with its timing paradata dropped, or a completion event written
+   * without the row that queues the sitting for upload. Each entry is a single Dexie
+   * transaction — it either committed or it did not — which is what makes replaying the
+   * list safe rather than a way to duplicate events.
+   */
   const retrySave = useCallback(() => {
-    const write = unsaved.current;
-    if (!write) {
+    void (async () => {
+      while (unsaved.current.length > 0) {
+        try {
+          await unsaved.current[0]!();
+        } catch {
+          // Still failing. Leave it, and everything behind it, where they are.
+          return;
+        }
+        unsaved.current.shift();
+      }
       setSaveError(null);
-      return;
-    }
-    void persist(write);
-  }, [persist]);
+    })();
+  }, []);
 
   const record = useCallback(
     async (unit: PresentableUnit, value: AnswerValue) => {
@@ -600,11 +642,14 @@ export default function App() {
          * sitting stuck `in_progress`, never queued, never uploaded, and the participant
          * looking at a thank-you screen.
          */
-        const landed = await persist(async () => {
-          await appendEvent(phase.session, "session.completed", undefined, timing.current.summary(), from, tMono());
-          await completeSession(phase.session);
-        });
-        if (!landed) return;
+        // Two writes, two `persist` calls: one closure containing both would, on a retry
+        // after a partial failure, append a second `session.completed` with a second
+        // timing summary.
+        const wrote = await persist(() =>
+          appendEvent(phase.session, "session.completed", undefined, timing.current.summary(), from, tMono()),
+        );
+        if (!wrote) return;
+        if (!(await persist(() => completeSession(phase.session)))) return;
         setPhase({ kind: "finished", session: phase.session });
       } else {
         void enterItem(next);
@@ -1041,11 +1086,13 @@ export default function App() {
               // event always follows the last edit in the log. Through `persist` for the
               // same reason as the other completion path: this is the write that queues
               // the sitting for upload.
-              const landed = await persist(async () => {
-                await appendEvent(phase.session, "session.completed", undefined, timing.current.summary(), 0, tMono());
-                await completeSession(phase.session);
-              });
-              if (landed) setPhase({ kind: "finished", session: phase.session });
+              const wrote = await persist(() =>
+                appendEvent(phase.session, "session.completed", undefined, timing.current.summary(), 0, tMono()),
+              );
+              if (!wrote) return;
+              if (await persist(() => completeSession(phase.session))) {
+                setPhase({ kind: "finished", session: phase.session });
+              }
             })();
           }}
         />

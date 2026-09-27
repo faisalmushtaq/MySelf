@@ -332,11 +332,19 @@ describe("the same sitting from two devices", () => {
     await storeSitting(db, "ybm", session([event(0)]), "dev_ipad_1");
     await storeSitting(db, "ybm", session([event(0)]), "dev_ipad_2");
 
-    // One row per sitting, keyed on its id: a device on a bad connection refuses the same
-    // sitting by the dozen, and appending a full copy of the log each time is how a
-    // quarantine collection grows faster than the dataset it guards.
-    const filed = docs.get(`${paths.quarantine("ybm")}/ses_1`);
+    /**
+     * One row per sitting PER DEVICE.
+     *
+     * Keyed on the sitting alone, a second device's refusal overwrote the first's copy —
+     * losing the evidence this is for. And repeated refusals from one device, which a bad
+     * connection produces by the dozen, merge onto their own row and increment a counter
+     * rather than appending a full copy of the log each time.
+     */
+    const filed = docs.get(`${paths.quarantine("ybm")}/ses_1__dev_ipad_2`);
     expect(filed).toMatchObject({ heldDeviceId: "dev_ipad_1", arrivingDeviceId: "dev_ipad_2" });
+    // The log goes in as text, so a merge replaces it whole instead of deep-merging one
+    // device's events into another's metadata.
+    expect(typeof filed!["arrivingSessionJson"]).toBe("string");
   });
 
   it("stays quarantined when the first device uploads again", async () => {
@@ -391,7 +399,7 @@ describe("a sitting that contradicts the one already stored", () => {
 
     expect((docs.get(paths.session("ybm", "ses_1")) as unknown as SessionDoc).quarantined).toBe(false);
     // Nothing is dropped, though: the short copy is filed with both counts.
-    expect(docs.get(`${paths.quarantine("ybm")}/ses_1`)).toMatchObject({
+    expect(docs.get(`${paths.quarantine("ybm")}/ses_1__dev_ipad_1`)).toMatchObject({
       heldEvents: 3,
       arrivingEvents: 1,
       storedFlagged: false,
@@ -465,7 +473,7 @@ describe("two iPads handed over at the same moment", () => {
     expect(outcome).toMatchObject({ stored: false, quarantined: true });
     const doc = docs.get(paths.session("ybm", "ses_1")) as unknown as SessionDoc;
     expect(doc.deviceId).toBe("dev_ipad_2");
-    expect(docs.get(`${paths.quarantine("ybm")}/ses_1`)).toBeTruthy();
+    expect(docs.get(`${paths.quarantine("ybm")}/ses_1__dev_ipad_1`)).toBeTruthy();
   });
 });
 
