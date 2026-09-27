@@ -147,6 +147,11 @@ export function wideTable(data: Dataset): WideTable {
       informant: s.informant ?? null,
       started: s.startedAt.slice(0, 10),
       minutes: s.durationMs === undefined ? null : Math.round(s.durationMs / 6000) / 10,
+      // Beside `minutes`, because the two differ exactly when a sitting was interrupted
+      // and an analysis screening on time needs to be able to see that rather than
+      // silently drop the sittings a school day produces.
+      elapsed_minutes: s.wallClockMs === undefined ? null : Math.round(s.wallClockMs / 6000) / 10,
+      resumed: s.resumedCount,
       answered: s.answeredCount,
       skipped: s.skippedCount,
       too_fast: s.tooFastCount,
@@ -187,7 +192,9 @@ export function wideTable(data: Dataset): WideTable {
     { key: "site", label: "Site", kind: "category" },
     { key: "informant", label: "Answered by", kind: "category" },
     { key: "started", label: "Date", kind: "text" },
-    { key: "minutes", label: "Minutes", kind: "number" },
+    { key: "minutes", label: "Minutes on task", kind: "number" },
+    { key: "elapsed_minutes", label: "Minutes elapsed", kind: "number" },
+    { key: "resumed", label: "Times resumed", kind: "number" },
     { key: "answered", label: "Answered", kind: "number" },
     { key: "skipped", label: "Skipped", kind: "number" },
     { key: "too_fast", label: "Too fast", kind: "number" },

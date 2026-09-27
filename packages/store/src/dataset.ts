@@ -68,9 +68,29 @@ export const sessionRow = z.object({
   releaseHash: z.string().min(1),
   startedAt: z.string().datetime(),
   completedAt: z.string().datetime().optional(),
-  /** Wall-clock and foreground durations, in milliseconds. */
+  /**
+   * Durations, in milliseconds, and they measure different things on purpose.
+   *
+   * `durationMs` and `foregroundMs` are what the DEVICE measured, from a monotonic
+   * clock, so neither is disturbed by an iPad's clock being wrong or changing mid-
+   * sitting. Both cover the app session that FINISHED the sitting: the device's timer
+   * starts fresh when a sitting is resumed after a reload or a crash, because a
+   * monotonic clock does not survive the page being reloaded and nothing else it could
+   * use would be trustworthy.
+   *
+   * `wallClockMs` is derived here instead, from the first and last event in the log, so
+   * it always covers the WHOLE sitting — including any stretch where the app was closed.
+   * For a sitting that was never interrupted the two agree closely; for one that was,
+   * `wallClockMs` is longer and `resumedCount` says why.
+   *
+   * An analysis screening on time should say which it means. `resumedCount` is how you
+   * find the sittings where it matters.
+   */
   durationMs: z.number().int().min(0).optional(),
   foregroundMs: z.number().int().min(0).optional(),
+  wallClockMs: z.number().int().min(0).optional(),
+  /** How many times this sitting was resumed after the app stopped. */
+  resumedCount: z.number().int().min(0),
   /** Counts that describe how the sitting went, for data-quality screening. */
   answeredCount: z.number().int().min(0),
   skippedCount: z.number().int().min(0),

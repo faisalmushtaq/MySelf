@@ -157,6 +157,15 @@ function replay(session: DeviceSession) {
   let reviewEdits = 0;
   let durationMs: number | undefined;
   let foregroundMs: number | undefined;
+  /**
+   * How many times the app stopped and the sitting was picked up again.
+   *
+   * Worth counting because the device's own timer starts fresh on each resume — a
+   * monotonic clock does not survive a reload — so `durationMs` on a resumed sitting
+   * covers only the last stretch. This is how an analysis finds the sittings where that
+   * matters, rather than quietly screening on a duration that means something else.
+   */
+  let resumedCount = 0;
   const secret: Record<string, string> = {};
 
   const at = (key: string): ItemState => {
@@ -219,6 +228,10 @@ function replay(session: DeviceSession) {
         if (typeof code === "string") secret["val_id"] = code;
         break;
       }
+      case "session.resumed": {
+        resumedCount += 1;
+        break;
+      }
       case "session.completed": {
         const total = (p as { totalMs?: number; foregroundMs?: number }).totalMs;
         const fg = (p as { foregroundMs?: number }).foregroundMs;
@@ -228,7 +241,21 @@ function replay(session: DeviceSession) {
       }
     }
   }
-  return { items, reviewEdits, durationMs, foregroundMs, secret };
+  /**
+   * The whole sitting, end to end, from the log itself.
+   *
+   * Derived rather than reported, so it covers every stretch including the ones the
+   * device's own timer could not see. `tWall` comes from the iPad's clock, so a device
+   * whose clock jumped mid-sitting could distort this — which is exactly why it sits
+   * beside `durationMs` rather than replacing it, and why both are in the dataset.
+   */
+  const stamps = session.events
+    .map((event) => Date.parse(event.tWall))
+    .filter((value) => Number.isFinite(value));
+  const wallClockMs =
+    stamps.length > 1 ? Math.max(0, Math.max(...stamps) - Math.min(...stamps)) : undefined;
+
+  return { items, reviewEdits, durationMs, foregroundMs, wallClockMs, resumedCount, secret };
 }
 
 /** The four components of the secret code, as answered in this session. */
@@ -326,7 +353,7 @@ export function ingest(sessions: DeviceSession[], options: IngestOptions): Inges
       continue;
     }
 
-    const { items, reviewEdits, durationMs, foregroundMs } = replay(session);
+    const { items, reviewEdits, durationMs, foregroundMs, wallClockMs, resumedCount } = replay(session);
     const derived = deriveParticipantCode(secretParts(items));
     // An assignment is a statement about this exact sitting and outranks a
     // correction, which is a statement about a code.
@@ -448,6 +475,8 @@ export function ingest(sessions: DeviceSession[], options: IngestOptions): Inges
       ...(session.completedAt ? { completedAt: session.completedAt } : {}),
       ...(durationMs !== undefined ? { durationMs } : {}),
       ...(foregroundMs !== undefined ? { foregroundMs } : {}),
+      ...(wallClockMs !== undefined ? { wallClockMs } : {}),
+      resumedCount,
       answeredCount: answered,
       skippedCount: skipped,
       tooFastCount: tooFast,
