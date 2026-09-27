@@ -139,31 +139,57 @@ export async function pullSittings(): Promise<StudyPull> {
   const { db } = firebase();
   const snapshot = await getDocs(collection(db, paths.sessions(STUDY)));
 
+  return assemblePull(
+    snapshot.docs.map((document) => document.data() as SessionDoc),
+    async (sessionId) =>
+      (await getDocs(collection(db, paths.sessionChunks(STUDY, sessionId)))).docs.map((c) => c.data() as ChunkDoc),
+  );
+}
+
+/**
+ * Turn what the database holds into sittings, or say why it could not.
+ *
+ * Separated from the querying so it can be tested without a browser or an emulator,
+ * because the decisions here are the ones with consequences and the query is four lines
+ * of SDK. It is also the path by which a researcher gets data at all: a bug in it means
+ * sittings that are safely in the database and unreachable, which is the failure this
+ * whole read path was built to fix.
+ */
+export async function assemblePull(
+  documents: readonly SessionDoc[],
+  chunksFor: (sessionId: string) => Promise<ChunkDoc[]>,
+): Promise<StudyPull> {
   const sessions: DeviceSession[] = [];
   const unreadable: string[] = [];
   let quarantined = 0;
 
-  for (const document of snapshot.docs) {
-    const data = document.data() as SessionDoc;
+  for (const data of documents) {
     if (data.quarantined === true) {
       quarantined += 1;
       continue;
     }
     try {
-      const chunks: ChunkDoc[] =
-        data.chunkCount > 0
-          ? (await getDocs(collection(db, paths.sessionChunks(STUDY, data.sessionId)))).docs.map(
-              (c) => c.data() as ChunkDoc,
-            )
-          : [];
+      // Only fetched when the sitting says it spilled. A normal sitting is one document,
+      // and reading a collection that does not exist for every one of them would double
+      // the cost of a pull for nothing.
+      const chunks = data.chunkCount > 0 ? await chunksFor(data.sessionId) : [];
       sessions.push(joinSession(data, chunks));
     } catch {
+      /**
+       * Named, not dropped, and not allowed to fail the whole pull.
+       *
+       * `joinSession` throws rather than returning a short log when a spilled sitting is
+       * missing a chunk — the one way a sitting could lose data invisibly. So the honest
+       * report is "these thirty came, this one is torn, go and look at it", and the
+       * thirty still arrive.
+       */
       unreadable.push(data.sessionId);
     }
   }
 
   return { sessions, quarantined, unreadable };
 }
+
 
 // ── Devices ────────────────────────────────────────────────────────────────
 
