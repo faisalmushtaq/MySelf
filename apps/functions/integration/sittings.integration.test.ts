@@ -402,20 +402,40 @@ describe("many sittings at once, as a handover produces", () => {
 describe("a class of thirty iPads handing in at once", () => {
   const CLASS_SIZE = 30;
 
-  /** A sitting whose every event names the device that wrote it. */
-  const ownedSitting = (n: number, events: number): DeviceSession =>
+  /**
+   * A sitting whose every event names the device that wrote it.
+   *
+   * `chars` pads each event, because the spill into chunks is decided by BYTES and not
+   * by event count: `splitSession` stores a sitting inline whenever the whole document
+   * fits in `MAX_DOCUMENT_BYTES`, and `EVENTS_PER_CHUNK` only divides up what is left
+   * over once it does not. The first version of this test used event counts alone and
+   * every one of its thirty sittings went inline — so the concurrent spill path, which
+   * is the one with several documents per sitting to get wrong, was not exercised at
+   * all. A mutation that dropped the last chunk from every split left it passing.
+   */
+  const ownedSitting = (n: number, events: number, chars = 0): DeviceSession =>
     sitting(
       Array.from({ length: events }, (_, i) => ({
         ...event(i),
-        payload: { value: { kind: "choice", code: i % 5 }, writtenBy: `ipad_${n}` },
+        payload: {
+          value: { kind: "choice", code: i % 5 },
+          writtenBy: `ipad_${n}`,
+          ...(chars > 0 ? { note: "x".repeat(chars) } : {}),
+        },
       })),
       { sessionId: `ses_class_${n}`, studyCode: `NDC${String(n).padStart(4, "0")}` },
     );
 
+  /** Long free-text answers, which is what actually pushes a sitting over the limit. */
+  const spills = (n: number) => n % 5 === 0;
+
   it("stores every sitting whole, with nothing crossing between them", async () => {
-    // Varying lengths so some spill into chunks and some do not — the mixture is the
-    // point, because the spill path is the one with more than one document to get wrong.
-    const sittings = Array.from({ length: CLASS_SIZE }, (_, n) => ownedSitting(n, 200 + n * 90));
+    // A mixture on purpose: every fifth device sends a sitting of long free-text answers
+    // that exceeds `MAX_DOCUMENT_BYTES` and spills into chunks, and the rest go inline.
+    // Both paths are then running concurrently, which is the actual situation.
+    const sittings = Array.from({ length: CLASS_SIZE }, (_, n) =>
+      spills(n) ? ownedSitting(n, 2_200, 400) : ownedSitting(n, 200 + n * 30),
+    );
 
     const outcomes = await Promise.all(
       sittings.map((one, n) => storeSitting(db, STUDY, one, `ipad_${n}`, new Date(), "device")),
@@ -428,6 +448,10 @@ describe("a class of thirty iPads handing in at once", () => {
       expect(back.studyCode, `sitting ${n} came back under the wrong code`).toBe(`NDC${String(n).padStart(4, "0")}`);
       expect(back.events, `sitting ${n} lost events`).toHaveLength(sent.events.length);
       expect(back.events.map((e) => e.seq)).toEqual([...Array(sent.events.length).keys()]);
+      // And the mixture is real rather than asserted in a comment: a change that stopped
+      // these spilling would make the test quietly weaker, so it has to fail instead.
+      const parent = await db.doc(paths.session(STUDY, `ses_class_${n}`)).get();
+      expect((parent.data() as SessionDoc).chunkCount > 0, `sitting ${n} spilled unexpectedly`).toBe(spills(n));
       // The check that catches an interleave a count would miss.
       const writers = new Set(back.events.map((e) => (e.payload as { writtenBy?: string } | undefined)?.writtenBy));
       expect([...writers], `sitting ${n} carries another device's events`).toEqual([`ipad_${n}`]);
@@ -443,9 +467,12 @@ describe("a class of thirty iPads handing in at once", () => {
      * whole mechanism exists to make impossible.
      */
     const pairs = 10;
+    // Equal event counts, so the rule has to fall back on "this is a second device"
+    // rather than on one log being longer — and every fifth pair is over the document
+    // limit, so a refusal there has chunks to leave behind or not.
     const attempts = Array.from({ length: pairs }, (_, p) => [
-      { device: `ipad_first_${p}`, sitting: ownedSitting(p, 400) },
-      { device: `ipad_second_${p}`, sitting: ownedSitting(p, 400) },
+      { device: `ipad_first_${p}`, sitting: spills(p) ? ownedSitting(p, 2_200, 400) : ownedSitting(p, 400) },
+      { device: `ipad_second_${p}`, sitting: spills(p) ? ownedSitting(p, 2_200, 400) : ownedSitting(p, 400) },
     ]).flat();
 
     const results = await Promise.all(
@@ -460,7 +487,7 @@ describe("a class of thirty iPads handing in at once", () => {
       expect(forThisId.filter((r) => !r.stored)).toHaveLength(1);
 
       const back = await readBack(`ses_class_${p}`);
-      expect(back.events).toHaveLength(400);
+      expect(back.events).toHaveLength(spills(p) ? 2_200 : 400);
       const writers = new Set(back.events.map((e) => (e.payload as { writtenBy?: string } | undefined)?.writtenBy));
       // One device's log, whole. Not a blend.
       expect([...writers], `id ${p} was stored as a blend of two devices`).toHaveLength(1);

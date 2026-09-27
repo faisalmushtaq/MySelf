@@ -632,8 +632,16 @@ failed, the sync rules protect a sitting that still exists. None of them sees th
 one coming, and the loss is a whole morning with nobody aware there was anything to
 lose.
 
+The app was not silent about persistence, but what it did amounted to the same thing.
+`void navigator.storage?.persist?.()` ran on every phase change with the answer thrown
+away: nothing found out whether the browser agreed, a refusal was indistinguishable from
+a grant, and on an iPad — where Safari does not implement the method — the call was a
+no-op that read like protection. (My first pass through this claimed the request was
+never made at all; it was, and the grep that said otherwise required a literal `persist(`
+and missed the optional call.)
+
 `apps/participant/src/lib/durability.ts` now asks the browser for a persistence
-promise on launch and reports where that leaves the device. Deliberately, it does no
+promise on launch, once, keeps the answer, and reports where that leaves the device. Deliberately, it does no
 user-agent sniffing: the question worth answering is not "is this Safari" but "did we
 get a promise that this data survives", which is answerable directly — so a future
 WebKit that implements `persist()` reads as safe with no change here, and a Chrome
@@ -678,9 +686,12 @@ Only a clock read at the moment of a request separates them, and only if somethi
 records it.
 
 So the upload now carries `sentAt`, the device's clock at the instant of the request,
-and the study keeps it beside its own `receivedAt` in the `sittings.received` audit
-row rather than reducing the pair to a difference — two representations of one fact
-drift; the pair does not. A device more than five minutes out is logged as a warning
+and the study keeps it in the `sittings.received` audit row beside its own reading of
+the same moment and the difference between them. All three, because the row's `at` is a
+server timestamp resolved when the write lands rather than when the request was read, so
+a reader subtracting `sentAt` from `at` would get a slightly different number with no way
+to know which was meant — and because "rows where the device was more than a minute out"
+is a question about a number, not about a pair. A device more than five minutes out is logged as a warning
 during fieldwork, which is where it can still be acted on. The tolerance is loose on
 purpose: request latency and an RTC-kept clock put seconds to a minute between the
 readings, and a warning that fires on those is a warning that gets filtered.
@@ -760,6 +771,47 @@ With that fixed, every CI job has a locally-verified counterpart except the WebK
 project itself: unit and typecheck, the integration suite against the emulator, the
 full chain over HTTP, the browser walk under Chromium, and the 20 security-rules tests
 (which also pass here). The first WebKit run is the thing to look at.
+
+## 13. A third review pass, over §11 and §12
+
+Two review passes over the previous night's work found eighteen defects, so the same
+treatment was applied to this night's. Three findings, and one of them is the kind worth
+being loud about.
+
+**A test whose comment claimed coverage it did not have.** The class-of-thirty case said
+"varying lengths so some spill into chunks and some do not — the mixture is the point,
+because the spill path is the one with more than one document to get wrong". It was
+false. The spill is decided by *bytes*: `splitSession` stores a sitting inline whenever
+the whole document fits in `MAX_DOCUMENT_BYTES`, and `EVENTS_PER_CHUNK` only divides up
+what is left over once it does not. Every one of the thirty sittings went inline, so the
+concurrent spill path was not exercised at all — and the way that was established was by
+mutating `splitSession` to drop the last chunk of every split, which the existing spill
+test caught and the new one did not. A test that passes a mutation of the thing it claims
+to cover is worse than no test, because the comment is then load-bearing and wrong.
+
+Both cases now pad events with long free-text answers so every fifth device genuinely
+exceeds the limit, and both assert the mixture rather than describing it: the session
+document's `chunkCount` has to be non-zero for exactly the devices expected to spill. The
+dropped-chunk mutation now fails them, and raising `MAX_DOCUMENT_BYTES` so nothing can
+spill also fails them, which is the guard against this weakening again unnoticed.
+
+**A comment that contradicted its own code.** The audit row's docstring said the device's
+clock was "kept beside the server's `at` rather than reduced to a difference — two
+representations of one fact drift; the pair does not", and the code then stored the
+difference as well. Worse, the two really could disagree: `at` is a server timestamp
+resolved by Firestore when the write lands, while the difference was computed against the
+handler's reading at the start of the request. The row now carries all three — `sentAt`,
+the `receivedAt` the difference actually came from, and `clockSkewMs` — and says why:
+the pair is the observation, and the number is what you query.
+
+**A persistence request whose answer was thrown away, and a wrong claim about it.**
+`void navigator.storage?.persist?.()` was already running on every phase change with the
+result discarded — nothing found out whether the browser agreed, a refusal looked
+identical to a grant, and on an iPad the call was a no-op that read like protection. The
+bare call is gone, since `storageDurability` now asks once per launch and keeps the
+answer. And §11 as first written claimed the request was never made at all, which was
+wrong: the grep behind that claim required a literal `persist(` and missed the optional
+call. Corrected in place rather than quietly.
 
 ### What is still not done
 

@@ -264,8 +264,16 @@ export default function App() {
   }, [runSync]);
 
   useEffect(() => {
+    /**
+     * Persistence used to be requested here as a bare `void navigator.storage?.persist?.()`
+     * on every phase change, with the answer thrown away. That is three problems in one
+     * line: nothing ever found out whether the browser agreed, a refusal looked identical
+     * to a grant, and on an iPad — where Safari does not implement the method at all — the
+     * call was a no-op that read like protection. `refreshDeviceStatus` now goes through
+     * `storageDurability`, which asks once per launch, keeps the answer, and reports what
+     * to do when there is no promise to be had.
+     */
     void refreshDeviceStatus();
-    void navigator.storage?.persist?.();
   }, [phase.kind, refreshDeviceStatus]);
 
   /**

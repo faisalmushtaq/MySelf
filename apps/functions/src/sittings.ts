@@ -466,11 +466,21 @@ export const saveSitting = onRequest(
           quarantined: outcomes.filter((o) => o.quarantined).length,
           sessionIds: outcomes.map((o) => o.sessionId),
           /**
-           * The device's own clock, kept beside the server's `at` rather than reduced to
-           * a difference. Two representations of one fact drift; the pair does not, and
-           * an analyst can compute whatever correction they need from it.
+           * The device's clock, the study's reading of the same moment, and the difference
+           * between them — all three, deliberately.
+           *
+           * `receivedAt` is here rather than left to `at` because `at` is a server
+           * timestamp resolved by Firestore when the write lands, which is some unknown
+           * number of milliseconds after the request was read. `skewMs` was computed
+           * against `now`, so a reader subtracting `sentAt` from `at` would get a
+           * slightly different number and have no way to know which was meant. Writing
+           * the reading the difference came from makes the row self-consistent.
+           *
+           * And the difference is stored as well as derivable because it is the thing
+           * worth querying: "audit rows where the device was more than a minute out" is a
+           * question about a number, not about a pair.
            */
-          ...(parsed.data.sentAt ? { sentAt: parsed.data.sentAt } : {}),
+          ...(parsed.data.sentAt ? { sentAt: parsed.data.sentAt, receivedAt: now.toISOString() } : {}),
           ...(skewMs === null ? {} : { clockSkewMs: skewMs }),
           at: FieldValue.serverTimestamp(),
         });
