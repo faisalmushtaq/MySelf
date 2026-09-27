@@ -112,8 +112,13 @@ const persistence: SyncPersistence = {
  * timer during a sitting, and the network returning), and an invariant enforced by
  * every caller separately is one a fourth caller will break.
  */
-let uploading = false;
-let checkpointing = false;
+/**
+ * ONE FLAG, NOT TWO. They were separate, which meant a checkpoint of a sitting and the
+ * completed upload of that same sitting could be in flight together — which is the race
+ * the guard exists to prevent, arriving between the two functions instead of within one.
+ * Both send the same documents, so they share the lock.
+ */
+let busy = false;
 
 export interface SyncOptions {
   /** Attempt sessions whose retry time has not yet arrived. Intended for the visible Sync now action. */
@@ -135,16 +140,16 @@ export async function synchroniseCompletedSessions(options: SyncOptions = {}): P
   if (typeof navigator !== "undefined" && navigator.onLine === false) {
     return { outcomes: [{ kind: "offline" }], synced: 0, failed: 0, quarantined: 0 };
   }
-  // Already draining. A second pass would re-send sittings the first is mid-way
-  // through and race its own uploads.
-  if (uploading) return { outcomes: [], synced: 0, failed: 0, quarantined: 0 };
-  uploading = true;
+  // Already uploading something. A second pass would re-send sittings the first is
+  // mid-way through and race its own uploads.
+  if (busy) return { outcomes: [], synced: 0, failed: 0, quarantined: 0 };
+  busy = true;
 
   const storage = options.storage ?? persistence;
   try {
     return await drain(storage, options);
   } finally {
-    uploading = false;
+    busy = false;
   }
 }
 
@@ -225,16 +230,17 @@ export interface CheckpointReport {
  */
 export async function checkpointRunningSessions(options: SyncOptions = {}): Promise<CheckpointReport> {
   if (typeof navigator !== "undefined" && navigator.onLine === false) return { saved: 0, missed: 0 };
-  // A checkpoint still in flight is already sending a copy of this sitting. Sending a
-  // second, longer one alongside it makes the two race, and the loser is refused.
-  if (checkpointing) return { saved: 0, missed: 0 };
-  checkpointing = true;
+  // Anything still in flight is already sending a copy of some sitting — possibly this
+  // one. Sending a second, longer copy alongside it makes the two race, and the loser is
+  // refused.
+  if (busy) return { saved: 0, missed: 0 };
+  busy = true;
 
   const storage = options.storage ?? persistence;
   try {
     return await sendCheckpoints(storage, options);
   } finally {
-    checkpointing = false;
+    busy = false;
   }
 }
 
@@ -348,6 +354,5 @@ function explain(error: unknown): string {
 
 /** Only for tests, which need each case to start with nothing in flight. */
 export function resetInFlightForTests(): void {
-  uploading = false;
-  checkpointing = false;
+  busy = false;
 }

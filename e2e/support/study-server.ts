@@ -126,7 +126,7 @@ export async function startStudyServer(study = "ybm"): Promise<StudyServer> {
           const outcomes = [];
           for (const one of parsed.data.sittings) {
             outcomes.push(
-              await storeSitting(db, study, one as never, deviceId, now, caller.anonymous ? "open" : "enrolled"),
+              await storeSitting(db, study, one as never, deviceId, now, caller.device ? "device" : "imported"),
             );
           }
           res

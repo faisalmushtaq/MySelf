@@ -115,19 +115,26 @@ export interface SessionDoc {
    */
   quarantined: boolean;
   /**
-   * How the device that filed this was authenticated.
+   * How this sitting reached the study.
    *
-   * `"open"` — it signed itself in, which is what happens when a participant
-   * opens the study's URL on any iPad. This is the normal case.
-   * `"enrolled"` — an owner registered that device and named it.
+   * `"device"` — an iPad presented the credential it issued itself, which is how a
+   * fielded sitting arrives. `"imported"` — a member of the research team uploaded a
+   * handover file from a device that could not reach the network.
    *
-   * Recorded because the alternative is a dataset that cannot tell the two apart.
-   * It is NOT a quality judgement and nothing filters on it by default: an
-   * open-URL sitting from a school hall is exactly as real as any other. It is
-   * here so that a study which DOES care — one fielding on known devices, or one
-   * checking whether a stray sitting came from outside the room — can ask.
+   * IT USED TO SAY `"open" | "enrolled"`, and that distinction died with `enrolDevice`:
+   * no device is registered in advance any more, so every sitting was `"open"` and the
+   * field discriminated nothing. Worse, it was derived from whether the CALLER was
+   * anonymous, so a researcher importing a file — who is signed in — was recorded as
+   * `"enrolled"`, labelling an unregistered iPad's sitting as having come from a
+   * vouched-for device. Exactly backwards.
+   *
+   * What remains is worth recording: a sitting that arrived over the network was filed by
+   * a device that proved which device it was, and one that arrived by file was filed by a
+   * person who said so. Neither is a quality judgement and nothing filters on it by
+   * default — a sitting handed over on a USB stick from a hall with no wifi is as real as
+   * any other — but an analysis that wants to know can ask.
    */
-  enrolment: "open" | "enrolled";
+  provenance: "device" | "imported";
 }
 
 export interface ChunkDoc {
@@ -174,11 +181,11 @@ export function splitSession(
   study: string,
   now = new Date(),
   /**
-   * Defaults to `"open"` on purpose. A caller that forgets is then pessimistic
-   * about its own sitting rather than quietly labelling an open-URL one as having
-   * come from a device somebody vouched for.
+   * Defaults to `"imported"` on purpose. A caller that forgets then understates what it
+   * knows — "a person put this here" — rather than claiming a device proved itself when
+   * nothing checked.
    */
-  enrolment: SessionDoc["enrolment"] = "open",
+  provenance: SessionDoc["provenance"] = "imported",
 ): SplitSession {
   const ordered = [...session.events].sort((a, b) => a.seq - b.seq);
   const base: Omit<SessionDoc, "events" | "chunkCount"> = {
@@ -194,7 +201,7 @@ export function splitSession(
     eventCount: ordered.length,
     receivedAt: now.toISOString(),
     quarantined: false,
-    enrolment,
+    provenance,
   };
 
   if (byteLength({ ...base, events: ordered }) <= MAX_DOCUMENT_BYTES) {

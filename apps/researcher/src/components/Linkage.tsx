@@ -70,10 +70,14 @@ export function Linkage({ onCorrectionsChanged }: { onCorrectionsChanged: () => 
   /**
    * Lock it again when nobody is there.
    *
-   * A laptop left open on a staffroom table with the names on screen is the
-   * ordinary case, not the paranoid one. Fifteen minutes of the tab being hidden
-   * or the window being unfocused is long enough not to interrupt somebody
-   * cross-checking a spreadsheet, and short enough to matter over a lunch break.
+   * A laptop left open on a staffroom table with the names on screen is the ordinary
+   * case, not the paranoid one.
+   *
+   * IT IS AN IDLE TIMER, NOT A HIDDEN-TAB TIMER. The first version only armed while
+   * `document.hidden`, which meant the case the comment described — a laptop left open on
+   * THIS screen — never locked at all, because the tab was visible the whole time. Now
+   * any fifteen minutes without a key, a pointer or a scroll locks it, and a hidden tab
+   * counts as idle for the same reason.
    */
   useEffect(() => {
     if (!unlocked) return;
@@ -86,12 +90,17 @@ export function Linkage({ onCorrectionsChanged }: { onCorrectionsChanged: () => 
     };
     const arm = () => {
       window.clearTimeout(timer);
-      if (document.hidden) timer = window.setTimeout(lock, 15 * 60 * 1000);
+      timer = window.setTimeout(lock, 15 * 60 * 1000);
     };
+    // Anything that means a person is present. `passive` so a scroll listener cannot
+    // make the page feel heavy.
+    const events = ["keydown", "pointerdown", "pointermove", "scroll", "focus"] as const;
+    for (const event of events) window.addEventListener(event, arm, { passive: true });
     document.addEventListener("visibilitychange", arm);
     arm();
     return () => {
       window.clearTimeout(timer);
+      for (const event of events) window.removeEventListener(event, arm);
       document.removeEventListener("visibilitychange", arm);
     };
   }, [unlocked]);

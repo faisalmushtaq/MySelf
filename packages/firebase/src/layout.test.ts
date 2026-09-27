@@ -195,23 +195,23 @@ describe("conflicts", () => {
  * dataset that could not tell an open-URL sitting from one collected on a named
  * device would have lost a distinction it may later need.
  */
-describe("how the device was authenticated", () => {
-  it("defaults to open, which is pessimistic rather than flattering", () => {
-    // A caller that forgets should understate its own sitting, not quietly label
-    // it as having come from a device somebody vouched for.
-    expect(splitSession(session([event(0)]), "anon_1", "ybm").doc.enrolment).toBe("open");
+describe("how a sitting reached the study", () => {
+  it("defaults to imported, which understates rather than flatters", () => {
+    // A caller that forgets should say "a person put this here" rather than claim a
+    // device proved itself when nothing checked.
+    expect(splitSession(session([event(0)]), "anon_1", "ybm").doc.provenance).toBe("imported");
   });
 
-  it("records a registered device when it is told about one", () => {
-    expect(splitSession(session([event(0)]), "dev_1", "ybm", new Date(0), "enrolled").doc.enrolment).toBe("enrolled");
+  it("records a device that presented its own credential", () => {
+    expect(splitSession(session([event(0)]), "ipad_1", "ybm", new Date(0), "device").doc.provenance).toBe("device");
   });
 
   it("is not something conflictWith has an opinion about", () => {
-    // An iPad that was registered part way through a study must not have its own
-    // earlier sittings treated as contradicting its later ones.
-    const open = splitSession(session([event(0)]), "dev_1", "ybm", new Date(0), "open").doc;
-    const enrolled = splitSession(session([event(0), event(1)]), "dev_1", "ybm", new Date(0), "enrolled").doc;
-    expect(conflictWith(open, enrolled)).toBeNull();
+    // The same sitting arriving by file and then over the network — or the reverse — is
+    // one sitting from one device, and must not read as a contradiction.
+    const imported = splitSession(session([event(0)]), "ipad_1", "ybm", new Date(0), "imported").doc;
+    const filed = splitSession(session([event(0), event(1)]), "ipad_1", "ybm", new Date(0), "device").doc;
+    expect(conflictWith(imported, filed)).toBeNull();
   });
 });
 

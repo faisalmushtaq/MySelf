@@ -133,7 +133,7 @@ class MySelfDb extends Dexie {
   device!: EntityTable<DeviceRow, "id">;
   install!: EntityTable<InstallRow, "id">;
   sync_state!: EntityTable<SyncStateRow, "sessionId">;
-  sync_receipts!: EntityTable<SyncReceiptRow, "sessionId">;
+  receipts!: EntityTable<SyncReceiptRow, "sessionId">;
   checkpoints!: EntityTable<CheckpointRow, "sessionId">;
   accessibility!: EntityTable<AccessibilityRow, "id">;
 
@@ -162,36 +162,42 @@ class MySelfDb extends Dexie {
       accessibility: "id, updatedAt",
     });
     /**
-     * Version 4: enrolment instead of a pasted endpoint, and checkpoints.
+     * Version 4: a self-issued identity, checkpoints, and receipts that mean
+     * something.
      *
-     * `sync_config` held an endpoint and a bearer token for a server that was
-     * never deployed, and `sync_receipts` was keyed on a batch id the study's
-     * actual write path does not issue. Both are dropped rather than migrated:
-     * nothing was ever successfully synchronised through them, so there is no
-     * record here worth carrying forward, and a receipt keyed on the wrong thing
-     * is worse than none. Sittings and their event logs are untouched — an iPad
-     * upgraded mid-study keeps everything a child answered.
+     * `sync_config` held an endpoint and a bearer token for a server that was never
+     * deployed. `sync_receipts` was keyed on a batch id the study's actual write path
+     * does not issue. Both go.
+     *
+     * THE NEW RECEIPTS TABLE HAS A NEW NAME, AND THAT IS NOT COSMETIC. Re-keying
+     * `sync_receipts` from `batchId` to `sessionId` looked like the obvious migration
+     * and would have bricked every device that had ever opened the app: Dexie refuses a
+     * primary-key change outright — `getSchemaDiff` throws `Upgrade: Not yet support for
+     * changing primary key` — and it throws BEFORE any `.upgrade()` callback runs, so
+     * there is no hook from which to clear the table first. The database would simply
+     * fail to open, on a device holding sittings, with no way in.
+     *
+     * So the old table is dropped and `receipts` is created beside it. Dropping and
+     * adding are both things Dexie will do.
+     *
+     * Nothing worth keeping is lost: no sitting was ever successfully synchronised
+     * through the old shape, and a receipt keyed on the wrong thing is worse than none.
+     * An upgraded device treats its queued sittings as unconfirmed and sends them again,
+     * which `saveSitting` is idempotent about. Sittings and their event logs are
+     * untouched — an iPad upgraded mid-study keeps everything a child answered.
      */
-    this.version(4)
-      .stores({
-        sessions: "sessionId, participantCode, state, updatedAt",
-        events: "eventId, sessionId, [sessionId+seq]",
-        device: "id",
-        sync_config: null,
-        install: "id",
-        sync_state: "sessionId, nextAttemptAt, syncedAt, quarantinedAt",
-        sync_receipts: "sessionId, verifiedAt",
-        checkpoints: "sessionId, at",
-        accessibility: "id, updatedAt",
-      })
-      .upgrade(async (tx) => {
-        // Receipts from the old shape cannot be re-keyed — they carry a batch id
-        // and a list of accepted sequences, not a stored-event count — so an
-        // upgraded device treats its queued sittings as not yet confirmed and
-        // sends them again. `saveSitting` is idempotent, so that costs one
-        // upload and nothing else.
-        await tx.table("sync_receipts").clear();
-      });
+    this.version(4).stores({
+      sessions: "sessionId, participantCode, state, updatedAt",
+      events: "eventId, sessionId, [sessionId+seq]",
+      device: "id",
+      sync_config: null,
+      sync_receipts: null,
+      install: "id",
+      sync_state: "sessionId, nextAttemptAt, syncedAt, quarantinedAt",
+      receipts: "sessionId, verifiedAt",
+      checkpoints: "sessionId, at",
+      accessibility: "id, updatedAt",
+    });
   }
 }
 
@@ -484,7 +490,7 @@ export async function markSessionQuarantined(sessionId: string, reason: string, 
 }
 
 export async function recordSyncReceipt(receipt: SyncReceiptRow): Promise<void> {
-  await db.sync_receipts.put(receipt);
+  await db.receipts.put(receipt);
 }
 
 export async function countStoredSessions(): Promise<StoredSessionCounts> {
@@ -564,7 +570,7 @@ export function safeToForget(
 export async function forgetConfirmedSessions(): Promise<Erasure> {
   const confirmed: SessionRow[] = [];
   for (const session of await db.sessions.toArray()) {
-    const receipt = await db.sync_receipts.get(session.sessionId);
+    const receipt = await db.receipts.get(session.sessionId);
     if (safeToForget(session, receipt)) confirmed.push(session);
   }
   if (confirmed.length === 0) return { sessions: 0, events: 0 };

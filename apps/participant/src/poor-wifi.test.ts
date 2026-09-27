@@ -493,3 +493,50 @@ describe("a device talking over itself", () => {
     expect(working).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("a checkpoint and a finished upload at the same time", () => {
+  /**
+   * The gap the two separate flags left.
+   *
+   * A checkpoint guard and an upload guard, each correct on its own, still allowed a
+   * checkpoint of a sitting and the completed upload of that same sitting to be in flight
+   * together — the exact race the guards exist to prevent, arriving between the two
+   * functions rather than within one. They send the same documents, so they share a lock.
+   */
+  it("never has both in flight at once", async () => {
+    resetInFlightForTests();
+    const calls = noCalls();
+    const { completedAt: _done, ...running } = session;
+    let inFlight = 0;
+    let overlapped = false;
+    const transport = vi.fn(async () => {
+      inFlight += 1;
+      if (inFlight > 1) overlapped = true;
+      await new Promise((resolve) => setTimeout(resolve, 30));
+      inFlight -= 1;
+      return ok();
+    });
+
+    const storage = store(calls, { running: [{ ...running, complete: false }] });
+    await Promise.all([
+      checkpointRunningSessions({ storage, transport: transport as unknown as typeof fetch }),
+      synchroniseCompletedSessions({ storage, transport: transport as unknown as typeof fetch }),
+      checkpointRunningSessions({ storage, transport: transport as unknown as typeof fetch }),
+    ]);
+
+    expect(overlapped).toBe(false);
+  });
+
+  it("lets both run once the other has finished", async () => {
+    resetInFlightForTests();
+    const calls = noCalls();
+    const { completedAt: _done, ...running } = session;
+    const transport = vi.fn(async () => ok());
+    const storage = store(calls, { running: [{ ...running, complete: false }] });
+
+    await checkpointRunningSessions({ storage, transport: transport as unknown as typeof fetch });
+    await synchroniseCompletedSessions({ storage, transport: transport as unknown as typeof fetch });
+
+    expect(transport).toHaveBeenCalledTimes(2);
+  });
+});

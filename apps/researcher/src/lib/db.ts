@@ -28,6 +28,13 @@ export interface StoredSession extends DeviceSession {
   /** When this sitting was imported, and from which file. */
   importedAt: string;
   source: string;
+  /**
+   * Which iPad collected it, where the file said.
+   *
+   * Absent for a sitting pulled from the study — the server holds that on its own record
+   * — and for handover files written before the format carried it.
+   */
+  deviceId?: string;
 }
 
 /**
@@ -186,6 +193,14 @@ export interface ImportReport {
 interface RawExport {
   format?: string;
   sessions?: unknown;
+  /**
+   * Which iPad wrote the file.
+   *
+   * Carried so a sitting imported from a handover file and the same sitting arriving later
+   * over wifi are recognised as one sitting from one device. Older files have none; they
+   * still import, and the sitting simply has no device recorded against it.
+   */
+  deviceId?: unknown;
 }
 
 /**
@@ -231,7 +246,12 @@ export async function importExportFile(name: string, text: string, passphrase = 
       report.duplicates += 1;
       continue;
     }
-    await db.sessions.add({ ...raw, importedAt, source: name });
+    await db.sessions.add({
+      ...raw,
+      importedAt,
+      source: name,
+      ...(typeof parsed.deviceId === "string" ? { deviceId: parsed.deviceId } : {}),
+    });
     report.added += 1;
   }
   return report;

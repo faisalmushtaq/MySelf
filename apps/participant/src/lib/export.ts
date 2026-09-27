@@ -1,6 +1,7 @@
 import { db, deviceKey } from "./db.js";
 import { unseal } from "./crypto.js";
 import { sealExport, type EncryptedEnvelope } from "@myself/store";
+import { deviceCredential } from "./identity.js";
 
 /**
  * Handover: taking the sittings off this iPad.
@@ -30,6 +31,19 @@ export interface DeviceExport {
   exportedAt: string;
   /** Which app wrote it, for when the reader has to be bug-compatible. */
   app: string;
+  /**
+   * Which iPad wrote it.
+   *
+   * The whole reason a device issues itself an identity at first launch rather than on
+   * first upload: a device that never reaches the network hands over as a file, and
+   * without this the file could not say which device it came off. The study files a
+   * sitting under this, so the same sitting arriving by file and later over wifi is one
+   * sitting from one device rather than two.
+   *
+   * It was promised by a comment and absent from the format, which meant the
+   * deduplication it described could not work.
+   */
+  deviceId: string;
   sessions: {
     sessionId: string;
     studyCode: string;
@@ -58,6 +72,7 @@ export interface ExportOptions {
 
 export async function buildDeviceExport(options: ExportOptions = {}): Promise<DeviceExport> {
   const key = await deviceKey();
+  const { installId } = await deviceCredential();
   const rows = await db.sessions.toArray();
   const wanted = rows.filter((s) => (options.includeInProgress ? true : s.state !== "in_progress"));
 
@@ -102,6 +117,7 @@ export async function buildDeviceExport(options: ExportOptions = {}): Promise<De
     format: EXPORT_FORMAT,
     exportedAt: new Date().toISOString(),
     app: options.appVersion ?? "myself-participant",
+    deviceId: installId,
     sessions,
   };
 }

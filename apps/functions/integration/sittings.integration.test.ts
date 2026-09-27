@@ -78,7 +78,7 @@ const many = (n: number, chars = 20) => Array.from({ length: n }, (_, i) => even
 
 describe("storing a sitting in a real database", () => {
   it("round trips every event, in order, with its payload intact", async () => {
-    const outcome = await storeSitting(db, STUDY, sitting(many(120)), "ipad_a", new Date(), "open");
+    const outcome = await storeSitting(db, STUDY, sitting(many(120)), "ipad_a", new Date(), "device");
     expect(outcome).toMatchObject({ stored: true, events: 120, quarantined: false });
 
     const back = await readBack("ses_integration_1");
@@ -93,7 +93,7 @@ describe("storing a sitting in a real database", () => {
 
   it("is idempotent across repeated uploads of the same sitting", async () => {
     const one = sitting(many(50));
-    for (let i = 0; i < 5; i += 1) await storeSitting(db, STUDY, one, "ipad_a", new Date(), "open");
+    for (let i = 0; i < 5; i += 1) await storeSitting(db, STUDY, one, "ipad_a", new Date(), "device");
 
     const sessions = await db.collection(paths.sessions(STUDY)).get();
     expect(sessions.size).toBe(1);
@@ -104,7 +104,7 @@ describe("storing a sitting in a real database", () => {
     // A sitting left open across a fortnight, or one with long free-text answers.
     // The spill exists so the write does not fail at the 1 MiB document limit —
     // which would lose the sitting at the moment it is handed over.
-    const outcome = await storeSitting(db, STUDY, sitting(many(900, 900)), "ipad_a", new Date(), "open");
+    const outcome = await storeSitting(db, STUDY, sitting(many(900, 900)), "ipad_a", new Date(), "device");
     expect(outcome.chunks).toBeGreaterThan(1);
     expect(outcome.events).toBe(900);
 
@@ -116,9 +116,9 @@ describe("storing a sitting in a real database", () => {
   it("accepts a sitting that grew, which is what a checkpoint becomes", async () => {
     // The real sequence on a device: checkpointed while being answered, then
     // finished. Each upload supersedes the last and the log only grows.
-    await storeSitting(db, STUDY, sitting(many(30), { complete: false }), "ipad_a", new Date(), "open");
-    await storeSitting(db, STUDY, sitting(many(60), { complete: false }), "ipad_a", new Date(), "open");
-    const final = await storeSitting(db, STUDY, sitting(many(90)), "ipad_a", new Date(), "open");
+    await storeSitting(db, STUDY, sitting(many(30), { complete: false }), "ipad_a", new Date(), "device");
+    await storeSitting(db, STUDY, sitting(many(60), { complete: false }), "ipad_a", new Date(), "device");
+    const final = await storeSitting(db, STUDY, sitting(many(90)), "ipad_a", new Date(), "device");
 
     expect(final).toMatchObject({ stored: true, events: 90 });
     const back = await readBack("ses_integration_1");
@@ -127,8 +127,8 @@ describe("storing a sitting in a real database", () => {
   });
 
   it("refuses a shorter log and keeps the longer one", async () => {
-    await storeSitting(db, STUDY, sitting(many(90)), "ipad_a", new Date(), "open");
-    const short = await storeSitting(db, STUDY, sitting(many(10)), "ipad_a", new Date(), "open");
+    await storeSitting(db, STUDY, sitting(many(90)), "ipad_a", new Date(), "device");
+    const short = await storeSitting(db, STUDY, sitting(many(10)), "ipad_a", new Date(), "device");
 
     expect(short).toMatchObject({ stored: false, quarantined: true });
     expect((await readBack("ses_integration_1")).events).toHaveLength(90);
@@ -141,20 +141,78 @@ describe("storing a sitting in a real database", () => {
     // The dangerous combination: a spilled sitting, then a shorter upload. If the
     // refusal happened after the chunk cleanup, the stored sitting would be left
     // claiming chunks that had been deleted and `joinSession` would refuse it.
-    await storeSitting(db, STUDY, sitting(many(900, 900)), "ipad_a", new Date(), "open");
+    await storeSitting(db, STUDY, sitting(many(900, 900)), "ipad_a", new Date(), "device");
     const before = await readBack("ses_integration_1");
 
-    await storeSitting(db, STUDY, sitting(many(20)), "ipad_a", new Date(), "open");
+    await storeSitting(db, STUDY, sitting(many(20)), "ipad_a", new Date(), "device");
 
     const after = await readBack("ses_integration_1");
     expect(after.events).toHaveLength(before.events.length);
   });
 });
 
+describe("a refused upload must leave the stored sitting alone", () => {
+  /**
+   * The corruption the previous write ordering allowed.
+   *
+   * Chunks used to be written before the transaction that decides, on the reasoning that
+   * a refused upload leaves chunks nobody reads. That holds only when the refused upload
+   * has no chunks in common with the stored sitting — and a chunk is identified by its
+   * index, so a shorter-but-still-chunked upload overwrote the low chunks and left the
+   * parent claiming the original count. `chunksComplete` counts indexes, finds them all
+   * present, and `joinSession` returns a blend of two different logs reported as whole.
+   *
+   * The earlier test for this used a shorter upload that fitted inline, so it wrote no
+   * chunks at all and passed against the broken ordering. This one is chunked on both
+   * sides, which is the case that actually bit.
+   */
+  it("does not overwrite the low chunks of a longer stored sitting", async () => {
+    const whole = await storeSitting(db, STUDY, sitting(many(900, 900)), "ipad_a", new Date(), "device");
+    expect(whole.chunks).toBeGreaterThan(2);
+    const before = await readBack("ses_integration_1");
+
+    // Shorter, and still large enough to spill into chunks of its own.
+    const shorter = sitting(many(500, 900));
+    const refused = await storeSitting(db, STUDY, shorter, "ipad_a", new Date(), "device");
+    expect(refused).toMatchObject({ stored: false, quarantined: true });
+
+    const after = await readBack("ses_integration_1");
+    expect(after.events).toHaveLength(before.events.length);
+    // Not merely the right length — the right events, which is what a blend would fail.
+    expect(after.events.map((e) => e.seq)).toEqual(before.events.map((e) => e.seq));
+    expect(JSON.stringify(after.events)).toBe(JSON.stringify(before.events));
+  });
+
+  it("does not overwrite them when a second device is the one refused", async () => {
+    await storeSitting(db, STUDY, sitting(many(900, 900)), "ipad_a", new Date(), "device");
+    const before = await readBack("ses_integration_1");
+
+    const refused = await storeSitting(db, STUDY, sitting(many(500, 900)), "ipad_b", new Date(), "device");
+    expect(refused.stored).toBe(false);
+
+    const after = await readBack("ses_integration_1");
+    expect(JSON.stringify(after.events)).toBe(JSON.stringify(before.events));
+  });
+
+  it("writes nothing at all when it is refused, not even orphan chunks", async () => {
+    // A refused upload used to leave its chunks behind. They were harmless only by
+    // accident; now the transaction means there is nothing to be harmless about.
+    await storeSitting(db, STUDY, sitting(many(900, 900)), "ipad_a", new Date(), "device");
+    const parent = (await db.doc(paths.session(STUDY, "ses_integration_1")).get()).data() as SessionDoc;
+    const chunkCountBefore = (await db.collection(paths.sessionChunks(STUDY, "ses_integration_1")).get()).size;
+    expect(chunkCountBefore).toBe(parent.chunkCount);
+
+    await storeSitting(db, STUDY, sitting(many(500, 900)), "ipad_b", new Date(), "device");
+
+    const chunkCountAfter = (await db.collection(paths.sessionChunks(STUDY, "ses_integration_1")).get()).size;
+    expect(chunkCountAfter).toBe(chunkCountBefore);
+  });
+});
+
 describe("two iPads, one session id", () => {
   it("keeps the first and files the second, in a real transaction", async () => {
-    await storeSitting(db, STUDY, sitting(many(40)), "ipad_a", new Date(), "open");
-    const second = await storeSitting(db, STUDY, sitting(many(40)), "ipad_b", new Date(), "open");
+    await storeSitting(db, STUDY, sitting(many(40)), "ipad_a", new Date(), "device");
+    const second = await storeSitting(db, STUDY, sitting(many(40)), "ipad_b", new Date(), "device");
 
     expect(second).toMatchObject({ stored: false, quarantined: true });
     const parent = (await db.doc(paths.session(STUDY, "ses_integration_1")).get()).data() as SessionDoc;

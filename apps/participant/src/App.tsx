@@ -422,8 +422,19 @@ export default function App() {
       storeRef.current.set(ref, { status: "answered", value });
       bumpAnswers();
       const t = timing.current.recordResponse(itemKey, had);
-      const landed = await persist(async () => {
-        await appendEvent(
+      /**
+       * ONE WRITE PER `persist`, and the reason is the retry.
+       *
+       * A closure containing two writes can half-succeed: the response lands, the
+       * paradata does not, and "Try again" re-runs both — appending the answer a second
+       * time and double-counting the pace run. `appendEvent` is a Dexie transaction, so a
+       * single write either commits or does not, which makes retrying exactly one of them
+       * safe.
+       *
+       * The counter is also moved out of the closure, so a retry cannot advance it twice.
+       */
+      const landed = await persist(() =>
+        appendEvent(
           phase.session,
           had ? "response.changed" : "response.recorded",
           itemKey,
@@ -432,24 +443,33 @@ export default function App() {
           { value, timing: t },
           phase.index,
           tMono(),
-        );
-        // The answer stands either way — this only records that it arrived
-        // faster than the question could have been read.
-        if (t.tooFast) {
-          fastRun.current += 1;
-          await appendEvent(
-            phase.session,
-            "response.too_fast",
-            itemKey,
-            { sinceShownMs: t.sinceShownMs, thresholdMs: t.thresholdMs, run: fastRun.current },
-            phase.index,
-            tMono(),
-          );
-        } else {
-          fastRun.current = 0;
-        }
-      });
+        ),
+      );
       if (!landed) return;
+
+      // The answer stands either way — this only records that it arrived faster than the
+      // question could have been read. Paradata rather than an answer, so a failure here
+      // is worth reporting but the response above is already safely stored.
+      if (t.tooFast) {
+        fastRun.current += 1;
+        const run = fastRun.current;
+        if (
+          !(await persist(() =>
+            appendEvent(
+              phase.session,
+              "response.too_fast",
+              itemKey,
+              { sinceShownMs: t.sinceShownMs, thresholdMs: t.thresholdMs, run },
+              phase.index,
+              tMono(),
+            ),
+          ))
+        ) {
+          return;
+        }
+      } else {
+        fastRun.current = 0;
+      }
       setSavedAt(new Date().toLocaleTimeString());
     },
     [phase, persist],
@@ -569,11 +589,22 @@ export default function App() {
       }
 
       if (next === null) {
-        // The last question leads to "you've finished" — not to a wall of
-        // everything they just answered. The review is offered there, for the
-        // minority who know they got something wrong (D-31).
-        await appendEvent(phase.session, "session.completed", undefined, timing.current.summary(), from, tMono());
-        await completeSession(phase.session);
+        /**
+         * The last question leads to "you've finished" — not to a wall of everything they
+         * just answered. The review is offered there, for the minority who know they got
+         * something wrong (D-31).
+         *
+         * THROUGH `persist`, LIKE EVERY OTHER WRITE. These two were the last ones that
+         * were not, and they are the worst pair to lose: `completeSession` is what moves
+         * a sitting into the upload queue, so a silent failure here left a finished
+         * sitting stuck `in_progress`, never queued, never uploaded, and the participant
+         * looking at a thank-you screen.
+         */
+        const landed = await persist(async () => {
+          await appendEvent(phase.session, "session.completed", undefined, timing.current.summary(), from, tMono());
+          await completeSession(phase.session);
+        });
+        if (!landed) return;
         setPhase({ kind: "finished", session: phase.session });
       } else {
         void enterItem(next);
@@ -1006,11 +1037,15 @@ export default function App() {
           }}
           onFinish={() => {
             void (async () => {
-              // Coming back from a change re-completes the session, so the
-              // completion event always follows the last edit in the log.
-              await appendEvent(phase.session, "session.completed", undefined, timing.current.summary(), 0, tMono());
-              await completeSession(phase.session);
-              setPhase({ kind: "finished", session: phase.session });
+              // Coming back from a change re-completes the session, so the completion
+              // event always follows the last edit in the log. Through `persist` for the
+              // same reason as the other completion path: this is the write that queues
+              // the sitting for upload.
+              const landed = await persist(async () => {
+                await appendEvent(phase.session, "session.completed", undefined, timing.current.summary(), 0, tMono());
+                await completeSession(phase.session);
+              });
+              if (landed) setPhase({ kind: "finished", session: phase.session });
             })();
           }}
         />

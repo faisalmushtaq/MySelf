@@ -195,7 +195,7 @@ test("a finished sitting reaches the database with its answers intact", async ({
   expect(held!.session.studyCode).toBe(CODE);
   expect(held!.session.complete).toBe(true);
   expect(held!.doc.deviceId).toMatch(/^ipad_/);
-  expect(held!.doc.enrolment).toBe("open");
+  expect(held!.doc.provenance).toBe("device");
 
   // The answers are in there, in order, with payloads — not an empty shell with the
   // right metadata.

@@ -106,6 +106,16 @@ function fakeDb() {
             });
             return tx;
           },
+          // Chunks are written and stale ones removed inside the transaction now, so a
+          // stand-in without `delete` would let a test pass on a path production cannot
+          // take.
+          delete: (r: { path: string }) => {
+            queued.push(() => {
+              docs.delete(r.path);
+              order.push(`delete ${r.path}`);
+            });
+            return tx;
+          },
         };
         const result = await body(tx);
         // Commit. A refused write fails here, after the body has run, which is
@@ -177,18 +187,18 @@ describe("an iPad that nobody registered", () => {
     expect(deviceIdFor(openDevice, "dev_somebody_elses_ipad")).toBe("anon_abc123");
   });
 
-  it("is recorded as an open-URL sitting rather than a registered one", async () => {
-    // Not a quality judgement, and nothing filters on it by default. It is here so
-    // a study that cares can tell the two apart at all.
+  it("is recorded as having come from a device, not from a person's import", async () => {
+    // Not a quality judgement, and nothing filters on it by default. It is here so an
+    // analysis that cares can tell a fielded sitting from a handover file at all.
     const { db, docs } = fakeDb();
-    await storeSitting(db, "ybm", session([event(0)]), openDevice.uid, new Date(), "open");
-    expect((docs.get(paths.session("ybm", "ses_1")) as unknown as SessionDoc).enrolment).toBe("open");
+    await storeSitting(db, "ybm", session([event(0)]), openDevice.uid, new Date(), "device");
+    expect((docs.get(paths.session("ybm", "ses_1")) as unknown as SessionDoc).provenance).toBe("device");
   });
 
-  it("records a registered device as registered", async () => {
+  it("records a researcher's file import as imported", async () => {
     const { db, docs } = fakeDb();
-    await storeSitting(db, "ybm", session([event(0)]), device.uid, new Date(), "enrolled");
-    expect((docs.get(paths.session("ybm", "ses_1")) as unknown as SessionDoc).enrolment).toBe("enrolled");
+    await storeSitting(db, "ybm", session([event(0)]), "ipad_from_a_file", new Date(), "imported");
+    expect((docs.get(paths.session("ybm", "ses_1")) as unknown as SessionDoc).provenance).toBe("imported");
   });
 
   it("is still not a tester link, which may not file one", async () => {
@@ -318,13 +328,15 @@ describe("the same sitting from two devices", () => {
   });
 
   it("files the copy that arrived, so both survive for a person to compare", async () => {
-    const { db, collections } = fakeDb();
+    const { db, docs } = fakeDb();
     await storeSitting(db, "ybm", session([event(0)]), "dev_ipad_1");
     await storeSitting(db, "ybm", session([event(0)]), "dev_ipad_2");
 
-    const filed = collections[paths.quarantine("ybm")] ?? [];
-    expect(filed).toHaveLength(1);
-    expect(filed[0]).toMatchObject({ heldDeviceId: "dev_ipad_1", arrivingDeviceId: "dev_ipad_2" });
+    // One row per sitting, keyed on its id: a device on a bad connection refuses the same
+    // sitting by the dozen, and appending a full copy of the log each time is how a
+    // quarantine collection grows faster than the dataset it guards.
+    const filed = docs.get(`${paths.quarantine("ybm")}/ses_1`);
+    expect(filed).toMatchObject({ heldDeviceId: "dev_ipad_1", arrivingDeviceId: "dev_ipad_2" });
   });
 
   it("stays quarantined when the first device uploads again", async () => {
@@ -373,16 +385,17 @@ describe("a sitting that contradicts the one already stored", () => {
     // The stored copy is the complete one. Quarantining it would drop a whole
     // sitting out of the export to punish a bad retry — the export skips
     // anything flagged.
-    const { db, docs, collections } = fakeDb();
+    const { db, docs } = fakeDb();
     await storeSitting(db, "ybm", session([event(0), event(1), event(2)]), "dev_ipad_1");
     await storeSitting(db, "ybm", session([event(0)]), "dev_ipad_1");
 
     expect((docs.get(paths.session("ybm", "ses_1")) as unknown as SessionDoc).quarantined).toBe(false);
     // Nothing is dropped, though: the short copy is filed with both counts.
-    expect(collections[paths.quarantine("ybm")]?.[0]).toMatchObject({
+    expect(docs.get(`${paths.quarantine("ybm")}/ses_1`)).toMatchObject({
       heldEvents: 3,
       arrivingEvents: 1,
       storedFlagged: false,
+      arrivingSessionTruncated: false,
     });
   });
 
@@ -437,7 +450,7 @@ describe("two iPads handed over at the same moment", () => {
     // "nothing stored", both decide they may proceed, and the second silently
     // replaces the first. `raceIn` makes the other device's sitting appear in
     // exactly that window.
-    const { db, docs, collections, raceIn } = fakeDb();
+    const { db, docs, raceIn } = fakeDb();
     const mine = session([event(0), event(1)]);
 
     raceIn(() => {
@@ -452,7 +465,7 @@ describe("two iPads handed over at the same moment", () => {
     expect(outcome).toMatchObject({ stored: false, quarantined: true });
     const doc = docs.get(paths.session("ybm", "ses_1")) as unknown as SessionDoc;
     expect(doc.deviceId).toBe("dev_ipad_2");
-    expect(collections[paths.quarantine("ybm")]).toHaveLength(1);
+    expect(docs.get(`${paths.quarantine("ybm")}/ses_1`)).toBeTruthy();
   });
 });
 

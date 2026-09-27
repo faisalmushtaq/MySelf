@@ -70,12 +70,13 @@ async function meterUploads(caller: Caller): Promise<void> {
  * upload overwrites identical documents. A device with a flaky connection can
  * post the same sitting ten times and the dataset has one of it.
  *
- * CHUNKS ARE WRITTEN BEFORE THE PARENT. A failure between the two leaves
- * chunks nobody reads, which is invisible: the export walks parents. The other
- * order leaves a parent claiming chunks that never arrived, which `joinSession`
- * refuses — correctly, but it means a sitting sitting in the dataset that
- * cannot be read. Stale chunks left by a build that packed the same events
- * differently are deleted after the parent is written, for the same reason.
+ * THE CHUNKS AND THE PARENT ARE WRITTEN TOGETHER, in one transaction, so a torn
+ * write leaves nothing rather than half of something. An earlier version wrote the
+ * chunks first and decided afterwards, which meant a refused upload had already
+ * overwritten chunks the stored sitting still claimed — and since a chunk is
+ * identified by its index, the result read back as a complete blend of two
+ * different logs. That is the failure this whole file exists to prevent, so the
+ * ordering is gone rather than documented.
  *
  * A TESTER LINK MAY NOT WRITE ONE. A link is a URL somebody was sent, and it
  * exists to pilot the narrative module before a study is fielded. Survey
@@ -147,53 +148,35 @@ export async function storeSitting(
   session: DeviceSession,
   deviceId: string,
   now = new Date(),
-  enrolment: SessionDoc["enrolment"] = "open",
+  provenance: SessionDoc["provenance"] = "imported",
 ): Promise<SittingOutcome> {
-  const { doc, chunks } = splitSession(session, deviceId, study, now, enrolment);
+  const { doc, chunks } = splitSession(session, deviceId, study, now, provenance);
 
   const parentRef = db.doc(paths.session(study, session.sessionId));
 
   /**
-   * Is this sitting allowed to land at all?
+   * The decision, the chunks and the parent, all together or none of them.
    *
-   * Asked once here, cheaply, so that an upload which is going to be refused
-   * does not first write a few hundred chunk documents. It is asked AGAIN
-   * inside the transaction below, because this answer can go stale.
-   */
-  const first = await parentRef.get();
-  const firstDoc = first.exists ? (first.data() as SessionDoc) : null;
-  const early = conflictWith(firstDoc, doc);
-  if (early) return refuse(db, study, session, deviceId, doc, firstDoc, early, now);
-
-  // Chunks first — see the note at the top of this file.
-  if (chunks.length > 0) {
-    const writing = db.batch();
-    for (const chunk of chunks) {
-      writing.set(db.doc(paths.sessionChunk(study, session.sessionId, chunk.index)), chunk satisfies ChunkDoc);
-    }
-    await writing.commit();
-  }
-
-  /**
-   * The decision and the write, together, or neither.
+   * THE ORDERING THIS REPLACES WAS QUIETLY UNSAFE. Chunks were written before the
+   * transaction that decides, on the reasoning that a refused upload would leave chunks
+   * nobody reads. That is true only when the refused upload has no chunks in common with
+   * the stored sitting — and a chunk's id is its index, so a refused 500-event upload
+   * (two chunks) over a stored 900-event one (four) overwrites chunks 0 and 1 and leaves
+   * the parent still claiming four. `chunksComplete` counts indexes and finds all four
+   * present, so `joinSession` returns a blend of two different logs and reports it as
+   * whole. Silent corruption of a child's answers, which is the one outcome this file
+   * exists to prevent.
    *
-   * The check above is not enough on its own. Reading the parent, deciding, and
-   * then writing it is three separate operations, and two devices uploading the
-   * same session id at the same moment both read "nothing stored", both decide
-   * they may proceed, and the second silently overwrites the first — the exact
-   * outcome the collision rule exists to prevent, reachable precisely when two
-   * iPads are handed over together at the end of a school day, which is the
-   * normal way this platform is used.
+   * Putting the chunk writes inside the transaction removes the hazard rather than
+   * narrowing it: a refused upload writes nothing at all. The cost is a ceiling —
+   * Firestore allows about 10 MiB per transaction — and a sitting large enough to exceed
+   * it now fails loudly instead of landing. That is the right direction for a failure,
+   * and it is far outside anything real: a full YBM sitting is 54 kB, and the 700 kB
+   * chunk budget means the ceiling is around a dozen chunks of the largest kind.
    *
-   * So the parent write happens in a transaction that re-reads the parent and
-   * re-applies the same rules. Firestore retries the transaction when the
-   * document changed underneath it, so the loser of a race sees the winner's
-   * document and is refused.
-   *
-   * Only the parent is in the transaction. The chunks are already written, and
-   * they are content-addressed by index off a deterministic split, so a refused
-   * upload leaves chunks nobody reads rather than data anybody misreads — the
-   * same trade the write ordering already makes.
+   * Firestore re-runs the body when a document moved underneath it, so the loser of a
+   * race between two devices sees the winner's parent and is refused — which is what
+   * makes the collision rule hold when a rack of iPads is handed over together.
    */
   const verdict = await db.runTransaction(async (tx) => {
     const snap = await tx.get(parentRef);
@@ -201,6 +184,23 @@ export async function storeSitting(
 
     const conflict = conflictWith(before, doc);
     if (conflict) return { conflict, before };
+
+    for (const chunk of chunks) {
+      tx.set(db.doc(paths.sessionChunk(study, session.sessionId, chunk.index)), chunk satisfies ChunkDoc);
+    }
+
+    /**
+     * Anything a longer earlier upload left behind, removed in the same breath.
+     *
+     * A sitting repacked by a later build — a change to the byte budget or the per-chunk
+     * cap puts the same events in fewer documents — would otherwise leave chunk 3 beside
+     * a parent claiming three, and `joinSession` counts, so the sitting would read as
+     * complete while carrying a stale tail. A log getting shorter cannot reach this:
+     * `conflictWith` refuses that above, which is what makes deleting here safe.
+     */
+    for (let i = chunks.length; i < (before?.chunkCount ?? 0); i += 1) {
+      tx.delete(db.doc(paths.sessionChunk(study, session.sessionId, i)));
+    }
 
     // Stays quarantined once it has been: a later upload from the original
     // device must not clear a flag an earlier collision raised, because the
@@ -210,28 +210,8 @@ export async function storeSitting(
     return { conflict: null, before };
   });
 
-  if (verdict.conflict) return refuse(db, study, session, deviceId, doc, verdict.before, verdict.conflict, now);
-
-  /**
-   * Anything a longer earlier upload left behind.
-   *
-   * A sitting split differently by a later build — a change to the byte budget
-   * or the per-chunk cap repacks the same events into fewer documents — would
-   * otherwise leave chunk 3 sitting next to a parent that claims three chunks,
-   * and `joinSession` counts, so the sitting would read as complete while
-   * carrying a stale tail. Deleted after the parent is written, so a failure
-   * here leaves the readable state rather than a gap.
-   *
-   * This can no longer be reached by a log getting shorter: `conflictWith`
-   * refuses that above, which is what makes deleting chunks here safe.
-   */
-  const stale = (verdict.before?.chunkCount ?? 0) - chunks.length;
-  if (stale > 0) {
-    const clearing = db.batch();
-    for (let i = chunks.length; i < (verdict.before?.chunkCount ?? 0); i += 1) {
-      clearing.delete(db.doc(paths.sessionChunk(study, session.sessionId, i)));
-    }
-    await clearing.commit();
+  if (verdict.conflict) {
+    return refuse(db, study, session, deviceId, doc, verdict.before, verdict.conflict, now);
   }
 
   return {
@@ -287,20 +267,45 @@ async function refuse(
     storedIsSuspect: conflict.storedIsSuspect,
   });
 
-  // Both sides of the comparison, in the row itself. A reason without the two
-  // event counts beside it sends whoever reads it back to the sittings to work
-  // out what actually differed.
-  await db.collection(paths.quarantine(study)).add({
+  /**
+   * Both sides of the comparison, in the row itself. A reason without the two event
+   * counts beside it sends whoever reads it back to the sittings to work out what
+   * actually differed.
+   *
+   * THE ARRIVING LOG IS CARRIED ONLY IF IT FITS. Embedding it unconditionally meant a
+   * spilled sitting — the ones over the 700 kB chunk budget — produced a quarantine
+   * document over Firestore's 1 MiB limit, so the write failed and the evidence this
+   * function promises to keep was the one thing lost. A truncated record that says it is
+   * truncated is worth more than a failed write.
+   *
+   * KEYED ON THE SESSION, not appended. Repeated refusals of the same sitting — which a
+   * device on a bad connection produces by the dozen — used to accumulate a full copy of
+   * the log each time. One row per sitting, with a count of how often it has happened.
+   */
+  const room = 700_000;
+  const asJson = JSON.stringify(session);
+  const row: Record<string, unknown> = {
     reason: conflict.reason,
     sessionId: session.sessionId,
     heldDeviceId: stored?.deviceId ?? null,
     heldEvents: stored?.eventCount ?? null,
     arrivingDeviceId: deviceId,
     arrivingEvents: doc.eventCount,
-    arrivingSession: session,
     storedFlagged: conflict.storedIsSuspect,
+    refusals: FieldValue.increment(1),
     at: now.toISOString(),
-  });
+  };
+  if (asJson.length <= room) {
+    row["arrivingSession"] = session;
+    row["arrivingSessionTruncated"] = false;
+  } else {
+    // The metadata plus enough of the head to recognise it. The device still holds the
+    // whole thing, and the reason says to hand it over as a file.
+    const { events: _tooBig, ...withoutEvents } = session;
+    row["arrivingSession"] = { ...withoutEvents, events: session.events.slice(0, 50) };
+    row["arrivingSessionTruncated"] = true;
+  }
+  await db.doc(`${paths.quarantine(study)}/${session.sessionId}`).set(row, { merge: true });
 
   if (conflict.storedIsSuspect) {
     await db.doc(paths.session(study, session.sessionId)).set({ quarantined: true }, { merge: true });
@@ -361,7 +366,15 @@ export const saveSitting = onRequest(
       for (const one of parsed.data.sittings) {
         try {
           outcomes.push(
-            await storeSitting(db, STUDY, one as DeviceSession, deviceId, now, caller.anonymous ? "open" : "enrolled"),
+            /**
+             * From what the caller IS, not from whether it was anonymous.
+             *
+             * `caller.device` is true only for an iPad that presented its own credential;
+             * a researcher importing a handover file is not a device. Deriving this from
+             * `anonymous` had it exactly backwards, recording an imported file as having
+             * come from a vouched-for device.
+             */
+            await storeSitting(db, STUDY, one as DeviceSession, deviceId, now, caller.device ? "device" : "imported"),
           );
         } catch (error) {
           logger.error("a sitting could not be stored", { sessionId: one.sessionId, error: String(error) });

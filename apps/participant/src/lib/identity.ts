@@ -70,6 +70,16 @@ let creating: Promise<DeviceCredential> | null = null;
 
 export function deviceCredential(): Promise<DeviceCredential> {
   if (cached) return Promise.resolve(cached);
+  /**
+   * A rejected attempt is not remembered.
+   *
+   * `creating ??= …` alone caches the promise including its rejection, so one transient
+   * IndexedDB failure — a locked database during an upgrade, storage momentarily
+   * unavailable — would make this reject forever. Everything downstream depends on it:
+   * `syncTarget` and `currentDevice` would both fail for the rest of the app's life, and
+   * the sync and checkpoint timers would never arm. The device would collect normally and
+   * silently never upload, which is the failure mode hardest to notice.
+   */
   creating ??= (async () => {
     const existing = await db.install.get("install");
     if (existing) {
@@ -98,7 +108,10 @@ export function deviceCredential(): Promise<DeviceCredential> {
       cached = { installId: won.installId, secret: won.secret, createdAt: won.createdAt };
     }
     return cached;
-  })();
+  })().catch((error: unknown) => {
+    creating = null;
+    throw error;
+  });
   return creating;
 }
 

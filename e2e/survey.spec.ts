@@ -412,6 +412,16 @@ test.describe("a sitting on a device with no study configured", () => {
     };
 
     expect(envelope.format).toBe("myself.device.export.v1.encrypted");
+    // Openable, and carrying the device that wrote it — the whole reason an iPad issues
+    // itself an identity at first launch rather than on first upload. Without it a file
+    // from a device that never reached the network could not say where it came from, and
+    // the same sitting arriving later over wifi would look like a second device.
+    const opened = (await (await import("@myself/store")).openExport(envelope as never, PASSPHRASE)) as {
+      deviceId?: string;
+      sessions: { sessionId: string }[];
+    };
+    expect(opened.deviceId).toMatch(/^ipad_[A-Z0-9]+$/);
+    expect(opened.sessions).toHaveLength(1);
     expect(envelope.sittings).toBe(1);
     expect(envelope.kdf.name).toBe("PBKDF2");
     expect(envelope.kdf.iterations).toBeGreaterThanOrEqual(600_000);
