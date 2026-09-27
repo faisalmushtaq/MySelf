@@ -6,12 +6,50 @@ the full test suite were run, and every claim below cites the file it came from.
 
 > **This document is the audit as found.** It is deliberately not rewritten as
 > work lands, because a record of what was wrong is worth keeping. What has since
-> been built, and what has not, is in **§8 — what changed after the audit** at
-> the end. Read that before acting on anything above it. Operational
-> instructions for fielding a study live in
-> [15-fielding-runbook.md](15-fielding-runbook.md).
+> been built, and what has not, is in **§8 onwards** at the end — §8 what changed,
+> §9 hardening, §10 and §13 the review passes over that work, §11 the seven-day
+> storage cap, §12 the clock and the class-of-thirty stress test. Read those
+> before acting on anything above them. Operational instructions for fielding a
+> study live in [15-fielding-runbook.md](15-fielding-runbook.md), which is the
+> document to hand somebody who is running a session.
 
-**Verdict.** The engineering is well above the norm for a research platform.
+### Where it stands now, in one place
+
+Everything §2 called a blocker is built, except withdrawal and erasure, which are
+manual by decision (§7 of the runbook). A sitting now travels from a child's finger to
+a Firestore document and on to the phenotype table an analyst opens, and that whole
+route is tested end to end rather than argued for.
+
+| The thing that had to work | Where it is |
+|---|---|
+| Sittings reach a database | `apps/functions/src/sittings.ts`, with the no-overwrite rule resolved inside a transaction (§8) |
+| Several iPads, nothing overwritten or missed | Proven under real contention, up to a class of thirty uploading at once (§12.2) |
+| Any iPad with the URL can take part | Self-issued device credential, no registration, no console switch (§8) |
+| Works with no network, syncs later | Collects offline, checkpoints, backs off, acts on reconnection at once (§9) |
+| A device that never reaches a network | Encrypted handover file carrying the same installation id (§8) |
+| Data survives on the device | The seven-day WebKit cap, which is why the Home Screen step is step one (§11) |
+| The dataset says what the child answered | Walked in a real browser and checked to the cell in the TSV (§12.3) |
+| Timestamps can be trusted | Monotonic within a sitting; clock skew recorded per upload (§12.1) |
+
+Counts as of the last run: 661 unit tests across 13 packages, 32 integration against
+the Firestore emulator, 8 in a real browser, 5 over the full chain from device to HTTP
+to database, 20 security-rules tests.
+
+**Still not done, and deliberately:** withdrawal and erasure (manual, by decision); the
+micro-narrative module and its safeguarding notification (§4); the identity Firebase
+project is not stood up (§3); `apps/api` has been neither removed nor kept on purpose
+(§7); the React components have no unit tests (§5). **And one to watch:** only Chromium
+can be installed in the environment this work was done in, so WebKit — the engine every
+iPad actually runs — has never been exercised here. CI runs it; the first WebKit run is
+the thing to look at.
+
+---
+
+*Everything from here to §8 is the audit as it was written on 2026-09-26, kept
+unchanged. It describes the state of the code before any of the work above was done,
+so its verdict and its blockers are a record rather than a to-do list.*
+
+**Verdict (as of the audit).** The engineering is well above the norm for a research platform.
 The definition layer, the survey engine, the release gate, the Firestore rules,
 the relay's authorisation model and the BIDS export are all genuinely good, and
 the test suite is real. What is not ready is the **route from a child's answer
