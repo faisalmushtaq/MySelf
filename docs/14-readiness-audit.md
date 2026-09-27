@@ -742,6 +742,25 @@ ethnicity, not the recorded code`, and shifting the sidecar's keys gave
 shown "Always left"`. That is the whole chain closed: a finger on a screen to a cell in
 the file somebody publishes from.
 
+### 12.4 A CI job that could not have reached the browser it exists for
+
+The `e2e` job was written without `pnpm -r build`, which every other job in the
+workflow has. The participant app resolves `@myself/store` through its `dist`, and so
+does the accuracy spec, so the build inside Playwright's webServer would have failed to
+resolve the entry point before a browser started. Verified rather than assumed, by
+moving `packages/store/dist` aside: `Failed to resolve entry for package
+"@myself/store"`.
+
+The cost of that was not a red job, it was a silent one. WebKit has never run in this
+environment and CI is its first exercise, so the whole point of that job is to find out
+what Safari does with this app — and it would have failed for a reason that has nothing
+to do with Safari, telling nobody anything.
+
+With that fixed, every CI job has a locally-verified counterpart except the WebKit
+project itself: unit and typecheck, the integration suite against the emulator, the
+full chain over HTTP, the browser walk under Chromium, and the 20 security-rules tests
+(which also pass here). The first WebKit run is the thing to look at.
+
 ### What is still not done
 
 Unchanged from §8–§10, and worth restating rather than leaving implicit: withdrawal
