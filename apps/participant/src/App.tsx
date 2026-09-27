@@ -31,6 +31,13 @@ import { checkpointRunningSessions, synchroniseCompletedSessions } from "./lib/s
 import { currentDevice, syncAvailable } from "./lib/device.js";
 import { updates } from "./lib/updates.js";
 import { deviceSpace, readableBytes, type Space } from "./lib/space.js";
+import {
+  EVICTION_CAP_DAYS,
+  HELD_TOO_LONG_DAYS,
+  heldForDays,
+  storageDurability,
+  type Durability,
+} from "./lib/durability.js";
 import { SessionTiming, wordCount } from "./lib/timing.js";
 import { ReviewScreen } from "./components/ReviewScreen.js";
 import { SurveyScreen } from "./components/SurveyScreen.js";
@@ -126,6 +133,14 @@ export default function App() {
   const [saveError, setSaveError] = useState<string | null>(null);
   const [space, setSpace] = useState<Space | null>(null);
   /**
+   * Whether this iPad's browser has promised to keep what it is holding, and how long
+   * it has been holding it. See `lib/durability.ts`: on an iPad that is not on the
+   * Home Screen, WebKit deletes everything after a week of the site not being opened,
+   * and a device in a cupboard between school visits is exactly that case.
+   */
+  const [durability, setDurability] = useState<Durability | null>(null);
+  const [heldDays, setHeldDays] = useState<number | null>(null);
+  /**
    * Writes that did not land, in the order they were meant to.
    *
    * A QUEUE, NOT ONE WRITE. Keeping only the first failure meant a retry replayed that one
@@ -188,6 +203,8 @@ export default function App() {
     setCounts(stored);
     setDevice(await deviceSummary());
     setSpace(await deviceSpace());
+    setDurability(await storageDurability());
+    setHeldDays(await heldForDays());
   }, []);
 
   const runSync = useCallback(
@@ -797,6 +814,19 @@ export default function App() {
               <span>Dyslexia-friendly reading mode</span>
             </label>
           </details>
+          {/*
+            Addressed to whoever set this iPad up, on the screen they are looking at
+            when they do it — because the one action that prevents the loss has to be
+            taken before any data exists, and the panel that explains it is behind a
+            five-tap gesture only a researcher knows. It sits with the build line,
+            which is already staff-facing text on this screen, and it disappears the
+            moment either protection is in place.
+          */}
+          {durability?.atRisk && (
+            <p className="hint warn setup-note">
+              Before using this iPad for real sittings: tap Share, then <strong>Add to Home Screen</strong>, and open MySelf from there. Safari deletes a website's saved data after {EVICTION_CAP_DAYS} days of not being opened; an app on the Home Screen keeps it.
+            </p>
+          )}
           <p
             className="hint demo-note"
             onClick={() => {
@@ -825,6 +855,23 @@ export default function App() {
                   {space.low
                     ? `Only about ${readableBytes(space.remaining)} of room left on this iPad — use another one for the next participant if you can. Nothing already answered is at risk.`
                     : `About ${readableBytes(space.remaining)} of room left, holding ${readableBytes(space.used)}.`}
+                </p>
+              )}
+              {/*
+                The eviction risk, stated plainly, on the panel a researcher opens
+                when deciding whether a device can go back in the cupboard. See
+                `lib/durability.ts` for why this is not a theoretical concern on an
+                iPad. The held-for line is the part that turns it into a decision:
+                "holding Monday's data since Monday" is actionable, a count is not.
+              */}
+              {durability && (durability.atRisk || (heldDays !== null && heldDays >= HELD_TOO_LONG_DAYS)) && (
+                <p className="hint warn">
+                  {durability.atRisk
+                    ? `This iPad is running MySelf as a Safari tab, so its saved data will be deleted after ${EVICTION_CAP_DAYS} days without the site being opened. Add MySelf to the Home Screen and open it from there, and that stops applying.`
+                    : "This iPad's storage is protected from being cleared by the browser."}
+                  {heldDays !== null && heldDays >= HELD_TOO_LONG_DAYS
+                    ? ` It has been holding data the study has not confirmed for ${heldDays} day${heldDays === 1 ? "" : "s"} — sync it today.`
+                    : ""}
                 </p>
               )}
               <p className="hint">

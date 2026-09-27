@@ -455,6 +455,62 @@ test.describe("a sitting on a device with no study configured", () => {
     await expect(handover.getByRole("button", { name: /enrol/i })).toHaveCount(0);
     await expect(handover.locator('input[type="password"]')).toHaveCount(1);
   });
+
+  /**
+   * The one setup step there is, and the only protection against the loss that
+   * would take a whole morning without anybody noticing.
+   *
+   * WebKit deletes a site's IndexedDB after seven days of the site not being
+   * opened. A fielded iPad holding unsynced sittings in a cupboard between school
+   * visits is precisely that, and an iOS web app on the Home Screen is exempt.
+   * So the app has to ask for it, on the screen the person setting the device up is
+   * looking at, and has to stop asking once the data is safe.
+   *
+   * The browser's answer is stubbed rather than taken as found, because the whole
+   * point is the behaviour on a browser that will not promise — which is every
+   * iPad, and is not the browser this test runs in.
+   */
+  test("asks for the Home Screen on a browser that will not promise to keep the data", async ({ page }) => {
+    await page.addInitScript(() => {
+      // Safari's shape: `estimate()` and nothing else. There is no persistence to
+      // be had, so the Home Screen is the only answer and the app must say so.
+      Object.defineProperty(navigator, "storage", {
+        value: { estimate: async () => ({ usage: 1_000, quota: 500_000_000 }) },
+        configurable: true,
+      });
+    });
+    await page.goto("./");
+
+    const note = page.locator("p.setup-note");
+    await expect(note).toBeVisible();
+    await expect(note).toContainText("Add to Home Screen");
+    await expect(note).toContainText("7 days");
+
+    // And the handover panel carries the same warning for the researcher deciding
+    // whether this device can be put away.
+    for (let i = 0; i < 5; i += 1) await page.locator("p.demo-note").click();
+    await expect(page.locator(".handover")).toContainText("deleted after 7 days");
+  });
+
+  test("says nothing about the Home Screen once the browser has promised to keep the data", async ({ page }) => {
+    await page.addInitScript(() => {
+      Object.defineProperty(navigator, "storage", {
+        value: {
+          estimate: async () => ({ usage: 1_000, quota: 500_000_000 }),
+          persisted: async () => false,
+          persist: async () => true,
+        },
+        configurable: true,
+      });
+    });
+    await page.goto("./");
+
+    // A warning that is always there is a warning nobody reads, so a granted
+    // promise has to actually remove it. The build line is still present, which is
+    // what makes this a check on the note and not on the page having rendered.
+    await expect(page.locator("p.demo-note")).toBeVisible();
+    await expect(page.locator("p.setup-note")).toHaveCount(0);
+  });
 });
 
 /**

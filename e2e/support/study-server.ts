@@ -26,8 +26,16 @@ import { getFirestore, type Firestore } from "firebase-admin/firestore";
 export interface StudyServer {
   url: string;
   db: Firestore;
-  /** Every request seen, so a test can assert what the device actually did. */
-  requests: { authorization: string | undefined; body: unknown }[];
+  /**
+   * Every request seen, so a test can assert what the device actually did.
+   *
+   * `receivedAt` is this machine's clock when the request arrived, which is what makes
+   * the device's own `sentAt` checkable: the two are readings of the same moment, so
+   * they should agree to within a request's latency. Comparing `sentAt` to the clock at
+   * the END of a test proves nothing — a walk through the survey takes minutes and the
+   * first checkpoint is legitimately that old.
+   */
+  requests: { authorization: string | undefined; body: unknown; receivedAt: number }[];
   /** Make the next `n` requests fail, to test a device's retry behaviour. */
   failNext(n: number, status?: number): void;
   /**
@@ -98,7 +106,7 @@ export async function startStudyServer(study = "ybm"): Promise<StudyServer> {
         } catch {
           body = null;
         }
-        requests.push({ authorization: req.headers.authorization, body });
+        requests.push({ authorization: req.headers.authorization, body, receivedAt: Date.now() });
 
         if (refuseAll || failures > 0) {
           if (!refuseAll) failures -= 1;

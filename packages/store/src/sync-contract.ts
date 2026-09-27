@@ -61,6 +61,30 @@ export const sittingUpload = z.object({
    * installation id it verified.
    */
   deviceId: z.string().min(1).max(120).optional(),
+  /**
+   * What this device believed the time was when it sent this.
+   *
+   * WHY THE STUDY WANTS IT. Every wall-clock timestamp in the dataset — when a
+   * sitting started, when each answer was given — comes from the iPad's own clock,
+   * and nothing else records whether that clock was right. An iPad restored from a
+   * backup, or one that has been off a network for a fortnight, can come up hours
+   * out, and the result is a sitting dated to the wrong day with nothing in the data
+   * to say so. Pairing the device's clock with the server's at a moment both
+   * observed is the only way to find that out, and it costs one field.
+   *
+   * IT CANNOT BE INFERRED WITHOUT THIS. `receivedAt` minus the last event's `tWall`
+   * looks like it would do, but a device that held a morning's sittings for three
+   * days offline — the normal case here — is indistinguishable from one whose clock
+   * is three days behind. Only a clock read at the moment of the request separates
+   * them.
+   *
+   * OPTIONAL, because an older build that does not send it must still be accepted.
+   * A sitting refused over a diagnostic field would lose everything a child
+   * answered, which is the trade this whole contract is written to avoid. It is also
+   * never trusted for anything: response timing comes from the monotonic clock, and
+   * this is recorded as an observation, not used as a time.
+   */
+  sentAt: z.string().min(1).max(40).optional(),
   sittings: z.array(sittingUploadItem).min(1).max(50),
 });
 

@@ -606,3 +606,125 @@ which extended the unlocked window instead of shortening it. And the export did 
 the installation id its own docstring promised.
 
 633 unit tests, 30 integration, 6 browser, 5 full-chain.
+
+## 11. The seven-day cap, which nothing in the app had accounted for
+
+Only Chromium is installable in the environment this work was done in, so WebKit has
+never run here and CI is its first exercise. That made it worth going through the
+participant app against what an iPad actually does rather than what a browser
+generally does. Most of it came back clean — `structuredClone` is only used in the
+researcher app, `randomUUID` is already guarded, the quota reading already treats
+Safari's numbers as advisory, and the vite build target is not exotic. One thing did
+not.
+
+**WebKit deletes a site's script-writable storage after seven days of Safari being
+used without that site being opened.** IndexedDB, the Cache API and the service
+worker registration all go. It is not storage pressure, there is no warning, and
+there is nothing to recover. An iOS web app launched from the Home Screen is exempt;
+a Safari tab is not.
+
+That is not an edge case for this study, it is the normal shape of a school visit: a
+device collects on a Monday in a hall with no usable wifi, holds the morning
+encrypted in IndexedDB, goes in a cupboard, and is picked up when somebody
+remembers. Every other protection in the app is aimed at the wrong failure — the
+space warning is about a full disk, the write guard fires once a write has already
+failed, the sync rules protect a sitting that still exists. None of them sees this
+one coming, and the loss is a whole morning with nobody aware there was anything to
+lose.
+
+`apps/participant/src/lib/durability.ts` now asks the browser for a persistence
+promise on launch and reports where that leaves the device. Deliberately, it does no
+user-agent sniffing: the question worth answering is not "is this Safari" but "did we
+get a promise that this data survives", which is answerable directly — so a future
+WebKit that implements `persist()` reads as safe with no change here, and a Chrome
+that refused reads as at risk. Two things clear the risk and either is enough: a
+granted `navigator.storage.persist()`, or running installed, checked both by
+`display-mode: standalone` and by `navigator.standalone` because the standard query
+only reached iOS in 16.4 and a school's iPads are rarely all the same age.
+
+Where it surfaces matters as much as the check. The action has to be taken *before*
+any data exists, by whoever sets the iPad up, and the handover panel is behind a
+five-tap gesture only a researcher knows. So the start screen carries a staff-facing
+line when the device is at risk — beside the build line, which is already staff text
+on that screen — and it disappears once either protection is in place, because a
+warning that is always there is a warning nobody reads. The handover panel carries
+the fuller version for the researcher deciding whether a device can go in the
+cupboard, together with how long it has been holding data the study has not
+confirmed. Three days is when that appears; seven is when Safari would act. A count
+of held sittings is not actionable; "holding Monday's data since Monday" is.
+
+Eighteen unit tests, mutation-checked in both directions, and two browser tests that
+stub the browser's answer rather than take it as found — because the behaviour under
+test is the one on a browser that will not promise, which is every iPad and is not
+the browser the suite runs in. The runbook now says why the Home Screen step is step
+one rather than leaving it as an instruction to be skipped.
+
+651 unit tests, 30 integration, 8 browser, 5 full-chain.
+
+## 12. Two more things a scientific instrument should not have to assume
+
+### 12.1 The device's clock
+
+Every wall-clock timestamp in the dataset — when a sitting started, when each answer
+was given — comes from the iPad's own clock, and until now nothing recorded whether
+that clock was right. An iPad restored from a backup, or one hand-set, can come up
+hours or days out, and the result is a morning's sittings dated to the wrong day with
+nothing in the data to reveal it.
+
+It cannot be recovered afterwards. `receivedAt` minus the last event's `tWall` looks
+like it would do, but a device that held a morning offline for three days — the normal
+case in this study — is indistinguishable from one whose clock is three days behind.
+Only a clock read at the moment of a request separates them, and only if something
+records it.
+
+So the upload now carries `sentAt`, the device's clock at the instant of the request,
+and the study keeps it beside its own `receivedAt` in the `sittings.received` audit
+row rather than reducing the pair to a difference — two representations of one fact
+drift; the pair does not. A device more than five minutes out is logged as a warning
+during fieldwork, which is where it can still be acted on. The tolerance is loose on
+purpose: request latency and an RTC-kept clock put seconds to a minute between the
+readings, and a warning that fires on those is a warning that gets filtered.
+
+Three deliberate constraints. The field is **optional**, so a build that does not send
+it is still accepted — a sitting refused over a diagnostic field would lose everything
+a child answered. It is **never used as a time**: response latencies come from the
+monotonic clock and are unaffected by any of this. And it is read **at the moment of
+sending**, not when the upload was queued, because a queued upload can wait a long
+time behind a retry backoff and a stale reading would manufacture exactly the skew it
+exists to detect. That last one is why the assertion lives in the full-chain suite and
+covers every request rather than the first: the first version of the test compared
+`sentAt` to the clock at the end of the test and failed, correctly — the first
+checkpoint of a two-minute walk is legitimately two minutes old. The study server now
+records when each request arrived, and the device's claim is checked against that.
+
+### 12.2 A class of thirty, all handing in at once
+
+The concurrency already tested is the right rule under real contention — six devices
+racing for one id, a retry overlapping its first attempt, a checkpoint overlapping the
+finished sitting, twenty sittings from one handover. None of them is the shape of the
+actual event: a teacher says put your iPads down, thirty devices come back onto one
+access point within seconds, and every one starts uploading. Thirty concurrent
+transactions, most independent and some colliding, and the failure that would produce
+is not a refusal — it is one sitting quietly carrying another's events.
+
+Two integration cases now run that. Thirty devices upload sittings of varying length,
+so some spill into chunks and some do not, and every sitting is read back and checked
+against what its own device sent — including a marker in each event payload naming the
+device that wrote it, because a count can come out right by accident and a set of
+writers cannot. Then ten pairs collide on the same session id at once: every id must
+resolve to exactly one stored sitting and one filed refusal, and the stored one must
+be one device's log whole rather than a blend, which is the outcome the entire
+mechanism exists to make impossible.
+
+### What is still not done
+
+Unchanged from §8–§10, and worth restating rather than leaving implicit: withdrawal
+and erasure are manual by decision; the narrative module and its safeguarding
+notification are not built; the identity project is not stood up; `apps/api` has not
+been removed or kept on purpose; the React components have no unit tests. And WebKit
+has still never run in this environment — only Chromium is installable here, so CI is
+its first exercise of the engine every iPad actually uses. The §11 work was done by
+reading the code against what WebKit does rather than by watching it, which is weaker,
+and the first CI run on the `webkit` project is the thing to look at.
+
+661 unit tests, 32 integration, 8 browser, 5 full-chain.

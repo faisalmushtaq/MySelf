@@ -57,6 +57,26 @@ Open `https://faisalmushtaq.github.io/MySelf/` in Safari, then **Share → Add t
 Home Screen**. Launch it from the Home Screen icon from now on. That is the whole
 setup, and it needs no network beyond loading the page once.
 
+**The Home Screen step is not cosmetic and it is the one thing here that can lose
+data.** Safari deletes a website's saved data — the whole encrypted database of
+sittings, and the offline app itself — after seven days of Safari being used
+without that site being opened. It is not a storage warning and there is nothing to
+recover afterwards: an iPad that collected on Monday, went into a cupboard, and is
+picked up the following week is a blank device. An iOS web app launched from the
+Home Screen is not subject to that cap, which is why this is step one.
+
+The app checks for itself and says so. If it is running as a plain Safari tab, the
+start screen carries a line asking for the Home Screen, and the handover panel
+repeats it with the seven days named. Both disappear once the device is safe, so a
+device showing neither is a device you can trust with held data. Two situations to
+take seriously:
+
+- **A line on the start screen asking for the Home Screen.** Do it before that
+  iPad is used for real sittings. If it already holds sittings, sync it first.
+- **"It has been holding data the study has not confirmed for N days."** Get that
+  device on a network today. Three days is when this appears; seven is when Safari
+  would delete it.
+
 The iPad gives itself an identity on first launch: an id to be known by and a
 secret to prove it, both generated on the device, **before it has ever reached the
 study**. The first upload registers that secret, and from then on the study accepts
@@ -81,7 +101,8 @@ stops a runaway client, which is the likely accident; and a specific device can 
 stopped (§8). If the URL ever circulates further than intended, **App Check** is the
 real control and is a project setting rather than a code change.
 
-**Adding a device mid-study needs no action at all.** Open the URL on it.
+**Adding a device mid-study needs no action at all.** Open the URL on it — and add
+it to the Home Screen, for the reason above.
 
 ## 3. On the day
 
@@ -120,6 +141,7 @@ the start screen, between participants.
 | Guest network with a **captive portal** | Refuses the portal's reply rather than mistaking a login page for a successful upload, and says the network may need signing in to. |
 | Connection drops mid-response | Treats it as a failure and re-sends. The study's write path is idempotent, so a sitting that did land is not duplicated. |
 | Repeated failures | Backs off, thirty seconds doubling to a ten-minute ceiling, jittered so a rack of iPads that failed together does not retry together. |
+| **Days go by with no network at all** | Collects and holds indefinitely, and after three days says on the handover panel how long it has been holding. This is the one case with a deadline that is not the device's: Safari deletes a plain tab's data at seven days (§2). A Home Screen app has no deadline. |
 
 The one thing the device will never do is mark a sitting confirmed on anything less
 than the study saying it stored every event.
@@ -225,3 +247,5 @@ to do with that is a judgement rather than a button.
 | The researcher view shows an empty study | Either no role (§1a), or nothing has been pulled yet. |
 | Linkage shows no names | The vault is locked, or was unlocked after the last derive — unlocking triggers one. |
 | A name looks like nonsense | Wrong passphrase. It should have been refused; report it. |
+| A sitting is dated to the wrong day | That iPad's clock was wrong. Every upload records what the device believed the time was alongside when the study received it, so the offset is in the audit trail (`sittings.received` rows carry `sentAt` and `clockSkewMs`), and a device more than five minutes out is logged as a warning. Response *timings* are unaffected — those come from a monotonic clock and never from the wall clock. Correct the iPad's date and report the offset so the affected sittings can be adjusted. |
+| A device has been holding data for days | Get it on a network today. See §2: a Safari tab loses everything at seven days. |

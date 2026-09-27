@@ -1,7 +1,14 @@
 import { describe, expect, it } from "vitest";
 import { joinSession, paths, splitSession, type ChunkDoc, type SessionDoc } from "@myself/firebase";
 import type { DeviceSession } from "@myself/store";
-import { deviceIdFor, sittingRefusal, storeSitting } from "./sittings.js";
+import {
+  CLOCK_SKEW_TOLERANCE_MS,
+  clockIsSuspect,
+  clockSkewMs,
+  deviceIdFor,
+  sittingRefusal,
+  storeSitting,
+} from "./sittings.js";
 // The upload shape is the shared wire contract, not this function's own idea of it.
 import { sittingUpload } from "@myself/store";
 import { RelayError, type Caller } from "./relay-policy.js";
@@ -488,5 +495,114 @@ describe("when a write fails part way", () => {
 
     expect(docs.has(paths.session("ybm", "ses_1"))).toBe(false);
     expect([...docs.keys()].every((k) => k.includes("/chunks/"))).toBe(true);
+  });
+});
+
+/**
+ * Whether the iPad's clock can be trusted, which decides whether the dataset's dates can.
+ *
+ * Every wall-clock timestamp in a sitting comes from the device. An iPad restored from
+ * a backup can come up hours or days out, and the result is a morning's sittings dated
+ * to the wrong day with nothing in the data to reveal it. Pairing the device's clock
+ * with the study's at a moment both observed is the only way to find it, and these are
+ * the cases where that comparison could mislead.
+ *
+ * THE EXPENSIVE MISTAKE IS THE REASSURING ONE. A device that did not say what its clock
+ * was must not read as a device whose clock agreed — that is a claim nobody made, and it
+ * is the direction that hides the problem rather than the one that raises a false alarm.
+ */
+describe("a device's clock against the study's", () => {
+  const received = new Date("2026-09-27T09:00:00.000Z");
+
+  it("says nothing at all when the device did not send its clock", () => {
+    // An older build. Null, not zero: zero would be recorded as agreement.
+    expect(clockSkewMs(undefined, received)).toBe(null);
+    expect(clockIsSuspect(clockSkewMs(undefined, received))).toBe(false);
+  });
+
+  it("says nothing when the value cannot be read", () => {
+    expect(clockSkewMs("half past nine", received)).toBe(null);
+    expect(clockSkewMs("", received)).toBe(null);
+  });
+
+  it("reports a device that agrees as nought", () => {
+    expect(clockSkewMs("2026-09-27T09:00:00.000Z", received)).toBe(0);
+    expect(clockIsSuspect(0)).toBe(false);
+  });
+
+  it("signs the difference so the direction is known", () => {
+    // Ahead is positive, behind is negative. Which way it is out is what tells an
+    // analyst whether the sittings are dated early or late.
+    expect(clockSkewMs("2026-09-27T09:00:30.000Z", received)).toBe(30_000);
+    expect(clockSkewMs("2026-09-27T08:59:30.000Z", received)).toBe(-30_000);
+  });
+
+  it("tolerates the difference a school network produces", () => {
+    // Request latency and an RTC-kept clock put seconds to a minute between the two
+    // readings. Warning on those would train everybody to ignore the warning.
+    expect(clockIsSuspect(clockSkewMs("2026-09-27T09:00:45.000Z", received))).toBe(false);
+    expect(clockIsSuspect(clockSkewMs("2026-09-27T08:56:00.000Z", received))).toBe(false);
+  });
+
+  it("flags a device that is out by hours, in either direction", () => {
+    expect(clockIsSuspect(clockSkewMs("2026-09-27T12:00:00.000Z", received))).toBe(true);
+    expect(clockIsSuspect(clockSkewMs("2026-09-27T06:00:00.000Z", received))).toBe(true);
+  });
+
+  it("flags a device restored with a clock days out", () => {
+    // The case that silently dates a whole morning to the wrong day.
+    expect(clockIsSuspect(clockSkewMs("2026-09-24T09:00:00.000Z", received))).toBe(true);
+  });
+
+  it("puts the boundary where the tolerance says", () => {
+    const inside = new Date(received.getTime() + CLOCK_SKEW_TOLERANCE_MS).toISOString();
+    const outside = new Date(received.getTime() + CLOCK_SKEW_TOLERANCE_MS + 1).toISOString();
+    expect(clockIsSuspect(clockSkewMs(inside, received))).toBe(false);
+    expect(clockIsSuspect(clockSkewMs(outside, received))).toBe(true);
+  });
+
+  /**
+   * The point of the field, stated as a test: a device that held its data for days
+   * must not look like a device with a broken clock. That is precisely the confusion
+   * the field exists to remove, and it is why the reading is taken at the moment of
+   * the request rather than from the sitting's own timestamps.
+   */
+  it("does not mistake a sitting held offline for days for a bad clock", () => {
+    const upload = sittingUpload.parse({
+      deviceId: "ipad_held",
+      sentAt: received.toISOString(),
+      sittings: [
+        {
+          sessionId: "ses_old",
+          studyCode: "NDC0001",
+          releaseKey: "ybm_nd2026_standard",
+          releaseHash: "sha256:abc",
+          // Answered three days before it was finally uploaded, which is normal here.
+          startedAt: "2026-09-24T09:15:00.000Z",
+          complete: true,
+          events: [{ seq: 0, type: "session.started", tWall: "2026-09-24T09:15:00.000Z", tMono: 0 }],
+        },
+      ],
+    });
+    expect(clockIsSuspect(clockSkewMs(upload.sentAt, received))).toBe(false);
+  });
+
+  it("accepts an upload from a build that does not send a clock at all", () => {
+    // Refusing one would lose everything a child answered over a diagnostic field.
+    const upload = sittingUpload.parse({
+      deviceId: "ipad_old_build",
+      sittings: [
+        {
+          sessionId: "ses_a",
+          studyCode: "NDC0001",
+          releaseKey: "ybm_nd2026_standard",
+          releaseHash: "sha256:abc",
+          startedAt: "2026-09-27T09:00:00.000Z",
+          complete: true,
+          events: [{ seq: 0, type: "session.started", tWall: "2026-09-27T09:00:00.000Z", tMono: 0 }],
+        },
+      ],
+    });
+    expect(upload.sentAt).toBeUndefined();
   });
 });

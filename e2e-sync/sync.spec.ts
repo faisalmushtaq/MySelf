@@ -208,6 +208,31 @@ test("a finished sitting reaches the database with its answers intact", async ({
 
   // And the device proved who it was rather than asserting it.
   expect(study.requests[0]!.authorization).toMatch(/^Device ipad_[A-Z0-9]+\.[A-Za-z0-9_-]{32,}$/);
+
+  /**
+   * Every wall-clock timestamp in the dataset comes from this iPad's clock, and
+   * `sentAt` is the only thing that lets the study check whether that clock was right.
+   * Asserted over the real request rather than in a unit test because the value has to
+   * be read at the moment of sending: an implementation that stamped it when the
+   * sitting was queued would pass a unit test and manufacture hours of skew on a
+   * device whose upload waited behind a retry backoff.
+   */
+  expect(study.requests.length).toBeGreaterThan(0);
+  for (const [n, request] of study.requests.entries()) {
+    const sentAt = (request.body as { sentAt?: string }).sentAt;
+    expect(sentAt, `request ${n} did not say what the device's clock read`).toBeDefined();
+    /**
+     * Every request, not just the first. A sitting's uploads are spread over the whole
+     * walk and some of them follow a retry delay, which is precisely where an
+     * implementation that stamped the value when the upload was QUEUED would drift —
+     * and drift is the thing the field exists to measure, so it must not be
+     * manufactured by the client.
+     */
+    expect(
+      Math.abs(Date.parse(sentAt!) - request.receivedAt),
+      `request ${n} claimed a clock reading far from when it arrived`,
+    ).toBeLessThan(10_000);
+  }
 });
 
 test("the device registers itself once and keeps the same identity across sittings", async ({ page }) => {

@@ -291,7 +291,18 @@ async function post(
       // The installation id travels in the body as well as being proved by the
       // credential, so a handover file — which carries no credential — files
       // under the same device as a network upload from the same iPad.
-      body: JSON.stringify({ deviceId: target.installId, sittings: [session] } satisfies SittingUpload),
+      /**
+       * `sentAt` is this device's clock at the moment of the request, so the study can
+       * pair it with its own and tell a device with a wrong clock from one that simply
+       * held its data for days. Read here rather than earlier: a queued upload may wait
+       * a long time behind a retry backoff, and a stale reading would manufacture the
+       * skew it exists to detect.
+       */
+      body: JSON.stringify({
+        deviceId: target.installId,
+        sentAt: new Date().toISOString(),
+        sittings: [session],
+      } satisfies SittingUpload),
       signal: controller.signal,
     });
     const body: unknown = await response.json().catch(() => null);

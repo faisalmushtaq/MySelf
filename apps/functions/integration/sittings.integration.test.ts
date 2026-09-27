@@ -380,3 +380,96 @@ describe("many sittings at once, as a handover produces", () => {
     }
   });
 });
+
+/**
+ * A class of thirty, all handing in at once.
+ *
+ * WHAT THE SMALLER CASES DO NOT SETTLE. Six devices racing for one id proves the
+ * conflict rule holds under real contention, and twenty sittings from one device
+ * proves a handover does not mix them up. Neither is the shape of the actual event:
+ * a teacher says "put your iPads down", thirty devices come back onto one access
+ * point within a few seconds, and every one of them starts uploading a full
+ * sitting. That is thirty concurrent transactions across thirty documents, most of
+ * them independent and a few of them colliding, and the failure it could produce is
+ * not a refusal — it is one sitting quietly carrying another's events.
+ *
+ * SO THE ASSERTION IS PER SITTING AND EXHAUSTIVE. Every device's sitting is read
+ * back and checked against what that device sent: its own code, its own event count,
+ * and payloads that identify which device wrote them. A store that dropped a
+ * transaction, or interleaved two, fails on the specific sitting rather than on a
+ * total that could come out right by accident.
+ */
+describe("a class of thirty iPads handing in at once", () => {
+  const CLASS_SIZE = 30;
+
+  /** A sitting whose every event names the device that wrote it. */
+  const ownedSitting = (n: number, events: number): DeviceSession =>
+    sitting(
+      Array.from({ length: events }, (_, i) => ({
+        ...event(i),
+        payload: { value: { kind: "choice", code: i % 5 }, writtenBy: `ipad_${n}` },
+      })),
+      { sessionId: `ses_class_${n}`, studyCode: `NDC${String(n).padStart(4, "0")}` },
+    );
+
+  it("stores every sitting whole, with nothing crossing between them", async () => {
+    // Varying lengths so some spill into chunks and some do not — the mixture is the
+    // point, because the spill path is the one with more than one document to get wrong.
+    const sittings = Array.from({ length: CLASS_SIZE }, (_, n) => ownedSitting(n, 200 + n * 90));
+
+    const outcomes = await Promise.all(
+      sittings.map((one, n) => storeSitting(db, STUDY, one, `ipad_${n}`, new Date(), "device")),
+    );
+    expect(outcomes.every((o) => o.stored)).toBe(true);
+    expect(outcomes.map((o) => o.events)).toEqual(sittings.map((s) => s.events.length));
+
+    for (const [n, sent] of sittings.entries()) {
+      const back = await readBack(`ses_class_${n}`);
+      expect(back.studyCode, `sitting ${n} came back under the wrong code`).toBe(`NDC${String(n).padStart(4, "0")}`);
+      expect(back.events, `sitting ${n} lost events`).toHaveLength(sent.events.length);
+      expect(back.events.map((e) => e.seq)).toEqual([...Array(sent.events.length).keys()]);
+      // The check that catches an interleave a count would miss.
+      const writers = new Set(back.events.map((e) => (e.payload as { writtenBy?: string } | undefined)?.writtenBy));
+      expect([...writers], `sitting ${n} carries another device's events`).toEqual([`ipad_${n}`]);
+    }
+  }, 120_000);
+
+  it("keeps one winner per id when a third of the class collides", async () => {
+    /**
+     * Ten devices, each racing one other device for the same session id — the shape
+     * a mistyped or re-used code produces at scale. Every id must end with exactly
+     * one stored sitting and one refusal, and the stored one must be internally
+     * consistent: half of one device's log and half of another's is the outcome this
+     * whole mechanism exists to make impossible.
+     */
+    const pairs = 10;
+    const attempts = Array.from({ length: pairs }, (_, p) => [
+      { device: `ipad_first_${p}`, sitting: ownedSitting(p, 400) },
+      { device: `ipad_second_${p}`, sitting: ownedSitting(p, 400) },
+    ]).flat();
+
+    const results = await Promise.all(
+      attempts.map((a) =>
+        storeSitting(db, STUDY, { ...a.sitting, events: a.sitting.events.map((e) => ({ ...e, payload: { ...(e.payload as object), writtenBy: a.device } })) }, a.device, new Date(), "device"),
+      ),
+    );
+
+    for (let p = 0; p < pairs; p += 1) {
+      const forThisId = results.filter((_, i) => attempts[i]!.sitting.sessionId === `ses_class_${p}`);
+      expect(forThisId.filter((r) => r.stored), `id ${p} did not resolve to one winner`).toHaveLength(1);
+      expect(forThisId.filter((r) => !r.stored)).toHaveLength(1);
+
+      const back = await readBack(`ses_class_${p}`);
+      expect(back.events).toHaveLength(400);
+      const writers = new Set(back.events.map((e) => (e.payload as { writtenBy?: string } | undefined)?.writtenBy));
+      // One device's log, whole. Not a blend.
+      expect([...writers], `id ${p} was stored as a blend of two devices`).toHaveLength(1);
+      expect([...writers][0]).toMatch(new RegExp(`^ipad_(first|second)_${p}$`));
+    }
+
+    // And the loser is readable rather than lost: a person has to be able to see what
+    // was refused and decide, which is the whole reason refusals are filed.
+    const quarantined = await db.collection(`studies/${STUDY}/quarantine`).get();
+    expect(quarantined.size).toBe(pairs);
+  }, 120_000);
+});

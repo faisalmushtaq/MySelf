@@ -30,6 +30,37 @@ import { authenticate, cors } from "./relay.js";
  */
 export const UPLOADS_PER_DEVICE_PER_DAY = 2_000;
 
+/**
+ * How far a device's clock may be out before the study says so.
+ *
+ * Five minutes, which is loose on purpose. Request latency, a slow school network and
+ * an iPad that keeps time by RTC while offline all put seconds to a minute between the
+ * two readings, and a warning that fires on those is a warning that gets filtered. What
+ * this is for is the device that is out by hours or days — restored from a backup, or
+ * with its clock set by hand — because that one dates a whole morning's sittings to the
+ * wrong day and nothing else in the data reveals it.
+ */
+export const CLOCK_SKEW_TOLERANCE_MS = 5 * 60 * 1000;
+
+/**
+ * How far the device's clock was from the study's, or null if it did not say.
+ *
+ * Positive means the device is ahead. Returns null rather than zero for a missing or
+ * unparseable value: zero would read as a device whose clock agreed, which is a claim
+ * nobody made, and it is the direction that hides a problem.
+ */
+export function clockSkewMs(sentAt: string | undefined, receivedAt: Date): number | null {
+  if (!sentAt) return null;
+  const sent = Date.parse(sentAt);
+  if (Number.isNaN(sent)) return null;
+  return sent - receivedAt.getTime();
+}
+
+/** Whether that skew is large enough that the dataset's dates cannot be trusted. */
+export function clockIsSuspect(skewMs: number | null): boolean {
+  return skewMs !== null && Math.abs(skewMs) > CLOCK_SKEW_TOLERANCE_MS;
+}
+
 async function meterUploads(caller: Caller): Promise<void> {
   const day = new Date().toISOString().slice(0, 10);
   const ref = research().doc(`${paths.audit(STUDY)}_uploads/${day}_${caller.uid}`);
@@ -408,6 +439,22 @@ export const saveSitting = onRequest(
       }
 
       const stored = outcomes.filter((o) => o.stored).length;
+      /**
+       * A device whose clock is hours out is worth knowing about during fieldwork, not
+       * at analysis. Every wall-clock timestamp in its sittings is wrong by the same
+       * amount and nothing in the data says so, so this is the only place it becomes
+       * visible — and the sittings named here are the ones affected.
+       */
+      const skewMs = clockSkewMs(parsed.data.sentAt, now);
+      if (clockIsSuspect(skewMs)) {
+        logger.warn("a device's clock disagrees with the study's", {
+          deviceId,
+          sentAt: parsed.data.sentAt,
+          receivedAt: now.toISOString(),
+          skewMs,
+          sessionIds: outcomes.map((o) => o.sessionId),
+        });
+      }
       try {
         await db.collection(paths.audit(STUDY)).add({
           action: "sittings.received",
@@ -418,6 +465,13 @@ export const saveSitting = onRequest(
           stored,
           quarantined: outcomes.filter((o) => o.quarantined).length,
           sessionIds: outcomes.map((o) => o.sessionId),
+          /**
+           * The device's own clock, kept beside the server's `at` rather than reduced to
+           * a difference. Two representations of one fact drift; the pair does not, and
+           * an analyst can compute whatever correction they need from it.
+           */
+          ...(parsed.data.sentAt ? { sentAt: parsed.data.sentAt } : {}),
+          ...(skewMs === null ? {} : { clockSkewMs: skewMs }),
           at: FieldValue.serverTimestamp(),
         });
       } catch (error) {

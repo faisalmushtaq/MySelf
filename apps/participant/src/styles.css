@@ -418,6 +418,19 @@ textarea {
   color: var(--muted);
 }
 
+/* The one setup step on this screen, addressed to staff rather than to the child
+   holding the iPad: add MySelf to the Home Screen, because Safari deletes a plain
+   tab's saved data after a week and this device may hold a morning's sittings for
+   longer than that. Deliberately its own class rather than a `.demo-note`, which
+   is the build line and is what the handover gesture is aimed at. */
+.setup-note {
+  margin-top: 1.75rem;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  text-align: left;
+  max-width: 34rem;
+}
+
 /* Who to ask, at the foot of the first screen: quiet, always there, never in
    the way of starting. */
 .start-footer {
