@@ -716,6 +716,32 @@ resolve to exactly one stored sitting and one filed refusal, and the stored one 
 be one device's log whole rather than a blend, which is the outcome the entire
 mechanism exists to make impossible.
 
+### 12.3 From the child's finger to the cell in the analyst's file
+
+The accuracy walk already went further than anything else here: it records the visible
+stem and the visible label of every option it taps, hands the sitting over as an
+encrypted file, decrypts it, resolves each stored code back through the release
+manifest, and then runs the same `ingest` the researcher view and the nightly export
+run. It stopped at the `Dataset` — an in-memory structure nobody analyses.
+
+What gets analysed is `phenotype/<instrument>.tsv`: a grid of integers whose meaning
+lives entirely in the `Levels` map of the JSON sidecar beside it. That grid is
+assembled by a different function from the one the walk had reached, and it has its own
+ways to be wrong — a column out of step with its header, a code written into the wrong
+variable's cell, a sidecar whose `Levels` came from a different release than the codes
+did. Each produces a file that opens cleanly in any tool and describes answers nobody
+gave.
+
+The walk now goes the last step, reading the TSV by header name rather than trusting a
+column order: the cell holds the recorded code, the status column beside it agrees the
+item was answered, and the sidecar's `Levels` entry for that code resolves to the label
+the child was actually shown. Both halves were mutation-checked against the real
+export — shifting the code by one gave `phenotype/ybm_demographics.tsv holds "2" for
+ethnicity, not the recorded code`, and shifting the sidecar's keys gave
+`phenotype/ehi_sf.json resolves ehi_writing=5 to "Usually left", but the child was
+shown "Always left"`. That is the whole chain closed: a finger on a screen to a cell in
+the file somebody publishes from.
+
 ### What is still not done
 
 Unchanged from §8–§10, and worth restating rather than leaving implicit: withdrawal

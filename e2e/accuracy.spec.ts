@@ -479,4 +479,74 @@ test("the dataset says what the participant actually answered", async ({ page })
     crossChecked += 1;
   }
   expect(crossChecked).toBeGreaterThan(20);
+
+  /**
+   * And finally the file an analyst actually opens.
+   *
+   * THE LAST SEAM. Everything above stops at the `Dataset` — an in-memory structure
+   * nobody analyses. What gets analysed is `phenotype/<instrument>.tsv`: a grid of
+   * codes, one column per variable, whose meaning lives entirely in the `Levels` map
+   * of the sidecar beside it. That grid is assembled by a different function from the
+   * one checked above, and it has its own ways to be wrong — a column that drifted out
+   * of step with its header, a code written into the wrong variable's cell, a sidecar
+   * whose `Levels` came from a different release than the codes did. Each produces a
+   * file that opens cleanly in any tool and describes answers nobody gave.
+   *
+   * So this walks from the child's finger to the cell: the code in the TSV, and the
+   * label that cell's `Levels` entry resolves it to, both have to be what was tapped.
+   * Read by parsing the TSV the way a reader would, by header name, rather than by
+   * trusting a column order.
+   */
+  const { buildBidsExport } = await storeTools();
+  const exported = buildBidsExport(derived.dataset, { manifest: manifest as never, datasetName: "accuracy check" });
+  const fileAt = (path: string) => exported.find((f) => f.path === path)?.content;
+
+  let inTheTsv = 0;
+  for (const row of answered) {
+    const stem = stemOf.get(`${row.instrument}.${row.item}`);
+    // Single choices only: a multi-select's cell is a set, and the dataset-level check
+    // above already takes it apart part by part.
+    if (!stem || row.value === null || row.label!.includes(" | ")) continue;
+
+    const tsv = fileAt(`phenotype/${row.instrument}.tsv`);
+    expect(tsv, `no phenotype table was written for ${row.instrument}`).toBeTruthy();
+    const [header, ...body] = tsv!.trim().split("\n");
+    const columns = header!.split("\t");
+    const column = columns.indexOf(row.variable);
+    expect(column, `${row.variable} has no column in phenotype/${row.instrument}.tsv`).toBeGreaterThan(-1);
+
+    // One sitting, so one row per instrument — and if that stopped being true the
+    // cell being read would silently become another participant's.
+    expect(body).toHaveLength(1);
+    const cell = body[0]!.split("\t")[column];
+    expect(cell, `phenotype/${row.instrument}.tsv holds "${cell}" for ${row.variable}, not the recorded code`).toBe(
+      String(row.value),
+    );
+
+    // The status column beside it must agree that this was answered, or an analysis
+    // filtering on status would drop a real answer.
+    const status = body[0]!.split("\t")[columns.indexOf(`${row.variable}_status`)];
+    expect(status).toBe("answered");
+
+    /**
+     * And the cell is interpretable. `Levels` is the only thing standing between a
+     * column of integers and a finding, and its entry is either the label or the label
+     * with its code name in brackets — so the label the child was shown has to be where
+     * that string starts.
+     */
+    const sidecar = JSON.parse(fileAt(`phenotype/${row.instrument}.json`)!) as Record<
+      string,
+      { Levels?: Record<string, string> }
+    >;
+    const level = sidecar[row.variable]?.Levels?.[String(row.value)];
+    if (level !== undefined) {
+      expect(
+        level === row.label || level.startsWith(`${row.label!} (`),
+        `phenotype/${row.instrument}.json resolves ${row.variable}=${row.value} to "${level}", but the child was shown "${row.label}"`,
+      ).toBe(true);
+    }
+    inTheTsv += 1;
+  }
+  // Enough of the questionnaire to mean something, rather than one lucky column.
+  expect(inTheTsv).toBeGreaterThan(20);
 });
