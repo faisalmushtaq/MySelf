@@ -13,6 +13,8 @@ export function MoveDialog({
   intro,
   sections,
   current,
+  initial,
+  origin,
   confirmLabel,
   onMove,
   onClose,
@@ -22,11 +24,21 @@ export function MoveDialog({
   sections: OutlineSection[];
   /** Where it is now, if anywhere: marked, and not the default. */
   current: string | null;
+  /** The section chosen to begin with, when there is a natural one (a restore: where it was). */
+  initial?: string | null;
+  /** Where an archived question was archived from: marked, and still choosable. */
+  origin?: string | null;
   confirmLabel: string;
   onMove: (sectionKey: string) => void;
   onClose: () => void;
 }) {
-  const [chosen, setChosen] = useState<string>(() => sections.find((s) => s.key !== current)?.key ?? sections[0]?.key ?? "");
+  const [chosen, setChosen] = useState<string>(
+    () =>
+      (initial && initial !== current && sections.some((s) => s.key === initial) ? initial : null) ??
+      sections.find((s) => s.key !== current)?.key ??
+      sections[0]?.key ??
+      "",
+  );
   const count = (s: OutlineSection) => s.blocks.reduce((n, b) => n + b.questions.length, 0);
   return (
     <Dialog
@@ -56,6 +68,7 @@ export function MoveDialog({
               <small>
                 {count(s) === 1 ? "1 question" : `${count(s)} questions`}
                 {s.key === current ? " · where it is now" : ""}
+                {s.key === origin ? " · where it was" : ""}
               </small>
             </span>
           </label>

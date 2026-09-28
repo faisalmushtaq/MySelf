@@ -227,6 +227,19 @@
   color: var(--text);
 }
 
+/*
+ * REVIEW FIX: text hidden for screen readers (.st-sr, position: absolute)
+ * inside a clipped, nowrap row label sat at its static position — past the end
+ * of a long block name — and, positioned against the row rather than the
+ * clipping label, widened the outline: the left column scrolled sideways at
+ * every width (457px of content in a 320px column) and, on a phone, so did
+ * the whole page. Pinned to the row's corner it takes up no width.
+ */
+.sto-row .st-sr {
+  top: 0;
+  left: 0;
+}
+
 .sto-main {
   flex: 1;
   min-width: 0;

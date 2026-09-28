@@ -274,6 +274,12 @@ export interface Tree {
   roots: TreeNode[];
   /** Every shown row, top to bottom — what arrow keys walk. */
   visible: TreeNode[];
+  /** The ids of `visible`: the rows actually drawn. */
+  shown: ReadonlySet<string>;
+  /**
+   * Every row built, INCLUDING those inside a collapsed section or block,
+   * which are not drawn. Whether a row is on screen is `shown`, not this.
+   */
   byId: ReadonlyMap<string, TreeNode>;
   filtering: boolean;
   /** Questions (live and archived) passing the search and filters. */
@@ -318,7 +324,13 @@ export function buildTree(o: Outline, index: IssueIndex, opts: TreeOptions): Tre
   const byId = new Map<string, TreeNode>();
   let matches = 0;
 
-  const finish = (node: Omit<TreeNode, "sig" | "treeSig">, sigParts: (string | number | boolean)[]): TreeNode => {
+  /**
+   * `allChildren`: every child built, shown or not. A collapsed row's children
+   * are not in `node.children`, but they still belong to it (REVIEW FIX: their
+   * `parentId` was left null, so a hidden row could not be traced to the
+   * collapsed row it is inside — see `tabStopFor`).
+   */
+  const finish = (node: Omit<TreeNode, "sig" | "treeSig">, sigParts: (string | number | boolean)[], allChildren: TreeNode[] = node.children): TreeNode => {
     const sig = [node.kind, node.level, node.label, node.expandable, node.expanded, node.issues.errors, node.issues.warnings, ranges(node.textMatch), ranges(node.idMatch), opts.canEdit, ...sigParts].join("␟");
     const full = node as TreeNode;
     full.sig = sig;
@@ -327,7 +339,7 @@ export function buildTree(o: Outline, index: IssueIndex, opts: TreeOptions): Tre
     let id = full.id;
     for (let n = 2; byId.has(id); n++) id = `${full.id}#${n}`;
     full.id = id;
-    for (const child of full.children) child.parentId = id;
+    for (const child of allChildren) child.parentId = id;
     byId.set(id, full);
     return full;
   };
@@ -444,6 +456,7 @@ export function buildTree(o: Outline, index: IssueIndex, opts: TreeOptions): Tre
               block: info,
             },
             [info.tier, info.unlocked, info.hasCondition, info.questionCount, info.condition ?? ""],
+            kids,
           ),
         );
         anyChild = true;
@@ -486,6 +499,7 @@ export function buildTree(o: Outline, index: IssueIndex, opts: TreeOptions): Tre
         section: info,
       },
       [questionCount, section.hasCondition, condition ?? "", info.fixed],
+      children,
     );
   }
 
@@ -650,6 +664,7 @@ export function buildTree(o: Outline, index: IssueIndex, opts: TreeOptions): Tre
             idMatch: [],
           },
           [o.archived.length],
+          kids,
         ),
       );
     }
@@ -663,7 +678,23 @@ export function buildTree(o: Outline, index: IssueIndex, opts: TreeOptions): Tre
     }
   };
   walk(roots);
-  return { roots, visible, byId, filtering, matches };
+  return { roots, visible, shown: new Set(visible.map((n) => n.id)), byId, filtering, matches };
+}
+
+/**
+ * The row that should hold the tree's one tab stop (roving tabindex): the
+ * current one while it is drawn; else the nearest drawn row it sits inside
+ * (collapsing a section moves the stop to the section, as focus moves in any
+ * tree); else the selected row if drawn; else the first row. Never a row that
+ * is not drawn — then no row would have tabindex=0 and Tab would skip the tree.
+ */
+export function tabStopFor(tree: Pick<Tree, "shown" | "byId" | "visible">, active: string | null, selected: string | null): string | null {
+  if (active && tree.shown.has(active)) return active;
+  for (let node = active ? tree.byId.get(active) : undefined; node; node = node.parentId ? tree.byId.get(node.parentId) : undefined) {
+    if (tree.shown.has(node.id)) return node.id;
+  }
+  if (selected && tree.shown.has(selected)) return selected;
+  return tree.visible[0]?.id ?? null;
 }
 
 function ranges(r: [number, number][]): string {

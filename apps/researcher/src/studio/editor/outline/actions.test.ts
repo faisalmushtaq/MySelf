@@ -74,10 +74,86 @@ describe("a question's menu offers exactly what the model allows", () => {
     expect(find(items, "archive").disabled).toBeUndefined();
   });
 
+  // REVIEW FIX: a published licensed question's Delete said "Archive instead",
+  // while its Archive item was disabled too.
+  it("never advises archiving where Archive itself is unavailable", () => {
+    const unlocked = unlockModule(live(), "ybm_identity", { ...actor, reason: "Checking linkage handling in a test." }).draft;
+    for (const [d, itemKey] of [
+      [live(), "sdq25_s.q3"],
+      [live(), liveQuestions(live())[0]!.itemKey],
+      [unlocked, "ybm_identity.ps_house_digit"],
+    ] as const) {
+      const items = questionActions(itemKey, facts(d));
+      expect(find(items, "archive").disabled).toBeTruthy();
+      expect(find(items, "delete").disabled).not.toMatch(/Archive instead/);
+      expect(find(items, "delete").disabled).toBe(find(items, "archive").disabled);
+    }
+    expect(find(questionActions("sdq25_s.q3", facts(live())), "delete").disabled).toMatch(/Remove the whole block instead/);
+  });
+
   it("points a licensed question's moves at its block", () => {
     const items = questionActions("sdq25_s.q3", facts(live()));
     expect(find(items, "move-up").disabled).toMatch(/Move the whole block instead/);
     expect(find(items, "move-to-section").disabled).toMatch(/licensed questionnaire/);
+  });
+});
+
+// REVIEW FIX: moves were offered on tier alone, but the model also refuses to
+// put anything in front of the ethics-protected consent. These were offered
+// and then refused with an error toast.
+describe("moves the model would refuse are not offered", () => {
+  it("won't offer to move a section in front of the consent section", () => {
+    const d = moveSection(live(), "hands_and_ladders", 1).draft;
+    const items = sectionActions("hands_and_ladders", facts(d));
+    const up = keyboardSectionMove(outline(d), "hands_and_ladders", -1)!;
+    expect(up.op === "section" && works(() => moveSection(d, "hands_and_ladders", up.toIndex))).toBe(false);
+    expect(find(items, "move-up").disabled).toMatch(/before “YBM introduction and consent”/);
+    expect(find(items, "move-down").disabled).toBeUndefined();
+  });
+
+  it("won't offer to move a question added to the Welcome section above the consent", () => {
+    const added = addQuestion(live(), { sectionKey: "welcome", typeId: "short_text", text: "Your school?" });
+    const items = questionActions(added.itemKey, facts(added.draft, new Set()));
+    const up = keyboardQuestionMove(outline(added.draft), added.itemKey, -1)!;
+    expect(up.op === "question" && works(() => moveQuestion(added.draft, added.itemKey, up.to))).toBe(false);
+    expect(find(items, "move-up").disabled).toMatch(/consent/);
+    expect(find(items, "move-down").disabled).toBeUndefined();
+  });
+
+  it("offers a move exactly when the model allows it, for every row of the live survey", () => {
+    const d = moveSection(live(), "hands_and_ladders", 1).draft;
+    const f = facts(d);
+    const o = f.outline;
+    for (const [dir, id] of [[-1, "move-up"], [1, "move-down"]] as const) {
+      for (const s of o.sections) {
+        const move = keyboardSectionMove(o, s.key, dir);
+        const offered = !find(sectionActions(s.key, f), id).disabled;
+        expect([s.key, offered]).toEqual([s.key, !!move && move.op === "section" && works(() => moveSection(d, s.key, move.toIndex))]);
+        for (const b of s.blocks) {
+          const bm = keyboardBlockMove(o, f.counts, s.key, b.componentIndex, dir);
+          const bOffered = !find(blockActions(s.key, b.componentIndex, f), id).disabled;
+          expect([s.key, b.componentIndex, bOffered]).toEqual([
+            s.key,
+            b.componentIndex,
+            !!bm && bm.op === "block" && works(() => moveBlock(d, bm.from, bm.to)),
+          ]);
+        }
+      }
+    }
+  });
+});
+
+describe("an archived question that can't go back where it was", () => {
+  it("disables Restore with the model's reason and still offers Restore into section…", () => {
+    // Archive a question, then empty and delete its section.
+    const added = addSection(live(), { title: "Spare" });
+    const q = addQuestion(added.draft, { sectionKey: added.sectionKey, typeId: "number", text: "How many pets?" });
+    const archived = archiveQuestion(q.draft, q.itemKey, actor).draft;
+    const gone = removeSection(archived, added.sectionKey).draft;
+    expect(works(() => restoreQuestion(gone, q.itemKey))).toBe(false);
+    const items = archivedActions(q.itemKey, facts(gone, new Set()));
+    expect(find(items, "restore").disabled).toMatch(/no longer in the survey/);
+    expect(find(items, "restore-into").disabled).toBeUndefined();
   });
 });
 

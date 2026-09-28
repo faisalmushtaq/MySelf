@@ -141,11 +141,14 @@ function PublishFlow() {
         const e = error instanceof StudioCallError ? error : null;
         dispatch({
           type: "failed",
-          failure: classifyPublishError({
-            code: e?.code ?? "unknown",
-            message: e?.message ?? (error instanceof Error ? error.message : String(error)),
-            details: e?.details ?? null,
-          }),
+          failure: classifyPublishError(
+            {
+              code: e?.code ?? "unknown",
+              message: e?.message ?? (error instanceof Error ? error.message : String(error)),
+              details: e?.details ?? null,
+            },
+            typeof navigator === "undefined" ? true : navigator.onLine,
+          ),
         });
       });
   }, [s]);
@@ -398,15 +401,17 @@ function StepBody({
                   checked={s.bump === o.bump}
                   disabled={!o.allowed}
                   onChange={() => dispatch({ type: "choose", bump: o.bump })}
+                  // REVIEW FIX: what each number means (and why a smaller one isn't allowed) is read with it, not only seen.
+                  aria-describedby={`${noteId}-${o.bump}-m${o.reason ? ` ${noteId}-${o.bump}-r` : ""}`}
                 />
                 <span>
                   <strong>
                     {o.title} — {versionLabel(o.version)}
                     {o.required && s.latest ? <em className="sto-pub-rec"> · what these changes need</em> : null}
                   </strong>
-                  <small>{o.meaning}</small>
+                  <small id={`${noteId}-${o.bump}-m`}>{o.meaning}</small>
                   {o.reason ? (
-                    <small className="sto-pub-why">
+                    <small className="sto-pub-why" id={`${noteId}-${o.bump}-r`}>
                       <Icon name="lock" size={12} /> Not allowed: {o.reason}
                     </small>
                   ) : null}

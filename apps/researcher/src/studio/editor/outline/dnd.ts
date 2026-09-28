@@ -1,4 +1,4 @@
-import { shortText, type Outline, type OutlineSection } from "@myself/studio";
+import { moveBlock, moveQuestion, moveSection, shortText, type Outline, type OutlineSection, type StudioDraft } from "@myself/studio";
 
 /**
  * Where a drag, or Alt+Arrow, puts something — as the operation that does it.
@@ -36,6 +36,18 @@ export type MoveOp =
   | { op: "question"; itemKey: string; to: { sectionKey: string; index: number } }
   | { op: "block"; from: { sectionKey: string; componentIndex: number }; to: { sectionKey: string; index: number } }
   | { op: "section"; sectionKey: string; toIndex: number };
+
+/** Carry out a planned move with the model's own operation (which may refuse it with a StudioOpError). */
+export function applyMove(d: StudioDraft, move: MoveOp): StudioDraft {
+  switch (move.op) {
+    case "question":
+      return moveQuestion(d, move.itemKey, move.to).draft;
+    case "block":
+      return moveBlock(d, move.from, move.to).draft;
+    case "section":
+      return moveSection(d, move.sectionKey, move.toIndex).draft;
+  }
+}
 
 export interface DropPlan {
   /** Null when the drop leaves everything where it is. */
@@ -311,6 +323,37 @@ export function keyboardSectionMove(o: Outline, sectionKey: string, direction: -
   const to = from + direction;
   if (from < 0 || to < 0 || to >= o.sections.length) return null;
   return { op: "section", sectionKey, toIndex: to };
+}
+
+// ---------------------------------------------------------------------------
+// The undo step's name
+// ---------------------------------------------------------------------------
+
+/**
+ * The undo label for a move, naming what moves: "Move “Gender”".
+ *
+ * REVIEW FIX: every move used to be labelled "Move question" (or "Move
+ * block"/"Move section"), and the draft history merges consecutive steps with
+ * the same label made within 1.2 s (so typing is one step, not one per key).
+ * Moving one question and then, a moment later, another — Alt+Down, Down,
+ * Alt+Down — was therefore ONE undo step, and Ctrl+Z silently put both back.
+ * Naming the thing keeps repeated moves of the same question one step
+ * (holding Alt+Down doesn't flood the history) while a move of anything else
+ * is a step of its own.
+ */
+export function moveLabel(o: Outline, move: MoveOp): string {
+  switch (move.op) {
+    case "question":
+      // With the ID: many questions start with the same words ("How much time
+      // do you usually spend on …"), so the text alone would still merge.
+      return `Move “${shortText(questionText(o, move.itemKey) || "(no text yet)", 30)}” (${move.itemKey})`;
+    case "block": {
+      const block = sectionByKey(o, move.from.sectionKey)?.blocks.find((b) => b.componentIndex === move.from.componentIndex);
+      return `Move “${shortText(block?.name ?? "the block", 40)}”`;
+    }
+    case "section":
+      return `Move section “${shortText(sectionByKey(o, move.sectionKey)?.title ?? move.sectionKey, 40)}”`;
+  }
 }
 
 // ---------------------------------------------------------------------------

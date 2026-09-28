@@ -62,7 +62,7 @@ export function Toolbar() {
           </button>
         </Tooltip>
       </div>
-      {shortcuts ? <ShortcutsDialog onClose={() => setShortcuts(false)} /> : null}
+      {shortcuts ? <ShortcutsDialog playground={ctx.playground} onClose={() => setShortcuts(false)} /> : null}
     </div>
   );
 }
@@ -113,7 +113,15 @@ function useMatchesLive(draft: StudioDraft, baseline: StudioDraft | null, ready:
     }, result ? DIFF_DELAY_MS : 150);
     return () => window.clearTimeout(timer);
   }, [draft, baseline, ready, result]);
-  return result && result.baseline === baseline ? result.same : null;
+  if (!result || result.baseline !== baseline) return null;
+  // REVIEW FIX: "keeps saying the last answer meanwhile" meant that for a
+  // second after the first change to a draft that matched, the toolbar still
+  // said "Draft matches the live version" — untrue, about the one thing a
+  // publisher reads it for. "Has changes" can stand while typing continues (it
+  // is almost always still true, and flickering would be worse); "matches"
+  // is only said of the draft it was worked out for.
+  if (result.same && result.draft !== draft) return null;
+  return result.same;
 }
 
 function DraftStatus() {
@@ -154,6 +162,7 @@ function saveText(save: SaveState): { icon: "check" | "warning" | "error" | "off
 
 function SaveStatus() {
   const ctx = useEditor();
+  const box = useRef<HTMLSpanElement | null>(null);
   if (ctx.playground) {
     return (
       <span className="sto-save sto-save-pending" role="status">
@@ -164,13 +173,23 @@ function SaveStatus() {
   const save = ctx.editor.save;
   const s = saveText(save);
   return (
-    <span className={`sto-save sto-save-${s.tone}`}>
+    <span className={`sto-save sto-save-${s.tone}`} ref={box} tabIndex={-1}>
       <span role="status" className="sto-save-text">
         {s.busy ? <Spinner /> : s.icon ? <Icon name={s.icon} size={16} /> : null}
         <span>{s.text}</span>
       </span>
       {save.kind === "error" ? (
-        <button type="button" className="st-btn st-btn-ghost st-btn-sm sto-retry" onClick={() => void ctx.editor.saveNow()} title={save.message}>
+        <button
+          type="button"
+          className="st-btn st-btn-ghost st-btn-sm sto-retry"
+          onClick={() => {
+            // REVIEW FIX: Retry disappears as soon as the save starts, which
+            // dropped focus to the page; it moves to the status it reports to.
+            box.current?.focus();
+            void ctx.editor.saveNow();
+          }}
+          title={save.message}
+        >
           Retry
         </button>
       ) : null}
@@ -185,10 +204,29 @@ function UndoRedo() {
   const { editor, canEdit } = ctx;
   const undo = editor.undoLabel ? `Undo ${lowerFirst(editor.undoLabel)}` : "Undo";
   const redo = editor.redoLabel ? `Redo ${lowerFirst(editor.redoLabel)}` : "Redo";
+  // REVIEW FIX: aria-disabled, not disabled. Undoing the last change with the
+  // keyboard disabled the very button that had focus, and a disabled button
+  // drops focus to the page — the next Tab started again from the top.
+  const noUndo = !canEdit || !editor.canUndo;
+  const noRedo = !canEdit || !editor.canRedo;
   return (
     <span className="sto-undo">
-      <IconButton icon="undo" label={`${undo} (${modKey()}+Z)`} disabled={!canEdit || !editor.canUndo} onClick={editor.undo} />
-      <IconButton icon="redo" label={`${redo} (${modKey()}+Shift+Z)`} disabled={!canEdit || !editor.canRedo} onClick={editor.redo} />
+      <IconButton
+        icon="undo"
+        label={`${undo} (${modKey()}+Z)`}
+        aria-disabled={noUndo || undefined}
+        onClick={() => {
+          if (!noUndo) editor.undo();
+        }}
+      />
+      <IconButton
+        icon="redo"
+        label={`${redo} (${modKey()}+Shift+Z)`}
+        aria-disabled={noRedo || undefined}
+        onClick={() => {
+          if (!noRedo) editor.redo();
+        }}
+      />
     </span>
   );
 }
@@ -371,12 +409,13 @@ function PublishButton() {
 
 // ── Shortcuts ────────────────────────────────────────────────────────────
 
-function ShortcutsDialog({ onClose }: { onClose: () => void }) {
+function ShortcutsDialog({ onClose, playground }: { onClose: () => void; playground: boolean }) {
   const mod = modKey();
   const rows: [ReactNode, string][] = [
     [<><Kbd>{mod}</Kbd> <Kbd>Z</Kbd></>, "Undo a change to the survey"],
     [<><Kbd>{mod}</Kbd> <Kbd>Shift</Kbd> <Kbd>Z</Kbd> or <Kbd>Ctrl</Kbd> <Kbd>Y</Kbd></>, "Redo"],
-    [<><Kbd>{mod}</Kbd> <Kbd>S</Kbd></>, "Save now"],
+    // REVIEW FIX: nothing is saved in the playground, and there Ctrl+S is the browser's "Save page".
+    ...(playground ? [] : [[<><Kbd>{mod}</Kbd> <Kbd>S</Kbd></>, "Save now"] as [ReactNode, string]]),
     [<Kbd>/</Kbd>, "Search the outline"],
     [<Kbd>?</Kbd>, "Show these shortcuts"],
     [<><Kbd>↑</Kbd> <Kbd>↓</Kbd></>, "Outline: move between rows"],

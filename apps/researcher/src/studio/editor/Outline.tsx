@@ -17,15 +17,13 @@ import {
   deleteQuestion,
   describeCondition,
   duplicateQuestion,
-  moveBlock,
-  moveQuestion,
-  moveSection,
   outline as outlineOf,
   questionType,
   removeBlock,
   removeSection,
   restoreQuestion,
   shortText,
+  type EditTier,
   type Outline as OutlineModel,
   type QuestionTypeId,
   type StudioDraft,
@@ -35,8 +33,19 @@ import { ConfirmDialog } from "../ui/dialog.js";
 import { Icon } from "../ui/icons.js";
 import { Button, IconButton, Kbd, VisuallyHidden } from "../ui/kit.js";
 import { useEditor } from "./context.js";
-import { actionsFor, type ActionId, type ActionSpec } from "./outline/actions.js";
-import { describeMoved, keyboardBlockMove, keyboardQuestionMove, keyboardSectionMove, planDrop, type DragItem, type DropPlan, type MoveOp } from "./outline/dnd.js";
+import { actionsFor, archivedTierOf, type ActionId, type ActionSpec } from "./outline/actions.js";
+import {
+  applyMove,
+  describeMoved,
+  keyboardBlockMove,
+  keyboardQuestionMove,
+  keyboardSectionMove,
+  moveLabel,
+  planDrop,
+  type DragItem,
+  type DropPlan,
+  type MoveOp,
+} from "./outline/dnd.js";
 import { dragItemOf, resolveHover } from "./outline/hover.js";
 import { isTextEntry, rowDomId } from "./outline/keys.js";
 import {
@@ -46,6 +55,7 @@ import {
   buildTree,
   expandKeyOf,
   indexIssues,
+  tabStopFor,
   typeahead,
   type Tree,
   type TreeNode,
@@ -87,18 +97,18 @@ interface MenuState {
   label: string;
 }
 
-function applyMove(d: StudioDraft, move: MoveOp): StudioDraft {
-  switch (move.op) {
-    case "question":
-      return moveQuestion(d, move.itemKey, move.to).draft;
-    case "block":
-      return moveBlock(d, move.from, move.to).draft;
-    case "section":
-      return moveSection(d, move.sectionKey, move.toIndex).draft;
-  }
-}
-
 const quote = (text: string, max = 60) => `“${shortText(text || "(no text yet)", max)}”`;
+
+/**
+ * Where "add a question after this one" puts it, in words. REVIEW FIX: after a
+ * question of a licensed or protected block, addQuestion puts the new question
+ * after the WHOLE block (nothing can go inside it), but the picker and the
+ * announcement said "after “<that question>”".
+ */
+function addAfterWhere(text: string, tier: EditTier, blockName: string): string {
+  if (tier === "editable") return `after ${quote(text, 40)}`;
+  return `after “${shortText(blockName, 40)}” — nothing can be added inside it, so it goes after the whole block`;
+}
 
 export function Outline() {
   const ctx = useEditor();
@@ -137,7 +147,8 @@ export function Outline() {
   const rootRef = useRef<HTMLDivElement | null>(null);
   const searchRef = useRef<HTMLInputElement | null>(null);
   const focusAfter = useRef<string | null>(null);
-  const scrollTo = useRef<string | null>(null);
+  // `tries`: how many trees the target has been hidden in (see the effect below).
+  const scrollTo = useRef<{ id: string; tries: number } | null>(null);
 
   // ── Selection: mark it, open what it is inside, bring it into view ───────
   const selectedId = encodeSelection(ctx.selection);
@@ -159,29 +170,40 @@ export function Outline() {
   useEffect(() => {
     if (!selectedId) return;
     expand(ancestorsOf(outlineRef.current, ctxRef.current.selection));
-    scrollTo.current = selectedId;
+    scrollTo.current = { id: selectedId, tries: 0 };
   }, [selectedId, expand]);
 
   useEffect(() => {
-    // The tab stop follows the tree: never on a row that has gone.
-    const active = store.active;
-    if (!active || !tree.byId.has(active)) {
-      const fallback = selectedId && tree.byId.has(selectedId) ? selectedId : (tree.visible[0]?.id ?? null);
-      store.set({ active: fallback });
-    }
+    // REVIEW FIX: these used to test `tree.byId`, which also holds the rows
+    // inside a collapsed section or block. So after "Collapse all" the tab
+    // stop stayed on a row that isn't drawn (no row had tabindex=0 and the
+    // tree could not be reached with Tab), and a jump into a folded block
+    // (a licensed questionnaire, from the checks panel or the address) was
+    // "scrolled to" before the block had opened, and never scrolled at all.
+    // Only rows actually shown count now.
+    // The tab stop follows the tree: never on a row that has gone or is hidden.
+    store.set({ active: tabStopFor(tree, store.active, selectedId) });
     const target = scrollTo.current;
-    if (target && tree.byId.has(target)) {
-      scrollTo.current = null;
-      store.set({ active: target });
-      document.getElementById(rowDomId(target))?.querySelector(":scope > .sto-row")?.scrollIntoView({ block: "nearest" });
+    if (target) {
+      if (tree.shown.has(target.id)) {
+        scrollTo.current = null;
+        store.set({ active: target.id });
+        document.getElementById(rowDomId(target.id))?.querySelector(":scope > .sto-row")?.scrollIntoView({ block: "nearest" });
+      } else if (!tree.byId.has(target.id) || ++target.tries > 2) {
+        // Filtered out, or still folded after its section and block were
+        // opened: give up rather than jump there later, out of the blue.
+        scrollTo.current = null;
+      }
     }
     const focus = focusAfter.current;
-    if (focus && tree.byId.has(focus)) {
+    if (focus && tree.shown.has(focus)) {
       focusAfter.current = null;
       store.set({ active: focus });
       const el = document.getElementById(rowDomId(focus));
       el?.focus();
       el?.querySelector(":scope > .sto-row")?.scrollIntoView({ block: "nearest" });
+    } else if (focus && !tree.byId.has(focus)) {
+      focusAfter.current = null;
     }
   }, [tree, store, selectedId]);
 
@@ -200,8 +222,8 @@ export function Outline() {
     (move: MoveOp, focus: boolean) => {
       const c = ctxRef.current;
       const out: { draft?: StudioDraft } = {};
-      const label = move.op === "question" ? "Move question" : move.op === "block" ? "Move block" : "Move section";
-      const ok = c.run(label, (d) => (out.draft = applyMove(d, move)));
+      // Names what moves, so moves of different things are separate undo steps (dnd.ts `moveLabel`).
+      const ok = c.run(moveLabel(outlineRef.current, move), (d) => (out.draft = applyMove(d, move)));
       if (!ok || !out.draft) return;
       const after = outlineOf(out.draft);
       const said = describeMoved(after, move);
@@ -302,6 +324,14 @@ export function Outline() {
     (action: ActionId, node: TreeNode) => {
       const c = ctxRef.current;
       const o = outlineRef.current;
+      // REVIEW FIX (two): a confirmation's `run` reads the context when it is
+      // confirmed (`ctxRef.current`), not the one captured when the menu item
+      // was chosen — by then a conflict may have made the draft read-only,
+      // and the stale `run` would have said "Archived…" for a change the
+      // editor silently dropped. And undo labels name the thing changed: the
+      // history merges same-label steps made within 1.2 s, so "Archive
+      // question" twice in quick succession was one undo step for two questions.
+      const named = (verb: string, text: string) => `${verb} “${shortText(text.trim() || "(no text yet)", 30)}”`;
       const q = node.question;
       const b = node.block;
       const s = node.section;
@@ -314,8 +344,10 @@ export function Outline() {
           if (s) setPending({ kind: "picker", sectionKey: s.key, afterItemKey: null, where: `at the end of ${s.title}` });
           return;
         case "add-question-after":
-          if (q) setPending({ kind: "picker", sectionKey: q.sectionKey, afterItemKey: q.itemKey, where: `after ${quote(q.text, 40)}` });
-          else if (b?.lastItemKey) setPending({ kind: "picker", sectionKey: b.sectionKey, afterItemKey: b.lastItemKey, where: `after “${shortText(b.name, 40)}”` });
+          if (q) {
+            const block = o.sections.find((x) => x.key === q.sectionKey)?.blocks.find((x) => x.componentIndex === q.componentIndex);
+            setPending({ kind: "picker", sectionKey: q.sectionKey, afterItemKey: q.itemKey, where: addAfterWhere(q.text, q.tier, block?.name ?? "its block") });
+          } else if (b?.lastItemKey) setPending({ kind: "picker", sectionKey: b.sectionKey, afterItemKey: b.lastItemKey, where: `after “${shortText(b.name, 40)}”` });
           return;
         case "add-section-after":
           if (s) addSectionAt(s.index + 1);
@@ -323,7 +355,7 @@ export function Outline() {
         case "duplicate": {
           if (!q) return;
           const out: { itemKey?: string } = {};
-          const ok = c.run("Duplicate question", (d) => {
+          const ok = c.run(named("Duplicate", q.text), (d) => {
             const r = duplicateQuestion(d, q.itemKey, c.reserved ? { reserved: c.reserved } : {});
             out.itemKey = r.itemKey;
             return r.draft;
@@ -370,10 +402,11 @@ export function Outline() {
               </>
             ),
             run: () => {
+              const now = ctxRef.current;
               const done = prepareRemoval(q.itemKey);
-              if (c.run("Archive question", (d) => archiveQuestion(d, q.itemKey, c.actor()).draft)) {
+              if (now.run(named("Archive", q.text), (d) => archiveQuestion(d, q.itemKey, now.actor()).draft)) {
                 done();
-                c.announce(`Archived ${quote(q.text)}. It is listed under Archived.`);
+                now.announce(`Archived ${quote(q.text)}. It is listed under Archived.`);
               }
             },
           });
@@ -392,10 +425,11 @@ export function Outline() {
               </p>
             ),
             run: () => {
+              const now = ctxRef.current;
               const done = prepareRemoval(q.itemKey);
-              if (c.run("Delete question", (d) => deleteQuestion(d, q.itemKey, { published: c.publishedItemKeys }).draft)) {
+              if (now.run(named("Delete", q.text), (d) => deleteQuestion(d, q.itemKey, { published: now.publishedItemKeys }).draft)) {
                 done();
-                c.announce(`Deleted ${quote(q.text)}.`);
+                now.announce(`Deleted ${quote(q.text)}.`);
               }
             },
           });
@@ -409,10 +443,11 @@ export function Outline() {
             destructive: true,
             body: <p className="stp-flush">“{s.title}” has nothing in it. Deleting it removes it from the draft.</p>,
             run: () => {
+              const now = ctxRef.current;
               const done = prepareRemoval(`section:${s.key}`);
-              if (c.run("Delete section", (d) => removeSection(d, s.key).draft)) {
+              if (now.run(named("Delete section", s.title), (d) => removeSection(d, s.key).draft)) {
                 done();
-                c.announce(`Deleted the section “${s.title}”.`);
+                now.announce(`Deleted the section “${s.title}”.`);
               }
             },
           });
@@ -438,10 +473,11 @@ export function Outline() {
               </>
             ),
             run: () => {
+              const now = ctxRef.current;
               const done = prepareRemoval(`block:${b.sectionKey}:${b.componentIndex}`);
-              if (c.run("Remove block", (d) => removeBlock(d, b.sectionKey, b.componentIndex, c.actor()).draft)) {
+              if (now.run(named("Remove", b.name), (d) => removeBlock(d, b.sectionKey, b.componentIndex, now.actor()).draft)) {
                 done();
-                c.announce(`Removed “${b.name}”. Its questions are listed under Archived.`);
+                now.announce(`Removed “${b.name}”. Its questions are listed under Archived.`);
               }
             },
           });
@@ -449,13 +485,17 @@ export function Outline() {
         case "restore": {
           if (!a) return;
           const out: { itemKey?: string } = {};
-          const ok = c.run("Restore question", (d) => {
+          const ok = c.run(named("Restore", a.text), (d) => {
             const r = restoreQuestion(d, a.itemKey);
             out.itemKey = r.itemKey;
             return r.draft;
           });
           if (ok && out.itemKey) {
             c.select({ kind: "question", itemKey: out.itemKey });
+            // REVIEW FIX: the archived row that had focus is gone; without
+            // this, focus fell to the page and a keyboard user had to Tab in
+            // from the top again. It follows the question to where it went.
+            focusAfter.current = out.itemKey;
             c.announce(`Restored ${quote(a.text)}.`);
           }
           return;
@@ -474,10 +514,11 @@ export function Outline() {
               </p>
             ),
             run: () => {
+              const now = ctxRef.current;
               const done = prepareRemoval(a.itemKey);
-              if (c.run("Delete archived question", (d) => deleteQuestion(d, a.itemKey, { published: c.publishedItemKeys }).draft)) {
+              if (now.run(named("Delete", a.text), (d) => deleteQuestion(d, a.itemKey, { published: now.publishedItemKeys }).draft)) {
                 done();
-                c.announce(`Deleted ${quote(a.text)} for good.`);
+                now.announce(`Deleted ${quote(a.text)} for good.`);
               }
             },
           });
@@ -715,7 +756,7 @@ export function Outline() {
       for (const s of o.sections) {
         for (const b of s.blocks) {
           const q = b.questions.find((x) => x.itemKey === sel.itemKey);
-          if (q) return { sectionKey: s.key, afterItemKey: q.itemKey, where: `after ${quote(q.text, 40)}` };
+          if (q) return { sectionKey: s.key, afterItemKey: q.itemKey, where: addAfterWhere(q.text, q.tier, b.name) };
         }
       }
     }
@@ -782,7 +823,17 @@ export function Outline() {
             }}
           />
           {query ? (
-            <IconButton icon="close" size="sm" label="Clear the search" onClick={() => setQuery("")} />
+            <IconButton
+              icon="close"
+              size="sm"
+              label="Clear the search"
+              onClick={() => {
+                setQuery("");
+                // REVIEW FIX: this button disappears once the box is empty, which
+                // dropped focus to the page; it goes back to the search box.
+                searchRef.current?.focus();
+              }}
+            />
           ) : (
             <span className="sto-search-key" aria-hidden="true">
               <Kbd>/</Kbd>
@@ -844,6 +895,8 @@ export function Outline() {
               setQuery("");
               setWithProblems(false);
               setWithConditions(false);
+              // REVIEW FIX: this button goes with the empty state; without this, focus fell to the page.
+              searchRef.current?.focus();
             }}
           >
             Show everything
@@ -902,7 +955,18 @@ export function Outline() {
         />
       ) : null}
 
-      {pending?.kind === "move" ? <MovePending node={pending.node} o={o} counts={counts} onDone={() => setPending(null)} runMove={runMove} /> : null}
+      {pending?.kind === "move" ? (
+        <MovePending
+          node={pending.node}
+          o={o}
+          counts={counts}
+          onDone={() => setPending(null)}
+          runMove={runMove}
+          focusLater={(id) => {
+            focusAfter.current = id;
+          }}
+        />
+      ) : null}
 
       {pending?.kind === "confirm" ? (
         <ConfirmDialog
@@ -930,34 +994,51 @@ function MovePending({
   counts,
   onDone,
   runMove,
+  focusLater,
 }: {
   node: TreeNode;
   o: OutlineModel;
   counts: readonly number[];
   onDone: () => void;
   runMove: (move: MoveOp, focus: boolean) => void;
+  focusLater: (id: string) => void;
 }) {
   const ctx = useEditor();
   if (node.kind === "archived" && node.archived) {
     const a = node.archived;
+    const origin = a.sectionKey && o.sections.some((s) => s.key === a.sectionKey) ? a.sectionKey : null;
+    const whole = archivedTierOf(ctx.draft, a.itemKey) === "locked";
+    // REVIEW FIX: this said the question "goes back at the end of the section
+    // you choose", which restoreQuestion does not do (into its own section it
+    // goes back exactly where it was; elsewhere it joins its module's block
+    // if the section has one), and it pre-chose the FIRST section — the
+    // consent section — rather than the one it was archived from.
+    const intro =
+      `${quote(a.text)} comes back with the same ID. In the section it was archived from it goes back exactly where it was; ` +
+      `in another section it goes at the end, or straight after that section's questions from the same module.` +
+      (whole ? " It is part of a licensed questionnaire, so the whole questionnaire comes back with it." : "");
     return (
       <MoveDialog
         title="Restore into which section?"
-        intro={`${quote(a.text)} goes back at the end of the section you choose, with the same ID.`}
+        intro={intro}
         sections={o.sections}
         current={null}
+        initial={origin}
+        origin={origin}
         confirmLabel="Restore here"
         onClose={onDone}
         onMove={(sectionKey) => {
           onDone();
           const out: { itemKey?: string } = {};
-          const ok = ctx.run("Restore question", (d) => {
+          const ok = ctx.run(`Restore “${shortText(a.text || a.itemKey, 30)}”`, (d) => {
             const r = restoreQuestion(d, a.itemKey, { sectionKey });
             out.itemKey = r.itemKey;
             return r.draft;
           });
           if (ok && out.itemKey) {
             ctx.select({ kind: "question", itemKey: out.itemKey });
+            // REVIEW FIX: the archived row that had focus is gone — follow the question.
+            focusLater(out.itemKey);
             ctx.announce(`Restored ${quote(a.text)} into ${o.sections.find((s) => s.key === sectionKey)?.title ?? sectionKey}.`);
           }
         }}

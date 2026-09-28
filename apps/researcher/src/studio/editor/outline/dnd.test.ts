@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { extractDraft, moveBlock, moveQuestion, moveSection, outline, StudioOpError, type Outline, type StudioDraft } from "@myself/studio";
-import { describeMoved, keyboardBlockMove, keyboardQuestionMove, keyboardSectionMove, planDrop, type MoveOp } from "./dnd.js";
+import { applyMove, describeMoved, keyboardBlockMove, keyboardQuestionMove, keyboardSectionMove, moveLabel, planDrop, type MoveOp } from "./dnd.js";
 
 const r710 = JSON.parse(readFileSync(resolve(__dirname, "../../../../../../releases/ybm_nd2026_standard_r7.1.0.manifest.json"), "utf8"));
 const draft = extractDraft(r710);
@@ -176,5 +176,28 @@ describe("saying where it went", () => {
     expect(describeMoved(outline(apply(draft, block)), block)).toBe("Moved “Strengths and Difficulties Questionnaire…” to position 3 of 3 in How you've been feeling");
     const section = keyboardSectionMove(o, "sleep", -1)!;
     expect(describeMoved(outline(apply(draft, section)), section)).toBe("Moved the section “Sleep” to position 3 of 9");
+  });
+});
+
+// REVIEW FIX: the history merges consecutive same-label steps made within
+// 1.2 s. Moves were all "Move question", so moving two questions in quick
+// succession was one undo step. The label now names what moved.
+describe("naming a move for undo", () => {
+  it("gives moves of different things different labels, and repeated moves of one thing the same", () => {
+    const first = keyboardQuestionMove(o, gaming[0]!, 1)!;
+    const moved = outline(apply(draft, first));
+    const again = keyboardQuestionMove(moved, gaming[0]!, 1)!;
+    const other = keyboardQuestionMove(o, gaming[2]!, 1)!;
+    // gaming[0] and gaming[2] start with the same 35 characters: the ID tells them apart.
+    expect(moveLabel(o, first)).toBe(`Move “Roughly how many hours do you…” (${gaming[0]})`);
+    expect(moveLabel(moved, again)).toBe(moveLabel(o, first));
+    expect(moveLabel(o, other)).not.toBe(moveLabel(o, first));
+    expect(moveLabel(o, keyboardBlockMove(o, counts, "wellbeing", 1, 1)!)).toBe("Move “Strengths and Difficulties…”");
+    expect(moveLabel(o, keyboardSectionMove(o, "sleep", -1)!)).toBe("Move section “Sleep”");
+  });
+
+  it("carries out a move with the model's operation", () => {
+    const move = keyboardSectionMove(o, "sleep", -1)!;
+    expect(applyMove(draft, move).composition.sections.map((s) => s.key).indexOf("sleep")).toBe(2);
   });
 });
