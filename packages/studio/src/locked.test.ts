@@ -179,9 +179,15 @@ describe("protectedDifferences", () => {
     expect(protectedDifferences(draft, baseline)).toMatchObject([{ change: "question", itemKey: "ybm_intro_consent.consent" }]);
   });
 
-  it("allows help text and notes without an unlock", () => {
-    const draft = edit((d) => Object.assign(consentItems(d)[0]!, { hint: "Read carefully", researcherNote: "checked" }));
+  it("allows researcher notes without an unlock", () => {
+    const draft = edit((d) => Object.assign(consentItems(d)[0]!, { researcherNote: "checked", reportingCategory: "Consent" }));
     expect(protectedDifferences(draft, baseline)).toEqual([]);
+  });
+
+  it("needs the unlock for help text too, which participants read", () => {
+    // Matches the editing operations, and holds for a draft written without them.
+    const draft = edit((d) => Object.assign(consentItems(d)[0]!, { hint: "Read carefully" }));
+    expect(protectedDifferences(draft, baseline)).not.toEqual([]);
   });
 
   it("reports a protected module taken out of the survey", () => {

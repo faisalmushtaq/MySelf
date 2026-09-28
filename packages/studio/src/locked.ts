@@ -41,7 +41,12 @@ export const LOCKED_ALLOWED_FIELDS = [
  * the participant code rely on, so it needs the same acknowledgement as a
  * change of wording.
  */
-export const PROTECTED_ALLOWED_FIELDS = ["hint", "presentation", "a11yNote", "researcherNote", "reportingCategory"] as const;
+// Researcher-facing notes only, exactly as the editing operations allow
+// (model.ts ALLOWED_FIELDS_BY_TIER.protected). Help text and presentation are
+// participant-visible, so on ethics-approved or linkage text they need the
+// unlock too — and this, run on the server at publish, is the check that
+// holds even for a draft written without going through the operations.
+export const PROTECTED_ALLOWED_FIELDS = ["researcherNote", "reportingCategory"] as const;
 
 /** Study modules that need an unlock before their content changes. */
 export const PROTECTED_INSTRUMENTS: readonly string[] = ["ybm_intro_consent", "ybm_identity"];
