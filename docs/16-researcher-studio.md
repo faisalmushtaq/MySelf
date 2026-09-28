@@ -26,8 +26,8 @@ screen instead of having it compiled in.**
 | Releases | `releases/ybm_nd2026_standard_r*.manifest.json` | Immutable. r7.1.0 is live (`sha256:308f47ba…5bee`). |
 | Cutting a release | `node packages/release/publish.mjs <semver> <D-refs>` | Then three hard-coded imports are repointed and the change is merged, and a push to `main` rebuilds and redeploys everything. |
 
-The survey structure in r7.1.0 is 9 sections, 20 components and 147 questions.
-The components are 11 of the study's own modules (all `licence.modifiable: "yes"`)
+The survey structure in r7.1.0 is 9 sections, 18 components and 147 questions.
+The components are 9 of the study's own modules (all `licence.modifiable: "yes"`)
 and 9 validated instruments (`modifiable: "no"` or `"with_permission"`). There are
 30 response scales and 6 scoring definitions.
 
