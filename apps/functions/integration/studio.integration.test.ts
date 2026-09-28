@@ -24,7 +24,7 @@ import {
   type VersionDoc,
 } from "@myself/studio";
 import { bundledManifests } from "../src/releases.js";
-import { recordDraftWrite, type DraftSide } from "../src/studio/draft-trigger.js";
+import { MAX_UNLOCK_ROWS_PER_SAVE, recordDraftWrite, type DraftSide } from "../src/studio/draft-trigger.js";
 import { setDomain, setMember } from "../src/studio/members.js";
 import { publish } from "../src/studio/publish.js";
 import { responseStats } from "../src/studio/stats.js";
@@ -394,6 +394,29 @@ describe("publishing", () => {
     expect(imported.details).toEqual({ kind: "version_taken", version: "7.1.0" });
   });
 
+  it("credits the saver of the published revision even when the trigger has not yet run for it", async () => {
+    await setUp();
+    await save(withQuestion((await currentDraft()).draft));
+    // A second editor's save, published before its trigger event arrives.
+    const LATE = { uid: "u_late", email: "late.editor@example.org" };
+    const doc = (await ref.draft().get()).data() as DraftSide & { revision: number };
+    const revision = doc.revision + 1;
+    const before = doc;
+    await ref.draft().update({
+      content: serialiseDraft(withQuestion((await currentDraft()).draft, "And your favourite animal?")),
+      revision,
+      updatedAt: FieldValue.serverTimestamp(),
+      updatedBy: LATE.uid,
+      updatedByEmail: LATE.email,
+    });
+    await publishAs(revision, "8.0.0");
+    expect((await data<VersionDoc>(ref.version("8.0.0"))).authors).toEqual([EDITOR.email, LATE.email]);
+    // The trigger arriving late still credits nobody with the next version.
+    const after = (await ref.draft().get()).data() as DraftSide;
+    await recordDraftWrite(db, { study: STUDY, surveyId: SURVEY, docId: "current" }, before, after, new Date().toISOString());
+    expect((await data<SurveyDoc>(ref.survey())).draftEditors).toEqual([]);
+  });
+
   it("returns the stored result when a publish that landed is retried", async () => {
     await setUp();
     const revision = await save(withQuestion((await currentDraft()).draft));
@@ -596,6 +619,11 @@ describe("a new survey", () => {
 // ── The list ────────────────────────────────────────────────────────────────
 
 describe("the Studio list", () => {
+  // The cores re-read the acting admin's own access inside their transaction,
+  // so the admin these tests act as has to be on the list, as in life.
+  const listed = (email: string, role: string) => db.doc(paths.studioMember(STUDY, email)).set({ email, role });
+  beforeEach(() => listed(ADMIN.email, "admin"));
+
   it("adds, changes and removes people, each audited", async () => {
     await setMember(db, { study: STUDY, email: "new.person@example.org", role: "editor", note: "BrainPOP content lead", actor: ADMIN });
     expect(await data(db.doc(paths.studioMember(STUDY, "new.person@example.org")))).toMatchObject({
@@ -617,7 +645,6 @@ describe("the Studio list", () => {
   });
 
   it("will not let an admin change or remove their own entry", async () => {
-    await db.doc(paths.studioMember(STUDY, ADMIN.email)).set({ email: ADMIN.email, role: "admin" });
     for (const role of [null, "viewer", "admin"] as const) {
       const error = await refusedCleanly(() => setMember(db, { study: STUDY, email: ADMIN.email, role, actor: ADMIN }));
       expect(error.code).toBe("failed-precondition");
@@ -654,6 +681,54 @@ describe("the Studio list", () => {
     const viaDomain = { uid: "u_bp", email: "lead@brainpop.com", owner: false };
     const error = await refusedCleanly(() => setDomain(db, { study: STUDY, domain: "brainpop.com", role: "editor", actor: viaDomain }));
     expect(error.details).toMatchObject({ kind: "invalid", issues: [{ code: "access.own_domain" }] });
+  });
+
+  it("refuses an admin whose own access went between the check and the change, writing nothing", async () => {
+    // `requireStudio` passed a moment ago; the entry has gone since.
+    await db.doc(paths.studioMember(STUDY, ADMIN.email)).delete();
+    for (const attempt of [
+      () => setMember(db, { study: STUDY, email: "new.person@example.org", role: "admin", actor: ADMIN }),
+      () => setDomain(db, { study: STUDY, domain: "example.net", role: "admin", actor: ADMIN }),
+    ]) {
+      const error = await refusedCleanly(attempt);
+      expect(error.code).toBe("permission-denied");
+      expect(error.details).toEqual({ kind: "forbidden", needed: "admin" });
+    }
+    // Demoted rather than removed: the same.
+    await listed(ADMIN.email, "publisher");
+    expect((await refusedCleanly(() => setMember(db, { study: STUDY, email: "x@example.org", role: "viewer", actor: ADMIN }))).code).toBe("permission-denied");
+  });
+
+  it("cannot be emptied of admins by two admins removing each other at the same instant", async () => {
+    const BEA = { uid: "u_bea", email: "bea.admin@example.org", owner: false };
+    await listed(BEA.email, "admin");
+    for (let round = 0; round < 2; round += 1) {
+      await listed(ADMIN.email, "admin");
+      await listed(BEA.email, "admin");
+      const results = await Promise.allSettled([
+        setMember(db, { study: STUDY, email: BEA.email, role: null, actor: ADMIN }),
+        setMember(db, { study: STUDY, email: ADMIN.email, role: null, actor: BEA }),
+      ]);
+      expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
+      const lost = results.find((r): r is PromiseRejectedResult => r.status === "rejected")!;
+      expect((lost.reason as HttpsError).details).toEqual({ kind: "forbidden", needed: "admin" });
+      const admins = (await db.collection(paths.studioMembers(STUDY)).where("role", "==", "admin").get()).docs.map((d) => d.id);
+      expect(admins).toHaveLength(1);
+    }
+  });
+
+  it("cannot be emptied of admins by one admin lowering the domain rule another depends on while that one removes them", async () => {
+    await db.doc(paths.studioAccessConfig(STUDY)).set({ domains: { "brainpop.com": "admin" } });
+    const viaDomain = { uid: "u_bp", email: "lead@brainpop.com", owner: false };
+    const results = await Promise.allSettled([
+      setDomain(db, { study: STUDY, domain: "brainpop.com", role: "editor", actor: ADMIN }),
+      setMember(db, { study: STUDY, email: ADMIN.email, role: null, actor: viaDomain }),
+    ]);
+    expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
+    const adminEntry = (await db.doc(paths.studioMember(STUDY, ADMIN.email)).get()).exists;
+    const domainRole = (await db.doc(paths.studioAccessConfig(STUDY)).get()).get("domains")["brainpop.com"];
+    // Whichever landed, somebody is still an admin.
+    expect(adminEntry || domainRole === "admin").toBe(true);
   });
 });
 
@@ -737,6 +812,30 @@ describe("the draft trigger", () => {
       subject: "ybm_intro_consent",
       detail: { reason, revision: 2, claimedBy: "somebody.else@example.org" },
     });
+  });
+
+  it("still records a save that carries a flood of made-up unlocks, with a bounded number of rows", async () => {
+    await setUp();
+    const before = (await ref.draft().get()).data() as DraftSide;
+    const flooded = withQuestion((await currentDraft()).draft);
+    // Within the rules' 900,000-character ceiling on a saved draft.
+    for (let i = 0; i < 300; i += 1) {
+      flooded.unlocked[`fake_module_${i}`] = { instrument: `fake_module_${i}`, by: "x", at: "x", reason: "r".repeat(1_500) };
+    }
+    expect(serialiseDraft(flooded).length).toBeLessThan(900_000);
+    await ref.draft().update({
+      content: serialiseDraft(flooded),
+      revision: 2,
+      updatedBy: EDITOR.uid,
+      updatedByEmail: EDITOR.email,
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+    const after = (await ref.draft().get()).data() as DraftSide;
+    await recordDraftWrite(db, { study: STUDY, surveyId: SURVEY, docId: "current" }, before, after, new Date().toISOString());
+    const [row] = await audit("draft.edited");
+    expect(row).toMatchObject({ actor: EDITOR.uid, subject: "ybm_studio.favourite_colour" });
+    expect((row!.detail as { unlocksNotRowed: string[] }).unlocksNotRowed).toHaveLength(300 - MAX_UNLOCK_ROWS_PER_SAVE);
+    expect(await audit("draft.unlocked")).toHaveLength(MAX_UNLOCK_ROWS_PER_SAVE);
   });
 
   it("records a save it cannot read, without failing", async () => {

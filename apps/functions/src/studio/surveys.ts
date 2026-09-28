@@ -1,5 +1,4 @@
 import { FieldValue, Timestamp, type Firestore } from "firebase-admin/firestore";
-import { HttpsError } from "firebase-functions/v2/https";
 import { compareVersions } from "@myself/release/gate";
 import { verifyRawManifestHash, type ReleaseManifest } from "@myself/schema";
 import {
@@ -68,7 +67,8 @@ export async function importLive(db: Firestore, args: ImportLiveArgs): Promise<I
     if (!(await verifyRawManifestHash(c.raw))) {
       // The build itself is wrong. Nothing is written from a bundle that does
       // not match its own hashes.
-      throw new HttpsError("internal", `The bundled release ${c.manifest.release.version} does not match its own hash, so nothing was imported.`);
+      const message = `The bundled release ${c.manifest.release.version} does not match its own hash, so nothing was imported.`;
+      throw refuse.invalid(message, [problem("import.bundle_hash_mismatch", message)], [], "internal");
     }
   }
   const latest = candidates[candidates.length - 1]!;

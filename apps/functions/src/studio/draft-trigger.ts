@@ -35,6 +35,19 @@ export const EDIT_WINDOW_MS = 10 * 60 * 1000;
 /** At most this many question IDs on one row; a longer list is marked truncated. */
 export const MAX_KEYS_PER_ROW = 300;
 
+/**
+ * At most this many `draft.unlocked` rows from one save. A survey has a
+ * handful of protected modules, so a real save never comes near it. The limit
+ * is there because `unlocked` is text the editor's browser wrote: without it,
+ * one save carrying thousands of made-up entries would have this trigger read
+ * and create thousands of rows in a single transaction — burying the real
+ * record, and past Firestore's commit limits failing the whole event, the
+ * save's own `draft.edited` row with it, so the save would never be attributed
+ * to anybody. Entries past the limit are named on the edit row instead
+ * (`unlocksNotRowed`).
+ */
+export const MAX_UNLOCK_ROWS_PER_SAVE = 25;
+
 export function editWindow(ms: number): number {
   return Math.floor(ms / EDIT_WINDOW_MS);
 }
@@ -80,7 +93,10 @@ export type DraftWrite =
       sections: string[];
       changes: string[];
       aspects: string[];
+      /** Unlocks gained, each to get its own row: at most MAX_UNLOCK_ROWS_PER_SAVE. */
       unlocks: UnlockGained[];
+      /** Instruments unlocked beyond that limit, named on the edit row instead. */
+      unlocksNotRowed: string[];
       unparsable: boolean;
     };
 
@@ -121,6 +137,14 @@ function unlocksGained(before: StudioDraft["unlocked"] | undefined, after: Studi
   return out;
 }
 
+/** The unlocks that get rows of their own, and the names of any past the limit. */
+function splitUnlocks(gained: UnlockGained[]): { unlocks: UnlockGained[]; unlocksNotRowed: string[] } {
+  return {
+    unlocks: gained.slice(0, MAX_UNLOCK_ROWS_PER_SAVE),
+    unlocksNotRowed: gained.slice(MAX_UNLOCK_ROWS_PER_SAVE, MAX_UNLOCK_ROWS_PER_SAVE + MAX_KEYS_PER_ROW).map((u) => u.instrument),
+  };
+}
+
 /**
  * What a write to the draft document amounts to. Pure: the whole decision,
  * without Firestore, so the tests can put every kind of write through it.
@@ -144,14 +168,18 @@ export function describeDraftWrite(before: DraftSide | undefined, after: DraftSi
     atMs: millisOf(after.updatedAt),
   };
 
-  const unlisted = { ...base, itemKeys: [], sections: [], changes: [], aspects: [], unlocks: [], unparsable: true };
+  const unlisted = { ...base, itemKeys: [], sections: [], changes: [], aspects: [], unlocks: [], unlocksNotRowed: [], unparsable: true };
   const was = readDraft(before.content);
   const now = readDraft(after.content);
   // With nothing readable to compare against, every unlock the new draft
   // carries is recorded: a repeated acknowledgement is harmless, a lost one
   // is not.
   if (!now) return unlisted;
-  if (!was) return { ...unlisted, unlocks: unlocksGained({}, now.unlocked) };
+  // Worked out before, and apart from, the comparison of the two drafts: an
+  // acknowledgement on the record must not be lost because the diff of the
+  // rest of the draft could not be made.
+  const unlocks = splitUnlocks(unlocksGained(was?.unlocked ?? {}, now.unlocked));
+  if (!was) return { ...unlisted, ...unlocks };
 
   try {
     const itemKeys: string[] = [];
@@ -167,11 +195,11 @@ export function describeDraftWrite(before: DraftSide | undefined, after: DraftSi
       add(changes, entry.kind);
       for (const aspect of entry.aspects ?? []) add(aspects, aspect);
     }
-    return { ...base, itemKeys, sections, changes, aspects, unlocks: unlocksGained(was.unlocked, now.unlocked), unparsable: false };
+    return { ...base, itemKeys, sections, changes, aspects, ...unlocks, unparsable: false };
   } catch {
     // Both documents parsed but could not be compared: a shape the model
     // never anticipated. Recorded, not thrown over.
-    return unlisted;
+    return { ...unlisted, ...unlocks };
   }
 }
 
@@ -186,6 +214,8 @@ export interface EditRowDetail {
   firstAt: Timestamp | null;
   unparsable: boolean;
   truncated: boolean;
+  /** Present only when some save's unlocks were past MAX_UNLOCK_ROWS_PER_SAVE: those instruments. */
+  unlocksNotRowed?: string[];
 }
 
 function union(a: unknown, b: string[]): string[] {
@@ -233,6 +263,8 @@ export function mergeEditRow(
     unparsable: was.unparsable === true || write.unparsable,
     truncated,
   };
+  const notRowed = union(was.unlocksNotRowed, write.unlocksNotRowed).slice(0, MAX_KEYS_PER_ROW);
+  if (notRowed.length > 0) detail.unlocksNotRowed = notRowed;
   // The Studio's activity list reads the question IDs from the subject.
   return { subject: itemKeys.join(", "), at: lastAt, detail };
 }

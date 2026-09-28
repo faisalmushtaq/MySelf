@@ -1,6 +1,7 @@
-import { FieldValue, type Firestore } from "firebase-admin/firestore";
+import { FieldValue, type Firestore, type Transaction } from "firebase-admin/firestore";
 import { paths } from "@myself/firebase";
 import { atLeast, STUDIO_ROLES, type SetDomainResponse, type SetMemberResponse, type StudioRole } from "@myself/studio";
+import { listedRole } from "./access.js";
 import { auditRow, newAuditRef, type AuditActor } from "./audit.js";
 import { isConsumerDomain } from "./domains.js";
 import { problem, refuse } from "./errors.js";
@@ -34,6 +35,31 @@ function isMap(value: unknown): value is Record<string, unknown> {
 }
 
 /**
+ * The actor is still an admin, read INSIDE the transaction that changes the
+ * list.
+ *
+ * `requireStudio` checked them a moment earlier, outside it — enough for
+ * everything else, but not for a change to the list itself. Two admins who
+ * each remove the other at the same instant would both pass that check, both
+ * transactions would touch only the other's entry, and both would commit:
+ * each refusal of a self-change holds on its own, and together they leave the
+ * Studio with no admin (write skew). Reading one's own entry (and the domain
+ * rule) here puts those documents in the transaction, so the second of two
+ * such changes is retried against the first's result and refused. The owner's
+ * access is the claim, not the list, so there is nothing of theirs to read.
+ */
+async function assertStillAdmin(tx: Transaction, db: Firestore, study: string, actor: AuditActor & { owner: boolean }): Promise<void> {
+  if (actor.owner) return;
+  const role = actor.email === null ? null : await listedRole((path) => tx.get(db.doc(path)), study, actor.email);
+  if (!atLeast(role, "admin")) {
+    throw refuse.forbidden(
+      "admin",
+      "Your own Studio access changed while this was being saved, and you are no longer an admin, so nothing was changed.",
+    );
+  }
+}
+
+/**
  * Give somebody a role, change it, or take them off the list.
  *
  * Nobody may change or remove their OWN entry, unless they hold the owner
@@ -53,6 +79,7 @@ export async function setMember(db: Firestore, args: SetMemberArgs): Promise<Set
   const ref = db.doc(paths.studioMember(study, email));
 
   return db.runTransaction(async (tx) => {
+    await assertStillAdmin(tx, db, study, actor);
     const snap = await tx.get(ref);
     const previousRole = snap.exists ? ((snap.get("role") as unknown) ?? null) : null;
     if (role === null) {
@@ -114,6 +141,7 @@ export async function setDomain(db: Firestore, args: SetDomainArgs): Promise<Set
   const ownDomain = !actor.owner && actorDomain?.length === 2 && actorDomain[1] === domain;
 
   return db.runTransaction(async (tx) => {
+    await assertStillAdmin(tx, db, study, actor);
     const config = await tx.get(configRef);
     if (ownDomain && !atLeast(role, "admin")) {
       const own = await tx.get(db.doc(paths.studioMember(study, actor.email!)));

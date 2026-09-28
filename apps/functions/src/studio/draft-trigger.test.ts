@@ -5,6 +5,7 @@ import { bundledManifests } from "../releases.js";
 import {
   EDIT_WINDOW_MS,
   MAX_KEYS_PER_ROW,
+  MAX_UNLOCK_ROWS_PER_SAVE,
   describeDraftWrite,
   editRowId,
   editWindow,
@@ -135,6 +136,7 @@ describe("coalescing saves into one row per editor per ten minutes", () => {
     changes: ["question.changed"],
     aspects: ["wording"],
     unlocks: [],
+    unlocksNotRowed: [],
     unparsable: false,
   });
 
@@ -198,5 +200,42 @@ describe("coalescing saves into one row per editor per ten minutes", () => {
 
   it("remembers that a save in the window could not be read", () => {
     expect(fold([a, { ...b, unparsable: true, itemKeys: [] }, a]).detail.unparsable).toBe(true);
+  });
+
+  it("names unlocks that did not get rows of their own, as a set, only when there were any", () => {
+    const flooded = { ...b, unlocksNotRowed: ["fake_1", "fake_2"] };
+    expect(fold([a, flooded, flooded]).detail.unlocksNotRowed).toEqual(["fake_1", "fake_2"]);
+    expect(fold([flooded, a]).detail.unlocksNotRowed).toEqual(["fake_1", "fake_2"]);
+    expect("unlocksNotRowed" in fold([a, b]).detail).toBe(false);
+  });
+});
+
+describe("a save carrying a flood of unlocks", () => {
+  // `unlocked` is text the editor's browser wrote. Thousands of made-up
+  // entries must not become thousands of rows in one transaction, which
+  // Firestore would refuse — losing the save's own edit row with it.
+  const flood = (count: number): StudioDraft => {
+    const d = base();
+    for (let i = 0; i < count; i += 1) d.unlocked[`fake_module_${i}`] = { instrument: `fake_module_${i}`, by: "x", at: "x", reason: "r".repeat(2_000) };
+    return d;
+  };
+
+  it("gets at most MAX_UNLOCK_ROWS_PER_SAVE rows, and names the rest on the edit row", () => {
+    const write = edit(describeDraftWrite(side(base(), 4), side(flood(MAX_UNLOCK_ROWS_PER_SAVE + 40), 5)));
+    expect(write.unlocks).toHaveLength(MAX_UNLOCK_ROWS_PER_SAVE);
+    expect(write.unlocksNotRowed).toHaveLength(40);
+    expect(write.unlocksNotRowed[0]).toBe(`fake_module_${MAX_UNLOCK_ROWS_PER_SAVE}`);
+  });
+
+  it("keeps the list of the rest bounded too", () => {
+    const write = edit(describeDraftWrite(side(base(), 4), side(flood(MAX_UNLOCK_ROWS_PER_SAVE + MAX_KEYS_PER_ROW + 500), 5)));
+    expect(write.unlocks).toHaveLength(MAX_UNLOCK_ROWS_PER_SAVE);
+    expect(write.unlocksNotRowed).toHaveLength(MAX_KEYS_PER_ROW);
+  });
+
+  it("is unaffected when the rest of the draft cannot be compared", () => {
+    const write = edit(describeDraftWrite(side("{not json", 4), side(flood(3), 5)));
+    expect(write.unlocks.map((u) => u.instrument)).toEqual(["fake_module_0", "fake_module_1", "fake_module_2"]);
+    expect(write.unlocksNotRowed).toEqual([]);
   });
 });

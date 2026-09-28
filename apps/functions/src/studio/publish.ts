@@ -1,5 +1,4 @@
 import { FieldValue, type Firestore } from "firebase-admin/firestore";
-import { HttpsError } from "firebase-functions/v2/https";
 import { buildRelease, PublishGateError } from "@myself/release";
 import { requiredEngineVersion } from "@myself/release/gate";
 import { verifyRawManifestHash, type ReleaseManifest } from "@myself/schema";
@@ -89,6 +88,30 @@ export function bumpTaken(latest: string | null, chosen: string, required: Bump)
   if (a2 > a1) return "major";
   if (a2 === a1 && b2 > b1) return "minor";
   return "patch";
+}
+
+/**
+ * Who wrote the draft being published: everyone the draft trigger has added
+ * since the last publish, and the person who saved this very revision.
+ *
+ * The trigger runs a moment after each save, and it deliberately adds nobody
+ * for a save a published version already includes (so they are not credited
+ * with the NEXT version). A publish pressed within that moment of the last
+ * save would otherwise credit neither version with it. The draft document
+ * names that saver itself — `updatedByEmail`, which the rules force to be the
+ * saver's own list key — so it is read from there. Keyed as the trigger keys
+ * editors: the address, or `uid:` for a saver without one.
+ */
+export function authorsOf(draftEditors: unknown, draft: { updatedBy?: unknown; updatedByEmail?: unknown }): string[] {
+  const authors = Array.isArray(draftEditors) ? draftEditors.filter((e): e is string => typeof e === "string") : [];
+  const saver =
+    typeof draft.updatedByEmail === "string" && draft.updatedByEmail
+      ? draft.updatedByEmail
+      : typeof draft.updatedBy === "string" && draft.updatedBy
+        ? `uid:${draft.updatedBy}`
+        : null;
+  if (saver && !authors.includes(saver)) authors.push(saver);
+  return authors;
 }
 
 function describeRefusedDraft(issues: Issue[]): string {
@@ -214,7 +237,8 @@ export async function publish(db: Firestore, args: PublishArgs): Promise<Publish
     if (!hash || !(await verifyRawManifestHash(JSON.parse(json)))) {
       // Never expected: buildRelease hashes what it returns. Refusing is the
       // only safe response to a release whose stored bytes would not verify.
-      throw new HttpsError("internal", "The release was built but did not verify against its own hash, so it was not published.");
+      const message = "The release was built but did not verify against its own hash, so it was not published.";
+      throw refuse.invalid(message, [problem("publish.hash_mismatch", message)], [], "internal");
     }
     if (bytes > MAX_MANIFEST_BYTES) {
       throw refuse.invalid(
@@ -263,7 +287,7 @@ export async function publish(db: Firestore, args: PublishArgs): Promise<Publish
       source: "studio",
       draftRevision: expectedRevision,
       basedOnVersion: state.draft.basedOn?.version ?? null,
-      authors: [...(state.survey.draftEditors ?? [])],
+      authors: authorsOf(state.survey.draftEditors, state.draft),
       publishedAt: FieldValue.serverTimestamp(),
       publishedBy: actor.uid,
       publishedByEmail: actor.email,

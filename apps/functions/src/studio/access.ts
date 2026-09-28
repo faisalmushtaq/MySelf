@@ -96,29 +96,42 @@ export async function studioRoleFor(db: Firestore, study: string, token: StudioT
   if (token.email_verified !== true) return { role: null, email: key, reason: "email_not_verified" };
   if (key === null) return { role: null, email: null, reason: "not_google" };
 
+  const role = await listedRole((path) => db.doc(path).get(), study, key);
+  return role ? { role, email: key, reason: null } : { role: null, email: key, reason: "not_listed" };
+}
+
+/** Reads one document: a plain read, or a read inside a transaction. */
+export type ListReader = (path: string) => Promise<{ exists: boolean; get(field: string): unknown }>;
+
+/**
+ * What the list alone gives a verified Google address (the lower-cased list
+ * key): steps 4 to 6 of `studioLevel`. Separate from the token checks so a
+ * transaction that changes the list can ask it again, with its own reads,
+ * about the very person making the change (see members.ts).
+ */
+export async function listedRole(read: ListReader, study: string, key: string): Promise<StudioRole | null> {
   // An address that could not be a document ID cannot be on the list, and
   // building a path from it could name a different document entirely. Google
   // never verifies such an address; refusing is the safe reading of one.
-  if (!isDocumentId(key)) return { role: null, email: key, reason: "not_listed" };
+  if (!isDocumentId(key)) return null;
 
   // Not `paths.studioMember`, which also trims: the rules look up the address
   // exactly as lower-cased, and so must this.
-  const member = await db.doc(`${paths.studioMembers(study)}/${key}`).get();
+  const member = await read(`${paths.studioMembers(study)}/${key}`);
   if (member.exists) {
     const role = member.get("role");
-    return isRole(role) ? { role, email: key, reason: null } : { role: null, email: key, reason: "not_listed" };
+    return isRole(role) ? role : null;
   }
 
   const parts = key.split("@");
-  if (parts.length === 2) {
-    const config = await db.doc(paths.studioAccessConfig(study)).get();
-    const domains: unknown = config.exists ? config.get("domains") : {};
-    if (isMap(domains) && Object.prototype.hasOwnProperty.call(domains, parts[1]!)) {
-      const role = domains[parts[1]!];
-      if (isRole(role)) return { role, email: key, reason: null };
-    }
+  if (parts.length !== 2) return null;
+  const config = await read(paths.studioAccessConfig(study));
+  const domains: unknown = config.exists ? config.get("domains") : {};
+  if (isMap(domains) && Object.prototype.hasOwnProperty.call(domains, parts[1]!)) {
+    const role = domains[parts[1]!];
+    if (isRole(role)) return role;
   }
-  return { role: null, email: key, reason: "not_listed" };
+  return null;
 }
 
 /** Who is acting, as every Studio write records them. */

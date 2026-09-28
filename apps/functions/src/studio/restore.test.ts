@@ -12,7 +12,7 @@ import {
   type StudioDraft,
 } from "@myself/studio";
 import { bundledManifests } from "../releases.js";
-import { bumpTaken } from "./publish.js";
+import { authorsOf, bumpTaken } from "./publish.js";
 import { identityIssues, licenceEscapes, lockBaseline } from "./store.js";
 import { mergeRestore } from "./versions.js";
 
@@ -181,5 +181,17 @@ describe("the bump a version number takes", () => {
     expect(bumpTaken("7.1.0", "7.2.0", "minor")).toBe("minor");
     expect(bumpTaken("7.1.0", "7.1.1", "patch")).toBe("patch");
     expect(bumpTaken(null, "1.0.0", "major")).toBe("major");
+  });
+});
+
+describe("a version's authors", () => {
+  it("are everyone the trigger recorded, plus whoever saved the revision published, once", () => {
+    const saver = { updatedBy: "u_late", updatedByEmail: "late@example.org" };
+    expect(authorsOf(["ed@example.org"], saver)).toEqual(["ed@example.org", "late@example.org"]);
+    expect(authorsOf(["late@example.org", "ed@example.org"], saver)).toEqual(["late@example.org", "ed@example.org"]);
+    expect(authorsOf(undefined, saver)).toEqual(["late@example.org"]);
+    // Keyed as the trigger keys a saver with no address.
+    expect(authorsOf([], { updatedBy: "u_owner", updatedByEmail: "" })).toEqual(["uid:u_owner"]);
+    expect(authorsOf(["ed@example.org", 42], {})).toEqual(["ed@example.org"]);
   });
 });
