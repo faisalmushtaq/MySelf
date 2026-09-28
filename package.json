@@ -12,7 +12,8 @@
     "test": "pnpm -r test",
     "typecheck": "pnpm -r typecheck",
     "test:e2e": "playwright test",
-    "test:e2e:sync": "firebase emulators:exec --only firestore --project demo-myself --config infra/firebase/firebase.test.json \"playwright test --config playwright.sync.config.ts\""
+    "test:e2e:sync": "firebase emulators:exec --only firestore --project demo-myself --config infra/firebase/firebase.test.json \"playwright test --config playwright.sync.config.ts\"",
+    "test:e2e:studio": "pnpm --filter @myself/functions package && firebase emulators:exec --only auth,firestore,functions --project demo-myself --config infra/firebase/firebase.studio-e2e.json \"playwright test --config playwright.studio.config.ts\""
   },
   "devDependencies": {
     "@myself/firebase": "workspace:*",
