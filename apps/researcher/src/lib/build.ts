@@ -1,5 +1,7 @@
+import { sha256 } from "@myself/schema";
 import { emptyDataset, ingest, type Dataset, type DeviceSession, type IdentityRow } from "@myself/store";
-import { latestRelease, releasesByHash } from "./releases.js";
+import { latestRelease, readStoredRelease, releasesByHash, type KnownRelease } from "./releases.js";
+import { fetchPublicRelease } from "./study.js";
 
 /**
  * Turning everything stored into one dataset.
@@ -20,11 +22,18 @@ export interface BuildResult {
   warnings: string[];
 }
 
+/**
+ * Releases by hash. The bundled ones by default; `buildDatasetWithStore`
+ * passes them together with any the release store supplied.
+ */
+export type ReleaseRegistry = ReadonlyMap<string, KnownRelease>;
+
 export function buildDataset(
   sessions: DeviceSession[],
   study: string,
   aliases: Record<string, string> = {},
   assignments: Record<string, string> = {},
+  registry: ReleaseRegistry = releasesByHash,
 ): BuildResult {
   if (sessions.length === 0) {
     return { dataset: emptyDataset(), identity: [], rejected: [], collisions: [], warnings: [] };
@@ -51,7 +60,7 @@ export function buildDataset(
   const warnings: string[] = [];
 
   for (const [hash, group] of ordered) {
-    const known = releasesByHash.get(hash);
+    const known = registry.get(hash);
     const release = known ?? latestRelease;
     if (!release) {
       rejected.push(
@@ -82,4 +91,124 @@ export function buildDataset(
   }
 
   return { dataset, identity, rejected, collisions, warnings };
+}
+
+// ---------------------------------------------------------------------------
+// Releases the bundle does not know (docs/16 §5.4)
+// ---------------------------------------------------------------------------
+
+/** The release store's document for a hash, unverified, or null when it has none. */
+export type ReleaseFetcher = (hash: string) => Promise<unknown>;
+
+export interface StoreResolution {
+  /** Releases the store held for the hashes asked about, each verified. */
+  found: KnownRelease[];
+  /** Documents the store held that failed verification, and were not used. */
+  refused: { hash: string; reason: string }[];
+}
+
+/**
+ * Long enough for a slow school network, short enough that a laptop with no
+ * connection still shows its data. The web SDK can take a while to decide it
+ * is offline, and nothing here is worth waiting on indefinitely.
+ */
+const FETCH_TIMEOUT_MS = 10_000;
+
+function within<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`no answer within ${ms} ms`)), ms);
+    promise.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (error: unknown) => {
+        clearTimeout(timer);
+        reject(error);
+      },
+    );
+  });
+}
+
+/**
+ * Ask the release store for each hash, and keep only what verifies.
+ *
+ * A fetch that fails or does not answer leaves its hash unknown, exactly as
+ * it was before the store existed; the dataset is still built. A document
+ * that fails verification is different — something wrote a release that is
+ * not what its hash says — so it is reported, and never used.
+ */
+export async function resolveFromStore(
+  hashes: Iterable<string>,
+  fetchRelease: ReleaseFetcher,
+  timeoutMs: number = FETCH_TIMEOUT_MS,
+): Promise<StoreResolution> {
+  const found: KnownRelease[] = [];
+  const refused: StoreResolution["refused"] = [];
+  // Only a well-formed hash names a document; anything else is unknown.
+  const asked = [...new Set(hashes)].filter((hash) => sha256.safeParse(hash).success);
+
+  await Promise.all(
+    asked.map(async (hash) => {
+      let data: unknown;
+      try {
+        data = await within(fetchRelease(hash), timeoutMs);
+      } catch (error) {
+        console.warn(`release ${hash} could not be fetched from the study; its sittings stay unknown`, error);
+        return;
+      }
+      if (data === null || data === undefined) return;
+      const read = await readStoredRelease(data, hash);
+      if ("refused" in read) {
+        console.error(`release ${hash} in the study's release store failed verification: ${read.refused}`);
+        refused.push({ hash, reason: read.refused });
+      } else {
+        found.push(read.release);
+      }
+    }),
+  );
+  return { found, refused };
+}
+
+/**
+ * Verified store releases, kept for the life of the page. A release never
+ * changes once published, so one fetched and verified is never fetched again;
+ * a miss is not kept, so a release published while the page is open is found
+ * on the next build.
+ */
+const verifiedFromStore = new Map<string, KnownRelease>();
+
+/**
+ * `buildDataset`, after asking the release store for any release the bundle
+ * does not know.
+ *
+ * What the store cannot supply is read exactly as before — through the latest
+ * bundled release, with the warning that says so. A store document that
+ * failed verification adds a warning of its own, because that is not a
+ * missing release but a wrong one.
+ */
+export async function buildDatasetWithStore(
+  sessions: DeviceSession[],
+  study: string,
+  aliases: Record<string, string> = {},
+  assignments: Record<string, string> = {},
+  options: { fetchRelease?: ReleaseFetcher; cache?: Map<string, KnownRelease>; timeoutMs?: number } = {},
+): Promise<BuildResult> {
+  const cache = options.cache ?? verifiedFromStore;
+  const unknown = new Set(
+    sessions.map((s) => s.releaseHash).filter((hash) => !releasesByHash.has(hash) && !cache.has(hash)),
+  );
+  const { found, refused } =
+    unknown.size > 0
+      ? await resolveFromStore(unknown, options.fetchRelease ?? fetchPublicRelease, options.timeoutMs)
+      : { found: [], refused: [] };
+  for (const release of found) cache.set(release.hash, release);
+
+  const built = buildDataset(sessions, study, aliases, assignments, new Map([...releasesByHash, ...cache]));
+  for (const { hash, reason } of refused) {
+    built.warnings.unshift(
+      `the study's copy of release ${hash.slice(0, 16)}… failed verification (${reason}) and was not used — tell whoever runs the study`,
+    );
+  }
+  return built;
 }
