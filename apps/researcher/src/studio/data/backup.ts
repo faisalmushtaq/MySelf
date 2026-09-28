@@ -115,6 +115,24 @@ export function assessBackup(
   return backup.baseRevision === current.revision ? "recoverable" : "stale";
 }
 
+/**
+ * Whether a backup found `recoverable` when the draft loaded may STILL be put
+ * back. assessBackup answers once, at load; the draft can move on after that
+ * (a colleague's save adopted, this tab's own saves), and putting back a copy
+ * taken against an older revision would then silently overwrite the newer
+ * work — as an ordinary edit, with no conflict to stop it. So it is
+ * recoverable only while the working copy is still based on the revision the
+ * backup was taken against, and only for someone who can edit.
+ */
+export function currentRecoveryKind(
+  assessed: "recoverable" | "stale",
+  backupBaseRevision: number,
+  currentBaseRevision: number,
+  readOnly: boolean,
+): "recoverable" | "stale" {
+  return assessed === "recoverable" && !readOnly && backupBaseRevision === currentBaseRevision ? "recoverable" : "stale";
+}
+
 /** sessionStorage, or null where the browser will not give it (a sandboxed frame, some private modes). */
 export function sessionStore(): StorageLike | null {
   try {

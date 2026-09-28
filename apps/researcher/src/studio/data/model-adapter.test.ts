@@ -53,7 +53,13 @@ describe("what has been published", () => {
     const index = manifestIndex(releaseManifest.parse(r710));
     expect(index.itemKeys.length).toBe(147);
     expect(new Set(index.itemKeys).size).toBe(index.itemKeys.length);
-    expect(index.variables.length).toBeGreaterThan(0);
+    // Aligned, as the real ManifestIndex promises: variables[i] is the column
+    // itemKeys[i] was recorded under, which reservedFrom pairs index by index.
+    expect(index.variables.length).toBe(index.itemKeys.length);
+    // kss.q1 is recorded as kss_q1 in r7.1.0's manifest.
+    const kss = index.itemKeys.indexOf("kss.q1");
+    expect(kss).toBeGreaterThanOrEqual(0);
+    expect(index.variables[kss]).toBe("kss_q1");
   });
 
   it("reserves every ID and variable any version used", () => {

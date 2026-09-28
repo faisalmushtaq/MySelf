@@ -353,14 +353,18 @@ function ActivateDialog({
         // Success is reported only once the public pointer says so: that is
         // what devices read, and a success message for a change they can't see
         // would be worse than none.
-        const confirmed = await studio.confirmLive(surveyId, res.hash);
+        //
+        // A failure to READ the pointer back is not a failure of the change,
+        // which the server has already made: it must not reach the catch
+        // below, whose message says nothing changed and invites a repeat.
+        const confirmed = await studio.confirmLive(surveyId, res.hash).catch(() => false);
         if (confirmed) {
           toast.success(`${label} is live again`, "Devices switch to it at their next start screen.");
           onClose();
         } else {
           setBusy(false);
           setError(
-            `The server accepted the change, but the live version doesn’t show ${label} yet. Wait a minute and reload this page to check before doing anything else.`,
+            `The server accepted the change, but the Studio couldn’t yet confirm that the live version shows ${label}. Wait a minute and reload this page to check before doing anything else.`,
           );
         }
       })

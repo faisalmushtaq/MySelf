@@ -13,17 +13,19 @@ import {
 import { STUDY, studioFirebase } from "../firebase.js";
 import { downloadText, toMillis, versionLabel } from "../format.js";
 import { useToast } from "../ui/toast.js";
-import { assessBackup, clearBackup, readBackup, sessionStore, writeBackup, type DraftBackup } from "./backup.js";
+import { assessBackup, clearBackup, currentRecoveryKind, readBackup, sessionStore, writeBackup, type DraftBackup } from "./backup.js";
+import { landedAttempt, rememberAttempt, type SaveAttempt } from "./own-writes.js";
+import { snapshotAction } from "./snapshot-gate.js";
 import { takeRestoreIntent } from "./restore-intent.js";
 import { classifySaveError, codeOf, readErrorMessage } from "./errors.js";
 import { record, redo, redoLabel, replace, startHistory, undo, undoLabel, type History } from "./history.js";
 import { NOT_CONNECTED } from "./live.js";
+import { armSaveTimer } from "./save-timer.js";
 import {
   initialSaveMachine,
   isDirty,
   statusOf,
   step,
-  wakeAt,
   type RemoteDraft,
   type SaveEffect,
   type SaveEvent,
@@ -83,7 +85,10 @@ function tryParse(content: string): { draft: StudioDraft } | { error: string } {
   }
 }
 
-type Outcome = { kind: "saved" } | { kind: "conflict"; theirs: RemoteDraft } | { kind: "missing" };
+/** At most one "Updated by …" toast per person in this long. */
+const UPDATE_TOAST_GAP_MS = 30_000;
+
+type Outcome = { kind: "saved"; revision: number } | { kind: "conflict"; theirs: RemoteDraft } | { kind: "missing" };
 
 export function useDraftSession(surveyId: string): DraftSession {
   const fb = studioFirebase();
@@ -109,11 +114,17 @@ export function useDraftSession(surveyId: string): DraftSession {
   }, []);
   const machineRef = useRef<SaveMachine>(initialSaveMachine(typeof navigator === "undefined" ? true : navigator.onLine));
   const [machine, setMachine] = useState<SaveMachine>(machineRef.current);
-  /** The content of the revision the working copy is based on, so an unchanged draft is not written again. */
-  const savedContentRef = useRef<string | null>(null);
+  /**
+   * The content of a revision known to be saved, so an unchanged draft is not
+   * written again. Qualified by its revision: the skip applies only when the
+   * save is against that same revision, so a record that has fallen behind
+   * costs one redundant write, never a skipped one.
+   */
+  const savedRef = useRef<{ revision: number; content: string } | null>(null);
+  /** The writes this tab attempted most recently (own-writes.ts). */
+  const attemptsRef = useRef<SaveAttempt[]>([]);
   const waitersRef = useRef<(() => void)[]>([]);
-  /** The working copy came from the local cache and the server has not been heard from yet. */
-  const loadedFromCacheRef = useRef(false);
+  const lastUpdateToastRef = useRef<{ title: string; at: number } | null>(null);
 
   const ctx = useRef({ uid: session.user?.uid ?? null, email: ruleEmail(session.user), refresh: session.refresh, toast });
   ctx.current = { uid: session.user?.uid ?? null, email: ruleEmail(session.user), refresh: session.refresh, toast };
@@ -140,7 +151,7 @@ export function useDraftSession(surveyId: string): DraftSession {
         setLoadError(`The latest saved draft can’t be opened: ${parsed.error}`);
         return;
       }
-      savedContentRef.current = remote.content;
+      savedRef.current = { revision: remote.revision, content: remote.content };
       const intent = reason === "remote" ? takeRestoreIntent(surveyId, remote.revision) : null;
       const h = historyRef.current;
       if (intent && h) {
@@ -150,14 +161,18 @@ export function useDraftSession(surveyId: string): DraftSession {
         return;
       }
       setHistory(replace(parsed.draft));
-      const quiet = loadedFromCacheRef.current;
-      loadedFromCacheRef.current = false;
-      if (reason === "remote" && !quiet) {
+      if (reason === "remote") {
         const mine = remote.byUid !== null && remote.byUid === ctx.current.uid;
-        ctx.current.toast.info(
-          mine ? "Updated from your other tab" : `Updated by ${remote.byEmail ?? "someone else"}`,
-          "The draft now shows the latest saved version.",
-        );
+        const title = mine ? "Updated from your other tab" : `Updated by ${remote.byEmail ?? "someone else"}`;
+        // A colleague who is typing saves every few seconds. One toast per
+        // person per half-minute says so, instead of a stream of them (each
+        // also read out by a screen reader).
+        const now = Date.now();
+        const last = lastUpdateToastRef.current;
+        if (!last || last.title !== title || now - last.at >= UPDATE_TOAST_GAP_MS) {
+          lastUpdateToastRef.current = { title, at: now };
+          ctx.current.toast.info(title, "The draft now shows the latest saved version.");
+        }
       }
     },
     [surveyId, setHistory],
@@ -174,7 +189,8 @@ export function useDraftSession(surveyId: string): DraftSession {
         return;
       }
       const content = serialiseDraft(h.present);
-      if (content === savedContentRef.current) {
+      const saved = savedRef.current;
+      if (saved && saved.revision === baseRevision && saved.content === content) {
         queueMicrotask(() => dispatch({ type: "save_skipped", now: now() }));
         return;
       }
@@ -186,26 +202,43 @@ export function useDraftSession(surveyId: string): DraftSession {
         return;
       }
       const ref = doc(fb.db, paths.studioDraft(STUDY, surveyId));
+      // Remembered before the transaction runs, so a retry of this very
+      // transaction (after its first commit landed unacknowledged) knows its
+      // own write when it reads it.
+      attemptsRef.current = rememberAttempt(attemptsRef.current, {
+        baseRevision,
+        content,
+        edits: machineRef.current.inFlight?.edits ?? machineRef.current.edits,
+      });
       try {
         const outcome = await runTransaction<Outcome>(fb.db, async (tx) => {
           const snap = await tx.get(ref);
           if (!snap.exists()) return { kind: "missing" };
           const current = snap.data() as DraftDoc;
-          if (current.revision !== baseRevision) return { kind: "conflict", theirs: remoteOf(current) };
+          let base = baseRevision;
+          if (current.revision !== baseRevision) {
+            const mine = landedAttempt(attemptsRef.current, current, uid);
+            if (!mine || mine.baseRevision !== baseRevision) return { kind: "conflict", theirs: remoteOf(current) };
+            // Not somebody else: an earlier save of ours that landed without
+            // its answer. Nothing to write if it is this very content;
+            // otherwise the rest of our work goes on top of it.
+            if (current.content === content) return { kind: "saved", revision: current.revision };
+            base = current.revision;
+          }
           // Exactly the fields the rules allow an editor to change
           // (DRAFT_CLIENT_FIELDS): anything more and the whole write is refused.
           tx.update(ref, {
             content,
-            revision: baseRevision + 1,
+            revision: base + 1,
             updatedAt: serverTimestamp(),
             updatedBy: uid,
             updatedByEmail: email,
           });
-          return { kind: "saved" };
+          return { kind: "saved", revision: base + 1 };
         });
         if (outcome.kind === "saved") {
-          savedContentRef.current = content;
-          dispatch({ type: "save_succeeded", revision: baseRevision + 1, now: now() });
+          savedRef.current = { revision: outcome.revision, content };
+          dispatch({ type: "save_succeeded", revision: outcome.revision, now: now() });
         } else if (outcome.kind === "conflict") {
           dispatch({ type: "save_conflict", theirs: outcome.theirs, now: now() });
         } else {
@@ -241,31 +274,38 @@ export function useDraftSession(surveyId: string): DraftSession {
     const ref = doc(fb.db, paths.studioDraft(STUDY, surveyId));
     return onSnapshot(
       ref,
+      // Metadata changes too: a cached snapshot that the server then confirms
+      // unchanged arrives only as a metadata change, and the working copy
+      // waits for exactly that confirmation (snapshot-gate.ts).
+      { includeMetadataChanges: true },
       (snap) => {
         setListenerError(null);
-        if (!snap.exists()) {
-          if (!machineRef.current.loaded) setStatus("missing");
+        const action = snapshotAction({ exists: snap.exists(), fromCache: snap.metadata.fromCache }, machineRef.current.loaded);
+        if (action === "wait") return;
+        if (action === "missing") {
+          setStatus("missing");
           return;
         }
         const data = snap.data() as DraftDoc;
-        setBasedOn(data.basedOn ?? null);
-        const remote = remoteOf(data);
-        if (machineRef.current.loaded) {
+        setBasedOn((prev) => (prev?.version === data.basedOn?.version && prev?.hash === data.basedOn?.hash ? prev : (data.basedOn ?? null)));
+        if (action === "remote") {
+          // Our own save whose answer never came back is not someone else's.
+          const mine = landedAttempt(attemptsRef.current, data, ctx.current.uid);
+          const remote: RemoteDraft = mine ? { ...remoteOf(data), landedEdits: mine.edits } : remoteOf(data);
           dispatch({ type: "remote", remote, now: Date.now() });
-          if (!snap.metadata.fromCache) loadedFromCacheRef.current = false;
+          if (mine && machineRef.current.baseRevision === remote.revision) {
+            savedRef.current = { revision: remote.revision, content: remote.content };
+          }
           return;
         }
-        // Shown straight away even if it came from the local cache; the
-        // server's copy, if newer, then replaces it without announcing an
-        // "update" that is only the page catching up.
-        loadedFromCacheRef.current = snap.metadata.fromCache;
+        const remote = remoteOf(data);
         const parsed = tryParse(data.content);
         if ("error" in parsed) {
           setStatus("error");
           setLoadError(parsed.error);
           return;
         }
-        savedContentRef.current = data.content;
+        savedRef.current = { revision: data.revision, content: data.content };
         setHistory(startHistory(parsed.draft));
         dispatch({ type: "loaded", remote });
         setStatus("ready");
@@ -288,12 +328,23 @@ export function useDraftSession(surveyId: string): DraftSession {
   }, [fb, surveyId, attempt, dispatch, setHistory]);
 
   // ── The save timer ──────────────────────────────────────────────────────
-  useEffect(() => {
-    const due = wakeAt(machine);
-    if (due === null) return;
-    const t = window.setTimeout(() => dispatch({ type: "tick", now: Date.now() }), Math.max(0, due - Date.now()));
-    return () => window.clearTimeout(t);
-  }, [machine, dispatch]);
+  // Re-armed on every change of state. A timer that fires a moment before
+  // the wall clock says it is due still counts as due (save-timer.ts):
+  // otherwise the tick changes nothing, nothing re-renders, and the save
+  // waits for the next keystroke.
+  useEffect(
+    () =>
+      armSaveTimer(
+        {
+          now: () => Date.now(),
+          setTimeout: (fn, ms) => window.setTimeout(fn, ms),
+          clearTimeout: (id) => window.clearTimeout(id),
+        },
+        () => machineRef.current,
+        (now) => dispatch({ type: "tick", now }),
+      ),
+    [machine, dispatch],
+  );
 
   // ── Connection ──────────────────────────────────────────────────────────
   useEffect(() => {
@@ -405,7 +456,7 @@ export function useDraftSession(surveyId: string): DraftSession {
       // Keeping mine rebases onto their revision, so theirs is now what is
       // saved: an unchanged-draft check must compare against it, not against
       // this tab's last save, or "nothing to write" could leave theirs in place.
-      if (choice === "keep_mine" && theirs) savedContentRef.current = theirs.content;
+      if (choice === "keep_mine" && theirs) savedRef.current = { revision: theirs.revision, content: theirs.content };
       dispatch({ type: "resolve", choice, now: Date.now() });
     },
     [dispatch],
@@ -481,7 +532,12 @@ export function useDraftSession(surveyId: string): DraftSession {
 
   // ── Recovery ────────────────────────────────────────────────────────────
   const recover = useCallback(() => {
-    if (!recovery || recovery.kind !== "recoverable") return;
+    if (!recovery) return;
+    // Checked again now, not only at load: if the draft has been saved since
+    // (by anyone), putting the copy back would overwrite that save unseen.
+    if (currentRecoveryKind(recovery.kind, recovery.backup.baseRevision, machineRef.current.baseRevision, readOnlyRef.current) !== "recoverable") {
+      return;
+    }
     const parsed = tryParse(recovery.backup.content);
     if ("error" in parsed) {
       ctx.current.toast.error("The unsaved copy couldn’t be read", parsed.error);
@@ -519,7 +575,12 @@ export function useDraftSession(surveyId: string): DraftSession {
 
   return {
     editor,
-    recovery: recovery ? { kind: readOnly && recovery.kind === "recoverable" ? "stale" : recovery.kind, savedAt: new Date(recovery.backup.savedAt) } : null,
+    recovery: recovery
+      ? {
+          kind: currentRecoveryKind(recovery.kind, recovery.backup.baseRevision, machine.baseRevision, readOnly),
+          savedAt: new Date(recovery.backup.savedAt),
+        }
+      : null,
     recover,
     discardRecovery,
     downloadRecovery,

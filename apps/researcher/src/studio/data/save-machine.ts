@@ -39,6 +39,16 @@ export interface RemoteDraft {
   byEmail: string | null;
   /** Milliseconds since the epoch, or null while the server time is pending. */
   at: number | null;
+  /**
+   * Set by the hook when this is recognisably the write THIS tab attempted
+   * (same account, the revision after the one it saved against, byte-for-byte
+   * the content it sent): the number of edits that attempt carried. A save can
+   * land on the server and still report a failure (the connection dropped
+   * before the answer came back); without this, the tab would later meet its
+   * own write in the listener and call it somebody else's — a conflict with
+   * itself.
+   */
+  landedEdits?: number;
 }
 
 export type SaveFailure =
@@ -166,6 +176,27 @@ function startSave(s: SaveMachine): Step {
 /** Someone else's save, with nothing of ours in flight. */
 function onRemote(s: SaveMachine, remote: RemoteDraft): Step {
   if (remote.revision <= s.baseRevision) return { state: s, effects: [] };
+  if (remote.landedEdits !== undefined && remote.revision === s.baseRevision + 1 && !s.conflict) {
+    // Our own save after all (its confirmation was lost): exactly what a
+    // success would have done, never an adoption or a conflict.
+    const savedEdits = Math.max(s.savedEdits, remote.landedEdits);
+    const stillDirty = s.edits !== savedEdits;
+    return {
+      state: {
+        ...s,
+        baseRevision: remote.revision,
+        savedEdits,
+        failure: null,
+        failures: 0,
+        retryAt: null,
+        savedAt: remote.at ?? s.savedAt,
+        firstUnsavedAt: stillDirty ? s.firstUnsavedAt : null,
+        lastEditAt: stillDirty ? s.lastEditAt : null,
+        saveRequested: stillDirty && s.saveRequested,
+      },
+      effects: [],
+    };
+  }
   if (s.conflict) return { state: { ...s, conflict: newest(s.conflict, remote) }, effects: [] };
   if (!isDirty(s)) {
     return {

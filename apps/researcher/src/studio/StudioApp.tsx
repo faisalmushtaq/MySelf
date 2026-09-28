@@ -98,6 +98,17 @@ const TITLES: Record<string, string> = {
 function usePageChrome(route: Route) {
   const previous = useRef<Route | null>(null);
 
+  // Declared first, so it captures the researcher view's title before the
+  // effect below replaces it: leaving the Studio for the researcher view
+  // (which never sets a title of its own) must not leave the tab saying
+  // "Edit · … — MySelf Studio".
+  useEffect(() => {
+    const original = document.title;
+    return () => {
+      document.title = original;
+    };
+  }, []);
+
   useEffect(() => {
     const page =
       route.name === "survey"

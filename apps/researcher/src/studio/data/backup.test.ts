@@ -1,5 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { assessBackup, backupKey, clearBackup, readBackup, writeBackup, type DraftBackup, type StorageLike } from "./backup.js";
+import {
+  assessBackup,
+  backupKey,
+  clearBackup,
+  currentRecoveryKind,
+  readBackup,
+  writeBackup,
+  type DraftBackup,
+  type StorageLike,
+} from "./backup.js";
 
 function memoryStorage(): StorageLike & { data: Map<string, string> } {
   const data = new Map<string, string>();
@@ -78,5 +87,22 @@ describe("unsaved-work backups", () => {
     expect(readBackup(refusing, slot)).toBeNull();
     expect(() => clearBackup(refusing, slot)).not.toThrow();
     expect(writeBackup(null, backup)).toBe(false);
+  });
+});
+
+describe("whether a backup can still be put back", () => {
+  it("only while the working copy is still based on the revision the backup was taken against", () => {
+    expect(currentRecoveryKind("recoverable", 4, 4, false)).toBe("recoverable");
+    // A colleague's save was adopted, or this tab saved, after the page loaded:
+    // putting the copy back now would overwrite that save as an ordinary edit.
+    expect(currentRecoveryKind("recoverable", 4, 5, false)).toBe("stale");
+  });
+
+  it("never for somebody who cannot edit (a viewer, or during a conflict)", () => {
+    expect(currentRecoveryKind("recoverable", 4, 4, true)).toBe("stale");
+  });
+
+  it("never turns a stale backup back into a recoverable one", () => {
+    expect(currentRecoveryKind("stale", 4, 4, false)).toBe("stale");
   });
 });

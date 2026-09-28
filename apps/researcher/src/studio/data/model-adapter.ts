@@ -36,13 +36,19 @@ export function reservedFrom(versions: readonly Pick<VersionDoc, "itemKeys" | "v
   return { itemKeys, variables };
 }
 
-/** TEMPORARY fallback. The question IDs and variables a release administers. */
+/**
+ * TEMPORARY fallback. The question IDs and variables a release administers,
+ * in administered order and ALIGNED — `variables[i]` is the column
+ * `itemKeys[i]` was recorded under — as the real `ManifestIndex` promises and
+ * its `reservedFrom` relies on (it pairs them index by index). Not
+ * de-duplicated separately, which would break that pairing.
+ */
 export function manifestIndex(manifest: ReleaseManifest): { itemKeys: string[]; variables: string[] } {
   const draft = draftOfManifest(manifest);
   const live = draft ? liveQuestions(draft) : [];
   return {
-    itemKeys: [...new Set(live.map((q) => q.itemKey))],
-    variables: [...new Set(live.map((q) => q.item.variable))],
+    itemKeys: live.map((q) => q.itemKey),
+    variables: live.map((q) => q.item.variable),
   };
 }
 

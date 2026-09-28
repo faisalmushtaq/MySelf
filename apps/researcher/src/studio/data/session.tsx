@@ -65,13 +65,18 @@ export function StudioDataProvider({ children }: { children: ReactNode }) {
         );
       } catch (error) {
         if (mine !== seq.current) return;
-        setState({
+        const failed: SessionState = {
           status: "error",
           user: userOf(user),
           role: null,
           reason: null,
           error: `Couldn’t check your access to the Studio. ${toStudioCallError(error).message}`,
-        });
+        };
+        // A background re-check (the draft editor asks after a refused save)
+        // that merely failed to reach the server must not replace the whole
+        // Studio — and the editor with it — with an error page. The role
+        // already shown stands; the rules still check every request.
+        setState((s) => (keepShowing && s.status === "ready" && s.user?.uid === user.uid ? s : failed));
       }
     },
     [fb],

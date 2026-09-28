@@ -225,6 +225,88 @@ describe("somebody else’s save", () => {
   });
 });
 
+describe("our own save whose answer was lost", () => {
+  // The hook marks a remote as `landedEdits` only when it is byte-for-byte the
+  // content this tab sent, by this account, at the revision after the base.
+  const landed = (revision: number, edits: number): RemoteDraft => ({ ...remote(revision, "mine", "me@example.org"), landedEdits: edits });
+
+  it("is recognised as saved, not as somebody else’s save, when the listener delivers it after the failure", () => {
+    const r = run(
+      [
+        { type: "edit", now: 0 },
+        { type: "save_now", now: 1 },
+        { type: "save_failed", failure: { kind: "offline" }, now: 2 },
+        { type: "remote", remote: landed(6, 1), now: 3 },
+      ],
+      loadedAt(5),
+    );
+    expect(r.state.conflict).toBeNull();
+    expect(r.effects.filter((e) => e.type === "adopt")).toEqual([]);
+    expect(r.state.baseRevision).toBe(6);
+    expect(isDirty(r.state)).toBe(false);
+    expect(r.state.failure).toBeNull();
+    expect(statusOf(r.state).kind).toBe("saved");
+  });
+
+  it("keeps later edits unsaved and saves them on top of it", () => {
+    const r = run(
+      [
+        { type: "edit", now: 0 },
+        { type: "save_now", now: 1 },
+        { type: "edit", now: 2 },
+        { type: "save_failed", failure: { kind: "other", message: "x" }, now: 3 },
+        { type: "remote", remote: landed(6, 1), now: 4 },
+      ],
+      loadedAt(5),
+    );
+    expect(r.state.conflict).toBeNull();
+    expect(r.state.baseRevision).toBe(6);
+    expect(isDirty(r.state)).toBe(true);
+    expect(step(r.state, { type: "save_now", now: 5 }).effects).toEqual([{ type: "save", baseRevision: 6 }]);
+  });
+
+  it("is recognised when it arrives while the retry is in flight and that retry then fails", () => {
+    const r = run(
+      [
+        { type: "edit", now: 0 },
+        { type: "save_now", now: 1 },
+        { type: "remote", remote: landed(6, 1), now: 2 },
+        { type: "save_failed", failure: { kind: "offline" }, now: 3 },
+      ],
+      loadedAt(5),
+    );
+    expect(r.state.conflict).toBeNull();
+    expect(r.state.baseRevision).toBe(6);
+    expect(isDirty(r.state)).toBe(false);
+  });
+
+  it("without the mark, the same revision is still treated as a conflict (never silently taken)", () => {
+    const r = run(
+      [
+        { type: "edit", now: 0 },
+        { type: "save_now", now: 1 },
+        { type: "save_failed", failure: { kind: "offline" }, now: 2 },
+        { type: "remote", remote: remote(6, "mine", "me@example.org"), now: 3 },
+      ],
+      loadedAt(5),
+    );
+    expect(r.state.conflict?.revision).toBe(6);
+  });
+
+  it("does not skip a revision: a marked remote two ahead is somebody else’s, a conflict", () => {
+    const r = run(
+      [
+        { type: "edit", now: 0 },
+        { type: "save_now", now: 1 },
+        { type: "save_failed", failure: { kind: "offline" }, now: 2 },
+        { type: "remote", remote: landed(7, 1), now: 3 },
+      ],
+      loadedAt(5),
+    );
+    expect(r.state.conflict?.revision).toBe(7);
+  });
+});
+
 describe("resolving a conflict", () => {
   const inConflict = () =>
     run(

@@ -15,7 +15,7 @@ import {
 import { httpsCallable } from "firebase/functions";
 import { paths } from "@myself/firebase";
 import { compareVersions } from "@myself/release/gate";
-import { CALLABLES, extractDraft, type ResponseStatsRequest } from "@myself/studio";
+import { CALLABLES, atLeast, extractDraft, type ResponseStatsRequest } from "@myself/studio";
 import { STUDY, studioFirebase } from "../firebase.js";
 import { toMillis } from "../format.js";
 import { usePlaygroundMode } from "../mode.js";
@@ -165,9 +165,14 @@ export const PRESENCE_WINDOW_MS = 90_000;
 export function usePresence(surveyId: string, focus: string | null): PresenceDoc[] {
   const playground = usePlaygroundMode();
   const fb = playground ? null : studioFirebase();
-  const { user } = useStudioSession();
+  const { user, role } = useStudioSession();
   const uid = user?.uid ?? null;
   const email = ruleEmail(user);
+  // The rules let only editors (and above) write a presence marker: a viewer
+  // cannot collide with anyone, and trying would be a refused write every 30 s.
+  // Viewers still see who else is there.
+  const writes = atLeast(role, "editor");
+  const writer = writes ? fb : null;
   const focusRef = useRef(focus);
   focusRef.current = focus;
   const [all, setAll] = useState<PresenceDoc[]>([]);
@@ -175,8 +180,8 @@ export function usePresence(surveyId: string, focus: string | null): PresenceDoc
 
   // Own heartbeat.
   useEffect(() => {
-    if (!fb || !uid) return;
-    const ref = doc(fb.db, paths.studioPresenceOf(STUDY, surveyId, uid));
+    if (!writer || !uid) return;
+    const ref = doc(writer.db, paths.studioPresenceOf(STUDY, surveyId, uid));
     const beat = () => {
       void setDoc(ref, { uid, email, at: serverTimestamp(), focus: focusRef.current }).catch(() => undefined);
     };
@@ -194,7 +199,7 @@ export function usePresence(surveyId: string, focus: string | null): PresenceDoc
       unregister();
       leave();
     };
-  }, [fb, uid, email, surveyId]);
+  }, [writer, uid, email, surveyId]);
 
   // Tell others when the question in focus changes — debounced, so clicking
   // down an outline is one write, not twenty.
@@ -204,9 +209,9 @@ export function usePresence(surveyId: string, focus: string | null): PresenceDoc
       first.current = false;
       return;
     }
-    if (!fb || !uid) return;
+    if (!writer || !uid) return;
     const t = window.setTimeout(() => {
-      void setDoc(doc(fb.db, paths.studioPresenceOf(STUDY, surveyId, uid)), {
+      void setDoc(doc(writer.db, paths.studioPresenceOf(STUDY, surveyId, uid)), {
         uid,
         email,
         at: serverTimestamp(),
@@ -214,7 +219,7 @@ export function usePresence(surveyId: string, focus: string | null): PresenceDoc
       }).catch(() => undefined);
     }, 800);
     return () => window.clearTimeout(t);
-  }, [fb, uid, email, surveyId, focus]);
+  }, [writer, uid, email, surveyId, focus]);
 
   // Everyone else.
   useEffect(() => {
@@ -261,7 +266,10 @@ export function buildPublishedContext(
     baseline: activeRelease ? extractDraft(activeRelease.raw) : null,
     active,
     latestVersion: survey?.latestVersion ?? null,
-    reserved: reservedFrom(versions),
+    // A copy: the real reservedFrom (packages/studio history.ts) takes a
+    // mutable array, and this must still compile when the adapter becomes a
+    // re-export of it.
+    reserved: reservedFrom([...versions]),
     publishedItemKeys,
     publishedScaleCodes: publishedScaleCodes(manifests),
   };
