@@ -132,6 +132,18 @@ What is happening underneath:
 **A new build never interrupts a sitting.** If one arrives mid-morning it waits for
 the start screen, between participants.
 
+**A new survey version needs no new build.** Versions published in MySelf Studio
+(docs/16) are picked up at the start screen, in the background, and only for the
+next participant; anyone mid-way through finishes on the version they started.
+The small print under the start screen names the release in use and whether it
+was downloaded or is the one built in. Offline, the iPad keeps using the last
+version it downloaded — so open MySelf once on wifi after a publish, before a
+session somewhere without it.
+
+**Once only, when the Studio build first ships:** an iPad already running
+MySelf picks the new build up only after the app is fully closed (swiped away)
+and opened again. Do that once per iPad, at the start screen.
+
 ### What a bad network looks like from the iPad
 
 | What happens | What the device does |
