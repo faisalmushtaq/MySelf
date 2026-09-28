@@ -94,7 +94,12 @@ function SurveyRow({ survey }: { survey: SurveyDoc }) {
           {survey.title}
         </Link>
         <span className="stp-srow-meta">
-          <span className="stp-id">{survey.surveyId}</span> · <span className="stp-nowrap">{plural(survey.versionCount, "version")}</span>
+          {/* On a phone the two go on lines of their own when they must, and the "·" goes. */}
+          <span className="stp-id">{survey.surveyId}</span>{" "}
+          <span className="stp-srow-sep" aria-hidden="true">
+            ·
+          </span>{" "}
+          <span className="stp-nowrap">{plural(survey.versionCount, "version")}</span>
         </span>
       </th>
       <td>
@@ -170,10 +175,10 @@ function useImportLive() {
       .importLive({ surveyId: SURVEY_ID })
       .then((res) => {
         toast.success(
-          "The live survey is set up",
+          res.imported.length > 0 ? "Live survey imported" : "Already imported",
           res.imported.length > 0
-            ? `Brought in ${res.imported.map(versionLabel).join(", ")}. ${versionLabel(res.active)} is live, and the draft starts from it.`
-            : `Everything was already here. ${versionLabel(res.active)} is live.`,
+            ? `${plural(res.imported.length, "version")} · ${versionLabel(res.active)} is live`
+            : `${versionLabel(res.active)} is live`,
         );
         navigate({ name: "survey", surveyId: res.surveyId, tab: "edit", q: null });
       })
@@ -187,19 +192,17 @@ function FirstRun({ onNew }: { onNew: () => void }) {
   const importLive = useImportLive();
   return (
     <section className="stp-first" aria-labelledby="first-run-title">
-      <span className="stp-first-icon" aria-hidden="true">
-        <Icon name="restore" size={20} />
-      </span>
+      <Icon name="import" size={32} className="st-icon stp-first-icon" />
       <h2 id="first-run-title" className="stp-h2">
         Set up from the live survey
       </h2>
       <p>
-        Import <span className="stp-id">{SURVEY_ID}</span> and its published versions, and start a draft from the live
-        one. <InfoTip label="setting up from the live survey" text={IMPORT_HELP} />
+        Import <span className="stp-id">{SURVEY_ID}</span> and its published versions.
+        <InfoTip label="setting up from the live survey" text={IMPORT_HELP} />
       </p>
       {importLive.error ? <Notice tone="error">{importLive.error}</Notice> : null}
       <div className="stp-actions">
-        <Button variant="primary" icon="restore" busy={importLive.busy} onClick={importLive.run}>
+        <Button variant="primary" icon="import" busy={importLive.busy} onClick={importLive.run}>
           Set up from the live survey
         </Button>
         <Button variant="secondary" icon="plus" onClick={onNew}>
@@ -220,7 +223,7 @@ function ImportLiveNotice() {
         The live survey (<span className="stp-id">{SURVEY_ID}</span>) isn&rsquo;t in the Studio yet.{" "}
         <InfoTip label="setting up from the live survey" text={IMPORT_HELP} />
       </span>
-      <Button size="sm" variant="secondary" icon="restore" busy={importLive.busy} onClick={importLive.run}>
+      <Button size="sm" variant="secondary" icon="import" busy={importLive.busy} onClick={importLive.run}>
         Set up from the live survey
       </Button>
       {importLive.error ? <Notice tone="error">{importLive.error}</Notice> : null}

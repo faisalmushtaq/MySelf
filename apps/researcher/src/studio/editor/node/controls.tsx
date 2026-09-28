@@ -96,7 +96,28 @@ export function useSyncedText(
 // Messages
 // ---------------------------------------------------------------------------
 
-/** Validation messages for one field: icon and words, errors first. */
+/**
+ * An issue's short line, with its advice (if any) behind an ⓘ that stays with
+ * the last word rather than wrapping onto a line of its own.
+ */
+export function IssueText({ issue, label }: { issue: Issue; label: string }) {
+  if (!issue.hint) return <>{issue.message}</>;
+  const cut = issue.message.lastIndexOf(" ") + 1;
+  return (
+    <>
+      {issue.message.slice(0, cut)}
+      <span className="st-nowrap">
+        {issue.message.slice(cut)}
+        <InfoTip text={issue.hint} label={label} />
+      </span>
+    </>
+  );
+}
+
+/**
+ * Validation messages for one field: icon and a short line, errors first, with
+ * any advice behind an ⓘ — the field is on screen, so the line never names it.
+ */
 export function IssueMessages({ id, issues, local }: { id?: string; issues?: readonly Issue[] | undefined; local?: string | null }) {
   const list = issues ?? [];
   if (!local && list.length === 0) return null;
@@ -116,7 +137,7 @@ export function IssueMessages({ id, issues, local }: { id?: string; issues?: rea
           <Icon name={issue.severity === "error" ? "error" : "warning"} size={14} />
           <span>
             <span className="st-sr">{issue.severity === "error" ? "Error: " : "Warning: "}</span>
-            {issue.message}
+            <IssueText issue={issue} label={issue.severity === "error" ? "this error" : "this warning"} />
           </span>
         </p>
       ))}

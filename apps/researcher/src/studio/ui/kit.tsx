@@ -5,6 +5,7 @@ import {
   useCallback,
   useEffect,
   useId,
+  useLayoutEffect,
   useRef,
   useState,
   type ButtonHTMLAttributes,
@@ -86,10 +87,17 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(functio
  * A tooltip that works from the keyboard as well as the mouse: shown on hover
  * and on focus, and linked with aria-describedby so it is read, not just seen.
  * It never carries information the control's own name does not.
+ *
+ * It is placed against the window rather than its column, so a tip in a
+ * scrolling panel (the checks list, the settings panel) or at a window edge
+ * is never cut off: centred on its control, kept 8px inside the window, and
+ * flipped above or below when there is no room on the side asked for.
  */
 export function Tooltip({ text, children, side = "bottom" }: { text: string; children: ReactElement; side?: "top" | "bottom" }) {
   const id = useId();
   const [open, setOpen] = useState(false);
+  const anchor = useRef<HTMLSpanElement | null>(null);
+  const tip = useRef<HTMLSpanElement | null>(null);
   // Hover waits a moment so passing the pointer over a toolbar doesn't flash
   // a trail of tooltips; keyboard focus shows it at once.
   const timer = useRef<number | null>(null);
@@ -98,10 +106,45 @@ export function Tooltip({ text, children, side = "bottom" }: { text: string; chi
     timer.current = null;
   };
   useEffect(() => clear, []);
+  useLayoutEffect(() => {
+    if (!open) return;
+    const place = () => {
+      const a = anchor.current;
+      const t = tip.current;
+      if (!a || !t) return;
+      // Measured from where it lands at 0,0, so a transformed ancestor (which
+      // moves what "fixed" is fixed to) is allowed for.
+      t.style.left = "0px";
+      t.style.top = "0px";
+      const origin = t.getBoundingClientRect();
+      const box = a.getBoundingClientRect();
+      const gap = 6;
+      const margin = 8;
+      const width = document.documentElement.clientWidth;
+      const height = window.innerHeight;
+      const left = Math.max(margin, Math.min(box.left + box.width / 2 - origin.width / 2, width - origin.width - margin));
+      const below = box.bottom + gap;
+      const above = box.top - gap - origin.height;
+      const fitsBelow = below + origin.height <= height - margin;
+      const fitsAbove = above >= margin;
+      const top = side === "top" ? (fitsAbove || !fitsBelow ? above : below) : fitsBelow || !fitsAbove ? below : above;
+      t.style.left = `${left - origin.left}px`;
+      t.style.top = `${top - origin.top}px`;
+      t.style.visibility = "visible";
+    };
+    place();
+    window.addEventListener("scroll", place, true);
+    window.addEventListener("resize", place);
+    return () => {
+      window.removeEventListener("scroll", place, true);
+      window.removeEventListener("resize", place);
+    };
+  }, [open, side, text]);
   if (!isValidElement(children)) return children;
   const child = children as ReactElement<Record<string, unknown>>;
   return (
     <span
+      ref={anchor}
       className="st-tip-anchor"
       onMouseEnter={() => {
         clear();
@@ -122,7 +165,7 @@ export function Tooltip({ text, children, side = "bottom" }: { text: string; chi
     >
       {cloneElement(child, { "aria-describedby": open ? id : undefined })}
       {open ? (
-        <span role="tooltip" id={id} className={`st-tip st-tip-${side}`}>
+        <span ref={tip} role="tooltip" id={id} className={`st-tip st-tip-${side}`}>
           {text}
         </span>
       ) : null}
@@ -302,12 +345,32 @@ export const AutoTextarea = forwardRef<HTMLTextAreaElement, TextareaHTMLAttribut
       },
       [ref],
     );
-    useEffect(() => {
+    const fit = useCallback(() => {
       const el = inner.current;
       if (!el) return;
       el.style.height = "auto";
       el.style.height = `${el.scrollHeight + 2}px`;
-    }, [value]);
+    }, []);
+    useEffect(fit, [value, fit]);
+    // A narrower box needs more lines (a window made smaller, a phone turned
+    // upright), or the end of a long question is cut off.
+    useEffect(() => {
+      const el = inner.current;
+      if (!el || typeof ResizeObserver === "undefined") return;
+      let width = el.clientWidth;
+      let frame = 0;
+      const observer = new ResizeObserver(() => {
+        if (el.clientWidth === width) return;
+        width = el.clientWidth;
+        cancelAnimationFrame(frame);
+        frame = requestAnimationFrame(fit);
+      });
+      observer.observe(el);
+      return () => {
+        observer.disconnect();
+        cancelAnimationFrame(frame);
+      };
+    }, [fit]);
     return <textarea ref={setRefs} rows={1} className={`st-autotext${className ? ` ${className}` : ""}`} value={value} {...rest} />;
   },
 );
@@ -320,6 +383,8 @@ export interface MenuItem {
   /** Why it is disabled, shown in the menu so nobody has to guess. */
   hint?: string;
   danger?: boolean;
+  /** A key that does the same from anywhere, shown at the end of the item ("?"). */
+  shortcut?: string;
 }
 
 /**
@@ -417,6 +482,7 @@ export function MenuButton({
                 role="menuitem"
                 tabIndex={i === active ? 0 : -1}
                 aria-disabled={item.disabled || undefined}
+                aria-keyshortcuts={item.shortcut}
                 className={`st-menu-item${item.danger ? " st-menu-danger" : ""}`}
                 onClick={() => {
                   if (item.disabled) return;
@@ -430,6 +496,11 @@ export function MenuButton({
                   {item.label}
                   {item.disabled && item.hint ? <small>{item.hint}</small> : null}
                 </span>
+                {item.shortcut ? (
+                  <span className="st-menu-key" aria-hidden="true">
+                    <Kbd>{item.shortcut}</Kbd>
+                  </span>
+                ) : null}
               </button>
             </li>
           ))}

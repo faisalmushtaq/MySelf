@@ -151,12 +151,29 @@ export function VersionsScreen({ surveyId, survey, editor }: { surveyId: string;
   );
 }
 
-/** Complete sittings, for the row; the details show complete and partial. */
-function sittingsShort(stats: Loadable<ResponseStatsResponse>, hash: string): { text: string; none: boolean } {
-  if (stats.status !== "ready") return { text: "—", none: true };
+/**
+ * Complete sittings, for the row; the details show complete and partial.
+ * Still counting shows a shimmer, and a count that couldn't be had a dash
+ * that says so — never the same dash for both.
+ */
+function SittingsCell({ stats, hash }: { stats: Loadable<ResponseStatsResponse>; hash: string }) {
+  if (stats.status === "loading") {
+    return (
+      <span className="stp-skel-inline" role="status" aria-label="Counting sittings">
+        <span />
+      </span>
+    );
+  }
+  if (stats.status === "error") {
+    return (
+      <span className="stp-meta" title="Couldn’t count the sittings">
+        —<span className="st-sr">Couldn’t count the sittings</span>
+      </span>
+    );
+  }
   const s = stats.data.byHash[hash];
-  if (!s) return { text: "None", none: true };
-  return { text: `${s.complete.toLocaleString("en-GB")} complete`, none: false };
+  if (!s) return <span className="stp-meta">None</span>;
+  return <span>{`${s.complete.toLocaleString("en-GB")} complete`}</span>;
 }
 
 function sittings(stats: Loadable<ResponseStatsResponse>, hash: string): string {
@@ -193,7 +210,6 @@ function VersionRow({
   const detailId = useId();
   const publishedAt = toDate(v.publishedAt);
   const note = v.releaseNote?.trim() ? v.releaseNote : null;
-  const short = sittingsShort(stats, v.hash);
 
   const download = () => {
     setDownloading(true);
@@ -278,13 +294,11 @@ function VersionRow({
           )}
         </td>
         <td className="stp-num stp-hide-medium">
-          <span className={short.none ? "stp-meta" : undefined}>{short.text}</span>
+          <SittingsCell stats={stats} hash={v.hash} />
         </td>
         <td className="stp-cell-action">
           <span className="stp-actions">
-            <Button size="sm" variant="ghost" icon="compare" aria-label={`Compare ${label} with the draft`} onClick={onCompare}>
-              Compare
-            </Button>
+            <IconButton icon="compare" label={`Compare ${label} with the draft`} onClick={onCompare} />
             <MenuButton label={`More actions for ${label}`} items={items} />
           </span>
           {dialog === "restore" ? (

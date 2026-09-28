@@ -11,7 +11,9 @@
   right: 0;
   bottom: 0;
   z-index: 40;
-  width: min(400px, 100vw);
+  /* Exactly over the settings panel, so none of the survey itself is hidden
+     at any width where the panel is a column of its own. */
+  width: var(--st-right, 320px);
   display: flex;
   flex-direction: column;
   background: var(--st-bg);
@@ -70,10 +72,6 @@
 .sto-vp-title .st-infotip button:hover {
   color: var(--st-text);
 }
-.sto-vp-title .st-tip {
-  left: 0;
-  transform: none;
-}
 .studio .sto-vp-head h2:focus,
 .studio .sto-vp-head h2:focus-visible {
   box-shadow: none;
@@ -90,13 +88,16 @@
   color: var(--st-text-tertiary);
   font-variant-numeric: tabular-nums;
 }
-.sto-vp-summary.has-errors {
+.sto-vp-sum-err {
   color: var(--st-danger);
   font-weight: 500;
 }
-.sto-vp-summary.has-warnings {
+.sto-vp-sum-warn {
   color: var(--st-warn);
   font-weight: 500;
+}
+.sto-vp-sum-sep {
+  color: var(--st-text-tertiary);
 }
 
 .sto-vp-body {
@@ -186,6 +187,12 @@
   padding-top: 64px;
 }
 
+/* Narrower windows put the settings panel under the editor: a wider sheet. */
+@media (max-width: 1180px) {
+  .sto-vp {
+    width: min(400px, 100vw);
+  }
+}
 @media (max-width: 760px) {
   .sto-vp {
     top: auto;

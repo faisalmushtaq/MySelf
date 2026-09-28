@@ -146,8 +146,14 @@ export interface Issue {
   severity: Severity;
   /** Stable machine code, e.g. "question.text_missing", "options.duplicate_value". */
   code: string;
-  /** Plain English, saying what is wrong and what to do about it. */
+  /**
+   * What is wrong, in one short line a researcher can scan. It does not name
+   * the question or screen it is about: `location` says that, and the editor
+   * shows the message under that place's heading or beside the field itself.
+   */
   message: string;
+  /** Why it matters and what to do about it, when that takes more than the message. */
+  hint?: string;
   location: IssueLocation;
 }
 

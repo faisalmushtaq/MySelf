@@ -46,7 +46,7 @@ const TITLE: Record<Bump, string> = { major: "Major", minor: "Minor", patch: "Pa
 /** Why a smaller bump than `required` is not allowed. */
 export function tooSmallReason(required: Bump): string {
   if (required === "major") {
-    return "These changes alter the questions, so they need a major version: answers before and after must not be read as the same survey.";
+    return "These changes alter the questions, so they need a major version.";
   }
   return "These changes include wording participants see, which is never a patch.";
 }

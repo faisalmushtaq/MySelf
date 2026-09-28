@@ -118,31 +118,6 @@
 .sti-flag .st-icon {
   color: var(--st-text-tertiary);
 }
-.sti-checks {
-  list-style: none;
-  margin: 0 0 12px;
-  padding: 0;
-  display: grid;
-  gap: 4px;
-  font-size: 13px;
-  line-height: 20px;
-}
-.sti-checks li {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.sti-check-ok .st-icon {
-  color: var(--st-accent);
-}
-.sti-check-error {
-  color: var(--st-danger);
-  font-weight: 500;
-}
-.sti-check-warn .st-icon {
-  color: var(--st-warn);
-}
-
 .sti-actions {
   display: flex;
   flex-wrap: wrap;
@@ -188,19 +163,6 @@
 }
 .sti .stn-details-body {
   padding-left: 0;
-}
-.sti-unavailable ul {
-  margin: 0;
-  padding-left: 16px;
-  display: grid;
-  gap: 6px;
-  font-size: 12px;
-  line-height: 16px;
-  color: var(--st-text-secondary);
-}
-.sti-unavailable strong {
-  font-weight: 600;
-  color: var(--st-text);
 }
 .sti .stn-facts > div {
   grid-template-columns: 104px minmax(0, 1fr);

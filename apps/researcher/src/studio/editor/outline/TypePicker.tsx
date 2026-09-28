@@ -2,15 +2,17 @@ import { type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { NOT_YET_SUPPORTED, QUESTION_TYPES, type QuestionType, type QuestionTypeId } from "@myself/studio";
 import { Dialog } from "../../ui/dialog.js";
 import { Icon } from "../../ui/icons.js";
+import { Disclosure } from "../node/controls.js";
 import { TYPE_ICONS } from "./Row.js";
 
 /**
  * Choosing what kind of question to add.
  *
  * Only the types the participant app renders, validates, stores and reports
- * can be chosen (catalogue.ts). The rest are listed too, greyed out with the
- * reason, so nobody spends ten minutes looking for a Likert grid that the app
- * could not show.
+ * can be chosen (catalogue.ts). The rest are one line at the end, folded, with
+ * the reason for each inside, so nobody spends ten minutes looking for a
+ * Likert grid that the app could not show — without listing what can't be
+ * chosen among what can.
  */
 
 const GROUPS: { id: QuestionType["group"]; title: string }[] = [
@@ -63,8 +65,7 @@ export function TypePicker({ where, onChoose, onClose }: { where: string; onChoo
             </section>
           );
         })}
-        <section className="sto-type-group sto-type-unavailable" aria-labelledby="sto-tg-none">
-          <h3 id="sto-tg-none">Not available for new questions</h3>
+        <Disclosure summary={`Not available here (${existingOnly.length + NOT_YET_SUPPORTED.length})`} className="sto-type-unavailable">
           <ul className="sto-type-grid">
             {existingOnly.map((t) => (
               <li key={t.id}>
@@ -93,7 +94,7 @@ export function TypePicker({ where, onChoose, onClose }: { where: string; onChoo
               </li>
             ))}
           </ul>
-        </section>
+        </Disclosure>
       </div>
     </Dialog>
   );

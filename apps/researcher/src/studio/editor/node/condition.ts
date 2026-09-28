@@ -7,7 +7,6 @@ import {
   findQuestion,
   fromLogic,
   liveQuestions,
-  shortText,
   TEST_LABELS,
   testsFor,
   toLogic,
@@ -17,6 +16,7 @@ import {
   type SimpleCondition,
   type StudioDraft,
 } from "@myself/studio";
+import { questionName } from "../outline/model.js";
 
 /**
  * The model behind the condition builder ("Show this question only if…").
@@ -99,7 +99,7 @@ export function earlierQuestions(
     if (tests.length === 0) continue;
     out.push({
       itemKey: q.itemKey,
-      text: shortText(q.item.stem.text, 70),
+      text: questionName(q.item.stem.text, 70),
       sectionKey: q.sectionKey,
       sectionTitle: titles.get(q.sectionKey) ?? q.sectionKey,
       responseType: q.item.responseType,

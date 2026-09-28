@@ -7,14 +7,13 @@ import {
   generateVariable,
   liveQuestions,
   MAX_VARIABLE_LENGTH,
-  NOT_YET_SUPPORTED,
   placements,
-  shortText,
   SLUG_PATTERN,
   splitItemKey,
   type ReservedIds,
   type StudioDraft,
 } from "@myself/studio";
+import { questionName } from "../outline/model.js";
 
 /**
  * The pure side of the settings panel: what a question's settings are, what
@@ -155,7 +154,7 @@ export function dependentsOf(draft: StudioDraft, itemKey: string): Dependents {
     if (seen.has(q.itemKey)) continue;
     seen.add(q.itemKey);
     const item = q.item;
-    const text = shortText(item.stem.text, 60);
+    const text = questionName(item.stem.text, 60);
     if (mentions(item.displayIf, itemKey)) out.questions.push({ itemKey: q.itemKey, text });
     const texts: unknown[] = [item.stem, item.lede, item.moreInfo?.body];
     if (item.responseType === "checkbox_set") texts.push(...item.statements.map((s) => s.text));
@@ -195,46 +194,6 @@ export function conditionSummary(d: Pick<Dependents, "questions" | "sections" | 
   if (parts.length === 0) return null;
   const list = parts.length === 1 ? parts[0] : `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}`;
   return `Used in the conditions of ${list}`;
-}
-
-// ---------------------------------------------------------------------------
-// Settings the participant app does not honour yet
-// ---------------------------------------------------------------------------
-
-const reason = (id: string) => NOT_YET_SUPPORTED.find((n) => n.id === id)?.reason ?? "";
-
-/**
- * Settings a question type has in the schema but the participant app ignores.
- * They are listed, with why, instead of offered: a setting that appears to work
- * and silently does nothing is worse than one that is plainly not there.
- */
-export function notAvailableFor(responseType: ItemDefinition["responseType"]): { label: string; reason: string }[] {
-  const out: { label: string; reason: string }[] = [];
-  if (responseType === "multi_choice") {
-    out.push({ label: "Minimum selections", reason: reason("minimum_answers") });
-  }
-  if (responseType === "text_short" || responseType === "text_long") {
-    out.push({ label: "Minimum characters", reason: reason("minimum_answers") });
-    out.push({
-      label: "Placeholder text",
-      reason: "The participant app shows answer boxes empty, so placeholder text would never be seen.",
-    });
-  }
-  if (responseType === "single_choice" || responseType === "multi_choice") {
-    out.push({
-      label: "Randomised option order",
-      reason:
-        "Answers are harder to compare when each participant saw the options in a different order, and the participant app always shows them in the order listed, so it isn't offered yet.",
-    });
-  }
-  if (responseType === "date") {
-    out.push({
-      label: "Earliest and latest year",
-      reason: "The participant app doesn't check the year on its own yet. Use the age limits, which it does check.",
-    });
-  }
-  out.push({ label: "Image, audio or video", reason: reason("media") });
-  return out;
 }
 
 // ---------------------------------------------------------------------------

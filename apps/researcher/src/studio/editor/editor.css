@@ -47,7 +47,10 @@
 .ste-left {
   background: var(--st-bg-subtle);
   border-right: 1px solid var(--st-border);
-  /* A tooltip near the edge must never make the outline scroll sideways. */
+  /* A tooltip near the edge must never make the outline scroll sideways.
+     No scroll-padding to clear the sticky search header: the header is inside
+     this scroller, so focusing its own controls would scroll the list. The
+     outline keeps rows clear of it by hand (Outline.tsx `revealRow`). */
   overflow-x: hidden;
 }
 .ste-right {
@@ -83,9 +86,20 @@
     border-top: 1px solid var(--st-border);
   }
 }
+/* Only a phone folds the outline away (EditorPage.tsx `Columns`). */
+.ste-outline-toggle {
+  display: none;
+}
 @media (max-width: 760px) {
   .stp-app:has(> .stp-main-wide) {
     height: auto;
+  }
+  /* The page grows with what is on it. Held to the window's height, the
+     workspace ended a window down while the question ran on past it, and the
+     toolbar, sticky only within the workspace, scrolled away with it. */
+  .stp-app:has(> .stp-main-wide) > .stp-main-wide:has(> .ste-workspace),
+  .ste-workspace {
+    flex: none;
   }
   .ste-columns {
     display: block;
@@ -96,7 +110,40 @@
     overflow: visible;
     border: 0;
   }
-  .ste-left {
+  .ste-outline-toggle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    height: 44px;
+    padding: 0 16px;
+    border: 0;
+    border-bottom: 1px solid var(--st-border);
+    background: var(--st-bg-subtle);
+    color: var(--st-text);
+    font: inherit;
+    font-size: 13px;
+    font-weight: 500;
+    text-align: left;
+    cursor: pointer;
+  }
+  .ste-outline-toggle > .st-icon {
+    color: var(--st-text-tertiary);
+  }
+  .ste-outline-toggle > .st-icon:last-child {
+    margin-left: auto;
+  }
+  .ste-outline-toggle[aria-expanded="true"] > .st-icon:last-child {
+    transform: rotate(180deg);
+  }
+  .ste-columns:not(.is-outline-open) > .ste-left {
+    display: none;
+  }
+  /* Open, it scrolls on its own, so the list never pushes the editor a
+     hundred rows down the page. */
+  .ste-columns.is-outline-open > .ste-left {
+    max-height: 60vh;
+    overflow-y: auto;
     border-bottom: 1px solid var(--st-border);
   }
   .ste-centre {

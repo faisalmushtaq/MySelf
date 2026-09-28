@@ -19,7 +19,7 @@ import { useToast } from "../../ui/toast.js";
 import { useEditor } from "../context.js";
 import { ConditionBuilder } from "./ConditionBuilder.js";
 import { Disclosure, IssueMessages, LockBanner, LockTip, Panel, TextField } from "./controls.js";
-import { focusSoon } from "./focus.js";
+import { focusField, focusSoon } from "./focus.js";
 import { fieldsShownFor, questionIssues, unplacedIssues, type FieldIssues } from "./issues.js";
 import { FieldsEditor, GroupsEditor, StatementsEditor } from "./ListEditors.js";
 import { identityText, lockedBanner, protectedBanner, publishedPending, questionLock, tierAllows, typeLock, type QuestionLock } from "./locks.js";
@@ -132,10 +132,19 @@ export function QuestionEditor({ itemKey }: { itemKey: string }) {
             <span>Not placed in any section</span>
           )}
         </nav>
-        <h2 className="stn-meta" tabIndex={-1} data-editor-heading>
-          <span className="st-num">{place ? `Question ${place.number} of ${place.total}` : "Question"}</span>
-          <span className="stn-meta-id">{itemKey}</span>
-        </h2>
+        <div className="stn-head-end">
+          {/* The condition itself is at the foot of the page, under the answer: say at the top that there is one. */}
+          {item.displayIf ? (
+            <button type="button" className="stn-if" onClick={() => focusField("displayIf")}>
+              <Icon name="branch" size={12} />
+              Shown to some
+            </button>
+          ) : null}
+          <h2 className="stn-meta" tabIndex={-1} data-editor-heading>
+            <span className="st-num">{place ? `Question ${place.number} of ${place.total}` : "Question"}</span>
+            <span className="stn-meta-id">{itemKey}</span>
+          </h2>
+        </div>
       </header>
 
       <QuestionNotices lock={lock} onUnlock={() => setUnlocking(true)} variable={item.variable} />

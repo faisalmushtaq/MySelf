@@ -55,6 +55,7 @@ import {
   buildTree,
   expandKeyOf,
   indexIssues,
+  questionName,
   tabStopFor,
   typeahead,
   type Tree,
@@ -66,6 +67,7 @@ import { RowMenu } from "./outline/RowMenu.js";
 import { RowStore } from "./outline/store.js";
 import { TypePicker } from "./outline/TypePicker.js";
 import { encodeSelection } from "./selection.js";
+import { SHORTCUTS_MENU_ITEM } from "./Toolbar.js";
 import "./outline.css";
 
 /**
@@ -97,7 +99,52 @@ interface MenuState {
   label: string;
 }
 
-const quote = (text: string, max = 60) => `“${shortText(text || "(no text yet)", max)}”`;
+const quote = (text: string, max = 60) => `“${questionName(text, max)}”`;
+
+/**
+ * How far a row brought into view stays from the sticky search header, and
+ * from the column's bottom edge. The bottom margin shows what comes next when
+ * the keyboard moves down the list, or a row is revealed from elsewhere; a row
+ * just clicked gets none, so a whole row near the bottom never slides away
+ * under the pointer.
+ */
+const REVEAL_GAP_TOP = 8;
+const REVEAL_GAP_BOTTOM = 40;
+
+/**
+ * Scroll a row into view within the outline's own column, clear of its sticky
+ * search header and off the bottom edge. Done by hand: the browser's own
+ * scrolling knows nothing of the header, and giving the column a
+ * scroll-padding to tell it made focusing the header's own controls (the
+ * search, "+", the "…" menu) scroll the list away from the selection. Where
+ * the outline doesn't scroll on its own — a phone, where the columns stack —
+ * the page is left where it is: scrolling the window down to the row would
+ * push the editor for what was just opened off the screen.
+ */
+function revealRow(id: string, gapBottom = REVEAL_GAP_BOTTOM): void {
+  const row = document.getElementById(rowDomId(id))?.querySelector<HTMLElement>(":scope > .sto-row");
+  if (!row) return;
+  const column = row.closest<HTMLElement>(".ste-left");
+  if (!column) {
+    row.scrollIntoView({ block: "nearest" });
+    return;
+  }
+  if (getComputedStyle(column).overflowY === "visible") return;
+  const box = column.getBoundingClientRect();
+  const inner = box.top + column.clientTop;
+  const head = column.querySelector<HTMLElement>(".sto-head")?.offsetHeight ?? 0;
+  const top = inner + head + REVEAL_GAP_TOP;
+  const bottom = inner + column.clientHeight - gapBottom;
+  const r = row.getBoundingClientRect();
+  if (r.top < top) column.scrollTop -= top - r.top;
+  // Never so far that the row's top goes under the header, in a very short column.
+  else if (r.bottom > bottom) column.scrollTop += Math.min(r.bottom - bottom, r.top - top);
+}
+
+/** The bottom margin for revealing a row: none for the row the pointer pressed, while it has focus. */
+function gapBelow(id: string, pressed: string | null): number {
+  return pressed === id && document.activeElement?.id === rowDomId(id) ? 0 : REVEAL_GAP_BOTTOM;
+}
 
 /**
  * Where "add a question after this one" puts it, in words. REVIEW FIX: after a
@@ -149,9 +196,14 @@ export function Outline() {
   const focusAfter = useRef<string | null>(null);
   // `tries`: how many trees the target has been hidden in (see the effect below).
   const scrollTo = useRef<{ id: string; tries: number } | null>(null);
+  // The row the pointer last pressed, until the keyboard moves on or focus
+  // leaves the tree (see `gapBelow`).
+  const pressed = useRef<string | null>(null);
 
   // ── Selection: mark it, open what it is inside, bring it into view ───────
   const selectedId = encodeSelection(ctx.selection);
+  const selectedIdRef = useRef(selectedId);
+  selectedIdRef.current = selectedId;
   useLayoutEffect(() => {
     store.set({ selected: selectedId });
   }, [store, selectedId]);
@@ -173,6 +225,14 @@ export function Outline() {
     scrollTo.current = { id: selectedId, tries: 0 };
   }, [selectedId, expand]);
 
+  // Clearing the search or a filter redraws the whole tree from the top: bring
+  // the selection back into view rather than lose the researcher's place.
+  const wasFiltering = useRef(tree.filtering);
+  useEffect(() => {
+    if (wasFiltering.current && !tree.filtering && selectedIdRef.current) scrollTo.current = { id: selectedIdRef.current, tries: 0 };
+    wasFiltering.current = tree.filtering;
+  }, [tree.filtering]);
+
   useEffect(() => {
     // REVIEW FIX: these used to test `tree.byId`, which also holds the rows
     // inside a collapsed section or block. So after "Collapse all" the tab
@@ -188,7 +248,7 @@ export function Outline() {
       if (tree.shown.has(target.id)) {
         scrollTo.current = null;
         store.set({ active: target.id });
-        document.getElementById(rowDomId(target.id))?.querySelector(":scope > .sto-row")?.scrollIntoView({ block: "nearest" });
+        revealRow(target.id, gapBelow(target.id, pressed.current));
       } else if (!tree.byId.has(target.id) || ++target.tries > 2) {
         // Filtered out, or still folded after its section and block were
         // opened: give up rather than jump there later, out of the blue.
@@ -199,20 +259,23 @@ export function Outline() {
     if (focus && tree.shown.has(focus)) {
       focusAfter.current = null;
       store.set({ active: focus });
-      const el = document.getElementById(rowDomId(focus));
-      el?.focus();
-      el?.querySelector(":scope > .sto-row")?.scrollIntoView({ block: "nearest" });
+      document.getElementById(rowDomId(focus))?.focus({ preventScroll: true });
+      revealRow(focus);
     } else if (focus && !tree.byId.has(focus)) {
       focusAfter.current = null;
     }
   }, [tree, store, selectedId]);
 
+  // Arrow keys, Home and End, typeahead, and focus coming back from a menu:
+  // the row is brought into view clear of the sticky header, which the
+  // browser's own scroll-on-focus would leave it under.
   const focusRow = useCallback(
     (id: string | undefined) => {
       if (!id) return;
+      pressed.current = null;
       store.set({ active: id });
-      const el = document.getElementById(rowDomId(id));
-      el?.focus();
+      document.getElementById(rowDomId(id))?.focus({ preventScroll: true });
+      revealRow(id);
     },
     [store],
   );
@@ -331,7 +394,7 @@ export function Outline() {
       // editor silently dropped. And undo labels name the thing changed: the
       // history merges same-label steps made within 1.2 s, so "Archive
       // question" twice in quick succession was one undo step for two questions.
-      const named = (verb: string, text: string) => `${verb} “${shortText(text.trim() || "(no text yet)", 30)}”`;
+      const named = (verb: string, text: string) => `${verb} “${questionName(text, 30)}”`;
       const q = node.question;
       const b = node.block;
       const s = node.section;
@@ -675,6 +738,7 @@ export function Outline() {
   const onTreeKeyDown = (e: ReactKeyboardEvent<HTMLUListElement>) => {
     const target = e.target as HTMLElement;
     if (target.getAttribute("role") !== "treeitem") return;
+    pressed.current = null;
     const id = target.dataset["rowId"] ?? "";
     const i = tree.visible.findIndex((n) => n.id === id);
     const node = tree.visible[i];
@@ -792,6 +856,7 @@ export function Outline() {
     return [
       { label: "Expand all", icon: "chevron-down", onSelect: () => setAllRef.current(true), disabled: filtering, ...(hint ? { hint } : {}) },
       { label: "Collapse all", icon: "chevron-right", onSelect: () => setAllRef.current(false), disabled: filtering, ...(hint ? { hint } : {}) },
+      SHORTCUTS_MENU_ITEM,
     ];
   }, [filtering]);
   const problemCount = ctx.issues.length;
@@ -852,10 +917,10 @@ export function Outline() {
         </div>
         <div className="sto-tools">
           <div className="sto-chips" role="group" aria-label="Show only">
-            <Tooltip text="Show only questions with issues">
+            <Tooltip text="Show only questions with errors or warnings">
               <button type="button" className="sto-chip" aria-pressed={withProblems} onClick={() => setWithProblems((v) => !v)}>
                 <Icon name={withProblems ? "check" : "warning"} size={12} />
-                Issues
+                Checks
                 {problemCount > 0 ? <span className="sto-chip-count">{problemCount}</span> : null}
               </button>
             </Tooltip>
@@ -925,9 +990,19 @@ export function Outline() {
             aria-describedby="sto-tree-help"
             className="sto-tree"
             onKeyDown={onTreeKeyDown}
+            onPointerDown={(e) => {
+              pressed.current = (e.target as HTMLElement).closest<HTMLElement>("[data-row-id]")?.dataset["rowId"] ?? null;
+            }}
+            onBlur={(e) => {
+              if (!e.currentTarget.contains(e.relatedTarget as Node | null)) pressed.current = null;
+            }}
             onFocus={(e) => {
               const id = (e.target as HTMLElement).dataset["rowId"];
-              if (id) store.set({ active: id });
+              if (!id) return;
+              store.set({ active: id });
+              // Tabbing in is scrolled by the browser, after this event and
+              // blind to the sticky header: settle the row once it has.
+              requestAnimationFrame(() => revealRow(id, gapBelow(id, pressed.current)));
             }}
           >
             {tree.roots.map((node) => (

@@ -1,11 +1,11 @@
-import { useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode, type RefObject } from "react";
 import { diffDrafts, summariseIssues, type StudioDraft } from "@myself/studio";
 import { usePresence, type SaveState } from "../data/index.js";
 import { formatTime, toDate, versionLabel } from "../format.js";
 import { Link, useRoute, type Route } from "../router.js";
 import { Dialog } from "../ui/dialog.js";
 import { Icon } from "../ui/icons.js";
-import { IconButton, Kbd, Spinner, StatusDot, Tooltip, VisuallyHidden } from "../ui/kit.js";
+import { IconButton, Kbd, Spinner, StatusDot, Tooltip, VisuallyHidden, type MenuItem } from "../ui/kit.js";
 import { useToast } from "../ui/toast.js";
 import { useEditor } from "./context.js";
 import { isTextEntry, modKey } from "./outline/keys.js";
@@ -24,15 +24,39 @@ import "./toolbar.css";
 
 export const VALIDATION_TOGGLE_ID = "sto-validation-toggle";
 export const VALIDATION_PANEL_ID = "sto-validation";
+/**
+ * Asks the editor to show its keyboard shortcuts: the account menu's
+ * "Keyboard shortcuts" item sends it, since the menu lives in the page's
+ * header, outside the editor (DESIGN.md §4 keeps "?" out of the toolbar).
+ */
+export const SHOW_SHORTCUTS_EVENT = "studio:show-shortcuts";
+/**
+ * "Keyboard shortcuts  ?" as a menu item: in the outline's "…" menu, and in
+ * the account menu while the editor is on screen (only then is there a
+ * toolbar to answer it).
+ */
+export const SHORTCUTS_MENU_ITEM: MenuItem = {
+  label: "Keyboard shortcuts",
+  icon: "keyboard",
+  shortcut: "?",
+  onSelect: () => window.dispatchEvent(new Event(SHOW_SHORTCUTS_EVENT)),
+};
 
 export function Toolbar() {
   const ctx = useEditor();
+  const bar = useRef<HTMLDivElement | null>(null);
+  useFocusClearOfToolbar(bar);
   const [shortcuts, setShortcuts] = useState(false);
   useEditorShortcuts(() => setShortcuts(true));
+  useEffect(() => {
+    const show = () => setShortcuts(true);
+    window.addEventListener(SHOW_SHORTCUTS_EVENT, show);
+    return () => window.removeEventListener(SHOW_SHORTCUTS_EVENT, show);
+  }, []);
   const title = ctx.draft.composition.title;
 
   return (
-    <div className="sto-toolbar" role="region" aria-label="Survey toolbar">
+    <div ref={bar} className="sto-toolbar" role="region" aria-label="Survey toolbar">
       {/* The header's crumb shows the title; the page keeps it as its heading. */}
       <h1 className="st-sr">{title}</h1>
       <div className="sto-tb-status">
@@ -48,22 +72,40 @@ export function Toolbar() {
         <ValidationBadge />
         <PreviewLink />
         <PublishButton />
-        <Tooltip text="Keyboard shortcuts (?)">
-          <button
-            type="button"
-            className="st-iconbtn st-iconbtn-ghost st-iconbtn-md sto-help"
-            aria-label="Keyboard shortcuts"
-            aria-haspopup="dialog"
-            aria-keyshortcuts="?"
-            onClick={() => setShortcuts(true)}
-          >
-            <span aria-hidden="true">?</span>
-          </button>
-        </Tooltip>
       </div>
       {shortcuts ? <ShortcutsDialog playground={ctx.playground} onClose={() => setShortcuts(false)} /> : null}
     </div>
   );
+}
+
+/**
+ * On a phone the page scrolls as a whole and the toolbar sticks to the top of
+ * the window, where the browser's own scroll-to-focus can leave what it moved
+ * to underneath it (Shift+Tab upwards, a jump from the checks). Whatever takes
+ * focus in the columns is nudged clear of it. A scroll-padding on the page
+ * would do the same, but would also scroll the page whenever one of the
+ * toolbar's own buttons took focus.
+ */
+function useFocusClearOfToolbar(bar: RefObject<HTMLElement | null>) {
+  useEffect(() => {
+    const phone = window.matchMedia("(max-width: 760px)");
+    const onFocus = (e: FocusEvent) => {
+      const node = bar.current;
+      const el = e.target;
+      if (!phone.matches || !node || !(el instanceof HTMLElement) || !el.closest(".ste-columns")) return;
+      // Menus and dialogs place themselves (a row's menu closes if the page scrolls).
+      if (el.closest('[role="menu"], [role="dialog"]')) return;
+      // After the browser's own scrolling, which follows this event.
+      requestAnimationFrame(() => {
+        const clear = node.getBoundingClientRect().bottom + 8;
+        const r = el.getBoundingClientRect();
+        // Something taller than the room below the toolbar is left where the browser put it.
+        if (r.top < clear && r.bottom > 0 && r.height <= window.innerHeight - clear) window.scrollBy(0, r.top - clear);
+      });
+    };
+    document.addEventListener("focusin", onFocus);
+    return () => document.removeEventListener("focusin", onFocus);
+  }, [bar]);
 }
 
 // ── What is live, and whether the draft differs ─────────────────────────

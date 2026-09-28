@@ -125,6 +125,10 @@
   flex: none;
 }
 
+.st-nowrap {
+  white-space: nowrap;
+}
+
 @media (prefers-reduced-motion: no-preference) {
   .studio button,
   .studio a,
@@ -265,10 +269,12 @@
   position: relative;
   display: inline-flex;
 }
+/* Placed by Tooltip (kit.tsx) against the window, and shown once placed. */
 .st-tip {
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
+  position: fixed;
+  left: 0;
+  top: 0;
+  visibility: hidden;
   z-index: 80;
   width: max-content;
   max-width: 280px;
@@ -283,12 +289,6 @@
   pointer-events: none;
   white-space: normal;
   text-align: left;
-}
-.st-tip-bottom {
-  top: calc(100% + 6px);
-}
-.st-tip-top {
-  bottom: calc(100% + 6px);
 }
 @media (prefers-reduced-motion: no-preference) {
   .st-tip {
@@ -617,6 +617,18 @@
 .st-autotext[aria-invalid="true"] {
   border-color: var(--st-danger);
 }
+/* An invalid box keeps its red while focused, with a red ring to match:
+   never a red border inside a green ring. */
+.studio .st-field-error .st-input:focus-visible,
+.studio .st-field-error .st-select:focus-visible,
+.studio .st-field-error .st-autotext:focus-visible,
+.studio .stn-field-invalid .st-input:focus-visible,
+.studio .stn-field-invalid .st-autotext:focus-visible,
+.studio .st-input[aria-invalid="true"]:focus-visible,
+.studio .st-autotext[aria-invalid="true"]:focus-visible {
+  border-color: var(--st-danger);
+  box-shadow: 0 0 0 2px #ffffff, 0 0 0 4px rgba(185, 28, 28, 0.35);
+}
 .st-input:disabled,
 .st-select:disabled,
 .st-autotext:disabled,
@@ -746,7 +758,11 @@
   position: absolute;
   top: calc(100% + 4px);
   z-index: 70;
+  /* As wide as its longest item: anchored to a small button, the list would
+     otherwise shrink to its minimum and wrap an item's name. */
+  width: max-content;
   min-width: 200px;
+  max-width: min(320px, calc(100vw - 32px));
   list-style: none;
   margin: 0;
   padding: 4px;
@@ -819,6 +835,10 @@
 .st-menu-text small {
   font-size: 12px;
   color: var(--st-text-tertiary);
+}
+.st-menu-key {
+  margin-left: auto;
+  padding-left: 16px;
 }
 
 /* ── Dialogs ──────────────────────────────────────────────────────────── */

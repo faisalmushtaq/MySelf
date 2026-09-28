@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMemoryDraftEditor, useStudioSession, type Loadable, type PublishedContext, type StudioUser } from "../data/index.js";
 import { EditorPage } from "../editor/EditorPage.js";
+import { SHORTCUTS_MENU_ITEM } from "../editor/Toolbar.js";
 import { PlaygroundMode } from "../mode.js";
 import { PreviewPage } from "../preview/PreviewPage.js";
 import { loadPlayground, PLAYGROUND_VERSION, type PlaygroundData } from "../playground-data.js";
 import { Banner, Shell, type ShellTab } from "../shell/Shell.js";
-import { Notice, Skeleton } from "../ui/kit.js";
+import { Notice, Skeleton, type MenuItem } from "../ui/kit.js";
 import { useToast } from "../ui/toast.js";
 
 /**
@@ -16,6 +17,8 @@ import { useToast } from "../ui/toast.js";
  */
 
 const GUEST: StudioUser = { uid: "playground", email: null, displayName: "Playground", photoURL: null };
+/** The editor's shortcuts in the account menu, as on a real survey (when there is an account menu). */
+const PLAYGROUND_MENU: MenuItem[] = [SHORTCUTS_MENU_ITEM];
 
 export function PlaygroundScreen({ tab, q }: { tab: "edit" | "preview"; q: string | null }) {
   const [data, setData] = useState<Loadable<PlaygroundData>>({ status: "loading" });
@@ -52,7 +55,7 @@ export function PlaygroundScreen({ tab, q }: { tab: "edit" | "preview"; q: strin
 
   return (
     <PlaygroundMode.Provider value={true}>
-      <Shell crumb="Playground" tabs={tabs} banner={banner} wide>
+      <Shell crumb="Playground" tabs={tabs} banner={banner} wide menuItems={tab === "edit" && data.status === "ready" ? PLAYGROUND_MENU : undefined}>
         {data.status === "loading" ? (
           <div className="stp-page">
             <Skeleton lines={6} label="Opening the live survey" />

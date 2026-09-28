@@ -262,7 +262,22 @@ export interface LockedDifference {
   /** The question at fault, when the difference is inside one. */
   itemKey?: string;
   change: LockedChange;
+  /** The whole explanation: what differs, why that isn't allowed, and what to do. */
   message: string;
+  /** What differs, in one short line (validation's issue message). */
+  summary: string;
+  /** Why that isn't allowed and what to do (validation's issue hint). */
+  detail: string;
+}
+
+/** A difference from its short line and its explanation; the message is both. */
+function difference(
+  base: Omit<LockedDifference, "message" | "summary" | "detail">,
+  lead: string,
+  summary: string,
+  detail: string,
+): LockedDifference {
+  return { ...base, message: `${lead} ${detail}`, summary, detail };
 }
 
 /** What a changed field is called in a message. */
@@ -322,6 +337,8 @@ function compareDefinitions(
     options.tier === "locked"
       ? `${name} is a licensed, validated instrument, so it must be administered exactly as published`
       : `${name} is protected (ethics-approved consent, or the details participant linkage relies on), so it can only change after it has been unlocked with a recorded reason`;
+  // Short lines don't name the instrument: its block, or its question, is the heading they sit under.
+  const kind = options.tier === "locked" ? "a licensed instrument" : "a protected module";
   const fix =
     options.tier === "locked"
       ? "Undo the change. You can still move the block, show it conditionally, change whether answers are required, and edit help text and layout."
@@ -331,12 +348,14 @@ function compareDefinitions(
     // Instrument-level content, questions set aside.
     const shell = (d: Loose) => ({ ...d, forms: formsOf(d).map((f) => ({ ...f, items: [] })) });
     if (canonicalJson(shell(now)) !== canonicalJson(shell(then))) {
-      out.push({
-        instrument,
-        refKey,
-        change: "definition",
-        message: `The details of ${name} (such as its instructions or scoring) differ from the published version. ${why}. ${fix}`,
-      });
+      out.push(
+        difference(
+          { instrument, refKey, change: "definition" },
+          `The details of ${name} (such as its instructions or scoring) differ from the published version.`,
+          `Details changed in ${kind}`,
+          `${why}. ${fix}`,
+        ),
+      );
     }
 
     const nowItems = itemsOf(formsOf(now)[0]);
@@ -347,15 +366,12 @@ function compareDefinitions(
     for (const item of thenItems) {
       const key = String(item["key"]);
       if (!nowByKey.has(key)) {
-        out.push({
-          instrument,
-          refKey,
-          itemKey: `${instrument}.${key}`,
-          change: "question_removed",
-          message: `${questionLabel(`${instrument}.${key}`, item)} has been removed from ${name}. ${why}. ${
-            options.tier === "locked" ? "Put the question back, or remove the whole instrument instead." : fix
-          }`,
-        });
+        const itemKey = `${instrument}.${key}`;
+        const lead = `${questionLabel(itemKey, item)} has been removed from ${name}.`;
+        // The question is gone from the draft, so the editor may have no text
+        // to head it with (only its ID): the explanation says which it was.
+        const detail = `${lead} ${why}. ${options.tier === "locked" ? "Put the question back, or remove the whole instrument instead." : fix}`;
+        out.push({ instrument, refKey, itemKey, change: "question_removed", message: detail, summary: `Removed from ${kind}`, detail });
       }
     }
     for (const item of nowItems) {
@@ -363,40 +379,43 @@ function compareDefinitions(
       const itemKey = `${instrument}.${key}`;
       const before = thenByKey.get(key);
       if (!before) {
-        out.push({
-          instrument,
-          refKey,
-          itemKey,
-          change: "question_added",
-          message: `${questionLabel(itemKey, item)} has been added to ${name}. ${why}. ${
-            options.tier === "locked" ? "Add the question to one of the study's own modules instead." : fix
-          }`,
-        });
+        out.push(
+          difference(
+            { instrument, refKey, itemKey, change: "question_added" },
+            `${questionLabel(itemKey, item)} has been added to ${name}.`,
+            `Added to ${kind}`,
+            `${why}. ${options.tier === "locked" ? "Add the question to one of the study's own modules instead." : fix}`,
+          ),
+        );
         continue;
       }
       const a = withoutFields(item, options.allowed);
       const b = withoutFields(before, options.allowed);
       if (canonicalJson(a) !== canonicalJson(b)) {
         const fields = changedFields(a, b);
-        out.push({
-          instrument,
-          refKey,
-          itemKey,
-          change: "question",
-          message: `The ${joinAnd(fields)} of ${questionLabel(itemKey, item)} ${fields.length > 1 ? "have" : "has"} changed since the published version. ${why}. ${fix}`,
-        });
+        const what = joinAnd(fields);
+        out.push(
+          difference(
+            { instrument, refKey, itemKey, change: "question" },
+            `The ${what} of ${questionLabel(itemKey, item)} ${fields.length > 1 ? "have" : "has"} changed since the published version.`,
+            `${what.charAt(0).toUpperCase()}${what.slice(1)} changed in ${kind}`,
+            `${why}. ${fix}`,
+          ),
+        );
       }
     }
 
     const common = (items: Loose[], other: Map<string, Loose>) =>
       items.map((i) => String(i["key"])).filter((k) => other.has(k));
     if (common(nowItems, thenByKey).join("\u0000") !== common(thenItems, nowByKey).join("\u0000")) {
-      out.push({
-        instrument,
-        refKey,
-        change: "order",
-        message: `The order of the questions in ${name} differs from the published version. ${why}. ${fix}`,
-      });
+      out.push(
+        difference(
+          { instrument, refKey, change: "order" },
+          `The order of the questions in ${name} differs from the published version.`,
+          `Question order changed in ${kind}`,
+          `${why}. ${fix}`,
+        ),
+      );
     }
   }
 
@@ -410,25 +429,28 @@ function compareDefinitions(
     const before = baseline.scales?.[scaleKey];
     if (!before) continue; // a scale the item did not use before is already reported as a question change
     if (canonicalJson(normaliseScale(draft.scales?.[scaleKey])) !== canonicalJson(normaliseScale(before))) {
-      out.push({
-        instrument,
-        refKey,
-        itemKey: `${instrument}.${String(item["key"])}`,
-        change: "scale",
-        message: `The answer options of ${name} (${scaleKey}) differ from the published version. ${why}. ${fix}`,
-      });
+      out.push(
+        difference(
+          { instrument, refKey, itemKey: `${instrument}.${String(item["key"])}`, change: "scale" },
+          `The answer options of ${name} (${scaleKey}) differ from the published version.`,
+          `Answer options changed in ${kind}`,
+          `${why}. ${fix}`,
+        ),
+      );
     }
   }
 
   const scoringKey = now["scoringKey"];
   if (typeof scoringKey === "string" && baseline.scoring?.[scoringKey]) {
     if (canonicalJson(normaliseScoring(draft.scoring?.[scoringKey])) !== canonicalJson(normaliseScoring(baseline.scoring[scoringKey]))) {
-      out.push({
-        instrument,
-        refKey,
-        change: "scoring",
-        message: `The scoring rules of ${name} (${scoringKey}) differ from the published version. ${why}. ${fix}`,
-      });
+      out.push(
+        difference(
+          { instrument, refKey, change: "scoring" },
+          `The scoring rules of ${name} (${scoringKey}) differ from the published version.`,
+          `Scoring rules changed in ${kind}`,
+          `${why}. ${fix}`,
+        ),
+      );
     }
   }
   return out;
@@ -480,40 +502,46 @@ function introducedRegistries(
     seen.add(scaleKey);
     const expected = options.referenceScales?.[scaleKey] ?? baseline.scales?.[scaleKey];
     if (expected === undefined) {
-      out.push({
-        instrument,
-        refKey,
-        itemKey: `${instrument}.${String(item["key"])}`,
-        change: "scale",
-        message: `The answer options of ${name} (${scaleKey}) can't be checked against the instrument library, so they can't be shown to be the licensed ones. Add the instrument again from the library.`,
-      });
+      out.push(
+        difference(
+          { instrument, refKey, itemKey: `${instrument}.${String(item["key"])}`, change: "scale" },
+          `The answer options of ${name} (${scaleKey}) can't be checked against the instrument library.`,
+          "Answer options can't be checked against the library",
+          "They can't be shown to be the licensed ones. Add the instrument again from the library.",
+        ),
+      );
     } else if (canonicalJson(normaliseScale(draft.scales?.[scaleKey])) !== canonicalJson(normaliseScale(expected))) {
-      out.push({
-        instrument,
-        refKey,
-        itemKey: `${instrument}.${String(item["key"])}`,
-        change: "scale",
-        message: `The answer options of ${name} (${scaleKey}) differ from the licensed version in the instrument library. Validated instruments must be used exactly as licensed; add it again from the library.`,
-      });
+      out.push(
+        difference(
+          { instrument, refKey, itemKey: `${instrument}.${String(item["key"])}`, change: "scale" },
+          `The answer options of ${name} (${scaleKey}) differ from the licensed version in the instrument library.`,
+          "Answer options differ from the licensed version",
+          "Validated instruments must be used exactly as licensed; add it again from the library.",
+        ),
+      );
     }
   }
   const scoringKey = now["scoringKey"];
   if (typeof scoringKey === "string") {
     const expected = options.referenceScoring?.[scoringKey] ?? baseline.scoring?.[scoringKey];
     if (expected === undefined) {
-      out.push({
-        instrument,
-        refKey,
-        change: "scoring",
-        message: `The scoring rules of ${name} (${scoringKey}) can't be checked against the instrument library. Add the instrument again from the library.`,
-      });
+      out.push(
+        difference(
+          { instrument, refKey, change: "scoring" },
+          `The scoring rules of ${name} (${scoringKey}) can't be checked against the instrument library.`,
+          "Scoring rules can't be checked against the library",
+          "Add the instrument again from the library.",
+        ),
+      );
     } else if (canonicalJson(normaliseScoring(draft.scoring?.[scoringKey])) !== canonicalJson(normaliseScoring(expected))) {
-      out.push({
-        instrument,
-        refKey,
-        change: "scoring",
-        message: `The scoring rules of ${name} (${scoringKey}) differ from the licensed version in the instrument library. Add it again from the library.`,
-      });
+      out.push(
+        difference(
+          { instrument, refKey, change: "scoring" },
+          `The scoring rules of ${name} (${scoringKey}) differ from the licensed version in the instrument library.`,
+          "Scoring rules differ from the licensed version",
+          "Add it again from the library.",
+        ),
+      );
     }
   }
   return out;
@@ -542,14 +570,22 @@ export function lockedDifferences(draft: StudioDraft, baseline: StudioDraft, opt
       continue;
     }
     const name = instrumentLabel(def, refKey);
-    out.push({
-      instrument: String((def as { instrument?: unknown }).instrument ?? refKey),
-      refKey,
-      change: "introduced",
-      message: known
-        ? `${name} differs from the licensed version in the instrument library. Validated instruments must be used exactly as licensed; add it again from the library.`
-        : `${name} is a licensed, validated instrument that is not in the published version this draft started from, and nothing shows its content is the licensed one. Validated instruments can only be added unchanged from the instrument library.`,
-    });
+    const at = { instrument: String((def as { instrument?: unknown }).instrument ?? refKey), refKey, change: "introduced" as const };
+    out.push(
+      known
+        ? difference(
+            at,
+            `${name} differs from the licensed version in the instrument library.`,
+            "Differs from the licensed version in the library",
+            `Validated instruments such as ${name} must be used exactly as licensed; add it again from the library.`,
+          )
+        : difference(
+            at,
+            `${name} is a licensed, validated instrument that is not in the published version this draft started from, and nothing shows its content is the licensed one.`,
+            "A licensed instrument can't be added by editing",
+            `${name} isn't in the published version this draft started from, and nothing shows its content is the licensed one. Validated instruments can only be added unchanged from the instrument library.`,
+          ),
+    );
   }
   return out;
 }
@@ -573,12 +609,14 @@ export function protectedDifferences(draft: StudioDraft, baseline: StudioDraft):
     if (base) {
       out.push(...compareDefinitions(refKey, def, base, draft, baseline, { tier: "protected", allowed: PROTECTED_ALLOWED_FIELDS }));
     } else {
-      out.push({
-        instrument: String(instrument ?? refKey),
-        refKey,
-        change: "introduced",
-        message: `${instrumentLabel(def, refKey)} is protected and is not in the published version this draft started from. Unlock it and record why before adding it.`,
-      });
+      out.push(
+        difference(
+          { instrument: String(instrument ?? refKey), refKey, change: "introduced" },
+          `${instrumentLabel(def, refKey)} is protected and is not in the published version this draft started from.`,
+          "A protected module can't be added without unlocking",
+          `${instrumentLabel(def, refKey)} isn't in the published version this draft started from. Unlock it and record why before adding it.`,
+        ),
+      );
     }
   }
   for (const [refKey, base] of Object.entries(baseline.instruments ?? {})) {
@@ -586,12 +624,14 @@ export function protectedDifferences(draft: StudioDraft, baseline: StudioDraft):
     if (typeof instrument !== "string" || !PROTECTED_INSTRUMENTS.includes(instrument)) continue;
     if (draftByInstrument.has(instrument)) continue;
     if (isUnlocked(draft.unlocked, instrument)) continue;
-    out.push({
-      instrument,
-      refKey,
-      change: "removed",
-      message: `${instrumentLabel(base, instrument)} is protected and has been removed from the survey. Put it back, or unlock it and record why it is being removed.`,
-    });
+    out.push(
+      difference(
+        { instrument, refKey, change: "removed" },
+        `${instrumentLabel(base, instrument)} is protected and has been removed from the survey.`,
+        `Protected ${instrumentLabel(base, instrument)} removed`,
+        "Put it back, or unlock it and record why it is being removed.",
+      ),
+    );
   }
   return out;
 }

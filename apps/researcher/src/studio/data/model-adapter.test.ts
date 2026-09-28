@@ -119,6 +119,10 @@ describe("what has been published", () => {
     expect(ctx.publishedItemKeys.size).toBeGreaterThanOrEqual(147);
     expect(ctx.reserved.itemKeys).toEqual(ctx.publishedItemKeys);
     expect(ctx.publishedScaleCodes.size).toBeGreaterThan(0);
+    // The survey document changing (a save adds to its editors) keeps the same
+    // baseline object, so nothing compared with it starts over.
+    const again = buildPublishedContext({ ...survey, draftEditors: ["someone@example.org"] }, [version(r710), version(r701)], new Map(releases));
+    expect(again.baseline).toBe(ctx.baseline);
     // Nothing published: no baseline, nothing reserved.
     const empty = buildPublishedContext({ ...survey, active: null }, [], new Map());
     expect(empty.baseline).toBeNull();

@@ -349,15 +349,16 @@ function AddMember({ existing, onAdd }: { existing: MemberDoc[]; onAdd: (email: 
         <Field label="Role">
           {(p) => <RoleSelect id={p.id} describedBy={hintId} value={role} onChange={setRole} />}
         </Field>
+        {/* Under the Role box it describes, not under the address. */}
+        <p id={hintId} className="stp-role-hint">
+          {ROLE_DESCRIPTIONS[role]}
+        </p>
         <div className="stp-inline-submit">
-          <Button type="submit" variant="primary" icon="plus" busy={busy}>
+          <Button type="submit" variant="secondary" icon="plus" busy={busy}>
             Add
           </Button>
         </div>
       </div>
-      <p id={hintId} className="stp-role-hint">
-        {ROLE_DESCRIPTIONS[role]}
-      </p>
     </form>
   );
 }
@@ -475,15 +476,15 @@ function Domains({ nested }: { nested: boolean }) {
           <Field label="Role">
             {(p) => <RoleSelect id={p.id} describedBy={hintId} value={role} onChange={setRole} />}
           </Field>
+          <p id={hintId} className="stp-role-hint">
+            {ROLE_DESCRIPTIONS[role]}
+          </p>
           <div className="stp-inline-submit">
             <Button type="submit" variant="secondary" icon="plus">
               Add rule
             </Button>
           </div>
         </div>
-        <p id={hintId} className="stp-role-hint">
-          {ROLE_DESCRIPTIONS[role]}
-        </p>
       </form>
       {confirm ? (
         <ConfirmDialog

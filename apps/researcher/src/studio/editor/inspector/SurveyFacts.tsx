@@ -1,15 +1,15 @@
 import { useMemo, type ReactNode } from "react";
-import { liveQuestions, summariseIssues, type ArchivedQuestion } from "@myself/studio";
+import { liveQuestions, type ArchivedQuestion } from "@myself/studio";
 import { formatDateTime, toDate, versionLabel } from "../../format.js";
-import { Icon } from "../../ui/icons.js";
-import { Button, InfoTip } from "../../ui/kit.js";
+import { InfoTip } from "../../ui/kit.js";
 import { useEditor } from "../context.js";
 import { Facts } from "../node/controls.js";
 import { ageBandLabel, READING_LEVELS } from "../node/SettingsEditor.js";
 
 /**
  * The survey at a glance, for the settings panel when no question is chosen:
- * what it is, what is live, and how the draft stands.
+ * what it is and what is live. How the draft's checks stand is the toolbar's
+ * to say, in one place.
  */
 export function SurveyFacts({ tip }: { tip?: ReactNode }) {
   const ctx = useEditor();
@@ -18,8 +18,10 @@ export function SurveyFacts({ tip }: { tip?: ReactNode }) {
   const questions = useMemo(() => new Set(liveQuestions(draft).map((q) => q.itemKey)), [draft]);
   // Not counted until what has been published is known: every question would count as new.
   const newQuestions = ctx.publishedStatus === "ready" ? [...questions].filter((k) => !ctx.publishedItemKeys.has(k)).length : 0;
-  const { errors, warnings } = summariseIssues(ctx.issues);
-  const active = ctx.published?.active ?? null;
+  // The survey document names the live version as soon as it arrives, well
+  // before every published release has been fetched and verified — the same
+  // source the toolbar reads, so the two never disagree.
+  const active = ctx.survey?.active ?? ctx.published?.active ?? null;
   const unlocked = Object.keys(draft.unlocked);
 
   return (
@@ -42,7 +44,7 @@ export function SurveyFacts({ tip }: { tip?: ReactNode }) {
               label: "Live version",
               value: active
                 ? `${versionLabel(active.version)} · ${formatDateTime(toDate(active.publishedAt))}`
-                : ctx.publishedStatus === "loading"
+                : !ctx.survey && ctx.publishedStatus === "loading"
                   ? "Loading…"
                   : "Not published yet",
             },
@@ -51,31 +53,6 @@ export function SurveyFacts({ tip }: { tip?: ReactNode }) {
             { label: "Archived", value: String(draft.archived.length) },
           ]}
         />
-      </section>
-      <section className="sti-group" aria-labelledby="sti-facts-checks">
-        <div className="sti-titlerow">
-          <h3 className="sti-title" id="sti-facts-checks">
-            Checks
-          </h3>
-        </div>
-        <ul className="sti-checks">
-          <li className={errors > 0 ? "sti-check-error" : "sti-check-ok"}>
-            <Icon name={errors > 0 ? "error" : "check"} size={16} />
-            {errors > 0 ? `${errors} error${errors === 1 ? "" : "s"} to fix before publishing` : "No errors"}
-          </li>
-          {warnings > 0 ? (
-            <li className="sti-check-warn">
-              <Icon name="warning" size={16} />
-              {warnings} warning{warnings === 1 ? "" : "s"}
-            </li>
-          ) : null}
-        </ul>
-        {errors + warnings > 0 ? (
-          <Button size="sm" variant="secondary" onClick={() => ctx.setValidationOpen(true)}>
-            See the list
-          </Button>
-        ) : null}
-        {!ctx.issuesFresh ? <p className="sti-note">Checking your latest change…</p> : null}
       </section>
       {unlocked.length > 0 ? (
         <section className="sti-group" aria-labelledby="sti-facts-unlocked">

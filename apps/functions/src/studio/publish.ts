@@ -114,9 +114,33 @@ export function authorsOf(draftEditors: unknown, draft: { updatedBy?: unknown; u
   return authors;
 }
 
-function describeRefusedDraft(issues: Issue[]): string {
+/**
+ * Where an issue is, in a few words: the question's ID, else its block or its
+ * section, else the screen. Validation's messages don't name the place ("Add
+ * the question text") — the editor shows each under its place — but the
+ * refusal is one sentence on its own, so it says where.
+ */
+export function placeOfIssue(issue: Issue, draft?: StudioDraft): string | null {
+  const at = issue.location;
+  if (at.itemKey) return at.itemKey;
+  if (at.kind === "block" && at.refKey) {
+    const name = (draft?.instruments[at.refKey] as { name?: unknown } | undefined)?.name;
+    return `block “${typeof name === "string" && name ? name : at.refKey}”`;
+  }
+  if (at.sectionKey) {
+    const title = draft?.composition.sections.find((s) => s.key === at.sectionKey)?.title;
+    return title ? `section “${title}”` : `section ${at.sectionKey}`;
+  }
+  if (at.kind === "welcome") return "start screen";
+  if (at.kind === "completion") return "completion screen";
+  return null;
+}
+
+export function describeRefusedDraft(issues: Issue[], draft?: StudioDraft): string {
   const errors = issues.filter((i) => i.severity === "error");
-  const first = errors[0]?.message ?? "";
+  const firstIssue = errors[0];
+  const place = firstIssue ? placeOfIssue(firstIssue, draft) : null;
+  const first = `${firstIssue?.message ?? ""}${place ? ` (${place})` : ""}`;
   return errors.length === 1
     ? `This draft can't be published: ${first}`
     : `This draft can't be published: there are ${errors.length} problems to fix first, starting with: ${first}`;
@@ -185,7 +209,7 @@ export async function publish(db: Firestore, args: PublishArgs): Promise<Publish
         publishedScaleCodes: publishedScaleCodes(published),
       }),
     ];
-    if (issues.some((i) => i.severity === "error")) throw refuse.invalid(describeRefusedDraft(issues), issues);
+    if (issues.some((i) => i.severity === "error")) throw refuse.invalid(describeRefusedDraft(issues, draft), issues);
 
     const summary = diffDrafts(baseline, draft);
     const required = suggestBump(summary);

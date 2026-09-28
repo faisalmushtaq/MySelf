@@ -1,4 +1,5 @@
 import { shortText, type Issue, type Outline } from "@myself/studio";
+import { UNTITLED_QUESTION } from "../outline/model.js";
 import type { Selection } from "../selection.js";
 
 /**
@@ -42,9 +43,9 @@ export function selectionFor(issue: Issue, outline?: Outline): Selection {
 export interface IssueGroup {
   /** Stable key for the list. */
   id: string;
-  /** Where, in words: "Start screen", a section's title, a question's text and ID. */
+  /** Where, in words: "Start screen", a section's title, a block's name, a question's text and ID. */
   label: string;
-  /** The section a question is in, when the label is a question. */
+  /** The section a question or block is in, when the label is one. */
   context: string | null;
   issues: Issue[];
 }
@@ -61,37 +62,62 @@ interface Place {
   order: number;
 }
 
-/** Issues by severity, then by place in survey order: start, each section and its questions, completion, survey. */
-export function groupIssues(issues: readonly Issue[], outline: Outline): GroupedIssues {
+/**
+ * Issues by severity, then by place in survey order: start, each section and
+ * its questions, completion, survey. `before` is the version the draft is
+ * checked against: a question removed from the draft outright (not archived)
+ * is headed by its text from there, rather than by its ID alone.
+ */
+export function groupIssues(issues: readonly Issue[], outline: Outline, before?: Outline | null): GroupedIssues {
   const questionPlace = new Map<string, { text: string; section: string; order: number }>();
   const sectionPlace = new Map<string, { title: string; order: number }>();
+  const blockPlace = new Map<string, { name: string; section: string; order: number }>();
   const STEP = 100_000;
   outline.sections.forEach((section, i) => {
     const base = (i + 1) * STEP;
     sectionPlace.set(section.key, { title: section.title, order: base });
     let n = 0;
     for (const block of section.blocks) {
+      // Just before its first question: a block's own problems (its condition,
+      // its order) read before those of the questions in it.
+      blockPlace.set(`${section.key}\u0000${block.refKey}`, { name: block.name, section: section.title, order: base + 0.5 + n });
       for (const q of block.questions) questionPlace.set(q.itemKey, { text: q.text, section: section.title, order: base + 1 + n++ });
     }
   });
   const end = (outline.sections.length + 1) * STEP;
   const archived = new Map(outline.archived.map((a) => [a.itemKey, a.text]));
+  let removed: Map<string, string> | null = null;
+  const removedText = (itemKey: string): string | undefined => {
+    if (!before) return undefined;
+    removed ??= new Map(before.sections.flatMap((s) => s.blocks.flatMap((b) => b.questions.map((q) => [q.itemKey, q.text] as const))));
+    return removed.get(itemKey);
+  };
 
   const placeOf = (issue: Issue): Place => {
     const at = issue.location;
     if ((at.kind === "question" || at.kind === "option") && at.itemKey) {
       const q = questionPlace.get(at.itemKey);
       if (q) {
-        const said = q.text.trim() ? `“${shortText(q.text, 70)}”` : "Untitled question";
+        const said = q.text.trim() ? `“${shortText(q.text, 70)}”` : UNTITLED_QUESTION;
         return { id: `q:${at.itemKey}`, label: `${said} (${at.itemKey})`, context: q.section, order: q.order };
       }
       const text = archived.get(at.itemKey);
+      const gone = text === undefined ? removedText(at.itemKey) : undefined;
       return {
         id: `q:${at.itemKey}`,
-        label: text !== undefined ? `“${shortText(text, 70)}” (${at.itemKey}, archived)` : `Question ${at.itemKey}`,
+        label:
+          text !== undefined
+            ? `“${shortText(text, 70)}” (${at.itemKey}, archived)`
+            : gone?.trim()
+              ? `“${shortText(gone, 70)}” (${at.itemKey})`
+              : `Question ${at.itemKey}`,
         context: null,
         order: end - 1,
       };
+    }
+    if (at.kind === "block" && at.sectionKey && at.refKey) {
+      const b = blockPlace.get(`${at.sectionKey}\u0000${at.refKey}`);
+      if (b) return { id: `b:${at.sectionKey}:${at.refKey}`, label: `“${shortText(b.name, 70)}”`, context: b.section, order: b.order };
     }
     if ((at.kind === "section" || at.kind === "block" || at.kind === "question" || at.kind === "option") && at.sectionKey) {
       const s = sectionPlace.get(at.sectionKey);
