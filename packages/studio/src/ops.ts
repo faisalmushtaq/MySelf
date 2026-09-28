@@ -1,4 +1,5 @@
 import { refKeyOf } from "@myself/release/gate";
+import type { ReservedIds } from "./history.js";
 import { canonicalJson, type ItemDefinition, type LogicExpr } from "@myself/schema";
 import { CHOICE_TYPES, defaultTextFor, questionType, templateFor, type QuestionTypeId } from "./catalogue.js";
 import type { ArchivedPosition, ArchivedQuestion, CompositionInput, InstrumentOrModule, ScaleInput, StudioDraft } from "./contract.js";
@@ -64,11 +65,6 @@ type ParticipantCode = NonNullable<CompositionInput["participantCode"]>;
 type Contact = NonNullable<CompositionInput["contact"]>;
 type Effort = NonNullable<CompositionInput["effort"]>;
 
-/** IDs and variables used by any published version: never to be given to a new question. */
-export interface ReservedIds {
-  itemKeys: ReadonlySet<string>;
-  variables: ReadonlySet<string>;
-}
 
 /** Who did something, and when (ISO), for the records the draft keeps. */
 export interface OpActor {
