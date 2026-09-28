@@ -7,6 +7,14 @@
         { "fieldPath": "quarantined", "order": "ASCENDING" },
         { "fieldPath": "startedAt", "order": "ASCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "studioAudit",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "surveyId", "order": "ASCENDING" },
+        { "fieldPath": "at", "order": "DESCENDING" }
+      ]
     }
   ],
   "fieldOverrides": [

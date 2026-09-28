@@ -11,12 +11,14 @@ import {
 } from "@firebase/rules-unit-testing";
 import {
   collection,
+  collectionGroup,
   deleteDoc,
   deleteField,
   doc,
   getDoc,
   getDocs,
   query,
+  runTransaction,
   serverTimestamp,
   setDoc,
   setLogLevel,
@@ -340,6 +342,28 @@ describe("editors", () => {
     expect(stored.get("basedOn")).toEqual({ version: VERSION, hash: `sha256:${HASH_HEX}` });
   });
 
+  // Review addition: the Studio saves in a transaction (read the draft, then
+  // update it), not with a bare updateDoc, and R10 is about two people. Both
+  // are pinned here: the transaction's read and write both pass, and the second
+  // of two editors who loaded the same revision is refused rather than
+  // silently replacing the first one's save.
+  it("save through a transaction, and the second of two saves from one revision loses", async () => {
+    const ed = member("editor");
+    const colleague = google("u_x", "x@brainpop.test");
+    await allowed("first save from revision 3, in a transaction", () =>
+      runTransaction(ed.db, async (tx) => {
+        const ref = doc(ed.db, P.draft);
+        const loaded = await tx.get(ref);
+        tx.update(ref, saveFields(ed, (loaded.get("revision") as number) + 1));
+      }),
+    );
+    // The colleague also loaded revision 3, so also asks for 4, which is taken.
+    await refused("second save from revision 3", () => save(colleague, { revision: 4 }));
+    const stored = await getDoc(doc(ed.db, P.draft));
+    expect(stored.get("revision")).toBe(4);
+    expect(stored.get("updatedBy")).toBe(ed.uid);
+  });
+
   it("change exactly the fields the contract lists, and the Studio's save touches no others", async () => {
     expect([...DRAFT_CLIENT_FIELDS].sort()).toEqual(Object.keys(saveFields(member("editor"))).sort());
   });
@@ -447,6 +471,35 @@ describe("what participants load", () => {
     await allowed("device gets the pointer", () => getDoc(doc(db, P.published)));
     await allowed("device gets the release", () => getDoc(doc(db, P.publicRelease)));
   });
+
+  // Review addition. The participant app does not use the SDK here: it makes a
+  // plain signed-out REST GET (docs/16 §5.3, apps/participant/src/lib/releases.ts)
+  // and treats 404 as "nothing published" and anything else as "unreachable".
+  // So the status codes are part of the contract, and are checked on the wire.
+  it("answers the participant app's signed-out REST GET: 200, or 404 when absent, never a list", async () => {
+    const emulator = env.emulators.firestore!;
+    const base = `http://${emulator.host}:${emulator.port}/v1/projects/${env.projectId}/databases/(default)/documents`;
+    const status = async (path: string, init?: RequestInit) => (await fetch(`${base}/${path}`, init)).status;
+
+    expect(await status(P.published)).toBe(200);
+    expect(await status(P.publicRelease)).toBe(200);
+    expect(await status(paths.publishedPointer(STUDY, "no_such_survey"))).toBe(404);
+    expect(await status(paths.publicRelease(STUDY, "0".repeat(64)))).toBe(404);
+    // A REST list is a `list`, and a structured query is too.
+    expect(await status(P.publishedAll)).toBe(403);
+    expect(await status(P.publicReleases)).toBe(403);
+    const runQuery = (collectionId: string) =>
+      status(`studies/${STUDY}:runQuery`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ structuredQuery: { from: [{ collectionId }] } }),
+      });
+    expect(await runQuery("published")).toBe(403);
+    expect(await runQuery("publicReleases")).toBe(403);
+    // Nothing else in the Studio answers a signed-out GET.
+    expect(await status(P.draft)).toBe(403);
+    expect(await status(P.version)).toBe(403);
+  });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -541,6 +594,56 @@ describe("people not on the list", () => {
   it("an entry whose role is not a Studio role", async () => {
     await seed((db) => setDoc(doc(db, P.member("odd@example.org")), { email: "odd@example.org", role: "superuser" }));
     await hasNoStudioAccess("unknown role", google("u_odd", "odd@example.org"));
+  });
+});
+
+// Review addition. studioLevel() reads the list of the study in the path, so a
+// place on one study's list (or its domain rule) is no place on another's.
+// Nothing else tested that the lookup is scoped by the path's study rather
+// than, say, a fixed one.
+describe("a place on one study's list", () => {
+  it("gives nothing in another study", async () => {
+    const OTHER = "other_study";
+    const O = {
+      survey: paths.studioSurvey(OTHER, SURVEY),
+      draft: paths.studioDraft(OTHER, SURVEY),
+      version: paths.studioVersion(OTHER, SURVEY, VERSION),
+      presence: (uid: string) => paths.studioPresenceOf(OTHER, SURVEY, uid),
+      members: paths.studioMembers(OTHER),
+      member: (email: string) => paths.studioMember(OTHER, email),
+      access: paths.studioAccessConfig(OTHER),
+      auditRow: `${paths.studioAudit(OTHER)}/row_1`,
+    };
+    await seed(async (db) => {
+      await setDoc(doc(db, O.survey), { surveyId: SURVEY, study: OTHER, title: "Another study" });
+      await setDoc(doc(db, O.draft), draftDoc());
+      await setDoc(doc(db, O.version), { surveyId: SURVEY, version: VERSION });
+      await setDoc(doc(db, O.member(OTHER_MEMBER)), { email: OTHER_MEMBER, role: "viewer" });
+      await setDoc(doc(db, O.access), { domains: {}, updatedAt: T0, updatedBy: "cli:test" });
+      await setDoc(doc(db, O.auditRow), { at: T0, actor: "cli:test", action: "survey.created" });
+    });
+
+    for (const [who, c] of [
+      ["ybm admin", member("admin")],
+      ["ybm editor", member("editor")],
+      ["ybm domain editor", google("u_x", "x@brainpop.test")],
+    ] as const) {
+      await refused(`${who}: get survey`, () => getDoc(doc(c.db, O.survey)));
+      await refused(`${who}: list surveys`, () => getDocs(collection(c.db, paths.studioSurveys(OTHER))));
+      await refused(`${who}: get draft`, () => getDoc(doc(c.db, O.draft)));
+      await refused(`${who}: get version`, () => getDoc(doc(c.db, O.version)));
+      await refused(`${who}: get audit`, () => getDoc(doc(c.db, O.auditRow)));
+      await refused(`${who}: save the draft`, () => save(c, {}, O.draft));
+      await refused(`${who}: mark presence`, () => setDoc(doc(c.db, O.presence(c.uid)), presenceFields(c)));
+      await refused(`${who}: list members`, () => getDocs(collection(c.db, O.members)));
+      await refused(`${who}: another member's entry`, () => getDoc(doc(c.db, O.member(OTHER_MEMBER))));
+      await refused(`${who}: the domain rule`, () => getDoc(doc(c.db, O.access)));
+    }
+
+    // The owner claim is not per study (nor is it for devices and audit above),
+    // so the owner is an admin in every study. Pinned so it is a decision.
+    const owner = caller("u_owner", { role: "owner", email: "owner@leeds.test" });
+    await allowed("owner: get draft in another study", () => getDoc(doc(owner.db, O.draft)));
   });
 });
 
@@ -725,6 +828,10 @@ describe("anyone trying to pass for someone at the domain", () => {
       "evil@brainpop.test.attacker.com",
       "evil@attacker.com#@brainpop.test",
       "evil@attacker.com@brainpop.test",
+      // Review addition: the one spoof that puts the real domain second of
+      // three parts, so it is refused only by the rule's "exactly one @" check.
+      // Without it, deleting that check left every test passing.
+      "evil@brainpop.test@attacker.com",
       "evil@sub.brainpop.test",
       "evil@xbrainpop.test",
       "brainpop.test@attacker.com",
@@ -754,5 +861,71 @@ describe("everything else in the Studio", () => {
     // Studio access is not access to the sittings.
     await refused("sittings", () => getDoc(doc(db, paths.session(STUDY, "s1"))));
     await refused("narratives", () => getDoc(doc(db, paths.narrative(STUDY, "s1"))));
+  });
+
+  // Review addition. Every Studio rule is scoped to /studies/{study}/…, and a
+  // collection-group query is matched only by a `{path=**}` rule, of which
+  // there is none but the closing deny. So nobody, not even the owner, can
+  // enumerate drafts, the list, or the public documents across studies. A
+  // `match /{path=**}/published/{id}` added later for convenience would open
+  // exactly that, and fail here.
+  it("cannot be enumerated across studies with a collection-group query", async () => {
+    const groups = [
+      "surveys",
+      "draft",
+      "versions",
+      "presence",
+      "published",
+      "publicReleases",
+      "studioMembers",
+      "studioAccess",
+      "studioAudit",
+    ];
+    for (const [who, db] of [
+      ["admin", member("admin").db],
+      ["owner", caller("u_owner", { role: "owner", email: "owner@leeds.test" }).db],
+      ["signed out", nobody()],
+    ] as const) {
+      for (const group of groups) {
+        await refused(`${who}: collection group ${group}`, () => getDocs(collectionGroup(db, group)));
+      }
+    }
+  });
+});
+
+// Review addition. The emulator ignores firestore.indexes.json, so nothing else
+// would notice these going missing; production would. The fieldOverrides are
+// the task's (docs/16 §5.2: the big strings and the audit detail are never
+// indexed). The composite index serves the Studio's history panel, which asks
+// for one survey's audit rows newest first (`where surveyId ==`, `orderBy at
+// desc`), a query Firestore refuses in production without it.
+describe("firestore.indexes.json", () => {
+  const spec = JSON.parse(readFileSync(fileURLToPath(new URL("../firestore.indexes.json", import.meta.url)), "utf8")) as {
+    indexes: Array<{ collectionGroup: string; queryScope: string; fields: Array<{ fieldPath: string; order?: string }> }>;
+    fieldOverrides: Array<{ collectionGroup: string; fieldPath: string; indexes: unknown[] }>;
+  };
+
+  it("keeps the large Studio fields out of every index", () => {
+    for (const [group, field] of [
+      ["draft", "content"],
+      ["publicReleases", "manifest"],
+      ["studioAudit", "detail"],
+    ]) {
+      const override = spec.fieldOverrides.find((o) => o.collectionGroup === group && o.fieldPath === field);
+      expect(override, `${group}.${field}`).toBeDefined();
+      expect(override!.indexes).toEqual([]);
+    }
+  });
+
+  it("indexes one survey's audit rows newest first, and keeps the sittings index", () => {
+    expect(spec.indexes).toContainEqual({
+      collectionGroup: "studioAudit",
+      queryScope: "COLLECTION",
+      fields: [
+        { fieldPath: "surveyId", order: "ASCENDING" },
+        { fieldPath: "at", order: "DESCENDING" },
+      ],
+    });
+    expect(spec.indexes.some((i) => i.collectionGroup === "sessions")).toBe(true);
   });
 });
