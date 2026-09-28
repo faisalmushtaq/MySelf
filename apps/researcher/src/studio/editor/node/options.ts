@@ -7,13 +7,13 @@ import {
   isUnlocked,
   protectedModule,
   scaleUsage,
-  shortText,
   splitItemKey,
   type ArchivedQuestion,
   type EditTier,
   type ScaleInput,
   type StudioDraft,
 } from "@myself/studio";
+import { questionName } from "../outline/model.js";
 
 /**
  * Option-list helpers for the options editor.
@@ -113,7 +113,7 @@ export function optionsAccess(draft: StudioDraft, itemKey: string): OptionsAcces
       return {
         editable: false,
         why: "shared",
-        reason: `These options are shared with “${shortText(other.item.stem.text, 50)}” in “${instrumentName(draft, other.instrument)}”, whose options can't change${otherTier === "protected" ? " while it is protected" : ""}.`,
+        reason: `These options are shared with “${questionName(other.item.stem.text, 50)}” in “${instrumentName(draft, other.instrument)}”, whose options can't change${otherTier === "protected" ? " while it is protected" : ""}.`,
         canFork: true,
         scaleKey,
       };
@@ -126,7 +126,7 @@ export function optionsAccess(draft: StudioDraft, itemKey: string): OptionsAcces
       return {
         editable: false,
         why: "shared",
-        reason: `These options are shared with “${shortText(record.item.stem.text, 50)}” (archived), whose options can't change${otherTier === "protected" ? " while it is protected" : ""}.`,
+        reason: `These options are shared with “${questionName(record.item.stem.text, 50)}” (archived), whose options can't change${otherTier === "protected" ? " while it is protected" : ""}.`,
         canFork: true,
         scaleKey,
       };

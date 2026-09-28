@@ -1,4 +1,5 @@
 import { moveBlock, moveQuestion, moveSection, shortText, type Outline, type OutlineSection, type StudioDraft } from "@myself/studio";
+import { questionName } from "./model.js";
 
 /**
  * Where a drag, or Alt+Arrow, puts something — as the operation that does it.
@@ -110,7 +111,7 @@ function middleOfBlock(without: SeqEntry[], index: number, instrument: string): 
 }
 
 function middleRefusal(text: string, block: SeqEntry): string {
-  return `“${shortText(text, 50)}” can’t go in the middle of “${block.blockName}”: a question stays with its own block. Drop it before or after the block.`;
+  return `“${questionName(text, 50)}” can’t go in the middle of “${block.blockName}”: a question stays with its own block. Drop it before or after the block.`;
 }
 
 function questionText(o: Outline, itemKey: string): string {
@@ -346,7 +347,7 @@ export function moveLabel(o: Outline, move: MoveOp): string {
     case "question":
       // With the ID: many questions start with the same words ("How much time
       // do you usually spend on …"), so the text alone would still merge.
-      return `Move “${shortText(questionText(o, move.itemKey) || "(no text yet)", 30)}” (${move.itemKey})`;
+      return `Move “${questionName(questionText(o, move.itemKey), 30)}” (${move.itemKey})`;
     case "block": {
       const block = sectionByKey(o, move.from.sectionKey)?.blocks.find((b) => b.componentIndex === move.from.componentIndex);
       return `Move “${shortText(block?.name ?? "the block", 40)}”`;
@@ -370,7 +371,7 @@ export function describeMoved(o: Outline, move: MoveOp): string | null {
     case "question": {
       const at = locate(o, move.itemKey);
       if (!at) return null;
-      return `Moved “${shortText(questionText(o, move.itemKey), 50)}” to position ${at.index + 1} of ${at.seq.length} in ${at.section.title}`;
+      return `Moved “${questionName(questionText(o, move.itemKey), 50)}” to position ${at.index + 1} of ${at.seq.length} in ${at.section.title}`;
     }
     case "block": {
       const section = sectionByKey(o, move.to.sectionKey);

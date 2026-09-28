@@ -8,12 +8,12 @@ import {
   liveQuestions,
   MAX_VARIABLE_LENGTH,
   placements,
-  shortText,
   SLUG_PATTERN,
   splitItemKey,
   type ReservedIds,
   type StudioDraft,
 } from "@myself/studio";
+import { questionName } from "../outline/model.js";
 
 /**
  * The pure side of the settings panel: what a question's settings are, what
@@ -154,7 +154,7 @@ export function dependentsOf(draft: StudioDraft, itemKey: string): Dependents {
     if (seen.has(q.itemKey)) continue;
     seen.add(q.itemKey);
     const item = q.item;
-    const text = shortText(item.stem.text, 60);
+    const text = questionName(item.stem.text, 60);
     if (mentions(item.displayIf, itemKey)) out.questions.push({ itemKey: q.itemKey, text });
     const texts: unknown[] = [item.stem, item.lede, item.moreInfo?.body];
     if (item.responseType === "checkbox_set") texts.push(...item.statements.map((s) => s.text));

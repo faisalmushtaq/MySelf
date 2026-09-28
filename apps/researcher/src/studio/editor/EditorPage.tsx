@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { StudioRole, SurveyDoc } from "@myself/studio";
 import type { DraftEditor, Loadable, PublishedContext, StudioUser } from "../data/index.js";
 import { Icon } from "../ui/icons.js";
@@ -6,6 +6,7 @@ import { EmptyState, Skeleton } from "../ui/kit.js";
 import { EditorProvider, useEditor } from "./context.js";
 import { Inspector } from "./Inspector.js";
 import { NodeEditor } from "./NodeEditor.js";
+import { focusSoon } from "./node/focus.js";
 import { Outline } from "./Outline.js";
 import { PublishDialog } from "./PublishDialog.js";
 import { encodeSelection } from "./selection.js";
@@ -74,7 +75,16 @@ function Columns() {
   const { selection } = useEditor();
   const selected = encodeSelection(selection);
   const [outlineOpen, setOutlineOpen] = useState(false);
-  useEffect(() => setOutlineOpen(false), [selected]);
+  const open = useRef(outlineOpen);
+  open.current = outlineOpen;
+  // Folding the list away also hides the row that had focus. Carry focus on to
+  // the heading of what was chosen, so a keyboard or screen-reader user lands
+  // there rather than on <body>.
+  useEffect(() => {
+    if (!open.current) return;
+    setOutlineOpen(false);
+    if (document.getElementById("ste-outline")?.contains(document.activeElement)) focusSoon("[data-editor-heading]");
+  }, [selected]);
   // Unfolded, the list opens at the selection, in the middle of its own box
   // (the page itself stays where it is).
   useLayoutEffect(() => {

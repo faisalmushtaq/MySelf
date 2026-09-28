@@ -55,6 +55,7 @@ import {
   buildTree,
   expandKeyOf,
   indexIssues,
+  questionName,
   tabStopFor,
   typeahead,
   type Tree,
@@ -98,7 +99,7 @@ interface MenuState {
   label: string;
 }
 
-const quote = (text: string, max = 60) => `“${shortText(text || "(no text yet)", max)}”`;
+const quote = (text: string, max = 60) => `“${questionName(text, max)}”`;
 
 /**
  * How far a row brought into view stays from the sticky search header, and
@@ -393,7 +394,7 @@ export function Outline() {
       // editor silently dropped. And undo labels name the thing changed: the
       // history merges same-label steps made within 1.2 s, so "Archive
       // question" twice in quick succession was one undo step for two questions.
-      const named = (verb: string, text: string) => `${verb} “${shortText(text.trim() || "(no text yet)", 30)}”`;
+      const named = (verb: string, text: string) => `${verb} “${questionName(text, 30)}”`;
       const q = node.question;
       const b = node.block;
       const s = node.section;

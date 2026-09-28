@@ -2,7 +2,18 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { extractDraft, outline, validateDraft, type Issue } from "@myself/studio";
-import { ancestorsOf, blockExpandKey, buildTree, findMatches, indexIssues, tabStopFor, typeahead, type TreeOptions } from "./model.js";
+import {
+  ancestorsOf,
+  blockExpandKey,
+  buildTree,
+  findMatches,
+  indexIssues,
+  questionName,
+  tabStopFor,
+  typeahead,
+  UNTITLED_QUESTION,
+  type TreeOptions,
+} from "./model.js";
 
 const r710 = JSON.parse(readFileSync(resolve(__dirname, "../../../../../../releases/ybm_nd2026_standard_r7.1.0.manifest.json"), "utf8"));
 const draft = extractDraft(r710);
@@ -219,5 +230,16 @@ describe("issue counts", () => {
     const t = buildTree(o, idx, base);
     expect(t.byId.get("section:sleep")!.issues).toEqual({ errors: 1, warnings: 2 });
     expect(t.byId.get("settings")!.issues).toEqual({ errors: 1, warnings: 0 });
+  });
+});
+
+describe("questionName", () => {
+  it("cuts a question's text to fit", () => {
+    expect(questionName("How many hours do you usually sleep on a school night?", 30)).toBe("How many hours do you usually…");
+  });
+
+  it("calls a question with no text yet by the one name used everywhere", () => {
+    expect(questionName("")).toBe(UNTITLED_QUESTION);
+    expect(questionName("   \n ")).toBe(UNTITLED_QUESTION);
   });
 });
