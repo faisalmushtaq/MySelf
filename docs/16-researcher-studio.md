@@ -505,6 +505,336 @@ Each row carries: `at` (server time), `actor` (uid), `actorEmail`, `surveyId`,
 
 ## 9. Handover
 
-§9 onwards is written as the implementation lands: architecture, collections,
-roles, rules, lifecycle, deployment, rollback, managing researchers, and
-limitations.
+This section is for whoever runs, extends or audits MySelf Studio. §1–§8 give
+the reasoning. This section says what exists and how to operate it.
+
+### 9.1 What was built, and where
+
+```
+Researcher (Google account on the Studio list)
+   │  https://faisalmushtaq.github.io/MySelf/researcher/#/surveys
+   ▼
+apps/researcher/src/studio/          the Studio (React, hash routes)
+   ├─ data/          Firebase: sign-in, live queries, the auto-save engine, callables
+   ├─ editor/        outline · question/section/screen editors · settings panel ·
+   │                 validation panel · publish dialog
+   ├─ preview/       preview.html: the participant's own screens, in memory
+   └─ screens/       sign-in, not-authorised, surveys, versions, settings/access
+          │ draft saves (Firestore rules: revision+1)     │ callables (trusted)
+          ▼                                               ▼
+Firestore studies/{study}/…  ◄──────────────  apps/functions/src/studio/
+   surveys · draft · versions · published ·      access · publish · versions ·
+   publicReleases · studioMembers ·              members · stats · draft-trigger
+   studioAccess · studioAudit
+          │ public get (REST, no SDK)
+          ▼
+apps/participant (MySelf Go, https://faisalmushtaq.github.io/MySelf/)
+   lib/releases.ts   fetch pointer → fetch release → verify hash, schema and
+                     engine → cache (IndexedDB v5) → pin each sitting to its release
+```
+
+The pure model is `packages/studio`, shared by the browser and the functions:
+- `draft` and `walk`: extract a draft from a release, compile it back, and walk a
+  draft in order;
+- `ops`: every editing operation;
+- `validate` and `locked`: validation, the licence locks and protected modules;
+- `diff`: the change summary and version rules;
+- `history`: IDs and variables reserved by earlier versions.
+
+`packages/release/src/gate.ts` is the publish gate, split from hashing so a browser
+can run it. `packages/schema/src/canonical.ts` is the one hash implementation.
+
+### 9.2 Collections and documents
+
+All are under `studies/{study}/` (the study is `ybm`). The typed shapes are in
+`packages/studio/src/contract.ts`, and the paths in
+`packages/firebase/src/layout.ts`.
+
+| Collection | Document shape | Who writes |
+|---|---|---|
+| `surveys/{surveyId}` | `SurveyDoc` | functions |
+| `surveys/{surveyId}/draft/current` | `DraftDoc` (the draft as a JSON string, `revision`) | editors, with a revision check |
+| `surveys/{surveyId}/versions/{version}` | `VersionDoc` (immutable) | functions |
+| `surveys/{surveyId}/presence/{uid}` | `PresenceDoc` | the person themselves |
+| `published/{surveyId}` | `PublishedPointerDoc` (**public get**) | functions |
+| `publicReleases/{hashHex}` | `PublicReleaseDoc`: the manifest as its exact JSON (**public get**, immutable) | functions |
+| `studioMembers/{email}` | `MemberDoc` (the allowlist) | functions, or the CLI |
+| `studioAccess/config` | `AccessConfigDoc` (domain rules) | functions, or the CLI |
+| `studioAudit/{id}` | `AuditDoc` | functions only |
+
+Existing collections, including `sessions`, are unchanged. **No response data was
+migrated or rewritten.**
+
+### 9.3 Roles and access
+
+**Sign-in.** Firebase Authentication with Google (popup). The session is scoped to
+the browser tab.
+
+**Roles** (each includes the ones below it):
+
+| Role | Can |
+|---|---|
+| viewer | read everything in the Studio, and preview |
+| editor | viewer, plus edit the draft |
+| publisher | editor, plus publish, restore a version into the draft, and make an earlier version live |
+| admin | publisher, plus manage who has access |
+
+**Where a role comes from:**
+- The allowlist entry `studioMembers/{lower-cased email}` for a verified Google
+  account.
+- Otherwise a domain rule in `studioAccess/config`. An individual entry always
+  decides over a domain rule.
+- An existing `owner` custom claim counts as admin.
+- Existing `researcher` or `analyst` claims do **not** give Studio access.
+
+**Enforcement.**
+- **Firestore rules** (`infra/firebase/firestore.rules`, Studio section) read
+  the allowlist on every request.
+- **Every callable** re-reads it (`apps/functions/src/studio/access.ts`, which
+  resolves roles exactly as the rules do).
+- Removing someone takes effect on their next request.
+- No client can write the allowlist, the audit log, versions, releases or the
+  pointer.
+
+**Adding and removing researchers:**
+- **In the Studio (admin):** account menu → *Who has access*, or a survey's
+  *Settings → Access*. Add an email with a role, change a role, remove someone,
+  and add or remove a domain rule. Public mail domains such as gmail.com are
+  refused as domain rules. You cannot change your own entry. Every change is
+  audited.
+- **From a terminal**, with credentials for the project (needed for the very first
+  admin):
+
+  ```
+  pnpm --filter @myself/functions studio-access add brainpopresearch@gmail.com admin --project myself-research
+  pnpm --filter @myself/functions studio-access remove someone@example.org --project myself-research
+  pnpm --filter @myself/functions studio-access list --project myself-research
+  pnpm --filter @myself/functions studio-access domain brainpop.com editor --project myself-research
+  ```
+
+  Add `--key-file sa.json` to use a downloaded service-account key instead of
+  `gcloud auth application-default login`. Delete that key afterwards.
+
+### 9.4 Security rules and their tests
+
+`infra/firebase/test/studio.rules.test.ts` (47 tests), with the existing
+`rules.test.ts` (20), runs against the Firestore emulator:
+- **Authorised:** each role, a domain member, the owner claim.
+- **Unauthorised:** signed out; not listed; an unverified email; a non-Google
+  provider; anonymous; a device; researcher/analyst claims.
+- **Malicious:**
+  - wrong revision;
+  - forged `updatedBy`, or a client timestamp;
+  - an oversized draft;
+  - creating or deleting a draft;
+  - every write to versions, releases, the pointer, the list and the audit log;
+  - listing the public collections;
+  - domain spoofs (`evil@brainpop.test@attacker.com`, `…brainpop.test.attacker.com`);
+  - a role in one study used in another;
+  - collection-group queries.
+
+The deploy workflow runs the rules suite before it deploys the rules.
+
+### 9.5 Editing, validation and publishing
+
+**Editing.**
+- Every change is one of `packages/studio/src/ops.ts`'s operations, applied as
+  one undo step.
+- Saving is automatic, about 1.2 s after the last change. It is a Firestore
+  transaction that succeeds only against the revision the editor loaded.
+- If someone else saved first, the editor becomes read-only. It shows both
+  versions and the editor chooses which to keep; nothing is overwritten
+  silently.
+- Offline, changes stay in the tab and save when the connection returns. Unsaved
+  work also survives a crash in session storage.
+
+**Validation** (`validateDraft`) runs as you type, with the same context the
+server uses. It checks:
+- text is present;
+- IDs and variables are unique and not reused from earlier versions;
+- options, limits and patterns are valid;
+- conditions point only at earlier questions and at options that exist;
+- sections are not empty;
+- the start and completion screens are configured;
+- licensed content is unchanged;
+- protected modules are unlocked before they change;
+- linkage and identity items are intact;
+- every publish-gate failure is reported.
+
+Errors block publishing and warnings don't. **Go to** jumps to the field.
+
+**Preview** (the Preview tab):
+- It runs the current draft on the participant app's own screen components, at
+  desktop, tablet or phone size.
+- You can restart, start from any question, see why each question is shown or
+  hidden, and view the completion and review screens.
+- It uses an in-memory store behind a Content-Security-Policy that blocks the
+  network. A build check fails if the preview can reach the participant app's
+  storage or upload code.
+
+**Publishing** (publisher and above), in the dialog:
+1. Save.
+2. Checks (acknowledge any warnings).
+3. What changes, and which are breaking.
+4. The version number. The minimum bump follows docs/06 §3, and you may choose a
+   larger one.
+5. A release note (required).
+6. Confirm.
+
+`studioPublish` then re-runs everything on the server and writes all of the
+following in **one transaction**:
+- the immutable release;
+- the version record;
+- the public pointer, with its generation incremented;
+- the survey summary;
+- the audit row.
+
+The dialog says a version is live only after reading the public pointer back.
+
+### 9.6 Versions, rollback and history
+
+The **Versions** tab lists every version, newest first, with:
+- status, version number, dates, authors and publisher;
+- the release note and change summary;
+- the number of sittings recorded under it.
+
+From there you can:
+- **Compare** any two versions, or a version with the draft.
+- **Restore into draft.** The version becomes the draft. Questions it lacks are
+  archived, not lost. Option values stay retired.
+- **Make live again.** This is the emergency rollback. It repoints the live
+  survey to an earlier published release, needs a reason, and is audited.
+- **Download** a version's manifest.
+
+The **Activity** tab shows the audit trail. Draft edits are grouped per editor
+per 10 minutes.
+
+### 9.7 How the participant app picks up a version
+
+At the start screen, in the background and never blocking:
+1. It fetches `published/{surveyId}` over the Firestore REST API.
+2. If the release named there is new, it fetches `publicReleases/{hash}`.
+3. It checks the release's canonical SHA-256, parses every question with the
+   schema and checks the engine version.
+4. It caches the release, then switches to it at the start screen.
+
+**Fallbacks:** offline, or on any failure, it uses the last release it verified,
+or the built-in r7.1.0.
+
+**Pinning:** each sitting stays on the release it started with, including when it
+is resumed after a newer publish. The footer's staff line shows the release in
+use and whether it is built in or downloaded.
+
+**One-time rollout note (add to the fielding runbook):**
+- iPads running today's build pick up this build only after MySelf is fully
+  closed and reopened.
+- The new service-worker handling never reloads mid-sitting, so the old page is
+  never told to take over.
+- From this build on, a new *survey version* needs no app update at all.
+
+### 9.8 Deployment (first time)
+
+1. **Merge to `main`.** `firebase.yml` then:
+   - runs the rules tests;
+   - deploys the rules and indexes (including the new `studioAudit` index);
+   - deploys the functions (the path filter includes `packages/studio`,
+     `release`, `library`, `engine` and `scoring`), including the 10 new Studio
+     functions;
+   - deploys hosting.
+
+   `pages.yml` deploys the participant app (with runtime loading) and the Studio.
+
+   Until step 4, the participant app finds nothing published and keeps running
+   the built-in r7.1.0, exactly as today.
+2. **Firebase console → Authentication:**
+   - Google is enabled as a sign-in provider (the researcher view already uses
+     it);
+   - `faisalmushtaq.github.io` is in *Authorised domains*.
+3. **Give BrainPOP Research access:**
+   - either the existing owner signs in at `/MySelf/researcher/#/surveys` and
+     adds `brainpopresearch@gmail.com` (for example as admin) under *Who has
+     access*;
+   - or run the `studio-access add` command above.
+4. **An admin opens the Studio and presses "Set up from the live survey".** This:
+   - imports r5.0.0 to r7.1.0 as version history, marked as from the
+     repository;
+   - points the live pointer at r7.1.0;
+   - creates the draft.
+
+   It is idempotent.
+5. **Smoke test:**
+   - the participant link's staff footer should still show release 7.1.0;
+   - make a harmless edit, preview, and publish a MINOR version (for example a
+     study label);
+   - the participant start screen shows it on its next load;
+   - roll it back with *Make live again* on r7.1.0.
+
+The emulator end-to-end test (`pnpm test:e2e:studio`, and the `studio` CI job)
+performs this whole loop.
+
+### 9.9 Rollback
+
+| What went wrong | Do this |
+|---|---|
+| A published version | Versions → *Make live again* on the previous one. It is atomic and audited. Devices switch at their next start screen. |
+| A draft | Versions → *Restore into draft*, or undo. |
+| The functions | Redeploy the previous commit's functions. Data in Firestore is unaffected. |
+| The participant build | Revert its commit on `main`. The previous build runs its built-in release. Version 5 of the device database only adds tables, so older builds still open it. |
+| The rules | Redeploy the previous `firestore.rules`. The Studio collections are additive. |
+
+**Nothing in any rollback touches a sitting.**
+
+### 9.10 Tests
+
+| Command | What it covers |
+|---|---|
+| `pnpm -r test` | Unit tests. The Studio model alone has 268, including the exact round trip of r7.1.0 through the Studio. |
+| `pnpm --filter @myself/functions test:integration` | Publish atomicity, conflicts, concurrent publishes, idempotent retries, rollback, restore, access races (Firestore emulator). |
+| `cd infra/firebase/test && npm test` | The rules (67 tests). |
+| `pnpm test:e2e` | The participant app, including runtime loading, pinning, a tampered release and the database upgrade (15 tests). |
+| `pnpm test:e2e:studio` | The whole Studio loop (§9.8) on the Auth, Firestore and Functions emulators. |
+
+### 9.11 Decisions for the research team to confirm
+
+1. **Who is admin or publisher.** For example, `brainpopresearch@gmail.com` as
+   admin, or a `brainpop.com` domain rule if it is a managed Google Workspace.
+2. **Licensed instruments are locked.** Wording, options, codes and order can't
+   change. The consent and identity modules need an audited unlock.
+3. **Minimum version bump.** A publisher may choose a larger bump but never a
+   smaller one than the changes need. Any question wording change is MAJOR.
+4. **Existing claims.** Researcher and analyst claims holders do not get Studio
+   access automatically.
+5. **Release manifests now live in Firestore, not git.** They are still
+   immutable and content-hashed. This supersedes part of D-43's "in version
+   control" reasoning for survey releases.
+   - They are downloadable from Versions.
+   - Committing them periodically to `releases/` keeps git as a second record.
+
+### 9.12 Known limitations
+
+- **Hidden settings.** The following aren't supported by the participant app, so
+  the Studio doesn't offer them:
+  - narrative (MyStory) components;
+  - a Likert grid on one screen;
+  - minimum selections or characters;
+  - media;
+  - randomisation;
+  - section transition text.
+- **No test-session collection.** The preview is in memory only.
+- **Shared origin.** The Studio runs on the shared `faisalmushtaq.github.io`
+  origin. Moving it to Firebase Hosting would give it its own.
+- **Exports.**
+  - BIDS sidecars still come from one release.
+  - The researcher view's BIDS download still uses its compiled-in latest
+    release.
+  - Sittings under an unknown release are listed in `unreadable.json` by the
+    nightly export and are no longer misread.
+- **Publish cost.** Each publish and restore reads every stored release of the
+  survey (about 130 kB each). This is fine at the current scale.
+- **Domain rules.** A domain rule can't tell a Workspace-managed account from a
+  personal Google account registered with a work address, because Firebase ID
+  tokens carry no `hd` claim.
+- **Diff wording.** A question restored from the archive shows as "added" when
+  compared with a published version. Both are MAJOR, so this affects only the
+  wording.
+- **WebKit** runs in CI only.
