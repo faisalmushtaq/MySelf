@@ -1,0 +1,173 @@
+/*
+ * The settings panel (`sti-`): dense, quiet, one column. Groups are separated
+ * by hairlines rather than boxes so a long list of settings reads down the
+ * panel; each setting says in a sentence what it does. Form controls come
+ * from the kit and from the centre editor's field styles (node.css), so a box
+ * looks the same wherever it is.
+ */
+
+.sti {
+  padding: 0.9rem 1rem 3rem;
+  display: grid;
+  gap: 0;
+}
+.sti-head {
+  padding-bottom: 0.6rem;
+  border-bottom: 1px solid var(--hairline);
+}
+.sti-eyebrow {
+  margin: 0;
+  font-size: 0.74rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.sti-id {
+  margin: 0.25rem 0 0;
+  overflow-wrap: anywhere;
+}
+.sti-tip {
+  margin-top: 0.75rem;
+  padding: 0.6rem 0.75rem;
+  border-radius: var(--st-radius);
+  background: var(--canvas);
+  border: 1px solid var(--hairline);
+  font-size: 0.9rem;
+}
+.sti-group {
+  padding: 1rem 0 0.6rem;
+  border-bottom: 1px solid var(--hairline);
+}
+.sti-group:last-child {
+  border-bottom: 0;
+}
+.sti-title {
+  margin: 0 0 0.75rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+.sti-note {
+  margin: 0 0 0.75rem;
+  font-size: 0.85rem;
+  color: var(--muted);
+  display: flex;
+  gap: 0.35rem;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+.sti-note .st-icon {
+  margin-top: 0.15rem;
+}
+.sti-status {
+  margin: 0 0 0.75rem;
+  font-size: 0.9rem;
+  line-height: 1.6;
+}
+
+/* Radio choices as full-width rows, the chosen one marked by a filled dot,
+   a border and a wash — never the colour alone. */
+.sti-radios {
+  border: 0;
+  margin: 0 0 0.75rem;
+  padding: 0;
+  display: grid;
+  gap: 0.4rem;
+  min-width: 0;
+}
+.sti-legend {
+  padding: 0;
+  margin-bottom: 0.4rem;
+  font-size: 0.74rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.sti-radio {
+  display: flex;
+  gap: 0.55rem;
+  align-items: flex-start;
+  padding: 0.55rem 0.65rem;
+  border: 1px solid var(--hairline);
+  border-radius: var(--st-radius);
+  background: var(--paper);
+  cursor: pointer;
+  font-size: 0.9rem;
+  line-height: 1.4;
+  transition: border-color 0.15s;
+}
+.sti-radio:hover {
+  border-color: var(--hairline-strong);
+}
+.sti-radio.on {
+  border-color: var(--accent);
+  background: var(--accent-wash);
+}
+.sti-radio input {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  margin: 0.05rem 0 0;
+  accent-color: var(--accent);
+}
+.sti-radio:focus-within {
+  box-shadow: var(--st-focus);
+}
+
+.sti-pair {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(7.5rem, 1fr));
+  gap: 0 0.75rem;
+}
+.studio .sti-pair .st-input.stn-number {
+  max-width: none;
+}
+
+.sti-idrow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.3rem 0.5rem;
+}
+.sti-fullid {
+  overflow-wrap: anywhere;
+}
+.sti-sensitivity {
+  margin-bottom: 1rem;
+}
+.sti-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  margin: 0.25rem 0 0.75rem;
+}
+.sti-links {
+  margin: 0;
+  padding-left: 1.1rem;
+  display: grid;
+  gap: 0.35rem;
+  font-size: 0.9rem;
+}
+.sti .stn-details {
+  margin-bottom: 0.75rem;
+}
+.sti-unavailable ul {
+  margin: 0;
+  padding-left: 1.1rem;
+  display: grid;
+  gap: 0.45rem;
+  font-size: 0.86rem;
+}
+.sti .stn-facts > div {
+  grid-template-columns: minmax(6.5rem, 8.5rem) minmax(0, 1fr);
+  gap: 0.6rem;
+}
+.sti .st-switch {
+  margin-bottom: 0.6rem;
+}
+
+@media (max-width: 560px) {
+  .sti .stn-facts > div {
+    grid-template-columns: 1fr;
+  }
+}
