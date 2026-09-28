@@ -5,7 +5,7 @@ import { Linkage } from "./components/Linkage.js";
 import { ParticipantPanel } from "./components/ParticipantPanel.js";
 import { Protocols } from "./components/Protocols.js";
 import { Summary } from "./components/Summary.js";
-import { buildDataset } from "./lib/build.js";
+import { buildDatasetWithStore } from "./lib/build.js";
 import {
   addSessions,
   aliases,
@@ -77,7 +77,7 @@ export default function App() {
     const sessions = await storedSessions();
     // Corrections are applied here, at derivation, so a repaired code joins a
     // participant's waves without anything being rewritten (D-37).
-    const built = buildDataset(sessions, STUDY, await aliases(), await assignments());
+    const built = await buildDatasetWithStore(sessions, STUDY, await aliases(), await assignments());
     setDataset(built.dataset);
     // Names go to their own table, never into the dataset the rest of this
     // app reads. They are needed to repair a code and to link a UPN, and the
