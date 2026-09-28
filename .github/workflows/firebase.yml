@@ -160,10 +160,25 @@ jobs:
       # and the change being blocked was the one that fixed where recordings
       # are written. A permission missing on one API is no reason to stop
       # shipping the other half.
+      # `--force` so a function DELETED from source does not wedge the deploy.
+      #
+      # In `--non-interactive` mode the CLI's default on finding a function that
+      # exists in the project but not in the source is to abort the whole deploy
+      # and ask a human to delete it by hand — which on a runner means the deploy
+      # never completes and every later change is blocked behind it. That is
+      # exactly what happened when `enrolDevice` was removed (an iPad no longer
+      # enrols): the orphaned function aborted the deploy and `saveSitting` — the
+      # upload path the study depends on — never shipped.
+      #
+      # The cost of `--force` is that a function removed from source is deleted in
+      # the project on the next deploy, with no prompt. That is correct for a
+      # deliberate removal and a hazard for an accidental one, so a function is
+      # removed from `apps/functions` only on purpose — the same care any deletion
+      # in this repository already gets.
       - name: Deploy functions
         if: always() && steps.changed.outputs.functions == 'true'
         working-directory: infra/firebase
-        run: firebase deploy --only functions --project myself-research --non-interactive
+        run: firebase deploy --only functions --project myself-research --non-interactive --force
 
       # The credential is a key to the whole project and has no business
       # outliving the job that used it.
