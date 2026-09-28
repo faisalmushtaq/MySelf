@@ -8,7 +8,8 @@
     "jsx": "react-jsx",
     "noEmit": true,
     "resolveJsonModule": true,
-    "types": ["vite/client"]
+    "types": ["vite/client"],
+    "paths": { "@participant/*": ["../participant/src/*"] }
   },
   "include": ["src", "vite.config.ts"]
 }
