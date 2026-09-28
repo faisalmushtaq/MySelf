@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { extractDraft, outline, validateDraft, type Issue } from "@myself/studio";
-import { ancestorsOf, blockExpandKey, buildTree, findMatches, indexIssues, typeahead, type TreeOptions } from "./model.js";
+import { ancestorsOf, blockExpandKey, buildTree, findMatches, indexIssues, tabStopFor, typeahead, type TreeOptions } from "./model.js";
 
 const r710 = JSON.parse(readFileSync(resolve(__dirname, "../../../../../../releases/ybm_nd2026_standard_r7.1.0.manifest.json"), "utf8"));
 const draft = extractDraft(r710);
@@ -167,6 +167,32 @@ describe("finding rows", () => {
     expect(ancestorsOf(o, { kind: "question", itemKey: "ybm_gaming.social_pct" })).toEqual(["section:gaming"]);
     expect(ancestorsOf(o, { kind: "block", sectionKey: "sleep", componentIndex: 0 })).toEqual(["section:sleep"]);
     expect(ancestorsOf(o, { kind: "welcome" })).toEqual([]);
+  });
+
+  // REVIEW FIX: `byId` also holds rows inside collapsed sections and blocks.
+  // The tab stop (and "scroll to the selection") used it as "is on screen",
+  // so after Collapse all no drawn row had tabindex=0 and Tab skipped the tree.
+  it("knows which rows are drawn, and keeps the tab stop on a drawn row", () => {
+    const open = tree();
+    // A folded licensed questionnaire's questions are built but not drawn.
+    expect(open.byId.has("sdq25_s.q7")).toBe(true);
+    expect(open.shown.has("sdq25_s.q7")).toBe(false);
+    expect(open.shown.has("block:wellbeing:1")).toBe(true);
+    expect([...open.shown]).toEqual(open.visible.map((n) => n.id));
+    // A drawn stop stays where it is.
+    expect(tabStopFor(open, "ybm_gaming.social_pct", null)).toBe("ybm_gaming.social_pct");
+    // Hidden inside a folded block: the block holds the stop, as focus moves to a collapsed parent.
+    expect(tabStopFor(open, "sdq25_s.q7", null)).toBe("block:wellbeing:1");
+
+    // Collapse every section: the stop moves up to the question's section.
+    const closed = tree({ expanded: new Map(o.sections.map((s) => [`section:${s.key}`, false] as const)) });
+    expect(closed.byId.has("ybm_gaming.social_pct")).toBe(true);
+    expect(closed.shown.has("ybm_gaming.social_pct")).toBe(false);
+    expect(tabStopFor(closed, "ybm_gaming.social_pct", "ybm_gaming.social_pct")).toBe("section:gaming");
+    expect(tabStopFor(closed, "sdq25_s.q7", null)).toBe("section:wellbeing");
+    // A row that has gone: the selection if drawn, else the first row.
+    expect(tabStopFor(closed, "no.such_row", "section:sleep")).toBe("section:sleep");
+    expect(tabStopFor(closed, null, "ybm_gaming.social_pct")).toBe("welcome");
   });
 
   it("jumps to the next row starting with what is typed, wrapping round", () => {

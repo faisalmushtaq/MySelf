@@ -293,9 +293,20 @@ export function publishReducer(s: PublishState, e: PublishEvent): PublishState {
  * A refused publish, sorted by what the person can do about it. The server's
  * structured details decide; the code only fills in where there are none.
  */
-export function classifyPublishError(error: { code?: string; message?: string; details?: StudioErrorDetails | null }): Failure {
+export function classifyPublishError(
+  error: { code?: string; message?: string; details?: StudioErrorDetails | null },
+  /** `navigator.onLine` when the call failed; false means the browser knows it has no connection. */
+  online = true,
+): Failure {
   const message = error.message?.trim() || "The server refused the publish.";
   const d = error.details ?? null;
+  // REVIEW FIX: the Functions SDK reports a request that never got an answer
+  // (no connection) as "internal", not "unavailable", so being offline showed
+  // "Something went wrong on the server" instead of saying so. When the
+  // browser itself says it is offline, the request never left: say that.
+  if (!d && !online && (error.code === "internal" || error.code === "unknown" || error.code === "unavailable")) {
+    return { kind: "offline", message };
+  }
   if (d) {
     switch (d.kind) {
       case "conflict":

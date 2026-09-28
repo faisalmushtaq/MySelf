@@ -114,6 +114,14 @@
   display: inline-flex;
   gap: 0.1rem;
 }
+/* aria-disabled (so focus survives the last undo), drawn as the kit's :disabled. */
+.sto-undo .st-iconbtn[aria-disabled="true"] {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.sto-undo .st-iconbtn-ghost[aria-disabled="true"]:hover {
+  background: transparent;
+}
 
 /* The checks badge: a pill whose words say the count; icon shape says the worst. */
 .sto-checks {

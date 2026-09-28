@@ -6,13 +6,14 @@ import {
   instrumentName,
   isUnlocked,
   protectedModule,
+  restoreQuestion,
   splitItemKey,
   type EditTier,
   type Outline,
   type StudioDraft,
 } from "@myself/studio";
 import type { IconName } from "../../ui/icons.js";
-import { keyboardBlockMove, keyboardQuestionMove, keyboardSectionMove, type ComponentCounts } from "./dnd.js";
+import { applyMove, keyboardBlockMove, keyboardQuestionMove, keyboardSectionMove, type ComponentCounts, type MoveOp } from "./dnd.js";
 import type { TreeNode } from "./model.js";
 
 /**
@@ -60,6 +61,31 @@ export interface ActionFacts {
   published: ReadonlySet<string>;
 }
 
+/**
+ * The model's own refusal of an operation, or undefined when it goes through.
+ *
+ * REVIEW FIX: the tier checks below are the common reasons, but not the only
+ * ones. Moving anything in front of the ethics-protected consent
+ * (ops `keepConsentFirst`) is refused too — "Move section up" on the section
+ * just after "Welcome", or "Move up" on a question added to the Welcome
+ * section — and restoring can be refused (a clashing variable, a section that
+ * has gone). The menu offered those and the click ended in an error toast.
+ * Moves and restores are now tried on a copy (the operations never change the
+ * draft they are given) and disabled with the model's own words when refused.
+ */
+function refusalOf(attempt: () => unknown): string | undefined {
+  try {
+    attempt();
+    return undefined;
+  } catch (error) {
+    return error instanceof Error ? error.message : String(error);
+  }
+}
+
+function moveRefusal(draft: StudioDraft, move: MoveOp | null, atEnd: string): string | undefined {
+  return move ? refusalOf(() => applyMove(draft, move)) : atEnd;
+}
+
 /** Why a question of a non-editable instrument can't be changed this way, in a sentence. */
 function tierReason(draft: StudioDraft, instrument: string, tier: EditTier, what: "move" | "copy" | "archive" | "delete"): string {
   // Short: a menu may show several of these at once, one under each item.
@@ -94,21 +120,31 @@ export function questionActions(itemKey: string, facts: ActionFacts): ActionSpec
   else if (linkage) archive.disabled = linkage;
 
   const del: ActionSpec = { id: "delete", label: "Delete…", icon: "trash", danger: true };
-  if (published) {
-    del.disabled = "Archive instead: it has been published, so answers may already be recorded against it. Archiving keeps them readable.";
-  } else if (tier !== "editable") del.disabled = tierReason(draft, found.instrument, tier, "delete");
+  // REVIEW FIX: "Archive instead" was given first, even for a licensed or
+  // participant-code question whose Archive item (just above) is disabled
+  // too — advice the menu itself refuses. It is given only where archiving
+  // is actually open.
+  if (tier !== "editable") del.disabled = tierReason(draft, found.instrument, tier, "delete");
   else if (linkage) del.disabled = linkage;
+  else if (published) {
+    del.disabled = "Archive instead: it has been published, so answers may already be recorded against it. Archiving keeps them readable.";
+  }
 
   return [
-    { id: "add-question-after", label: "Add a question after this", icon: "plus" },
+    {
+      id: "add-question-after",
+      // REVIEW FIX: after a licensed or protected question the new one goes after the whole block (addQuestion).
+      label: tier === "editable" ? "Add a question after this" : "Add a question after this block",
+      icon: "plus",
+    },
     {
       id: "duplicate",
       label: "Duplicate",
       icon: "copy",
       ...(tier === "editable" ? {} : { disabled: tierReason(draft, found.instrument, tier, "copy") }),
     },
-    { id: "move-up", label: "Move up", icon: "arrow-up", ...disabledIf(moveReason ?? (up ? undefined : "Already the first question in the survey.")) },
-    { id: "move-down", label: "Move down", icon: "arrow-down", ...disabledIf(moveReason ?? (down ? undefined : "Already the last question in the survey.")) },
+    { id: "move-up", label: "Move up", icon: "arrow-up", ...disabledIf(moveReason ?? moveRefusal(draft, up, "Already the first question in the survey.")) },
+    { id: "move-down", label: "Move down", icon: "arrow-down", ...disabledIf(moveReason ?? moveRefusal(draft, down, "Already the last question in the survey.")) },
     { id: "move-to-section", label: "Move to section…", icon: "section", ...disabledIf(moveReason) },
     archive,
     del,
@@ -147,13 +183,13 @@ export function sectionActions(sectionKey: string, facts: ActionFacts): ActionSp
       id: "move-up",
       label: "Move section up",
       icon: "arrow-up",
-      ...disabledIf(fixed ?? (keyboardSectionMove(outline, sectionKey, -1) ? undefined : "Already the first section.")),
+      ...disabledIf(fixed ?? moveRefusal(draft, keyboardSectionMove(outline, sectionKey, -1), "Already the first section.")),
     },
     {
       id: "move-down",
       label: "Move section down",
       icon: "arrow-down",
-      ...disabledIf(fixed ?? (keyboardSectionMove(outline, sectionKey, 1) ? undefined : "Already the last section.")),
+      ...disabledIf(fixed ?? moveRefusal(draft, keyboardSectionMove(outline, sectionKey, 1), "Already the last section.")),
     },
     remove,
   ];
@@ -176,13 +212,13 @@ export function blockActions(sectionKey: string, componentIndex: number, facts: 
       id: "move-up",
       label: "Move block up",
       icon: "arrow-up",
-      ...disabledIf(fixed ?? (keyboardBlockMove(outline, counts, sectionKey, componentIndex, -1) ? undefined : "Already at the start of the survey.")),
+      ...disabledIf(fixed ?? moveRefusal(draft, keyboardBlockMove(outline, counts, sectionKey, componentIndex, -1), "Already at the start of the survey.")),
     },
     {
       id: "move-down",
       label: "Move block down",
       icon: "arrow-down",
-      ...disabledIf(fixed ?? (keyboardBlockMove(outline, counts, sectionKey, componentIndex, 1) ? undefined : "Already at the end of the survey.")),
+      ...disabledIf(fixed ?? moveRefusal(draft, keyboardBlockMove(outline, counts, sectionKey, componentIndex, 1), "Already at the end of the survey.")),
     },
     { id: "move-to-section", label: "Move block to section…", icon: "section", ...disabledIf(fixed) },
     remove,
@@ -217,7 +253,12 @@ export function archivedActions(itemKey: string, facts: ActionFacts): ActionSpec
   }
   const restoreBlocked = tier === "protected" ? `“${instrumentName(draft, instrument)}” is protected. Unlock it first.` : undefined;
   return [
-    { id: "restore", label: tier === "locked" ? "Restore (brings back the whole questionnaire)" : "Restore", icon: "restore", ...disabledIf(restoreBlocked) },
+    {
+      id: "restore",
+      label: tier === "locked" ? "Restore (brings back the whole questionnaire)" : "Restore",
+      icon: "restore",
+      ...disabledIf(restoreBlocked ?? refusalOf(() => restoreQuestion(draft, itemKey))),
+    },
     { id: "restore-into", label: "Restore into section…", icon: "section", ...disabledIf(restoreBlocked) },
     del,
   ];

@@ -203,6 +203,19 @@ describe("reading a refused publish", () => {
     expect(classifyPublishError({ code: "internal", message: "x", details: null }).kind).toBe("other");
   });
 
+  // REVIEW FIX: with no connection the Functions SDK throws "internal" (its
+  // request got no response at all), which read as a server fault.
+  it("says 'you appear to be offline' when the browser has no connection", () => {
+    const f = classifyPublishError({ code: "internal", message: "x", details: null }, false);
+    expect(f.kind).toBe("offline");
+    expect(failureTitle(f)).toBe("Nothing was published — you appear to be offline");
+    expect(classifyPublishError({ code: "unknown", message: "x", details: null }, false).kind).toBe("offline");
+    // A structured refusal is still what the server said, connection or not.
+    expect(classifyPublishError({ code: "aborted", message: "x", details: { kind: "conflict", currentRevision: 3 } }, false).kind).toBe("conflict");
+    // A timeout may still have published: never "offline", which says nothing was.
+    expect(classifyPublishError({ code: "deadline-exceeded", message: "x", details: null }, false).kind).toBe("uncertain");
+  });
+
   it("says nothing was published for every failure the server reports as refused", () => {
     const kinds = ["conflict", "forbidden", "offline", "other"] as const;
     for (const kind of kinds) expect(failureTitle({ kind, message: "" })).toMatch(/Nothing was published/);
