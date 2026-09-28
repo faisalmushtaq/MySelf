@@ -77,6 +77,32 @@ export interface ArchivedQuestion {
   sectionKey: string | null;
   archivedAt: string;
   archivedBy: string;
+  /**
+   * The instrument's definition with no questions in it, kept when archiving
+   * this question emptied the instrument and so removed it from the draft.
+   * Without it a restore would have nothing to put the question back into.
+   */
+  instrumentShell?: InstrumentOrModule;
+  /**
+   * Exactly where it was, so restoring it into the same section puts it back
+   * in the same place rather than at the end. Neighbours are recorded by key,
+   * not index, so questions restored in any order still land in their order.
+   */
+  position?: ArchivedPosition;
+}
+
+export interface ArchivedPosition {
+  /** The keys before it in its instrument's form, nearest first. */
+  formAfter: string[];
+  /** Its block, if it was placed. */
+  placement: {
+    /** The block's index among its section's components. */
+    componentIndex: number;
+    /** The keys before it in the block, nearest first. */
+    after: string[];
+    /** The block showed the whole form rather than a list of questions. */
+    wholeForm: boolean;
+  } | null;
 }
 
 export interface RetiredCode {
