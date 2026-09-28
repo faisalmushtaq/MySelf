@@ -3,6 +3,7 @@ import type {
   AuditDoc,
   MemberDoc,
   PresenceDoc,
+  ReservedIds,
   ResponseStatsResponse,
   SessionResponse,
   StudioDraft,
@@ -104,7 +105,7 @@ export interface PublishedContext {
   active: SurveyDoc["active"];
   latestVersion: string | null;
   /** Every question ID and variable any version has published. */
-  reserved: { itemKeys: Set<string>; variables: Set<string> };
+  reserved: ReservedIds;
   /** Question IDs that have ever been published — these can be archived but not deleted, and their IDs are locked. */
   publishedItemKeys: Set<string>;
   /** Option codes each scale has ever published, with their labels. */
