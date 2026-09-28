@@ -1,6 +1,8 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   atLeast,
+  extractDraft,
+  lockBaseline,
   StudioOpError,
   validateDraft,
   type Issue,
@@ -11,7 +13,7 @@ import {
   type SurveyDoc,
   type ValidationContext,
 } from "@myself/studio";
-import type { DraftEditor, Loadable, PublishedContext, StudioUser } from "../data/index.js";
+import { usePublishedManifest, type DraftEditor, type Loadable, type PublishedContext, type StudioUser } from "../data/index.js";
 import { usePlaygroundMode } from "../mode.js";
 import { useSelectedQuestion } from "../router.js";
 import { useToast } from "../ui/toast.js";
@@ -124,16 +126,26 @@ export function EditorProvider({
 
   const published = context.status === "ready" ? context.data : null;
 
+  // A survey that has never been published is checked, as on the server, against
+  // the release it was copied from (its `basedOn`), so a copy with a reworded
+  // licensed questionnaire is flagged here rather than first at Publish.
+  const originHash = published && !published.baseline ? (editor.basedOn?.hash ?? null) : null;
+  const originManifest = usePublishedManifest(originHash);
+  const origin = useMemo(
+    () => (originManifest.status === "ready" && originManifest.data ? extractDraft(originManifest.data) : null),
+    [originManifest],
+  );
+
   // ── Validation, debounced, with the context the server will use ──────────
-  const [issues, setIssues] = useState<Issue[]>(() => validateDraft(draft, contextFor(published)));
+  const [issues, setIssues] = useState<Issue[]>(() => validateDraft(draft, contextFor(published, origin, draft)));
   const [validatedDraft, setValidatedDraft] = useState<StudioDraft>(draft);
   useEffect(() => {
     const timer = window.setTimeout(() => {
-      setIssues(validateDraft(draft, contextFor(published)));
+      setIssues(validateDraft(draft, contextFor(published, origin, draft)));
       setValidatedDraft(draft);
     }, VALIDATE_DELAY_MS);
     return () => window.clearTimeout(timer);
-  }, [draft, published]);
+  }, [draft, published, origin]);
 
   // ── Permissions ──────────────────────────────────────────────────────────
   const conflict = editor.save.kind === "conflict";
@@ -258,11 +270,17 @@ export function EditorProvider({
 
 const EMPTY: ReadonlySet<string> = new Set();
 
-function contextFor(published: PublishedContext | null): ValidationContext {
+/**
+ * The validation context, built exactly as `studioPublish` builds it: the live
+ * version when there is one, otherwise the locked and protected content of the
+ * release the survey was copied from (or nothing at all for a blank survey),
+ * so licensed text cannot enter a first release unnoticed.
+ */
+function contextFor(published: PublishedContext | null, origin: StudioDraft | null, draft: StudioDraft): ValidationContext {
   if (!published) return {};
   return {
     reserved: published.reserved,
-    ...(published.baseline ? { baseline: published.baseline } : {}),
+    baseline: published.baseline ?? lockBaseline(origin, draft),
     publishedScaleCodes: published.publishedScaleCodes,
   };
 }

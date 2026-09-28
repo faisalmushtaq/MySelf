@@ -8,6 +8,7 @@ export * from "./logic.js";
 export * from "./ops.js";
 export { hasBlockingIssues, issuesFor, summariseIssues, validateDraft, type ValidationContext } from "./validate.js";
 export {
+  lockBaseline,
   lockedDifferences,
   lockedFingerprint,
   protectedDifferences,

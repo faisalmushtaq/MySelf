@@ -137,49 +137,11 @@ export function historyHashes(state: SurveyState): string[] {
 // ---------------------------------------------------------------------------
 
 /**
- * The baseline licensed and protected content is checked against, for a
- * survey that has never been published.
- *
- * Studio validation compares locked instruments and protected modules with
- * "the published version this draft started from" and, with no such version,
- * checks nothing — so a survey that had never been published could carry a
- * reworded SDQ into its first release. The server closes that. Its baseline is
- * the release the survey was created from (the draft's `basedOn`, which only
- * functions write) reduced to just its locked and protected instruments, the
- * answer options and scoring they use, and no sections — so the lock and
- * protection checks bite exactly as they would against a live version, while
- * the checks that are about THIS survey's own publishing history (reporting
- * labels, linkage items) have nothing to compare with, which is true: it has
- * none. A survey started blank gets the same shape with no instruments, so a
- * licensed instrument in it is reported as introduced without provenance.
+ * The baseline a never-published survey's locked content is checked against
+ * lives in @myself/studio now, so the editor applies the same one the server
+ * does and a copied survey cannot look ready in the Studio and then be refused.
  */
-export function lockBaseline(origin: StudioDraft | null, draft: StudioDraft): StudioDraft {
-  const base: StudioDraft = {
-    ...draft,
-    composition: { ...(origin ?? draft).composition, sections: [] },
-    instruments: {},
-    scales: {},
-    scoring: {},
-    archived: [],
-    retiredCodes: {},
-    unlocked: {},
-    notes: {},
-  };
-  if (!origin) return base;
-  for (const [refKey, def] of Object.entries(origin.instruments)) {
-    if (editTier(origin, def.instrument) === "editable") continue;
-    base.instruments[refKey] = def;
-    for (const form of def.forms) {
-      for (const item of form.items) {
-        const scale = (item as { scale?: unknown }).scale;
-        if (typeof scale === "string" && origin.scales[scale]) base.scales[scale] = origin.scales[scale]!;
-      }
-    }
-    const scoringKey = (def as { scoringKey?: unknown }).scoringKey;
-    if (typeof scoringKey === "string" && origin.scoring[scoringKey]) base.scoring[scoringKey] = origin.scoring[scoringKey]!;
-  }
-  return base;
-}
+export { lockBaseline } from "@myself/studio";
 
 /**
  * Licensed instruments whose licence the draft now says may be modified.
