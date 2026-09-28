@@ -4,14 +4,46 @@
       "collectionGroup": "sessions",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "quarantined", "order": "ASCENDING" },
-        { "fieldPath": "startedAt", "order": "ASCENDING" }
+        {
+          "fieldPath": "quarantined",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "startedAt",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "studioAudit",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "surveyId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "at",
+          "order": "DESCENDING"
+        }
       ]
     }
   ],
   "fieldOverrides": [
-    { "collectionGroup": "draft", "fieldPath": "content", "indexes": [] },
-    { "collectionGroup": "publicReleases", "fieldPath": "manifest", "indexes": [] },
-    { "collectionGroup": "studioAudit", "fieldPath": "detail", "indexes": [] }
+    {
+      "collectionGroup": "draft",
+      "fieldPath": "content",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "publicReleases",
+      "fieldPath": "manifest",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "studioAudit",
+      "fieldPath": "detail",
+      "indexes": []
+    }
   ]
 }

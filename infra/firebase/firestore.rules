@@ -118,14 +118,13 @@ service cloud.firestore {
         : 0;
     }
 
-    function higher(a, b) {
-      return a > b ? a : b;
+    // The person's own entry on the list, if there is one.
+    function memberPath(study) {
+      return /databases/$(database)/documents/studies/$(study)/studioMembers/$(emailKey());
     }
 
-    // The person's own entry on the list, if there is one.
     function memberLevel(study) {
-      let member = /databases/$(database)/documents/studies/$(study)/studioMembers/$(emailKey());
-      return exists(member) ? roleLevel(get(member).data.get('role', '')) : 0;
+      return exists(memberPath(study)) ? roleLevel(get(memberPath(study)).data.get('role', '')) : 0;
     }
 
     // A domain rule admits every verified account at a managed Workspace
@@ -142,8 +141,13 @@ service cloud.firestore {
 
     // 0 (nothing) to 4 (admin). An iPad is always 0, whatever else its token
     // carries. The existing owner is an admin, so there is somebody who can add
-    // the first member from Settings (docs/16 §5.7). Everyone else gets the
-    // higher of their own entry and their domain's rule.
+    // the first member from Settings (docs/16 §5.7).
+    //
+    // A PERSONAL ENTRY DECIDES, when there is one; the domain rule is only the
+    // default for people nobody has listed. That is what lets an admin give one
+    // person at an admitted domain less than the domain's role — a student at a
+    // domain of editors, say — instead of having to choose between the domain
+    // rule and listing everyone by hand.
     //
     // At most two documents are read, and the rules read each once however
     // often a request asks, so every Studio rule stays far inside the ten-read
@@ -152,7 +156,7 @@ service cloud.firestore {
     function studioLevel(study) {
       return isDevice() ? 0
         : isOwner() ? 4
-        : verifiedGoogle() ? higher(memberLevel(study), domainLevel(study))
+        : verifiedGoogle() ? (exists(memberPath(study)) ? memberLevel(study) : domainLevel(study))
         : 0;
     }
 

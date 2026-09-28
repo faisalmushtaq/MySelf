@@ -371,7 +371,7 @@ describe("a domain rule", () => {
     for (const [what, attempt] of adminReads(x.db)) await refused(`domain editor: ${what}`, attempt);
   });
 
-  it("combines with a personal entry by taking the higher of the two", async () => {
+  it("gives way to a personal entry, which decides for that person either way", async () => {
     await seed(async (db) => {
       await setDoc(doc(db, P.member("boss@brainpop.test")), { email: "boss@brainpop.test", role: "admin" });
       await setDoc(doc(db, P.member("reader@brainpop.test")), { email: "reader@brainpop.test", role: "viewer" });
@@ -379,9 +379,11 @@ describe("a domain rule", () => {
     // Listed above the domain's role: the listing wins.
     const boss = google("u_boss", "boss@brainpop.test");
     for (const [what, attempt] of adminReads(boss.db)) await allowed(`listed admin at domain: ${what}`, attempt);
-    // Listed below it: the domain still admits them as an editor. Narrowing one
-    // person at a domain means removing the domain rule and listing people.
-    await allowed("listed viewer at an editor domain saves", () => save(google("u_reader", "reader@brainpop.test")));
+    // Listed below it: the listing still wins, so an admin can give one person
+    // at an admitted domain less than the domain's role.
+    const reader = google("u_reader", "reader@brainpop.test");
+    await allowed("listed viewer at an editor domain reads the draft", () => getDoc(doc(reader.db, P.draft)));
+    await refused("listed viewer at an editor domain saves", () => save(reader));
   });
 
   it("stops admitting anyone the moment it is removed", async () => {
