@@ -169,6 +169,40 @@ describe("the preview frame's reach", () => {
   });
 });
 
+describe("preview.html's content security policy (the second lock)", () => {
+  // Nothing else would notice if the policy were dropped or loosened: the
+  // frame works exactly the same without it until something tries to send.
+  const html = readFileSync(join(repo, "apps/researcher/preview.html"), "utf8");
+  const meta = /<meta\s+http-equiv="Content-Security-Policy"\s+content="([^"]*)"/i.exec(html);
+  const directives = new Map(
+    (meta?.[1] ?? "")
+      .split(";")
+      .map((d) => d.trim().split(/\s+/))
+      .filter((d) => d[0])
+      .map(([name, ...values]) => [name!, values.join(" ")] as const),
+  );
+
+  it("refuses every way out: connections, workers, frames, forms, and images or media from elsewhere", () => {
+    expect(meta).not.toBeNull();
+    expect(directives.get("connect-src")).toBe("'none'");
+    expect(directives.get("worker-src")).toBe("'none'");
+    expect(directives.get("frame-src")).toBe("'none'");
+    expect(directives.get("media-src")).toBe("'none'");
+    expect(directives.get("form-action")).toBe("'none'");
+    expect(directives.get("object-src")).toBe("'none'");
+    expect(directives.get("img-src")).toBe("'self' data:");
+    // A default-src would also govern connect-src if the explicit one went;
+    // there is none, so the explicit ones above are the whole guarantee.
+    expect(directives.has("default-src")).toBe(false);
+  });
+
+  it("comes before anything the page loads, so it governs all of it", () => {
+    expect(meta).not.toBeNull();
+    expect(html.indexOf(meta![0])).toBeLessThan(html.indexOf("<script"));
+    expect(html.indexOf(meta![0])).toBeLessThan(html.indexOf("<body"));
+  });
+});
+
 describe("the build's check of the preview bundle", () => {
   const chunk = (fileName: string, over: Partial<ChunkLike> = {}): ChunkLike => ({
     type: "chunk",

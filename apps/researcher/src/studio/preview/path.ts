@@ -158,6 +158,47 @@ export function resolveStart(units: PresentableUnit[], startAt: StartAt, hasRevi
   return index < 0 ? { kind: "start" } : { kind: "running", index };
 }
 
+/**
+ * Where to pick the run up after the draft changed under it: the screen the
+ * frame last reported, so a researcher editing the wording of the question in
+ * front of them stays on it.
+ *
+ * `undefined` means "not known" (no report yet, an error, or a question the
+ * new draft no longer has), and the caller starts from the chosen starting
+ * point instead. The start screen is a place like any other and answers `null`
+ * — it used to fall through to the chosen starting point, so a researcher
+ * handed back to the start screen was moved to the "Start from…" question by
+ * an unrelated edit.
+ */
+export function restartPoint(state: StateMessage | null, unitKeys: ReadonlySet<string>): StartAt | undefined {
+  if (state === null) return undefined;
+  switch (state.phase) {
+    case "finished":
+      return START_FINISH;
+    case "review":
+      return START_REVIEW;
+    case "start":
+      return null;
+    case "error":
+      return undefined;
+    default:
+      // running, and the check-in and pace screens, which report the question they lead to.
+      return state.itemKey && unitKeys.has(state.itemKey) ? state.itemKey : undefined;
+  }
+}
+
+/**
+ * A problem line split into the field it is about and what is wrong, when it
+ * leads with a field path ("composition.sections.0.key: Required"). A plain
+ * sentence that happens to contain a colon — flatten's "manifest
+ * inconsistency: …", a gate refusal — is not a path, and is left whole.
+ */
+export function problemParts(line: string): { path: string | null; message: string } {
+  const at = line.indexOf(": ");
+  const path = at > 0 ? line.slice(0, at) : "";
+  return path && !/\s/.test(path) ? { path, message: line.slice(at + 2) } : { path: null, message: line };
+}
+
 /** Consecutive runs of units in one section, in order — how both the path and "Start from…" group. */
 export function sectionRuns(
   units: PresentableUnit[],

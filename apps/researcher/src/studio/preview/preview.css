@@ -89,15 +89,16 @@
 .st-pv-banner p {
   margin: 0;
 }
+/* Never `display: none`, even while empty: a live region that is not in the
+   accessibility tree when its words arrive is not announced by screen readers
+   (Chrome drops the change), and announce() empties it before each message.
+   Empty, it takes no room. */
 .st-pv-announce {
   margin-left: auto !important;
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
   font-weight: 500;
-}
-.st-pv-announce:empty {
-  display: none;
 }
 
 /* ── Notices and the blocked state ───────────────────────────────────── */

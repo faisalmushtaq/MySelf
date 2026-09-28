@@ -6,7 +6,17 @@ import { flattenManifest, type FlattenedRelease } from "@participant/lib/flatten
 import { Button, EmptyState, Notice, Segmented, Skeleton } from "../ui/kit.js";
 import { Icon, type IconName } from "../ui/icons.js";
 import { describeCondition, type DescribeContext } from "./model-adapter.js";
-import { pathEntries, sectionRuns, shorten, unitKeyOf, unitLabel, type PathEntry, type PathState } from "./path.js";
+import {
+  pathEntries,
+  problemParts,
+  restartPoint,
+  sectionRuns,
+  shorten,
+  unitKeyOf,
+  unitLabel,
+  type PathEntry,
+  type PathState,
+} from "./path.js";
 import {
   fingerprint,
   fromExpected,
@@ -255,11 +265,25 @@ function LivePreview({
   const runs = useMemo(() => sectionRuns(units, flattened.sectionTitles), [units, flattened]);
   const unitKeys = useMemo(() => new Set(units.map(unitKeyOf)), [units]);
 
+  // The pending announcement, so a newer one replaces it and unmounting (the
+  // draft turning unpreviewable, say) cancels it rather than setting state on
+  // a component that has gone.
+  const announceTimer = useRef<number | null>(null);
   const announce = useCallback((message: string) => {
     // Cleared first so the same words twice are still announced twice.
     setAnnouncement(null);
-    window.setTimeout(() => setAnnouncement(message), 30);
+    if (announceTimer.current !== null) window.clearTimeout(announceTimer.current);
+    announceTimer.current = window.setTimeout(() => {
+      announceTimer.current = null;
+      setAnnouncement(message);
+    }, 30);
   }, []);
+  useEffect(
+    () => () => {
+      if (announceTimer.current !== null) window.clearTimeout(announceTimer.current);
+    },
+    [],
+  );
   useEffect(() => {
     if (!announcement) return;
     const timer = window.setTimeout(() => setAnnouncement(null), 10_000);
@@ -309,20 +333,15 @@ function LivePreview({
       load(latest.current.chosenStart);
       return;
     }
-    const last = latest.current.state;
-    const here =
-      last?.phase === "finished"
-        ? START_FINISH
-        : last?.phase === "review"
-          ? START_REVIEW
-          : last?.itemKey && unitKeys.has(last.itemKey)
-            ? last.itemKey
-            : null;
-    load(here ?? latest.current.chosenStart);
+    // Where the run was; `undefined` when that is not known (see restartPoint).
+    const here = restartPoint(latest.current.state, unitKeys);
+    load(here === undefined ? latest.current.chosenStart : here);
     announce(
-      here
-        ? "The draft changed, so the preview restarted on the same screen. Answers given so far were cleared."
-        : "The draft changed, so the preview restarted.",
+      here === null
+        ? "The draft changed, so the preview reloaded on the start screen."
+        : here !== undefined
+          ? "The draft changed, so the preview restarted on the same screen. Answers given so far were cleared."
+          : "The draft changed, so the preview restarted.",
     );
   }, [frameReady, fingerprintOf, load, announce, unitKeys]);
 
@@ -502,12 +521,13 @@ function ProblemList({ lines, schema = false, initial = 8 }: { lines: string[]; 
   const first = shown.slice(0, initial);
   const rest = shown.slice(initial);
   const row = (line: string, i: number) => {
-    const at = schema ? line.indexOf(": ") : -1;
+    // Only a real field path is set as code; see problemParts.
+    const { path, message } = schema ? problemParts(line) : { path: null, message: line };
     return (
       <li key={i}>
-        {at > 0 ? (
+        {path !== null ? (
           <>
-            <code className="st-pv-path-code">{line.slice(0, at)}</code> {line.slice(at + 2)}
+            <code className="st-pv-path-code">{path}</code> {message}
           </>
         ) : (
           line

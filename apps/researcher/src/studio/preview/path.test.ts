@@ -10,7 +10,9 @@ import {
   computeVisibility,
   conditionTargets,
   pathEntries,
+  problemParts,
   resolveStart,
+  restartPoint,
   sectionRuns,
   shorten,
   unitKeyOf,
@@ -188,6 +190,47 @@ describe("preview start points", () => {
     expect(resolveStart(units, "review", true)).toEqual({ kind: "review" });
     // A survey with no review screen has nowhere to show one.
     expect(resolveStart(units, "review", false)).toEqual({ kind: "finished" });
+  });
+});
+
+describe("picking the run up after the draft changes", () => {
+  const keys = new Set(units.map(unitKeyOf));
+
+  it("stays on the screen the frame last reported", () => {
+    expect(restartPoint(state({ phase: "running", index: 2, itemKey: "q.c" }), keys)).toBe("q.c");
+    // The check-in and pace screens report the question they lead to.
+    expect(restartPoint(state({ phase: "checkin", index: 1, itemKey: "q.b" }), keys)).toBe("q.b");
+    expect(restartPoint(state({ phase: "finished", index: null, itemKey: null }), keys)).toBe("finish");
+    expect(restartPoint(state({ phase: "review", index: null, itemKey: null }), keys)).toBe("review");
+  });
+
+  it("keeps a researcher on the start screen there, not at the chosen starting question", () => {
+    // null is "the start screen"; it must not be read as "unknown", which the
+    // page answers with the "Start from…" choice.
+    expect(restartPoint(state({ phase: "start", index: null, itemKey: null }), keys)).toBeNull();
+  });
+
+  it("does not know where to go without a report, after an error, or when the question has gone", () => {
+    expect(restartPoint(null, keys)).toBeUndefined();
+    expect(restartPoint(state({ phase: "error", index: null, itemKey: null, error: "x" }), keys)).toBeUndefined();
+    expect(restartPoint(state({ phase: "running", index: 0, itemKey: "q.deleted" }), keys)).toBeUndefined();
+  });
+});
+
+describe("problem lines", () => {
+  it("sets a leading field path apart from what is wrong with it", () => {
+    expect(problemParts("composition.sections.0.key: Required")).toEqual({
+      path: "composition.sections.0.key",
+      message: "Required",
+    });
+    expect(problemParts("(draft): Expected object")).toEqual({ path: "(draft)", message: "Expected object" });
+  });
+
+  it("leaves a sentence that merely contains a colon whole", () => {
+    const line = "manifest inconsistency: 'kss@1.0/en-GB/self/standard' has no question 'q9'";
+    expect(problemParts(line)).toEqual({ path: null, message: line });
+    expect(problemParts("No colon here")).toEqual({ path: null, message: "No colon here" });
+    expect(problemParts(": leading")).toEqual({ path: null, message: ": leading" });
   });
 });
 
