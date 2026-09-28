@@ -78,16 +78,22 @@ export function manifestIndex(manifest: unknown): ManifestIndex {
   return { itemKeys, variables };
 }
 
+/**
+ * Read-only sets, so the editor's own reserved-ID set (ops.ts, ReadonlySet) can
+ * be passed straight in. `itemKeys` and `variables` in each version must be
+ * stored exactly as `manifestIndex` returns them — aligned, neither sorted nor
+ * de-duplicated on its own — or the pairing below is wrong.
+ */
 export interface ReservedIds {
-  itemKeys: Set<string>;
-  variables: Set<string>;
+  itemKeys: ReadonlySet<string>;
+  variables: ReadonlySet<string>;
   /**
    * The variable(s) each reserved question was published with, where the
    * versions recorded them aligned (see `ManifestIndex`). It is what lets
    * validation tell a question restored from an old version — same ID, same
    * variable — from a new question that happens to reuse an old ID.
    */
-  variablesByItem?: Map<string, Set<string>>;
+  variablesByItem?: ReadonlyMap<string, ReadonlySet<string>>;
 }
 
 /** Everything any published version reserved. */

@@ -7,18 +7,30 @@ import {
   responseScale,
   scoringDefinition,
 } from "@myself/schema";
-import type { ArchivedQuestion, InstrumentOrModule, Issue, IssueLocation, Severity, StudioDraft } from "./contract.js";
+import type {
+  ArchivedQuestion,
+  InstrumentOrModule,
+  Issue,
+  IssueLocation,
+  ScaleInput,
+  ScoringInput,
+  Severity,
+  StudioDraft,
+} from "./contract.js";
+import { DRAFT_FORMAT, DRAFT_FORMAT_VERSION } from "./contract.js";
 import { previewRelease, type PreviewRelease } from "./draft.js";
 import type { ReservedIds } from "./history.js";
 import {
-  editTier,
   instrumentLabel,
+  isUnlocked,
   LINKAGE_ITEM_KEYS,
   lockedDifferences,
+  lockedTest,
   protectedDifferences,
   questionLabel,
   truncateText,
   type LockedDifference,
+  type LockedOptions,
 } from "./locked.js";
 import { formOf, liveQuestions, placements, type LiveQuestion, type Placement } from "./walk.js";
 
@@ -48,10 +60,17 @@ export interface ValidationContext {
   publishedScaleCodes?: Map<string, Map<number, string>>;
   /**
    * Known-good definitions of validated instruments (the instrument library),
-   * keyed by reference string: a locked instrument the baseline lacks is
-   * accepted when it matches one exactly.
+   * keyed by reference string and frozen to one form each: a locked instrument
+   * the baseline lacks is accepted when it matches one exactly and its answer
+   * options and scoring match `referenceScales` / `referenceScoring` (or the
+   * baseline's copies). With no baseline — a survey never published — every
+   * locked instrument is held to these, when they are given.
    */
   reference?: Record<string, InstrumentOrModule>;
+  /** The library's answer options by scale key (see `reference`). */
+  referenceScales?: Record<string, ScaleInput>;
+  /** The library's scoring rules by key (see `reference`). */
+  referenceScoring?: Record<string, ScoringInput>;
 }
 
 // ---------------------------------------------------------------------------
@@ -264,6 +283,8 @@ interface Model {
   baseFirst: Map<string, LiveQuestion>;
   preview: PreviewRelease;
   sectionTitle(key: string): string;
+  /** Whether a draft definition is a locked (licensed) instrument — see `lockedTest`. */
+  isLocked: ReturnType<typeof lockedTest>;
 }
 
 function firstOccurrences(live: LiveQuestion[]): Map<string, LiveQuestion> {
@@ -345,6 +366,7 @@ function buildModel(draft: StudioDraft, ctx: ValidationContext, c: Collector): M
       const title = titles.get(key);
       return title ? `“${truncateText(title, 40)}”` : `“${key}”`;
     },
+    isLocked: lockedTest(ctx.baseline, ctx.reference),
   };
 }
 
@@ -1177,7 +1199,11 @@ function checkSections(m: Model, c: Collector): void {
 
     const components = list(section["components"]);
     const questions = m.live.filter((q) => q.sectionIndex === index).length;
-    const other = components.filter((comp) => isObject(comp) && (comp["kind"] === "narrative" || comp["kind"] === "screen")).length;
+    // A narrative is a step participants take. A "screen" component is not:
+    // neither the freeze nor the participant app shows anything for it, so a
+    // section holding only screens is as empty as one holding nothing.
+    // (Review fix: screens used to count as content.)
+    const other = components.filter((comp) => isObject(comp) && comp["kind"] === "narrative").length;
     if (questions === 0 && other === 0) {
       c.error(
         "section.empty",
@@ -1252,8 +1278,9 @@ function checkPlacements(m: Model, c: Collector): void {
       );
     }
 
-    // A licensed instrument is administered whole, in its own order.
-    if (editTier(def, m.draft.unlocked) !== "locked") continue;
+    // A licensed instrument is administered whole, in its own order. Whether it
+    // is licensed is not the draft's copy's say alone (see `lockedTest`).
+    if (!m.isLocked(def, refKey, m.draft.unlocked)) continue;
     const ps = m.places.filter((p) => p.refKey === refKey && p.form);
     if (ps.length > 1) {
       c.error(
@@ -1376,15 +1403,53 @@ function differenceAt(m: Model, d: LockedDifference): IssueLocation {
   return p ? blockAt(p) : at("block", { refKey: d.refKey });
 }
 
+/** A published version with nothing in it: what a survey never published is compared with. */
+function nothingPublished(draft: StudioDraft): StudioDraft {
+  return {
+    format: DRAFT_FORMAT,
+    formatVersion: DRAFT_FORMAT_VERSION,
+    surveyId: draft.surveyId,
+    composition: { ...draft.composition, sections: [] },
+    instruments: {},
+    scales: {},
+    scoring: {},
+    archived: [],
+    retiredCodes: {},
+    unlocked: {},
+    notes: {},
+  };
+}
+
+/** The answer options of a question, as code → label, or null when it has none. */
+function optionMap(draft: StudioDraft, item: Loose): string | null {
+  const key = item["scale"];
+  if (typeof key !== "string") return null;
+  const scale = draft.scales?.[key] as unknown as Loose | undefined;
+  return canonicalJson(list(scale?.["options"]).map((o) => (isObject(o) ? [o["code"], o["label"]] : o)));
+}
+
 function checkAgainstBaseline(m: Model, c: Collector): void {
+  const lockedOptions: LockedOptions = {};
+  if (m.ctx.reference) lockedOptions.reference = m.ctx.reference;
+  if (m.ctx.referenceScales) lockedOptions.referenceScales = m.ctx.referenceScales;
+  if (m.ctx.referenceScoring) lockedOptions.referenceScoring = m.ctx.referenceScoring;
   const baseline = m.ctx.baseline;
-  if (!baseline) return;
-  const lockedOptions = m.ctx.reference ? { reference: m.ctx.reference } : {};
+  if (!baseline) {
+    // A survey never published has nothing to compare with, but a licensed
+    // instrument in it must still be the library's, unchanged. Only checkable
+    // when the library is given; without it (a quick check in the editor)
+    // nothing here can be said. (Review fix: previously skipped entirely, so a
+    // first publish could carry a reworded licensed instrument.)
+    if (m.ctx.reference) {
+      for (const d of lockedDifferences(m.draft, nothingPublished(m.draft), lockedOptions)) c.error(`locked.${d.change}`, d.message, differenceAt(m, d));
+    }
+    return;
+  }
   for (const d of lockedDifferences(m.draft, baseline, lockedOptions)) c.error(`locked.${d.change}`, d.message, differenceAt(m, d));
   for (const d of protectedDifferences(m.draft, baseline)) c.error(`protected.${d.change}`, d.message, differenceAt(m, d));
 
   // Participant linkage: no unlock permits breaking it.
-  const unlocked = Object.prototype.hasOwnProperty.call(m.draft.unlocked ?? {}, "ybm_identity");
+  const unlocked = isUnlocked(m.draft.unlocked, "ybm_identity");
   for (const key of LINKAGE_ITEM_KEYS) {
     const before = m.baseFirst.get(key);
     if (!before) continue;
@@ -1416,7 +1481,11 @@ function checkAgainstBaseline(m: Model, c: Collector): void {
     } else if (unlocked) {
       const notes = new Set(["researcherNote", "a11yNote", "reportingCategory"]);
       const strip = (x: Loose) => Object.fromEntries(Object.entries(x).filter(([k]) => !notes.has(k)));
-      if (canonicalJson(strip(was)) !== canonicalJson(strip(is))) {
+      // The options count too: ingest builds the code from the birth month's
+      // option *code*, so recoding its options changes every later code as
+      // surely as changing the question does. (Review fix: docs/16 R5 says any
+      // other change warns, and a recoded scale used to pass silently.)
+      if (canonicalJson(strip(was)) !== canonicalJson(strip(is)) || optionMap(baseline, was) !== optionMap(m.draft, is)) {
         c.warn(
           "linkage.changed",
           `${label} is one of the four answers the participant code is made from, and it has changed. If participants now answer it differently, their codes will no longer match earlier sittings. Check the change with whoever manages participant linkage.`,
