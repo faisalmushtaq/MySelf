@@ -417,15 +417,28 @@ export function releaseService(options: ReleaseServiceOptions): ReleaseService {
    * built-in manifest at start-up always cost. After that it is remembered here:
    * a hash names immutable content, and this build's rules do not change while it
    * runs, so a second check could only give the same answer.
+   *
+   * WHAT IS REMEMBERED IS THE CHECK, NOT THE COPY. The row is still looked up on
+   * every read (one keyed IndexedDB get), because pruning can delete it while this
+   * page runs. Answering from memory alone once let a release that had been
+   * pruned — A, dropped when B went live with no sitting left under A, then
+   * brought back by a rollback to A — be made active and have sittings started
+   * under it, with nothing on the device to open it from at the next launch: the
+   * start screen fell back to the built-in release and those sittings could not
+   * be resumed. Now a pruned release counts as not held, and is downloaded and
+   * stored again before anything uses it.
    */
   const verified = new Map<string, LoadedRelease>();
 
   const cachedRelease = async (hash: string): Promise<LoadedRelease | null> => {
-    const known = verified.get(hash);
-    if (known) return known;
     try {
       const row = await cache.get(hash);
-      if (!row) return null;
+      if (!row) {
+        verified.delete(hash);
+        return null;
+      }
+      const known = verified.get(hash);
+      if (known) return known;
       const result = await verifyRelease(row.json, hash, { surveyId });
       if (!result.ok) return null;
       const loaded: LoadedRelease = { manifest: result.manifest, hash, source: "cached" };
