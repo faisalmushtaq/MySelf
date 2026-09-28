@@ -1,0 +1,91 @@
+/*
+ * The editor's frame: a toolbar, then three columns that each scroll on their
+ * own, filling the window under the Studio header. The outline and the
+ * settings panel stay put while a long question is edited in the middle, and
+ * the middle stays put while a 150-question outline is scrolled — which is
+ * what makes a long survey workable.
+ *
+ * Panel-specific styles live beside the panels (outline.css, node-editor.css
+ * and so on); this file only lays out the frame.
+ */
+
+.ste-state {
+  padding: 2rem 1.5rem;
+  max-width: 760px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.ste-workspace {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--canvas);
+}
+
+.ste-columns {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: var(--st-left, 320px) minmax(0, 1fr) var(--st-right, 340px);
+}
+
+.ste-left,
+.ste-centre,
+.ste-right {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.ste-left {
+  border-right: 1px solid var(--hairline);
+  background: var(--paper);
+}
+.ste-right {
+  border-left: 1px solid var(--hairline);
+  background: var(--paper);
+}
+.ste-centre {
+  padding: 1.5rem clamp(1rem, 3vw, 2.75rem) 4rem;
+}
+
+/* Narrower windows: settings move under the editor, then the outline tops the page. */
+@media (max-width: 1180px) {
+  .ste-columns {
+    grid-template-columns: 280px minmax(0, 1fr);
+  }
+  .ste-right {
+    grid-column: 2;
+    border-left: 0;
+    border-top: 1px solid var(--hairline);
+  }
+  .ste-columns {
+    grid-template-rows: minmax(0, 1fr) auto;
+  }
+  .ste-left {
+    grid-row: 1 / span 2;
+  }
+}
+@media (max-width: 760px) {
+  .stp-app:has(> .stp-main-wide) {
+    height: auto;
+  }
+  .ste-columns {
+    display: block;
+  }
+  .ste-left,
+  .ste-centre,
+  .ste-right {
+    overflow: visible;
+    border: 0;
+  }
+  .ste-left {
+    border-bottom: 1px solid var(--hairline);
+  }
+}
+
+.ste-placeholder {
+  padding: 1rem;
+  color: var(--muted);
+}

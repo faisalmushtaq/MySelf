@@ -1,15 +1,24 @@
-import { liveQuestions, type StudioRole } from "@myself/studio";
-import { usePresence, type DraftEditor, type Loadable, type PublishedContext, type StudioUser, type SurveyDoc } from "../data/index.js";
-import { formatTime } from "../format.js";
-import { usePlaygroundMode } from "../mode.js";
-import { Badge, EmptyState, Field, IconButton, Skeleton } from "../ui/kit.js";
+import type { StudioRole, SurveyDoc } from "@myself/studio";
+import type { DraftEditor, Loadable, PublishedContext, StudioUser } from "../data/index.js";
+import { EmptyState, Skeleton } from "../ui/kit.js";
+import { EditorProvider } from "./context.js";
+import { Inspector } from "./Inspector.js";
+import { NodeEditor } from "./NodeEditor.js";
+import { Outline } from "./Outline.js";
+import { PublishDialog } from "./PublishDialog.js";
+import { Toolbar } from "./Toolbar.js";
+import { ValidationPanel } from "./ValidationPanel.js";
+import "./editor.css";
 
 /**
- * PLACEHOLDER — the question editor is being built on its own branch and
- * replaces this file. It exists so the platform (routes, saving, versions,
- * access) can be run and reviewed on its own, and it pins the props the
- * platform passes. The one field it edits (the survey's title) is enough to
- * exercise the whole save path: debounce, transaction, conflict, recovery.
+ * The Studio editor: outline on the left, the selected thing in the middle,
+ * its settings on the right, and a toolbar that always says whether the work
+ * is saved and whether it can be published.
+ *
+ * The draft editor is passed in, never created here: SurveyLayout owns the one
+ * save engine for the survey (a second would compete with it), and the
+ * playground passes an in-memory one. Everything below reads the draft, the
+ * selection and the validation through the editor context.
  */
 
 export interface EditorPageProps {
@@ -22,89 +31,42 @@ export interface EditorPageProps {
   user: StudioUser;
 }
 
-function saveText(editor: DraftEditor): string {
-  const s = editor.save;
-  switch (s.kind) {
-    case "saved":
-      return s.at ? `Draft saved ${formatTime(s.at)}` : "Draft saved";
-    case "unsaved":
-      return "Unsaved changes";
-    case "saving":
-      return "Saving…";
-    case "offline":
-      return "Offline — changes kept in this tab";
-    case "error":
-      return "Save failed";
-    case "conflict":
-      return "Someone else saved — choose a version";
-  }
-}
-
-export function EditorPage({ surveyId, editor }: EditorPageProps) {
-  const others = usePresence(surveyId, null);
-  const playground = usePlaygroundMode();
+export function EditorPage({ surveyId, survey, editor, context, role, user }: EditorPageProps) {
   if (editor.status === "loading") {
     return (
-      <div className="stp-page">
-        <Skeleton lines={6} label="Loading the draft" />
+      <div className="ste-state">
+        <Skeleton lines={8} label="Loading the draft" />
       </div>
     );
   }
   const draft = editor.draft;
   if (!draft) {
     return (
-      <div className="stp-page">
-        <EmptyState icon="warning" title="There’s no draft to show">
-          <p>{editor.error ?? "This survey has no working draft."}</p>
+      <div className="ste-state">
+        <EmptyState icon="warning" title="There's no draft to show">
+          <p>{editor.error ?? "This survey has no working draft. An admin can set it up from the survey list."}</p>
         </EmptyState>
       </div>
     );
   }
-  const questions = liveQuestions(draft).length;
   return (
-    <div className="stp-page">
-      <div className="stp-page-head">
-        <h1 className="stp-h1">Edit</h1>
-        <div className="stp-actions">
-          <span role="status" className="stp-muted">
-            {playground ? "Nothing is saved in the playground" : saveText(editor)}
-          </span>
-          <IconButton icon="undo" label={editor.undoLabel ? `Undo ${editor.undoLabel}` : "Undo"} disabled={!editor.canUndo} onClick={editor.undo} />
-          <IconButton icon="redo" label={editor.redoLabel ? `Redo ${editor.redoLabel}` : "Redo"} disabled={!editor.canRedo} onClick={editor.redo} />
+    <EditorProvider surveyId={surveyId} survey={survey} editor={editor} draft={draft} context={context} role={role} user={user}>
+      <div className="ste-workspace">
+        <Toolbar />
+        <div className="ste-columns">
+          <aside className="ste-left" aria-label="Survey outline">
+            <Outline />
+          </aside>
+          <section className="ste-centre" aria-label="Editor">
+            <NodeEditor />
+          </section>
+          <aside className="ste-right" aria-label="Settings for the selection">
+            <Inspector />
+          </aside>
         </div>
+        <ValidationPanel />
+        <PublishDialog />
       </div>
-      {others.length > 0 ? (
-        <p className="stp-gap">
-          Also here:{" "}
-          {others.map((p) => (
-            <Badge key={p.uid} icon="user">
-              {p.email}
-            </Badge>
-          ))}
-        </p>
-      ) : null}
-      <div className="stp-card stp-gap">
-        <Field label="Survey title" hint="For the research team: it appears in the Studio, exports and the audit trail.">
-          {(p) => (
-            <input
-              {...p}
-              className="st-input"
-              value={draft.composition.title}
-              readOnly={editor.readOnly}
-              onChange={(e) => {
-                const title = e.target.value;
-                editor.apply((d) => ({ ...d, composition: { ...d.composition, title } }), "Rename the survey");
-              }}
-            />
-          )}
-        </Field>
-      </div>
-      <EmptyState icon="section" title="The question editor is coming soon">
-        <p>
-          This draft has {draft.composition.sections.length} sections and {questions} questions. Saving, versions and
-          access already work around it.
-        </p>
-      </EmptyState>
-    </div>
+    </EditorProvider>
   );
 }

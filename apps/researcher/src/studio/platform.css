@@ -824,3 +824,21 @@
     padding: 1.75rem 1.4rem;
   }
 }
+
+/* ── Wide pages ───────────────────────────────────────────────────────────
+ * The editor and the preview fill the window under the header, with their own
+ * panels scrolling, instead of growing the page past it.
+ */
+.stp-app:has(> .stp-main-wide) {
+  height: 100vh;
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+.stp-app:has(> .stp-main-wide) > .stp-main-wide {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
