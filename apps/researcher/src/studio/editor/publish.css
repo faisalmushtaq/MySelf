@@ -1,0 +1,209 @@
+/*
+ * The publish dialog. The stepper says where you are in words and numbers;
+ * the current step is bold and underlined, done steps carry a tick.
+ */
+
+.sto-steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1rem;
+  list-style: none;
+  margin: 0 0 1rem;
+  padding: 0 0 0.75rem;
+  border-bottom: 1px solid var(--hairline);
+  font-size: 0.84rem;
+}
+.sto-steps li {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--muted);
+}
+.sto-steps li.current {
+  color: var(--text);
+  font-weight: 600;
+  text-decoration: underline;
+  text-decoration-color: var(--accent);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 5px;
+}
+.sto-steps li.done {
+  color: var(--text);
+}
+.sto-step-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 1px solid var(--hairline-strong);
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+  text-decoration: none;
+}
+.sto-steps li.current .sto-step-mark {
+  background: #111;
+  border-color: #111;
+  color: #fff;
+}
+.sto-steps li.done .sto-step-mark {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.sto-pub-heading {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0 0 0.6rem;
+  font-size: 1.02rem;
+  font-weight: 600;
+}
+.studio .sto-pub-heading:focus,
+.studio .sto-pub-heading:focus-visible {
+  box-shadow: none;
+}
+.sto-pub-heading > .st-icon {
+  color: var(--accent);
+}
+.sto-pub-busy p {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.sto-pub-ok {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 0 0 0.6rem;
+  font-weight: 500;
+}
+.sto-pub-ok > .st-icon {
+  color: var(--accent);
+}
+.sto-pub-changes {
+  margin-top: 0.9rem;
+}
+
+.sto-pub-issues {
+  list-style: none;
+  margin: 0.75rem 0;
+  padding: 0;
+  display: grid;
+  gap: 0.5rem;
+}
+.sto-pub-issues li {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 0.55rem;
+  align-items: start;
+  padding: 0.55rem 0.65rem;
+  border: 1px solid var(--hairline);
+  border-radius: var(--st-radius);
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+.sto-pub-issues li > .st-icon {
+  margin-top: 0.15rem;
+  color: var(--warn);
+}
+
+.sto-pub-check {
+  display: flex;
+  gap: 0.6rem;
+  align-items: center;
+  margin-top: 0.9rem;
+  padding: 0.7rem 0.85rem;
+  border: 1px solid var(--hairline-strong);
+  border-radius: var(--st-radius);
+  font-weight: 500;
+  cursor: pointer;
+}
+.sto-pub-check input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--accent);
+}
+.sto-pub-check:has(input:checked) {
+  border-color: var(--accent);
+  background: var(--accent-wash);
+}
+.sto-pub-check.has-error {
+  border-color: var(--warn);
+}
+.sto-pub-problem {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 0.5rem 0 0;
+  font-size: 0.86rem;
+  font-weight: 500;
+  color: var(--warn);
+}
+
+.sto-pub-versions .stp-radio strong {
+  font-variant-numeric: tabular-nums;
+}
+.sto-pub-rec {
+  font-style: normal;
+  font-weight: 400;
+  color: var(--accent);
+}
+.sto-pub-why {
+  display: flex;
+  gap: 0.3rem;
+  align-items: flex-start;
+  color: var(--text) !important;
+}
+.sto-pub-why > .st-icon {
+  margin-top: 0.15rem;
+}
+
+.sto-pub-note {
+  min-height: 7.5rem;
+  resize: vertical;
+  line-height: 1.45;
+}
+.sto-pub-count {
+  float: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.sto-pub-summary {
+  display: grid;
+  gap: 0.6rem;
+  margin: 0 0 1rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--hairline);
+  border-radius: var(--st-radius);
+  background: var(--off-white);
+}
+.sto-pub-summary dt {
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.sto-pub-summary dd {
+  margin: 0.1rem 0 0;
+}
+.sto-pub-quote {
+  white-space: pre-line;
+  border-left: 3px solid var(--hairline-strong);
+  padding-left: 0.6rem;
+}
+
+.sto-pub-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+.sto-pub-gate {
+  margin: 0.25rem 0 0;
+  padding-left: 1.2rem;
+  font-size: 0.88rem;
+}
