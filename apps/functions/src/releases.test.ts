@@ -68,7 +68,7 @@ function fakeStore() {
       },
     }),
   } as unknown as Firestore;
-  const put = (hash: string, value: unknown) => docs.set(paths.publicRelease(STUDY, hashHex(hash)), value);
+  const put = (hash: string, value: unknown, study = STUDY) => docs.set(paths.publicRelease(study, hashHex(hash)), value);
   return { db, reads, put };
 }
 
@@ -190,6 +190,38 @@ describe("resolving a release by hash", () => {
     put(hash, storeDoc(raw, hash));
     expect((await resolve(db, STUDY, hash))?.source).toBe("store");
     expect(reads).toHaveLength(2);
+  });
+
+  it("remembers a verified release for the study whose store held it, not for every study", async () => {
+    // Review fix: the cache was keyed by hash alone, so once study A's store
+    // had verified a release, study B resolved it too without B's store ever
+    // being read — and only on a warm instance.
+    const { raw, hash } = await studioRelease();
+    const { db, reads, put } = fakeStore();
+    put(hash, storeDoc(raw, hash), "study_a");
+    const resolve = releaseResolver();
+
+    expect((await resolve(db, "study_a", hash))?.source).toBe("store");
+    expect(await resolve(db, "study_b", hash)).toBeNull();
+    expect(reads).toEqual([paths.publicRelease("study_a", hashHex(hash)), paths.publicRelease("study_b", hashHex(hash))]);
+  });
+
+  it("refuses, and does not throw on, a document nested deeply enough to overflow the hash", async () => {
+    // Review fix: canonical JSON and the schema both recurse, so a few
+    // hundred kB of nesting is a RangeError. Thrown, it would take the whole
+    // nightly export down over one document; it must be a refusal instead.
+    const { hash } = await studioRelease();
+    const depth = 200_000;
+    const manifest = `{"hash":"${hash}","deep":${"[".repeat(depth)}${"]".repeat(depth)}}`;
+    const { db, put } = fakeStore();
+    put(hash, { hash, manifest });
+
+    expect(await readStoredRelease({ hash, manifest }, hash)).toEqual({ refused: expect.stringMatching(/could not be checked/) });
+    expect(await releaseResolver()(db, STUDY, hash)).toBeNull();
+    expect(logger.error).toHaveBeenCalledWith(
+      expect.stringMatching(/failed verification/),
+      expect.objectContaining({ releaseHash: hash, reason: expect.stringMatching(/could not be checked/) }),
+    );
   });
 
   it("lets a failing read throw rather than report the release as unknown", async () => {

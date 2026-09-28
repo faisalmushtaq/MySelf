@@ -49,6 +49,9 @@ const STUDY = "YBM-ND2026";
 
 const plural = (n: number, noun: string): string => `${n} ${noun}${n === 1 ? "" : "s"}`;
 
+/** The newest `reload` started; an older one that finishes after it is dropped. */
+let reloadGeneration = 0;
+
 type Tab = "overview" | "table" | "linkage" | "mystory" | "data";
 
 export default function App() {
@@ -73,11 +76,18 @@ export default function App() {
   const [passphrase, setPassphrase] = useState("");
 
   const reload = useCallback(async () => {
+    const generation = ++reloadGeneration;
     setBusy(true);
     const sessions = await storedSessions();
     // Corrections are applied here, at derivation, so a repaired code joins a
     // participant's waves without anything being rewritten (D-37).
     const built = await buildDatasetWithStore(sessions, STUDY, await aliases(), await assignments());
+    // Asking the release store can take seconds (up to its timeout when
+    // offline), so reloads now overlap: the page-load build can still be
+    // waiting when a pull or an import starts another. Only the newest may set
+    // what is shown — an older one finishing late would put back a dataset
+    // missing the sittings just added. The newest also clears `busy`.
+    if (generation !== reloadGeneration) return;
     setDataset(built.dataset);
     // Names go to their own table, never into the dataset the rest of this
     // app reads. They are needed to repair a code and to link a UPN, and the
