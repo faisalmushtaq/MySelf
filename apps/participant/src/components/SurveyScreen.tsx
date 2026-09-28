@@ -62,6 +62,13 @@ export interface SurveyScreenProps {
   onRecord: (unit: PresentableUnit, value: AnswerValue) => void;
   onAdvance: (from: number, kind: "next" | "skip" | "decline") => void;
   onBack: (from: number) => void;
+  /**
+   * This question was opened from the end-of-survey summary to change one answer.
+   * In that mode both "Back to summary" and the primary button return to the
+   * summary, so a participant correcting one answer is never dropped back into
+   * the middle of the survey with a walk to the end ahead of them.
+   */
+  reviewEdit?: boolean;
   onEvent: (type: string, payload?: Record<string, unknown>) => void;
 }
 
@@ -289,7 +296,17 @@ export function SurveyScreen(props: SurveyScreenProps) {
       <header className="survey-header">
         {/* Named, not just an arrow: a bare chevron in a corner is missed, and
             people who want to change an answer need to see the way back. */}
-        {allowBack && walker.back(index) !== null ? (
+        {props.reviewEdit ? (
+          // Always offered when correcting one answer from the summary — even on
+          // the first question, where ordinary back-navigation has nowhere to go —
+          // because it returns to the summary, not to the previous question.
+          <button type="button" className="back" onClick={() => props.onBack(index)}>
+            <span className="back-arrow" aria-hidden="true">
+              ‹
+            </span>
+            Back to summary
+          </button>
+        ) : allowBack && walker.back(index) !== null ? (
           <button type="button" className="back" onClick={() => props.onBack(index)}>
             <span className="back-arrow" aria-hidden="true">
               ‹
@@ -449,7 +466,7 @@ export function SurveyScreen(props: SurveyScreenProps) {
               </button>
             )}
             <button type="button" className="next" disabled={!canAdvance} onClick={handleNext}>
-              {item.responseType === "info" ? "Continue" : answered ? "Next" : "Next"}
+              {props.reviewEdit ? "Save" : item.responseType === "info" ? "Continue" : "Next"}
             </button>
           </>
         )}

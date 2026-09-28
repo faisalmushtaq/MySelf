@@ -53,7 +53,7 @@ const est = (a: number, b: number) =>
 // The title is a title, not the first line of a wall of text. The body keeps
 // the approved wording verbatim; only its arrangement on screen changes.
 const introTitle = "Yorkshire Brain Map School Workshop";
-const introSubtitle = "Citizen Neuroscience — Notre Dame";
+const introSubtitle = "Citizen Neuroscience";
 
 const introText = `Thank you for taking part in this workshop.
 

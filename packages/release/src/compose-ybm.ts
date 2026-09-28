@@ -37,9 +37,9 @@ export const ybmComposition: AssessmentDraftInput = {
   key: "ybm_nd2026_standard",
   study: "ybm",
   title: "Yorkshire Brain Map — NotreDame 2026 standard questionnaire",
-  // What a participant sees: the site and the year, not the catalogue title.
-  // Researcher-set per fielding (D-24).
-  studyLabel: "Notre Dame · 2026",
+  // No participant-facing study label on the cover for this fielding: the field
+  // is researcher-set per fielding (D-24), and leaving it unset removes the line
+  // rather than printing an empty one (App renders it only when present).
   contact: { email: "brainpop@leeds.ac.uk", ethicsReference: "PSCETHS-1449" },
   // r2.0.0 presentation changes (D-17/D-18): hair type is an illustrated
   // tappable grid, MacArthur ladders are tap/drag ladder graphics with anchor

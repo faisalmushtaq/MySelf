@@ -511,6 +511,45 @@ test.describe("a sitting on a device with no study configured", () => {
     await expect(page.locator("p.demo-note")).toBeVisible();
     await expect(page.locator("p.setup-note")).toHaveCount(0);
   });
+
+  /**
+   * Correcting one answer at the end must land back at the end.
+   *
+   * THE BUG: a participant who finished, opened the summary and tapped a question
+   * to change it could not get back to the finish screen without walking every
+   * remaining question again — pressing Back dropped them out of review mode into
+   * the ordinary survey. This drives the real path: both "Back to summary" and the
+   * primary button must return to the summary, and the summary must return to the
+   * end, ready to hand over.
+   */
+  test("editing an answer from the summary returns to the summary, not the middle of the survey", async ({ page }) => {
+    await startSitting(page);
+    await walkToEnd(page);
+    await expect(page.locator(".screen.finish")).toBeVisible();
+
+    await page.getByRole("button", { name: /go back to my answers/i }).click();
+    const review = page.locator(".screen.review");
+    const survey = page.locator(".screen.survey");
+    await expect(review).toBeVisible();
+
+    // Tap a question to correct it, then press Back: this is exactly the move that
+    // used to strand the participant mid-survey. It must return to the summary.
+    await review.locator("button.review-row").first().click();
+    await expect(survey).toBeVisible();
+    await survey.getByRole("button", { name: /back to summary/i }).click();
+    await expect(review).toBeVisible();
+
+    // Saving an edit returns to the summary too — the other way out of an item.
+    await review.locator("button.review-row").first().click();
+    await expect(survey).toBeVisible();
+    await survey.getByRole("button", { name: /^save$/i }).click();
+    await expect(review).toBeVisible();
+
+    // And the summary hands back to the finish screen in one step, not a re-walk.
+    await review.getByRole("button", { name: /back to the end/i }).click();
+    await expect(page.locator(".screen.finish")).toBeVisible();
+    await expect(page.getByRole("button", { name: /hand back to the researcher/i })).toBeVisible();
+  });
 });
 
 /**

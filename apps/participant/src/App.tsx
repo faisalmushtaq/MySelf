@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { AnswerStore, Walker, type AnswerValue, type PresentableUnit } from "@myself/engine";
 import { releaseManifest, responseScale, scoringDefinition, type ReleaseManifest, type ResponseScale } from "@myself/schema";
-import rawManifest from "../../../releases/ybm_nd2026_standard_r7.0.1.manifest.json";
+import rawManifest from "../../../releases/ybm_nd2026_standard_r7.1.0.manifest.json";
 import { flattenManifest } from "./lib/flatten.js";
 import { resolveText, useScoringDefinitions } from "./lib/pipes.js";
 import {
@@ -44,7 +44,7 @@ import { SurveyScreen } from "./components/SurveyScreen.js";
 
 /**
  * MySelf Go — participant application (preview build).
- * Renders the frozen YBM r7.0.1 release entirely from its manifest, saves
+ * Renders the frozen YBM r7.1.0 release entirely from its manifest, saves
  * every response to encrypted IndexedDB before advancing, works offline via
  * the service worker, and returns to a neutral start screen on handover.
  */
@@ -687,6 +687,23 @@ export default function App() {
   const goBack = useCallback(
     async (from: number) => {
       if (phase.kind !== "running") return;
+      /**
+       * Editing one answer from the summary: "Back" returns to the summary.
+       *
+       * THE BUG THIS FIXES. A participant who has finished can open the summary,
+       * tap a question to change it, and land back on that question with
+       * `fromReview` set — so pressing Next returns them to the summary. But
+       * pressing Back rebuilt the running phase WITHOUT `fromReview`, dropping
+       * them into the ordinary survey with no way back to the end except walking
+       * every remaining question again. From the summary you came, so to the
+       * summary Back goes.
+       */
+      if (phase.fromReview) {
+        await leaveItem(from, false);
+        await appendEvent(phase.session, "review.returned", unitKeyOf(from), undefined, from, tMono());
+        setPhase({ kind: "review", session: phase.session });
+        return;
+      }
       const w = new Walker(flattened.units, storeRef.current, manifest.composition.allowBackNavigation);
       const prev = w.back(from);
       if (prev !== null) {
@@ -1061,6 +1078,7 @@ export default function App() {
           onAdvance={(f, k) => void advance(f, k)}
           onBack={(f) => void goBack(f)}
           onEvent={emit}
+          reviewEdit={phase.fromReview === true}
         />
       )}
 
