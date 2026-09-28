@@ -413,6 +413,14 @@ describe("sections", () => {
       }),
     );
     expectIssue(issues, "section.empty", { kind: "section", sectionKey: "extra" });
+    // A "screen" component shows participants nothing (neither the freeze nor
+    // the participant app renders one), so it does not make a section non-empty.
+    const screenOnly = validateDraft(
+      edit((d) => {
+        d.composition.sections.push({ key: "extra", title: "Extra", components: [{ kind: "screen", screen: "finish" }] });
+      }),
+    );
+    expectIssue(screenOnly, "section.empty", { kind: "section", sectionKey: "extra" });
   });
 
   it("with the same ID", () => {
@@ -527,11 +535,58 @@ describe("licensed, protected and identifying content", () => {
     expectIssue(issues, "locked.order_changed", { kind: "block", sectionKey: "hands_and_ladders", field: "items" });
   });
 
+  it("rewording a validated instrument after declaring the draft's copy modifiable", () => {
+    // Review fix: the draft's own licence used to decide whether it was locked.
+    const issues = validateDraft(
+      edit((d) => {
+        instrument(d, "sdq25_s").licence.modifiable = "yes";
+        item(d, "sdq25_s.q3").stem.text = "I get headaches";
+      }),
+      { baseline: live },
+    );
+    expectIssue(issues, "locked.question", { kind: "question", itemKey: "sdq25_s.q3" });
+    expectIssue(issues, "locked.definition", { kind: "block", refKey: "sdq25_s@1.0/en-GB/self/standard" });
+  });
+
+  it("splitting a validated instrument across sections", () => {
+    const split = (d: StudioDraft) => {
+      const sdq = section(d, "wellbeing").components[1];
+      const keys = (instrument(d, "sdq25_s").forms[0].items as Loose[]).map((i) => i.key as string);
+      sdq.items = keys.slice(0, 10);
+      section(d, "sleep").components.push({ ...structuredClone(sdq), items: keys.slice(10) });
+    };
+    expectIssue(validateDraft(edit(split)), "locked.split", { kind: "block", sectionKey: "wellbeing", field: "items" });
+    // Re-licensing the draft's copy does not get round it once there is a published version.
+    const relicensed = edit((d) => {
+      split(d);
+      instrument(d, "sdq25_s").licence.modifiable = "yes";
+    });
+    expectIssue(validateDraft(relicensed, { baseline: live }), "locked.split", { kind: "block", field: "items" });
+  });
+
+  it("a validated instrument in a survey never published is held to the library, when it is given", () => {
+    const locked = Object.fromEntries(Object.entries(live.instruments).filter(([, def]) => def.licence.modifiable !== "yes"));
+    const library: ValidationContext = { reference: locked, referenceScales: live.scales, referenceScoring: live.scoring };
+    expect(errors(validateDraft(live, library))).toEqual([]);
+    const reworded = edit((d) => (item(d, "sdq25_s.q3").stem.text = "I get headaches"));
+    expectIssue(validateDraft(reworded, library), "locked.introduced", { kind: "block", refKey: "sdq25_s@1.0/en-GB/self/standard" });
+    const relabelled = edit((d) => (d.scales["scale.sdq_3pt"]!.options[2]!.label = "Clearly True"));
+    expectIssue(validateDraft(relabelled, library), "locked.scale", { itemKey: "sdq25_s.q1" });
+    // Without the library nothing can be said, as before.
+    expect(errors(validateDraft(reworded))).toEqual([]);
+  });
+
   it("changing the consent wording without unlocking it", () => {
     const reword = (d: StudioDraft) => {
       item(d, "ybm_intro_consent.consent").statements[5].text.text = "I agree to take part";
     };
     expectIssue(validateDraft(edit(reword), { baseline: live }), "protected.question", { itemKey: "ybm_intro_consent.consent" });
+    // An unlock entry with nothing in it records no acknowledgement, so it unlocks nothing.
+    const hollow = edit((d) => {
+      reword(d);
+      (d.unlocked as Loose)["ybm_intro_consent"] = null;
+    });
+    expectIssue(validateDraft(hollow, { baseline: live }), "protected.question", { itemKey: "ybm_intro_consent.consent" });
     const unlocked = edit((d) => {
       reword(d);
       d.unlocked["ybm_intro_consent"] = { instrument: "ybm_intro_consent", by: "a@b.c", at: "2026-09-28T00:00:00Z", reason: "Approved amendment 3" };
@@ -566,6 +621,20 @@ describe("licensed, protected and identifying content", () => {
     );
     expectIssue(issues, "linkage.type_changed", { itemKey: "ybm_identity.ps_postcode_letters", field: "responseType" });
     expectIssue(issues, "linkage.variable_changed", { itemKey: "ybm_identity.ps_mother_initials", field: "variable" });
+  });
+
+  it("recoding the birth-month options, once unlocked, warns that participant codes will change", () => {
+    // Ingest builds the code from the option *code*, so this breaks linkage as
+    // surely as a change to the question — docs/16 R5: any other change warns.
+    const issues = validateDraft(
+      edit((d) => {
+        d.unlocked["ybm_identity"] = { instrument: "ybm_identity", by: "a@b.c", at: "2026-09-28T00:00:00Z", reason: "tidy" };
+        const scale = item(d, "ybm_identity.ps_birth_month").scale as string;
+        for (const option of d.scales[scale]!.options) option.code += 100;
+      }),
+      { baseline: live },
+    );
+    expectIssue(issues, "linkage.changed", { itemKey: "ybm_identity.ps_birth_month" }, "warning");
   });
 
   it("a name or date of birth not marked identifying", () => {

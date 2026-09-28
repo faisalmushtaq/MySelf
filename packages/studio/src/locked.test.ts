@@ -3,7 +3,7 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import type { StudioDraft } from "./contract.js";
 import { extractDraft } from "./draft.js";
-import { editTier, lockedDifferences, lockedFingerprint, protectedDifferences } from "./locked.js";
+import { editTier, isUnlocked, lockedDifferences, lockedFingerprint, lockedTest, protectedDifferences } from "./locked.js";
 
 // Test-only: drafts are edited here as plain JSON, the way the editor edits them.
 type Loose = Record<string, any>;
@@ -30,6 +30,29 @@ describe("tiers", () => {
       "editable",
     );
     expect(editTier(baseline.instruments["ybm_gaming@1.0/en-GB/self/standard"], {})).toBe("editable");
+  });
+
+  it("count only a real unlock record: one with a reason, for that module", () => {
+    const record = { instrument: "ybm_intro_consent", by: "a@b.c", at: "2026-09-28T00:00:00Z", reason: "Amendment 3 approved" };
+    expect(isUnlocked({ ybm_intro_consent: record }, "ybm_intro_consent")).toBe(true);
+    expect(isUnlocked({ ybm_intro_consent: null as never }, "ybm_intro_consent")).toBe(false);
+    expect(isUnlocked({ ybm_intro_consent: { ...record, reason: "  " } }, "ybm_intro_consent")).toBe(false);
+    expect(isUnlocked({ ybm_intro_consent: { ...record, instrument: "ybm_identity" } }, "ybm_intro_consent")).toBe(false);
+    expect(isUnlocked(undefined, "ybm_intro_consent")).toBe(false);
+    // …so a hollow record leaves the module protected.
+    expect(editTier(baseline.instruments[CONSENT], { ybm_intro_consent: null as never })).toBe("protected");
+  });
+
+  it("take a licence from the published version and the library, not from the draft's copy", () => {
+    const relicensed = { ...(structuredClone(baseline.instruments[SDQ]) as Loose), licence: { status: "open", modifiable: "yes" } };
+    // The draft's copy on its own would say "editable"…
+    expect(editTier(relicensed, {})).toBe("editable");
+    // …but the published version says SDQ is licensed, at this reference or any other.
+    expect(lockedTest(baseline)(relicensed, SDQ, {})).toBe(true);
+    expect(lockedTest(baseline)(relicensed, "sdq25_s@1.1/en-GB/self/standard", {})).toBe(true);
+    // The library says so too, for a survey that has never published it.
+    expect(lockedTest(undefined, { [SDQ]: baseline.instruments[SDQ]! })(relicensed, "sdq25_s@9.0/en-GB/self/standard", {})).toBe(true);
+    expect(lockedTest(baseline)(baseline.instruments["ybm_gaming@1.0/en-GB/self/standard"], "ybm_gaming@1.0/en-GB/self/standard", {})).toBe(false);
   });
 });
 
@@ -100,6 +123,47 @@ describe("lockedDifferences", () => {
     const reworded = edit((d) => (sdqItems(d)[0]!.stem.text = "Changed"));
     expect(lockedDifferences(reworded, withoutSdq, { reference: { [SDQ]: baseline.instruments[SDQ]! } })).toMatchObject([{ change: "introduced" }]);
   });
+
+  it("cannot be switched off by re-licensing the draft's copy", () => {
+    // The whole lock used to hinge on the draft's own `licence.modifiable`.
+    const relicensed = edit((d) => {
+      (d.instruments[SDQ] as Loose).licence.modifiable = "yes";
+      sdqItems(d)[2]!.stem.text = "I get headaches";
+    });
+    expect(lockedDifferences(relicensed, baseline).map((x) => [x.change, x.itemKey])).toEqual([
+      ["definition", undefined], // the licence itself
+      ["question", "sdq25_s.q3"],
+    ]);
+
+    // Nor by a re-licensed, reworded copy at a new version.
+    const copied = edit((d) => {
+      const def = structuredClone(d.instruments[SDQ]) as Loose;
+      delete d.instruments[SDQ];
+      Object.assign(def, { version: "1.1", licence: { ...def.licence, modifiable: "yes" } });
+      def.forms[0].items[2].stem.text = "I get headaches";
+      d.instruments["sdq25_s@1.1/en-GB/self/standard"] = def as never;
+    });
+    expect(lockedDifferences(copied, baseline)).toMatchObject([{ change: "introduced", refKey: "sdq25_s@1.1/en-GB/self/standard" }]);
+  });
+
+  it("holds an instrument added from the library to the library's answer options and scoring too", () => {
+    // Published without SDQ, its options or its scoring; the draft adds it.
+    const without = structuredClone(baseline);
+    delete without.instruments[SDQ];
+    delete without.scales["scale.sdq_3pt"];
+    delete without.scoring["score.sdq25_s"];
+    const library = { reference: { [SDQ]: baseline.instruments[SDQ]! }, referenceScales: baseline.scales, referenceScoring: baseline.scoring };
+    expect(lockedDifferences(baseline, without, library)).toEqual([]);
+
+    // The instrument matches the library, but its options were relabelled and its scoring emptied.
+    const tampered = edit((d) => {
+      d.scales["scale.sdq_3pt"]!.options[2]!.label = "Clearly True";
+      (d.scoring["score.sdq25_s"] as Loose).steps = [];
+    });
+    expect(lockedDifferences(tampered, without, library).map((x) => x.change)).toEqual(["scale", "scoring"]);
+    // With no library options to compare with, they can't be vouched for.
+    expect(lockedDifferences(baseline, without, { reference: library.reference }).map((x) => x.change)).toEqual(["scale", "scoring"]);
+  });
 });
 
 describe("protectedDifferences", () => {
@@ -110,6 +174,9 @@ describe("protectedDifferences", () => {
     expect(protectedDifferences(draft, baseline)).toMatchObject([{ change: "question", itemKey: "ybm_intro_consent.consent" }]);
     draft.unlocked["ybm_intro_consent"] = { instrument: "ybm_intro_consent", by: "a@b.c", at: "2026-09-28T00:00:00Z", reason: "Amendment approved" };
     expect(protectedDifferences(draft, baseline)).toEqual([]);
+    // An entry with no acknowledgement in it is not an unlock.
+    draft.unlocked["ybm_intro_consent"] = { ...draft.unlocked["ybm_intro_consent"], reason: "" };
+    expect(protectedDifferences(draft, baseline)).toMatchObject([{ change: "question", itemKey: "ybm_intro_consent.consent" }]);
   });
 
   it("allows help text and notes without an unlock", () => {

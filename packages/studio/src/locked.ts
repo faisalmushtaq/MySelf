@@ -1,5 +1,5 @@
 import { canonicalJson, instrumentVersion, moduleDefinition, responseScale, scoringDefinition } from "@myself/schema";
-import type { InstrumentOrModule, StudioDraft } from "./contract.js";
+import type { InstrumentOrModule, ScaleInput, ScoringInput, StudioDraft } from "./contract.js";
 
 /**
  * What the Studio may not change (docs/16 §4.4).
@@ -62,19 +62,84 @@ export const LINKAGE_ITEM_KEYS: readonly string[] = [
 export type EditTier = "locked" | "protected" | "editable";
 
 /**
- * The tier an instrument is edited under. Anything whose licence does not say
- * plainly that the wording may be modified is locked — including a definition
- * too malformed to say, which fails closed.
+ * Whether a protected module has been unlocked (docs/16 §4.4).
+ *
+ * The unlock is what records the ethics or linkage acknowledgement, so only a
+ * real record counts: an entry that is null, has no reason, or names another
+ * module is not one. (Review fix: any own key used to count, so a draft
+ * carrying `unlocked: { ybm_intro_consent: null }` passed as unlocked.)
+ */
+export function isUnlocked(unlocked: StudioDraft["unlocked"] | undefined, instrument: string): boolean {
+  if (!unlocked || typeof unlocked !== "object" || !Object.prototype.hasOwnProperty.call(unlocked, instrument)) return false;
+  const record = (unlocked as Record<string, unknown>)[instrument];
+  if (!record || typeof record !== "object") return false;
+  const r = record as { instrument?: unknown; reason?: unknown };
+  if (typeof r.reason !== "string" || r.reason.trim() === "") return false;
+  return r.instrument === undefined || r.instrument === instrument;
+}
+
+/**
+ * The tier an instrument is edited under, judged from this definition alone.
+ * Anything whose licence does not say plainly that the wording may be modified
+ * is locked — including a definition too malformed to say, which fails closed.
+ *
+ * The draft's copy is written by the editor, so on its own this is not enough
+ * to decide what must stay unchanged: see `lockedTest`, which also consults the
+ * published version and the library.
  */
 export function editTier(def: unknown, unlocked: StudioDraft["unlocked"] | undefined): EditTier {
   if (!def || typeof def !== "object") return "editable";
   const d = def as { instrument?: unknown; licence?: { modifiable?: unknown } };
   if (d.licence?.modifiable !== "yes") return "locked";
   const key = typeof d.instrument === "string" ? d.instrument : "";
-  if (PROTECTED_INSTRUMENTS.includes(key) && !(unlocked && Object.prototype.hasOwnProperty.call(unlocked, key))) {
-    return "protected";
-  }
+  if (PROTECTED_INSTRUMENTS.includes(key) && !isUnlocked(unlocked, key)) return "protected";
   return "editable";
+}
+
+function instrumentKeyOf(def: unknown): string | null {
+  const key = (def as { instrument?: unknown } | null | undefined)?.instrument;
+  return typeof key === "string" ? key : null;
+}
+
+function licenceLocked(def: unknown): boolean {
+  return !!def && typeof def === "object" && (def as { licence?: { modifiable?: unknown } }).licence?.modifiable !== "yes";
+}
+
+/**
+ * Which of a draft's definitions are locked.
+ *
+ * A licence is a fact about the instrument, recorded in the version that was
+ * published and in the instrument library — not something an editor can grant
+ * by editing the draft's own copy. So a definition is locked when its own
+ * licence says so, or when the published version holds a locked definition at
+ * the same reference, or the published version or the library holds a locked
+ * definition of the same instrument (at any version).
+ *
+ * (Review fix: the tier used to be read from the draft's copy only, so setting
+ * `licence.modifiable: "yes"` on the draft's SDQ — or on a copy of it at a new
+ * version — switched every locked-content check off and let it be reworded.)
+ */
+export function lockedTest(
+  baseline: StudioDraft | undefined,
+  reference?: Record<string, unknown>,
+): (def: unknown, refKey: string, unlocked: StudioDraft["unlocked"] | undefined) => boolean {
+  const refKeys = new Set<string>();
+  const instruments = new Set<string>();
+  for (const [refKey, def] of Object.entries(baseline?.instruments ?? {})) {
+    if (!licenceLocked(def)) continue;
+    refKeys.add(refKey);
+    const key = instrumentKeyOf(def);
+    if (key) instruments.add(key);
+  }
+  for (const def of Object.values(reference ?? {})) {
+    const key = instrumentKeyOf(def);
+    if (key && licenceLocked(def)) instruments.add(key);
+  }
+  return (def, refKey, unlocked) => {
+    if (editTier(def, unlocked) === "locked" || refKeys.has(refKey)) return true;
+    const key = instrumentKeyOf(def);
+    return key !== null && instruments.has(key);
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -336,9 +401,9 @@ function compareDefinitions(
     const scaleKey = item["scale"];
     if (typeof scaleKey !== "string" || seen.has(scaleKey)) continue;
     seen.add(scaleKey);
-    const before = baseline.scales[scaleKey];
+    const before = baseline.scales?.[scaleKey];
     if (!before) continue; // a scale the item did not use before is already reported as a question change
-    if (canonicalJson(normaliseScale(draft.scales[scaleKey])) !== canonicalJson(normaliseScale(before))) {
+    if (canonicalJson(normaliseScale(draft.scales?.[scaleKey])) !== canonicalJson(normaliseScale(before))) {
       out.push({
         instrument,
         refKey,
@@ -350,8 +415,8 @@ function compareDefinitions(
   }
 
   const scoringKey = now["scoringKey"];
-  if (typeof scoringKey === "string" && baseline.scoring[scoringKey]) {
-    if (canonicalJson(normaliseScoring(draft.scoring[scoringKey])) !== canonicalJson(normaliseScoring(baseline.scoring[scoringKey]))) {
+  if (typeof scoringKey === "string" && baseline.scoring?.[scoringKey]) {
+    if (canonicalJson(normaliseScoring(draft.scoring?.[scoringKey])) !== canonicalJson(normaliseScoring(baseline.scoring[scoringKey]))) {
       out.push({
         instrument,
         refKey,
@@ -366,30 +431,110 @@ function compareDefinitions(
 export interface LockedOptions {
   /**
    * Known-good definitions of validated instruments — the instrument library —
-   * keyed by reference string. A locked instrument the baseline lacks is
-   * accepted when it matches one of these exactly: that is adding a licensed
-   * instrument as licensed, not editing one.
+   * keyed by reference string, each frozen to the one form its reference
+   * resolves to (as a manifest stores it). A locked instrument the baseline
+   * lacks is accepted when it matches one of these exactly, and its answer
+   * options and scoring rules match too: that is adding a licensed instrument
+   * as licensed, not editing one.
    */
   reference?: Record<string, InstrumentOrModule>;
+  /**
+   * The library's answer options by scale key, for instruments accepted through
+   * `reference`. Where a scale is missing here the published version's copy is
+   * used; where neither has it, the options cannot be vouched for and the
+   * instrument is refused.
+   */
+  referenceScales?: Record<string, ScaleInput>;
+  /** The library's scoring rules by key; used like `referenceScales`. */
+  referenceScoring?: Record<string, ScoringInput>;
+}
+
+/**
+ * The answer options and scoring rules of a locked instrument accepted through
+ * the library, checked against the library (or, failing that, the published
+ * version). The instrument definition alone does not carry them — they live in
+ * the draft's scale and scoring registries — so without this a library SDQ
+ * could be added with relabelled options or emptied scoring. (Review fix.)
+ */
+function introducedRegistries(
+  refKey: string,
+  def: unknown,
+  draft: StudioDraft,
+  baseline: StudioDraft,
+  options: LockedOptions,
+): LockedDifference[] {
+  const out: LockedDifference[] = [];
+  const now = normaliseDef(def);
+  const instrument = typeof now["instrument"] === "string" ? (now["instrument"] as string) : refKey;
+  const name = instrumentLabel(now, instrument);
+  const seen = new Set<string>();
+  for (const item of itemsOf(formsOf(now)[0])) {
+    const scaleKey = item["scale"];
+    if (typeof scaleKey !== "string" || seen.has(scaleKey)) continue;
+    seen.add(scaleKey);
+    const expected = options.referenceScales?.[scaleKey] ?? baseline.scales?.[scaleKey];
+    if (expected === undefined) {
+      out.push({
+        instrument,
+        refKey,
+        itemKey: `${instrument}.${String(item["key"])}`,
+        change: "scale",
+        message: `The answer options of ${name} (${scaleKey}) can't be checked against the instrument library, so they can't be shown to be the licensed ones. Add the instrument again from the library.`,
+      });
+    } else if (canonicalJson(normaliseScale(draft.scales?.[scaleKey])) !== canonicalJson(normaliseScale(expected))) {
+      out.push({
+        instrument,
+        refKey,
+        itemKey: `${instrument}.${String(item["key"])}`,
+        change: "scale",
+        message: `The answer options of ${name} (${scaleKey}) differ from the licensed version in the instrument library. Validated instruments must be used exactly as licensed; add it again from the library.`,
+      });
+    }
+  }
+  const scoringKey = now["scoringKey"];
+  if (typeof scoringKey === "string") {
+    const expected = options.referenceScoring?.[scoringKey] ?? baseline.scoring?.[scoringKey];
+    if (expected === undefined) {
+      out.push({
+        instrument,
+        refKey,
+        change: "scoring",
+        message: `The scoring rules of ${name} (${scoringKey}) can't be checked against the instrument library. Add the instrument again from the library.`,
+      });
+    } else if (canonicalJson(normaliseScoring(draft.scoring?.[scoringKey])) !== canonicalJson(normaliseScoring(expected))) {
+      out.push({
+        instrument,
+        refKey,
+        change: "scoring",
+        message: `The scoring rules of ${name} (${scoringKey}) differ from the licensed version in the instrument library. Add it again from the library.`,
+      });
+    }
+  }
+  return out;
 }
 
 /**
  * Every way the draft's locked instruments differ from the published version
  * it started from. Also reports a locked instrument the baseline does not have:
  * nothing in the draft vouches for its content, so it cannot be introduced by
- * editing.
+ * editing. Which instruments are locked is decided by `lockedTest`, never by
+ * the draft's own copy alone.
  */
 export function lockedDifferences(draft: StudioDraft, baseline: StudioDraft, options: LockedOptions = {}): LockedDifference[] {
   const out: LockedDifference[] = [];
+  const isLocked = lockedTest(baseline, options.reference);
   for (const [refKey, def] of Object.entries(draft.instruments ?? {})) {
-    if (editTier(def, draft.unlocked) !== "locked") continue;
+    if (!isLocked(def, refKey, draft.unlocked)) continue;
     const base = baseline.instruments?.[refKey];
     if (base) {
       out.push(...compareDefinitions(refKey, def, base, draft, baseline, { tier: "locked", allowed: LOCKED_ALLOWED_FIELDS }));
       continue;
     }
     const known = options.reference?.[refKey];
-    if (known && lockedFingerprint(def) === lockedFingerprint(known)) continue;
+    if (known && lockedFingerprint(def) === lockedFingerprint(known)) {
+      out.push(...introducedRegistries(refKey, def, draft, baseline, options));
+      continue;
+    }
     const name = instrumentLabel(def, refKey);
     out.push({
       instrument: String((def as { instrument?: unknown }).instrument ?? refKey),
@@ -415,7 +560,9 @@ export function protectedDifferences(draft: StudioDraft, baseline: StudioDraft):
   for (const [refKey, def] of Object.entries(draft.instruments ?? {})) {
     const instrument = (def as { instrument?: unknown } | null)?.instrument;
     if (typeof instrument === "string") draftByInstrument.set(instrument, refKey);
-    if (editTier(def, draft.unlocked) !== "protected") continue;
+    // By name, not by the draft's licence: a protected module whose copy has
+    // been re-licensed is still the consent or identity module. (Review fix.)
+    if (typeof instrument !== "string" || !PROTECTED_INSTRUMENTS.includes(instrument) || isUnlocked(draft.unlocked, instrument)) continue;
     const base = baseline.instruments?.[refKey];
     if (base) {
       out.push(...compareDefinitions(refKey, def, base, draft, baseline, { tier: "protected", allowed: PROTECTED_ALLOWED_FIELDS }));
@@ -432,7 +579,7 @@ export function protectedDifferences(draft: StudioDraft, baseline: StudioDraft):
     const instrument = (base as { instrument?: unknown } | null)?.instrument;
     if (typeof instrument !== "string" || !PROTECTED_INSTRUMENTS.includes(instrument)) continue;
     if (draftByInstrument.has(instrument)) continue;
-    if (Object.prototype.hasOwnProperty.call(draft.unlocked ?? {}, instrument)) continue;
+    if (isUnlocked(draft.unlocked, instrument)) continue;
     out.push({
       instrument,
       refKey,

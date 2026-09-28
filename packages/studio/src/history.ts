@@ -78,6 +78,12 @@ export function manifestIndex(manifest: unknown): ManifestIndex {
   return { itemKeys, variables };
 }
 
+/**
+ * Read-only sets, so the editor's own reserved-ID set (ops.ts, ReadonlySet) can
+ * be passed straight in. `itemKeys` and `variables` in each version must be
+ * stored exactly as `manifestIndex` returns them — aligned, neither sorted nor
+ * de-duplicated on its own — or the pairing below is wrong.
+ */
 export interface ReservedIds {
   itemKeys: ReadonlySet<string>;
   variables: ReadonlySet<string>;
