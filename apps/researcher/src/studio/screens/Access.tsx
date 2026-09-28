@@ -1,11 +1,11 @@
-import { useState } from "react";
+import { useId, useState, type ReactNode } from "react";
 import { STUDIO_ROLES, atLeast, type StudioRole } from "@myself/studio";
 import { studio, StudioCallError, useAccessConfig, useAudit, useMembers, useStudioSession, type MemberDoc } from "../data/index.js";
-import { formatDate, ROLE_DESCRIPTIONS, ROLE_NAMES, toDate } from "../format.js";
+import { formatDate, formatDateTime, ROLE_DESCRIPTIONS, ROLE_NAMES, toDate } from "../format.js";
 import { AuditList, LoadError } from "../shell/common.js";
 import { PageHead, Shell } from "../shell/Shell.js";
 import { ConfirmDialog } from "../ui/dialog.js";
-import { Badge, Button, Field, IconButton, Notice, Skeleton } from "../ui/kit.js";
+import { Badge, Button, Field, IconButton, InfoTip, Skeleton } from "../ui/kit.js";
 import { useToast } from "../ui/toast.js";
 
 /**
@@ -57,37 +57,75 @@ export function AccessScreen() {
   return (
     <Shell crumb="Who has access">
       <div className="stp-page">
-        <PageHead title="Who has access" lede="The Studio list is shared by every survey in the study." />
+        <PageHead title="Who has access" lede="Shared by every survey in the study." />
         <AccessPanel />
       </div>
     </Shell>
   );
 }
 
-export function AccessPanel() {
+/**
+ * One part of the access page: a section with a hairline above it on its own
+ * page, or a titled sub-part when the whole panel sits inside Settings.
+ */
+function Part({
+  id,
+  title,
+  nested,
+  description,
+  children,
+}: {
+  id: string;
+  title: string;
+  nested: boolean;
+  description?: ReactNode;
+  children: ReactNode;
+}) {
+  const Heading = nested ? "h3" : "h2";
+  return (
+    <section className={nested ? "stp-sub" : "stp-section"} aria-labelledby={id}>
+      <div className="stp-section-head">
+        <div>
+          <Heading id={id} className={nested ? "stp-h3" : "stp-h2"}>
+            {title}
+          </Heading>
+          {description ? <p>{description}</p> : null}
+        </div>
+      </div>
+      {children}
+    </section>
+  );
+}
+
+export function AccessPanel({ nested = false }: { nested?: boolean }) {
   const session = useStudioSession();
   if (!atLeast(session.role, "admin")) {
     const role = session.role ?? "viewer";
     return (
-      <section className="stp-card" aria-labelledby="access-you">
-        <h2 id="access-you" className="stp-h2">
-          Your access
-        </h2>
-        <p>
-          You&rsquo;re signed in as <strong>{session.user?.email}</strong> with the <strong>{ROLE_NAMES[role]}</strong>{" "}
-          role. {ROLE_DESCRIPTIONS[role]}
-        </p>
-        <p className="stp-muted">To change who has access, or your own role, ask a Studio admin.</p>
-      </section>
+      <Part id="access-you" title="Your access" nested={nested}>
+        <dl className="stp-kv">
+          <div>
+            <dt>Signed in as</dt>
+            <dd>{session.user?.email}</dd>
+          </div>
+          <div>
+            <dt>Role</dt>
+            <dd>
+              <strong>{ROLE_NAMES[role]}</strong> <span className="stp-muted">· {ROLE_DESCRIPTIONS[role]}</span>
+            </dd>
+          </div>
+        </dl>
+        <p className="stp-meta">To change who has access, or your own role, ask a Studio admin.</p>
+      </Part>
     );
   }
   return (
-    <div className="stp-stack">
-      <Members />
-      <Domains />
-      <RoleLegend />
-      <AccessActivity />
-    </div>
+    <>
+      <Members nested={nested} />
+      <Domains nested={nested} />
+      <RoleLegend nested={nested} />
+      <AccessActivity nested={nested} />
+    </>
   );
 }
 
@@ -125,7 +163,7 @@ function RoleSelect({
   );
 }
 
-function Members() {
+function Members({ nested }: { nested: boolean }) {
   const session = useStudioSession();
   const members = useMembers();
   const toast = useToast();
@@ -149,55 +187,79 @@ function Members() {
   };
 
   return (
-    <section className="stp-card" aria-labelledby="access-people">
-      <h2 id="access-people" className="stp-h2">
-        People
-      </h2>
-      <p className="stp-muted">Each person signs in with the Google account for exactly this address.</p>
+    <Part
+      id="access-people"
+      title="People"
+      nested={nested}
+      description="Each person signs in with the Google account for exactly this address."
+    >
       {members.status === "loading" ? (
         <Skeleton lines={4} label="Loading people with access" />
       ) : members.status === "error" ? (
         <LoadError error={members.error} retry={members.retry} />
       ) : (
         <div className="stp-table-wrap">
-          <table className="stp-table">
+          <table className="stp-table stp-members">
             <thead>
               <tr>
                 <th scope="col">Email</th>
-                <th scope="col">Role</th>
-                <th scope="col">Added</th>
-                <th scope="col">
+                <th scope="col" className="stp-col-role">
+                  Role
+                </th>
+                <th scope="col" className="stp-col-added stp-hide-narrow">
+                  Added
+                </th>
+                <th scope="col" className="stp-col-by stp-hide-narrow">
+                  Added by
+                </th>
+                <th scope="col" className="stp-cell-action">
                   <span className="st-sr">Remove</span>
                 </th>
               </tr>
             </thead>
             <tbody>
               {members.data.length === 0 ? (
-                <tr>
-                  <td colSpan={4} className="stp-muted">
-                    Nobody is listed individually yet.
-                  </td>
+                <tr className="stp-empty-row">
+                  <td colSpan={5}>Nobody is listed individually yet.</td>
                 </tr>
               ) : (
                 members.data.map((m) => {
                   const self = m.email.toLowerCase() === me;
+                  const added = toDate(m.addedAt);
                   return (
                     <tr key={m.email}>
                       <th scope="row" className="stp-cell-email">
-                        {m.email} {self ? <Badge tone="muted">You</Badge> : null}
+                        {m.email}
+                        {self ? <Badge>You</Badge> : null}
                       </th>
                       <td>
-                        <RoleSelect
-                          label={`Role for ${m.email}`}
-                          value={m.role}
-                          disabled={self || busy === m.email}
-                          onChange={(role) => void setRole(m.email, role)}
-                        />
-                        {self ? <div className="st-field-hint">You can&rsquo;t change your own role.</div> : null}
+                        {self ? (
+                          <span className="stp-role-text">
+                            {ROLE_NAMES[m.role]}
+                            <InfoTip label="your role" text="You can’t change your own role. Ask another admin." />
+                          </span>
+                        ) : (
+                          <RoleSelect
+                            label={`Role for ${m.email}`}
+                            value={m.role}
+                            disabled={busy === m.email}
+                            onChange={(role) => void setRole(m.email, role)}
+                          />
+                        )}
                       </td>
-                      <td>
-                        {formatDate(toDate(m.addedAt))}
-                        {m.addedByEmail ? <div className="st-field-hint">by {m.addedByEmail}</div> : null}
+                      <td className="stp-hide-narrow">
+                        <span className="stp-muted" title={formatDateTime(added)}>
+                          {formatDate(added)}
+                        </span>
+                      </td>
+                      <td className="stp-hide-narrow">
+                        {m.addedByEmail ? (
+                          <span className="stp-muted stp-truncate" title={m.addedByEmail}>
+                            {m.addedByEmail}
+                          </span>
+                        ) : (
+                          <span className="stp-meta">—</span>
+                        )}
                       </td>
                       <td className="stp-cell-action">
                         {self ? null : (
@@ -233,7 +295,7 @@ function Members() {
           }}
         />
       ) : null}
-    </section>
+    </Part>
   );
 }
 
@@ -246,6 +308,7 @@ function AddMember({ existing, onAdd }: { existing: MemberDoc[]; onAdd: (email: 
   const [role, setRole] = useState<StudioRole>("editor");
   const [submitted, setSubmitted] = useState(false);
   const [busy, setBusy] = useState(false);
+  const hintId = useId();
   const normalised = email.trim().toLowerCase();
   const already = existing.find((m) => m.email.toLowerCase() === normalised);
   const problem = emailProblem(normalised) ?? (already ? `${normalised} is already listed as ${ROLE_NAMES[already.role]}. Change their role in the table.` : null);
@@ -268,9 +331,8 @@ function AddMember({ existing, onAdd }: { existing: MemberDoc[]; onAdd: (email: 
         });
       }}
     >
-      <h3 className="stp-h3">Add a person</h3>
       <div className="stp-inline-fields">
-        <Field label="Email address" error={submitted ? problem : null}>
+        <Field label="Add a person" error={submitted ? problem : null}>
           {(p) => (
             <input
               {...p}
@@ -284,8 +346,8 @@ function AddMember({ existing, onAdd }: { existing: MemberDoc[]; onAdd: (email: 
             />
           )}
         </Field>
-        <Field label="Role" hint={ROLE_DESCRIPTIONS[role]}>
-          {(p) => <RoleSelect id={p.id} describedBy={p["aria-describedby"]} value={role} onChange={setRole} />}
+        <Field label="Role">
+          {(p) => <RoleSelect id={p.id} describedBy={hintId} value={role} onChange={setRole} />}
         </Field>
         <div className="stp-inline-submit">
           <Button type="submit" variant="primary" icon="plus" busy={busy}>
@@ -293,11 +355,17 @@ function AddMember({ existing, onAdd }: { existing: MemberDoc[]; onAdd: (email: 
           </Button>
         </div>
       </div>
+      <p id={hintId} className="stp-role-hint">
+        {ROLE_DESCRIPTIONS[role]}
+      </p>
     </form>
   );
 }
 
-function Domains() {
+const DOMAIN_HELP =
+  "A domain rule lets in every verified Google Workspace account at that domain with the role you choose, unless the person is listed individually above. Use it for an organisation that manages its own Google accounts. Personal email domains such as gmail.com are refused, because anyone can create an account there.";
+
+function Domains({ nested }: { nested: boolean }) {
   const config = useAccessConfig();
   const toast = useToast();
   const [domain, setDomain] = useState("");
@@ -305,6 +373,7 @@ function Domains() {
   const [submitted, setSubmitted] = useState(false);
   const [confirm, setConfirm] = useState<{ domain: string; role: StudioRole | null } | null>(null);
   const [busy, setBusy] = useState(false);
+  const hintId = useId();
   const normalised = domain.trim().toLowerCase().replace(/^@/, "");
   const problem = domainProblem(normalised);
   const rules = config.status === "ready" && config.data ? Object.entries(config.data.domains).sort(([a], [b]) => a.localeCompare(b)) : [];
@@ -328,32 +397,56 @@ function Domains() {
   };
 
   return (
-    <section className="stp-card" aria-labelledby="access-domains">
-      <h2 id="access-domains" className="stp-h2">
-        Whole organisations
-      </h2>
-      <p className="stp-muted">
-        A domain rule lets in every verified Google Workspace account at that domain with the role you choose, unless the
-        person is listed individually above. Use it for an organisation that manages its own Google accounts. Personal
-        email domains such as gmail.com are refused by the server, because anyone can create an account there.
-      </p>
+    <Part
+      id="access-domains"
+      title="Whole organisations"
+      nested={nested}
+      description={
+        <>
+          Let in every verified account at a domain. <InfoTip label="domain rules" text={DOMAIN_HELP} />
+        </>
+      }
+    >
       {config.status === "loading" ? (
         <Skeleton lines={2} label="Loading domain rules" />
       ) : config.status === "error" ? (
         <LoadError error={config.error} retry={config.retry} />
-      ) : rules.length === 0 ? (
-        <p>No domain rules.</p>
       ) : (
-        <ul className="stp-rules">
-          {rules.map(([d, r]) => (
-            <li key={d}>
-              <span>
-                Everyone at <strong>{d}</strong> → {ROLE_NAMES[r]}
-              </span>
-              <IconButton icon="trash" variant="danger" label={`Remove the rule for ${d}`} onClick={() => setConfirm({ domain: d, role: null })} />
-            </li>
-          ))}
-        </ul>
+        <div className="stp-table-wrap">
+          <table className="stp-table stp-rules">
+            <thead>
+              <tr>
+                <th scope="col">Domain</th>
+                <th scope="col" className="stp-col-role">
+                  Role
+                </th>
+                <th scope="col" className="stp-cell-action">
+                  <span className="st-sr">Remove</span>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {rules.length === 0 ? (
+                <tr className="stp-empty-row">
+                  <td colSpan={3}>No domain rules.</td>
+                </tr>
+              ) : (
+                rules.map(([d, r]) => (
+                  <tr key={d}>
+                    <th scope="row" className="stp-cell-email">
+                      <span className="st-sr">Everyone at </span>
+                      {d}
+                    </th>
+                    <td>{ROLE_NAMES[r]}</td>
+                    <td className="stp-cell-action">
+                      <IconButton icon="trash" variant="danger" label={`Remove the rule for ${d}`} onClick={() => setConfirm({ domain: d, role: null })} />
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
       )}
       <form
         className="stp-inline-form"
@@ -365,9 +458,8 @@ function Domains() {
           setConfirm({ domain: normalised, role });
         }}
       >
-        <h3 className="stp-h3">Add a domain rule</h3>
         <div className="stp-inline-fields">
-          <Field label="Domain" error={submitted ? problem : null}>
+          <Field label="Add a domain" error={submitted ? problem : null}>
             {(p) => (
               <input
                 {...p}
@@ -380,8 +472,8 @@ function Domains() {
               />
             )}
           </Field>
-          <Field label="Role" hint={ROLE_DESCRIPTIONS[role]}>
-            {(p) => <RoleSelect id={p.id} describedBy={p["aria-describedby"]} value={role} onChange={setRole} />}
+          <Field label="Role">
+            {(p) => <RoleSelect id={p.id} describedBy={hintId} value={role} onChange={setRole} />}
           </Field>
           <div className="stp-inline-submit">
             <Button type="submit" variant="secondary" icon="plus">
@@ -389,6 +481,9 @@ function Domains() {
             </Button>
           </div>
         </div>
+        <p id={hintId} className="stp-role-hint">
+          {ROLE_DESCRIPTIONS[role]}
+        </p>
       </form>
       {confirm ? (
         <ConfirmDialog
@@ -412,17 +507,14 @@ function Domains() {
           onConfirm={() => apply(confirm)}
         />
       ) : null}
-    </section>
+    </Part>
   );
 }
 
-function RoleLegend() {
+function RoleLegend({ nested }: { nested: boolean }) {
   return (
-    <section className="stp-card" aria-labelledby="access-roles">
-      <h2 id="access-roles" className="stp-h2">
-        What each role can do
-      </h2>
-      <dl className="stp-roles">
+    <Part id="access-roles" title="Roles" nested={nested} description="A study owner (from the researcher view) counts as an admin here.">
+      <dl className="stp-kv">
         {STUDIO_ROLES.map((r) => (
           <div key={r}>
             <dt>{ROLE_NAMES[r]}</dt>
@@ -430,18 +522,14 @@ function RoleLegend() {
           </div>
         ))}
       </dl>
-      <Notice>An owner of the study (from the researcher view) is treated as an admin here.</Notice>
-    </section>
+    </Part>
   );
 }
 
-function AccessActivity() {
+function AccessActivity({ nested }: { nested: boolean }) {
   const audit = useAudit(null, 50);
   return (
-    <section className="stp-card" aria-labelledby="access-activity">
-      <h2 id="access-activity" className="stp-h2">
-        Changes to access
-      </h2>
+    <Part id="access-activity" title="Changes to access" nested={nested}>
       {audit.status === "loading" ? (
         <Skeleton lines={3} label="Loading changes to access" />
       ) : audit.status === "error" ? (
@@ -449,6 +537,6 @@ function AccessActivity() {
       ) : (
         <AuditList rows={audit.data.filter((r) => r.action.startsWith("access."))} empty="Adding, changing and removing people is recorded here." />
       )}
-    </section>
+    </Part>
   );
 }

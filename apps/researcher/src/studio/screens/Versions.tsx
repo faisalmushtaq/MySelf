@@ -15,12 +15,12 @@ import {
 } from "../data/index.js";
 import { diffDrafts } from "../data/model-adapter.js";
 import { loadRelease, useRelease } from "../data/releases.js";
-import { downloadText, formatDateTime, plural, toDate, versionLabel } from "../format.js";
+import { downloadText, formatDate, formatDateTime, toDate, versionLabel } from "../format.js";
 import { navigate } from "../router.js";
 import { AuditList, ChangeList, LoadError, changeHeadline } from "../shell/common.js";
 import { PageHead } from "../shell/Shell.js";
-import { ConfirmDialog, Dialog } from "../ui/dialog.js";
-import { Badge, Button, EmptyState, Field, MenuButton, Notice, Skeleton, type MenuItem } from "../ui/kit.js";
+import { Dialog } from "../ui/dialog.js";
+import { Button, EmptyState, Field, IconButton, InfoTip, MenuButton, Notice, Skeleton, StatusDot, type MenuItem } from "../ui/kit.js";
 import { TabPanel, Tabs } from "../ui/tabs.js";
 import { useToast } from "../ui/toast.js";
 
@@ -33,6 +33,9 @@ import { useToast } from "../ui/toast.js";
 
 type View = "history" | "compare" | "activity";
 const DRAFT = "__draft__";
+
+const LIVE_HELP =
+  "Participants’ devices pick up a change of version at their next start screen; a sitting already under way always finishes on the version it started.";
 
 export function VersionsScreen({ surveyId, survey, editor }: { surveyId: string; survey: SurveyDoc | null; editor: DraftEditor }) {
   const versions = useVersions(surveyId);
@@ -47,9 +50,17 @@ export function VersionsScreen({ surveyId, survey, editor }: { surveyId: string;
       <PageHead
         title="Versions"
         lede={
-          live
-            ? `${versionLabel(live.version)} is live. Participants’ devices pick up a change of version at their next start screen; a sitting already under way always finishes on the version it started.`
-            : "Nothing has been published from this survey yet."
+          live ? (
+            <>
+              <span className="stp-dotted">
+                <StatusDot tone="accent" />
+                {versionLabel(live.version)} is live
+              </span>
+              <InfoTip label="the live version" text={LIVE_HELP} />
+            </>
+          ) : (
+            "Nothing published yet."
+          )
         }
       />
       <Tabs
@@ -71,26 +82,58 @@ export function VersionsScreen({ surveyId, survey, editor }: { surveyId: string;
         ) : view === "history" ? (
           versions.data.length === 0 ? (
             <EmptyState icon="publish" title="No versions yet">
-              <p>When someone publishes the draft, each version appears here with its release note and what changed.</p>
+              <p>Each published version appears here, with its note and what changed.</p>
             </EmptyState>
           ) : (
-            <ol className="stp-versions" aria-label="Published versions, newest first">
-              {versions.data.map((v) => (
-                <VersionCard
-                  key={v.version}
-                  surveyId={surveyId}
-                  version={v}
-                  live={live?.hash === v.hash}
-                  liveVersion={live?.version ?? null}
-                  stats={stats}
-                  editor={editor}
-                  onCompare={() => {
-                    setCompare({ from: v.version, to: DRAFT });
-                    setView("compare");
-                  }}
-                />
-              ))}
-            </ol>
+            <div className="stp-table-wrap">
+              <table className="stp-table stp-vtable" aria-label="Published versions, newest first">
+                <thead>
+                  <tr>
+                    <th scope="col" className="stp-col-toggle">
+                      <span className="st-sr">Details</span>
+                    </th>
+                    <th scope="col" className="stp-col-version">
+                      Version
+                    </th>
+                    <th scope="col" className="stp-col-status">
+                      Status
+                    </th>
+                    <th scope="col" className="stp-col-when stp-hide-narrow">
+                      Published
+                    </th>
+                    <th scope="col" className="stp-col-by stp-hide-medium">
+                      By
+                    </th>
+                    <th scope="col" className="stp-hide-narrow">
+                      Note
+                    </th>
+                    <th scope="col" className="stp-col-sittings stp-num stp-hide-medium">
+                      Sittings
+                    </th>
+                    <th scope="col" className="stp-col-actions stp-cell-action">
+                      <span className="st-sr">Actions</span>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {versions.data.map((v) => (
+                    <VersionRow
+                      key={v.version}
+                      surveyId={surveyId}
+                      version={v}
+                      live={live?.hash === v.hash}
+                      liveVersion={live?.version ?? null}
+                      stats={stats}
+                      editor={editor}
+                      onCompare={() => {
+                        setCompare({ from: v.version, to: DRAFT });
+                        setView("compare");
+                      }}
+                    />
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )
         ) : view === "compare" ? (
           <CompareView
@@ -108,6 +151,14 @@ export function VersionsScreen({ surveyId, survey, editor }: { surveyId: string;
   );
 }
 
+/** Complete sittings, for the row; the details show complete and partial. */
+function sittingsShort(stats: Loadable<ResponseStatsResponse>, hash: string): { text: string; none: boolean } {
+  if (stats.status !== "ready") return { text: "—", none: true };
+  const s = stats.data.byHash[hash];
+  if (!s) return { text: "None", none: true };
+  return { text: `${s.complete.toLocaleString("en-GB")} complete`, none: false };
+}
+
 function sittings(stats: Loadable<ResponseStatsResponse>, hash: string): string {
   if (stats.status !== "ready") return "—";
   const s = stats.data.byHash[hash];
@@ -115,7 +166,7 @@ function sittings(stats: Loadable<ResponseStatsResponse>, hash: string): string 
   return `${s.complete.toLocaleString("en-GB")} complete · ${s.partial.toLocaleString("en-GB")} partial`;
 }
 
-function VersionCard({
+function VersionRow({
   surveyId,
   version: v,
   live,
@@ -137,9 +188,12 @@ function VersionCard({
   const canPublish = atLeast(session.role, "publisher");
   const [dialog, setDialog] = useState<"restore" | "activate" | null>(null);
   const [downloading, setDownloading] = useState(false);
+  const [open, setOpen] = useState(false);
   const label = versionLabel(v.version);
-  const headingId = useId();
+  const detailId = useId();
   const publishedAt = toDate(v.publishedAt);
+  const note = v.releaseNote?.trim() ? v.releaseNote : null;
+  const short = sittingsShort(stats, v.hash);
 
   const download = () => {
     setDownloading(true);
@@ -168,67 +222,125 @@ function VersionCard({
   ];
 
   return (
-    <li className={`stp-card stp-version${live ? " live" : ""}`} aria-labelledby={headingId}>
-      <div className="stp-version-head">
-        <div className="stp-version-title">
-          <h2 id={headingId} className="stp-h2">
-            {label}
-          </h2>
+    <>
+      <tr className={open ? "open" : undefined}>
+        <td className="stp-col-toggle">
+          <IconButton
+            size="sm"
+            icon={open ? "chevron-down" : "chevron-right"}
+            label={`Details of ${label}`}
+            aria-expanded={open}
+            aria-controls={open ? detailId : undefined}
+            onClick={() => setOpen((o) => !o)}
+          />
+        </td>
+        <th scope="row">
+          <span className="stp-version-label">{label}</span>
+        </th>
+        <td>
           {live ? (
-            <Badge tone="accent" icon="check">
+            <span className="stp-dotted">
+              <StatusDot tone="accent" />
               Live
-            </Badge>
+            </span>
           ) : (
-            <Badge tone="muted">Previous</Badge>
+            <span className="stp-dotted stp-muted">
+              <StatusDot />
+              Previous
+            </span>
           )}
-          {v.source === "repository" ? <Badge title="Published before the Studio existed, from the project’s releases folder">From the repository</Badge> : null}
-        </div>
-        <div className="stp-actions">
-          <Button size="sm" variant="ghost" icon="compare" onClick={onCompare}>
-            Compare with draft
-          </Button>
-          <MenuButton label={`More actions for ${label}`} items={items} />
-        </div>
-      </div>
-      <p className="stp-version-meta">
-        Published {formatDateTime(publishedAt)}
-        {v.publishedByEmail ? ` by ${v.publishedByEmail}` : ""}
-      </p>
-      <p className="stp-version-note">{v.releaseNote?.trim() ? v.releaseNote : <span className="stp-muted">No release note.</span>}</p>
-      <dl className="stp-facts">
-        <div>
-          <dt>Authors</dt>
-          <dd>{v.authors.length > 0 ? v.authors.join(", ") : "—"}</dd>
-        </div>
-        <div>
-          <dt>Sittings recorded</dt>
-          <dd>{sittings(stats, v.hash)}</dd>
-        </div>
-        <div>
-          <dt>Questions</dt>
-          <dd>{v.itemKeys.length.toLocaleString("en-GB")}</dd>
-        </div>
-        <div>
-          <dt>Release</dt>
-          <dd>
-            <code>{v.releaseKey}</code>
-          </dd>
-        </div>
-      </dl>
-      {v.changeSummary ? (
-        <details className="stp-details">
-          <summary>What changed — {changeHeadline(v.changeSummary)}</summary>
-          <ChangeList summary={v.changeSummary} />
-        </details>
+        </td>
+        <td className="stp-hide-narrow">
+          <span className="stp-muted stp-truncate" title={formatDateTime(publishedAt)}>
+            {formatDate(publishedAt)}
+          </span>
+        </td>
+        <td className="stp-hide-medium">
+          {v.publishedByEmail ? (
+            <span className="stp-truncate" title={v.publishedByEmail}>
+              {v.publishedByEmail}
+            </span>
+          ) : v.source === "repository" ? (
+            <span className="stp-meta" title="Published before the Studio existed, from the project’s releases folder">
+              Repository
+            </span>
+          ) : (
+            <span className="stp-meta">—</span>
+          )}
+        </td>
+        <td className="stp-hide-narrow">
+          {note ? (
+            <span className="stp-truncate" title={note}>
+              {note}
+            </span>
+          ) : (
+            <span className="stp-meta">No note</span>
+          )}
+        </td>
+        <td className="stp-num stp-hide-medium">
+          <span className={short.none ? "stp-meta" : undefined}>{short.text}</span>
+        </td>
+        <td className="stp-cell-action">
+          <span className="stp-actions">
+            <Button size="sm" variant="ghost" icon="compare" aria-label={`Compare ${label} with the draft`} onClick={onCompare}>
+              Compare
+            </Button>
+            <MenuButton label={`More actions for ${label}`} items={items} />
+          </span>
+          {dialog === "restore" ? (
+            <RestoreDialog surveyId={surveyId} version={v} liveVersion={liveVersion} editor={editor} onClose={() => setDialog(null)} />
+          ) : null}
+          {dialog === "activate" ? (
+            <ActivateDialog surveyId={surveyId} version={v} liveVersion={liveVersion} onClose={() => setDialog(null)} />
+          ) : null}
+        </td>
+      </tr>
+      {open ? (
+        <tr className="stp-vdetail" id={detailId}>
+          <td colSpan={8}>
+            <div className="stp-vdetail-inner">
+              <p className={`stp-version-note${note ? "" : " stp-meta"}`}>{note ?? "No release note."}</p>
+              <dl className="stp-kv stp-kv-compact">
+                <div>
+                  <dt>Published</dt>
+                  <dd>
+                    {formatDateTime(publishedAt)}
+                    {v.publishedByEmail ? ` by ${v.publishedByEmail}` : ""}
+                    {v.source === "repository" ? " · from the repository, before the Studio existed" : ""}
+                  </dd>
+                </div>
+                <div>
+                  <dt>Authors</dt>
+                  <dd>{v.authors.length > 0 ? v.authors.join(", ") : "—"}</dd>
+                </div>
+                <div>
+                  <dt>Sittings</dt>
+                  <dd>{sittings(stats, v.hash)}</dd>
+                </div>
+                <div>
+                  <dt>Questions</dt>
+                  <dd>{v.itemKeys.length.toLocaleString("en-GB")}</dd>
+                </div>
+                <div>
+                  <dt>Release</dt>
+                  <dd>
+                    <span className="stp-id">{v.releaseKey}</span>
+                  </dd>
+                </div>
+              </dl>
+              {v.changeSummary ? (
+                <div className="stp-vdetail-changes">
+                  <h3 className="stp-h3">
+                    What changed <span className="stp-count">{changeHeadline(v.changeSummary)}</span>
+                  </h3>
+                  <ChangeList summary={v.changeSummary} />
+                </div>
+              ) : null}
+            </div>
+          </td>
+        </tr>
       ) : null}
-
-      {dialog === "restore" ? (
-        <RestoreDialog surveyId={surveyId} version={v} liveVersion={liveVersion} editor={editor} onClose={() => setDialog(null)} />
-      ) : null}
-      {dialog === "activate" ? (
-        <ActivateDialog surveyId={surveyId} version={v} liveVersion={liveVersion} onClose={() => setDialog(null)} />
-      ) : null}
-    </li>
+    </>
   );
 }
 
@@ -257,6 +369,7 @@ function RestoreDialog({
       title={`Restore ${label} into the draft?`}
       onClose={onClose}
       dismissable={!busy}
+      width={480}
       footer={
         <>
           <Button variant="secondary" onClick={onClose} disabled={busy}>
@@ -293,14 +406,16 @@ function RestoreDialog({
         </>
       }
     >
-      <p className="stp-flush">
-        The working draft becomes a copy of {label}. Nothing is published: {liveVersion ? `${versionLabel(liveVersion)} stays live` : "nothing goes live"}{" "}
-        until someone publishes the draft.
-      </p>
-      <p>
-        Any changes in the draft that haven&rsquo;t been published are replaced. You can bring them back with Undo in the
-        editor in this tab until you close it; they aren&rsquo;t kept anywhere else.
-      </p>
+      <div className="st-confirm-body">
+        <p>
+          The draft becomes a copy of {label}. Nothing is published: {liveVersion ? `${versionLabel(liveVersion)} stays live` : "nothing goes live"}{" "}
+          until someone publishes the draft.
+        </p>
+        <p>
+          Unpublished changes in the draft are replaced. Undo in the editor brings them back until you close this tab;
+          they aren&rsquo;t kept anywhere else.
+        </p>
+      </div>
       {pending ? (
         <Notice
           tone="warn"
@@ -379,7 +494,7 @@ function ActivateDialog({
       title={`Make ${label} live again?`}
       onClose={onClose}
       dismissable={!busy}
-      width={560}
+      width={520}
       footer={
         <>
           <Button variant="secondary" onClick={onClose} disabled={busy}>
@@ -391,15 +506,17 @@ function ActivateDialog({
         </>
       }
     >
-      <p className="stp-flush">
-        This is the emergency switch. Participants&rsquo; devices change {liveVersion ? `from ${versionLabel(liveVersion)} ` : ""}to {label}{" "}
-        the next time they reach the start screen; sittings already under way finish on the version they started. The
-        draft isn&rsquo;t changed, and {liveVersion ? versionLabel(liveVersion) : "the current version"} stays in the history so you can switch back.
-      </p>
-      <p>
-        For an ordinary rollback, restore {label} into the draft and publish it as a new version instead — that keeps the
-        version history moving forward.
-      </p>
+      <div className="st-confirm-body">
+        <p>
+          This is the emergency switch. Devices change {liveVersion ? `from ${versionLabel(liveVersion)} ` : ""}to {label} at
+          their next start screen; sittings under way finish on the version they started. The draft isn&rsquo;t changed,
+          and {liveVersion ? versionLabel(liveVersion) : "the current version"} stays in the history so you can switch back.
+        </p>
+        <p>
+          For an ordinary rollback, restore {label} into the draft and publish it as a new version instead, so the history
+          keeps moving forward.
+        </p>
+      </div>
       <form
         onSubmit={(e) => {
           e.preventDefault();
@@ -463,6 +580,9 @@ function CompareView({
   const fromDraft = useDraftOf(versions, from, editor);
   const toDraft = useDraftOf(versions, to, editor);
   const nameOf = (c: string) => (c === DRAFT ? "the working draft" : versionLabel(c));
+  const shortName = (c: string) => (c === DRAFT ? "Working draft" : versionLabel(c));
+  const fromId = useId();
+  const toId = useId();
 
   const options = [
     { value: DRAFT, label: `Working draft${editor.hasUnsavedChanges ? " (including unsaved changes)" : ""}` },
@@ -481,31 +601,25 @@ function CompareView({
   return (
     <div className="stp-compare">
       <div className="stp-compare-pick">
-        <Field label="From">
-          {(p) => (
-            <select {...p} className="st-select" value={from} onChange={(e) => onSelection({ from: e.target.value, to })}>
-              {options.map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
-          )}
-        </Field>
+        <label htmlFor={fromId}>From</label>
+        <select id={fromId} className="st-select" value={from} onChange={(e) => onSelection({ from: e.target.value, to })}>
+          {options.map((o) => (
+            <option key={o.value} value={o.value}>
+              {o.label}
+            </option>
+          ))}
+        </select>
         <span className="stp-compare-arrow" aria-hidden="true">
           →
         </span>
-        <Field label="To">
-          {(p) => (
-            <select {...p} className="st-select" value={to} onChange={(e) => onSelection({ from, to: e.target.value })}>
-              {options.map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
-          )}
-        </Field>
+        <label htmlFor={toId}>To</label>
+        <select id={toId} className="st-select" value={to} onChange={(e) => onSelection({ from, to: e.target.value })}>
+          {options.map((o) => (
+            <option key={o.value} value={o.value}>
+              {o.label}
+            </option>
+          ))}
+        </select>
       </div>
       {fromDraft.status === "error" ? (
         <LoadError error={fromDraft.error} retry={fromDraft.retry} />
@@ -514,12 +628,20 @@ function CompareView({
       ) : !summary ? (
         <Skeleton lines={4} label="Comparing" />
       ) : (
-        <section className="stp-card" aria-live="polite">
-          <h2 className="stp-h2">
-            {from === to ? "Comparing a version with itself" : `From ${nameOf(from)} to ${nameOf(to)}`}
-          </h2>
-          <p className="stp-muted">{changeHeadline(summary)}</p>
-          <ChangeList summary={summary} empty={`No differences: ${nameOf(from)} and ${nameOf(to)} are the same.`} />
+        <section className="stp-compare-result" aria-live="polite" aria-labelledby={`${fromId}-result`}>
+          <div className="stp-section-head">
+            <div>
+              <h2 id={`${fromId}-result`} className="stp-h2">
+                {from === to ? `${shortName(from)}, compared with itself` : `From ${nameOf(from)} to ${nameOf(to)}`}
+              </h2>
+              <p>
+                {summary.entries.length > 0
+                  ? changeHeadline(summary)
+                  : `No differences: ${nameOf(from)} and ${nameOf(to)} are the same.`}
+              </p>
+            </div>
+          </div>
+          {summary.entries.length > 0 ? <ChangeList summary={summary} /> : null}
         </section>
       )}
     </div>

@@ -1,10 +1,10 @@
 import type { AuditDoc, ChangeEntry, ChangeKind, ChangeSummary } from "@myself/studio";
 import { formatDateTime, formatRelative, plural, toDate, versionLabel } from "../format.js";
-import { Badge, Button, EmptyState, Notice } from "../ui/kit.js";
+import { Badge, Button, EmptyState, InfoTip, Notice } from "../ui/kit.js";
 
 /**
  * Pieces several Studio pages share: a load failure with a retry, a change
- * summary as a readable list, and the activity log in sentences.
+ * summary as a tidy diff list, and the activity log in sentences.
  */
 
 export function LoadError({ error, retry }: { error: string; retry: () => void }) {
@@ -46,9 +46,12 @@ export function changeHeadline(summary: ChangeSummary): string {
   return `${parts.join(" · ")}.`;
 }
 
+const BREAKING_HELP =
+  "A breaking change alters how answers are coded or compared: data collected before and after it can’t be read as the same question.";
+
 /** A change summary grouped by kind, breaking changes marked in words as well as colour. */
 export function ChangeList({ summary, empty = "Nothing changed." }: { summary: ChangeSummary; empty?: string }) {
-  if (summary.entries.length === 0) return <p className="stp-muted">{empty}</p>;
+  if (summary.entries.length === 0) return <p className="stp-muted stp-flush">{empty}</p>;
   const breaking = summary.entries.some((e) => e.breaking);
   return (
     <div className="stp-changes">
@@ -56,9 +59,9 @@ export function ChangeList({ summary, empty = "Nothing changed." }: { summary: C
         <p className="stp-changes-note">
           <Badge tone="warn" icon="warning">
             Breaking
-          </Badge>{" "}
-          marks a change to how answers are coded or compared: data collected before and after it can&rsquo;t be read as
-          the same question.
+          </Badge>
+          <span>changes how answers are coded</span>
+          <InfoTip label="breaking changes" text={BREAKING_HELP} />
         </p>
       ) : null}
       {GROUPS.map((group) => {
@@ -81,10 +84,22 @@ export function ChangeList({ summary, empty = "Nothing changed." }: { summary: C
   );
 }
 
+/** The diff sign for a change: + for something added, − for something taken away, ~ for the rest. The group heading says it in words. */
+function signOf(kind: ChangeKind): { sign: string; tone: "add" | "remove" | "change" } {
+  if (kind.endsWith(".added") || kind.endsWith(".restored")) return { sign: "+", tone: "add" };
+  if (kind.endsWith(".removed") || kind.endsWith(".archived")) return { sign: "−", tone: "remove" };
+  if (kind.endsWith(".moved") || kind.endsWith(".reordered")) return { sign: "↕", tone: "change" };
+  return { sign: "~", tone: "change" };
+}
+
 function ChangeRow({ entry }: { entry: ChangeEntry }) {
+  const { sign, tone } = signOf(entry.kind);
   return (
     <li>
-      <span>{entry.message}</span>
+      <span className={`stp-change-sign ${tone}`} aria-hidden="true">
+        {sign}
+      </span>
+      <span className="stp-change-text">{entry.message}</span>
       {entry.breaking ? (
         <Badge tone="warn" icon="warning">
           Breaking
@@ -144,6 +159,7 @@ export function describeAudit(row: AuditDoc): string {
   }
 }
 
+/** The activity log: one compact line per event, newest first. */
 export function AuditList({ rows, empty }: { rows: AuditDoc[]; empty: string }) {
   if (rows.length === 0) return <EmptyState icon="history" title="No activity yet">{empty}</EmptyState>;
   return (

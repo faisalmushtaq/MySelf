@@ -2,13 +2,13 @@ import { useMemo, useState } from "react";
 import { atLeast } from "@myself/studio";
 import { studio, StudioCallError, useStudioSession, useSurveys, useVersions, type SurveyDoc } from "../data/index.js";
 import { SURVEY_ID } from "../firebase.js";
-import { formatDate, formatRelative, plural, toDate, versionLabel } from "../format.js";
-import { Link, navigate } from "../router.js";
+import { formatDate, formatDateTime, formatRelative, plural, toDate, versionLabel } from "../format.js";
+import { Link, navigate, type Route } from "../router.js";
 import { LoadError } from "../shell/common.js";
 import { PageHead, Shell } from "../shell/Shell.js";
 import { Dialog } from "../ui/dialog.js";
 import { Icon } from "../ui/icons.js";
-import { Badge, Button, EmptyState, Field, Notice, Skeleton } from "../ui/kit.js";
+import { Button, EmptyState, Field, InfoTip, Notice, Skeleton, StatusDot, Tooltip } from "../ui/kit.js";
 import { useToast } from "../ui/toast.js";
 
 /** Every survey in the study, what is live, and whether its draft has moved on. */
@@ -24,44 +24,55 @@ export function SurveysScreen() {
       <div className="stp-page">
         <PageHead
           title="Surveys"
-          lede="Each survey has one working draft, shared by everyone editing it, and the versions published from it."
           actions={
             isAdmin && surveys.status === "ready" && surveys.data.length > 0 ? (
-              <Button variant="secondary" icon="plus" onClick={() => setCreating(true)}>
+              <Button variant="primary" icon="plus" onClick={() => setCreating(true)}>
                 New survey
               </Button>
             ) : null
           }
         />
         {surveys.status === "loading" ? (
-          <div className="stp-card">
-            <Skeleton lines={4} label="Loading surveys" />
-          </div>
+          <Skeleton lines={4} label="Loading surveys" />
         ) : surveys.status === "error" ? (
           <LoadError error={surveys.error} retry={surveys.retry} />
         ) : surveys.data.length === 0 ? (
           isAdmin ? (
             <FirstRun onNew={() => setCreating(true)} />
           ) : (
-            <EmptyState icon="section" title="No surveys have been set up yet">
-              <p>
-                An admin sets the Studio up from the survey participants are answering now. Once they have, it appears
-                here for everyone on the Studio list.
-              </p>
+            <EmptyState icon="section" title="No surveys yet">
+              <p>An admin sets the Studio up from the live survey. It appears here once they have.</p>
             </EmptyState>
           )
         ) : (
           <>
-            {isAdmin && !hasLive ? (
-              <div className="stp-gap">
-                <ImportLiveCard compact />
-              </div>
-            ) : null}
-            <ul className="stp-survey-list" aria-label="Surveys">
-              {surveys.data.map((s) => (
-                <SurveyRow key={s.surveyId} survey={s} />
-              ))}
-            </ul>
+            {isAdmin && !hasLive ? <ImportLiveNotice /> : null}
+            <div className="stp-table-wrap">
+              <table className="stp-table stp-surveys" aria-label="Surveys">
+                <thead>
+                  <tr>
+                    <th scope="col">Survey</th>
+                    <th scope="col" className="stp-col-live">
+                      Live
+                    </th>
+                    <th scope="col" className="stp-col-draft stp-hide-narrow">
+                      Draft
+                    </th>
+                    <th scope="col" className="stp-col-when stp-hide-narrow">
+                      Published
+                    </th>
+                    <th scope="col" className="stp-cell-action">
+                      <span className="st-sr">Actions</span>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {surveys.data.map((s) => (
+                    <SurveyRow key={s.surveyId} survey={s} />
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </>
         )}
       </div>
@@ -73,86 +84,82 @@ export function SurveysScreen() {
 function SurveyRow({ survey }: { survey: SurveyDoc }) {
   const active = survey.active;
   const publishedAt = toDate(active?.publishedAt);
-  const edited = survey.draftEditors.length > 0;
-  const headingId = `survey-${survey.surveyId}`;
+  const editors = survey.draftEditors;
+  const edited = editors.length > 0;
+  const editedBy = edited ? `${editors[0]}${editors.length > 1 ? ` and ${plural(editors.length - 1, "other")}` : ""}` : null;
   return (
-    <li className="stp-card stp-survey" aria-labelledby={headingId}>
-      <div className="stp-survey-main">
-        <h2 id={headingId} className="stp-survey-title">
-          <Link to={{ name: "survey", surveyId: survey.surveyId, tab: "edit", q: null }}>{survey.title}</Link>
-        </h2>
-        <p className="stp-survey-id">
-          <code>{survey.surveyId}</code>
-        </p>
-        <div className="stp-badges">
-          {active ? (
-            <Badge tone="accent" icon="check" title={`Published ${formatDate(publishedAt)}`}>
-              Live: {versionLabel(active.version)}
-            </Badge>
-          ) : (
-            <Badge tone="muted">Not published yet</Badge>
-          )}
-          {edited ? (
-            <Badge tone="warn" icon="flag">
-              Draft has unpublished changes
-            </Badge>
-          ) : active ? (
-            <Badge>Draft matches the live version</Badge>
-          ) : null}
-        </div>
-        <p className="stp-survey-meta">
-          {active ? (
-            <>
-              {versionLabel(active.version)} published {formatRelative(publishedAt)}
-              {active.publishedByEmail ? ` by ${active.publishedByEmail}` : ""}
-            </>
-          ) : (
-            "Nothing published from this survey yet"
-          )}
-          {edited ? (
-            <>
-              {" · "}Edited since by {survey.draftEditors.slice(0, 3).join(", ")}
-              {survey.draftEditors.length > 3 ? ` and ${plural(survey.draftEditors.length - 3, "other")}` : ""}
-            </>
-          ) : null}
-          {" · "}
-          {plural(survey.versionCount, "version")}
-        </p>
-      </div>
-      <div className="stp-survey-actions">
-        <Link to={{ name: "survey", surveyId: survey.surveyId, tab: "edit", q: null }} className="st-btn st-btn-primary st-btn-sm">
-          <span>Open</span>
+    <tr>
+      <th scope="row" className="stp-cell-title">
+        <Link to={{ name: "survey", surveyId: survey.surveyId, tab: "edit", q: null }} className="stp-srow-title stp-plain" title={survey.title}>
+          {survey.title}
         </Link>
-        <Link to={{ name: "survey", surveyId: survey.surveyId, tab: "preview", q: null }} className="st-btn st-btn-ghost st-btn-sm">
-          <Icon name="eye" size={16} />
-          <span>Preview</span>
-        </Link>
-        <Link to={{ name: "survey", surveyId: survey.surveyId, tab: "versions", q: null }} className="st-btn st-btn-ghost st-btn-sm">
-          <Icon name="history" size={16} />
-          <span>Versions</span>
-        </Link>
-      </div>
-    </li>
+        <span className="stp-srow-meta">
+          <span className="stp-id">{survey.surveyId}</span> · <span className="stp-nowrap">{plural(survey.versionCount, "version")}</span>
+        </span>
+      </th>
+      <td>
+        {active ? (
+          <span className="stp-dotted">
+            <StatusDot tone="accent" />
+            <span className="stp-version-label">{versionLabel(active.version)}</span>
+          </span>
+        ) : (
+          <span className="stp-dotted stp-muted">
+            <StatusDot />
+            Not published
+          </span>
+        )}
+      </td>
+      <td className="stp-hide-narrow">
+        {edited ? (
+          <span className="stp-truncate" title={`Edited since the last publish by ${editors.join(", ")}`}>
+            Edited by {editedBy}
+          </span>
+        ) : active ? (
+          <span className="stp-meta">Matches live</span>
+        ) : (
+          <span className="stp-meta">—</span>
+        )}
+      </td>
+      <td className="stp-hide-narrow">
+        {active ? (
+          <span className="stp-muted" title={`${formatDateTime(publishedAt)}${active.publishedByEmail ? ` by ${active.publishedByEmail}` : ""}`}>
+            {formatRelative(publishedAt)}
+          </span>
+        ) : (
+          <span className="stp-meta">—</span>
+        )}
+      </td>
+      <td className="stp-cell-action">
+        <span className="stp-actions">
+          <IconLink label={`Preview ${survey.title}`} tip="Preview" icon="eye" to={{ name: "survey", surveyId: survey.surveyId, tab: "preview", q: null }} />
+          <IconLink label={`Versions of ${survey.title}`} tip="Versions" icon="history" to={{ name: "survey", surveyId: survey.surveyId, tab: "versions", q: null }} />
+        </span>
+      </td>
+    </tr>
   );
 }
 
-function FirstRun({ onNew }: { onNew: () => void }) {
+/**
+ * A link drawn as an icon button: a real link (new tab, copy address). Its
+ * accessible name says which survey; the tooltip, which sits beside the row,
+ * only needs the verb.
+ */
+function IconLink({ label, tip, icon, to }: { label: string; tip: string; icon: "eye" | "history"; to: Route }) {
   return (
-    <div className="stp-first-run">
-      <ImportLiveCard />
-      <div className="stp-card stp-first-alt">
-        <h2 className="stp-h2">Or start a different survey</h2>
-        <p>A new survey starts blank, or from a published version of another survey. It has its own versions and its own link for participants.</p>
-        <Button variant="secondary" icon="plus" onClick={onNew}>
-          New survey
-        </Button>
-      </div>
-    </div>
+    <Tooltip text={tip}>
+      <Link to={to} className="st-iconbtn st-iconbtn-ghost st-iconbtn-md" aria-label={label}>
+        <Icon name={icon} size={16} />
+      </Link>
+    </Tooltip>
   );
 }
+
+const IMPORT_HELP =
+  "Brings the questionnaire participants are answering now, with its earlier versions, into the Studio, and starts a draft from the live one. What participants see doesn’t change and no responses are touched. Safe to run again: anything already here is left as it is.";
 
 /** "Set up from the live survey" (docs/16 §6): an explicit, idempotent admin action. */
-function ImportLiveCard({ compact = false }: { compact?: boolean }) {
+function useImportLive() {
   const toast = useToast();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -173,26 +180,50 @@ function ImportLiveCard({ compact = false }: { compact?: boolean }) {
       .catch((e: unknown) => setError(e instanceof StudioCallError ? e.message : "The survey couldn’t be set up. Try again."))
       .finally(() => setBusy(false));
   };
+  return { run, busy, error };
+}
+
+function FirstRun({ onNew }: { onNew: () => void }) {
+  const importLive = useImportLive();
   return (
-    <div className={`stp-card stp-import${compact ? " compact" : ""}`}>
-      <div>
-        <h2 className="stp-h2">Set up from the live survey</h2>
-        <p>
-          Brings the questionnaire participants are answering now (<code>{SURVEY_ID}</code>) and its earlier versions
-          into the Studio, and starts a draft from the live one. What participants see doesn&rsquo;t change, and no
-          responses are touched. Safe to run again: anything already here is left as it is.
-        </p>
-        {error ? (
-          <div className="stp-gap-top">
-            <Notice tone="error">{error}</Notice>
-          </div>
-        ) : null}
-      </div>
-      <div className="stp-import-action">
-        <Button variant="accent" icon="restore" busy={busy} onClick={run}>
+    <section className="stp-first" aria-labelledby="first-run-title">
+      <span className="stp-first-icon" aria-hidden="true">
+        <Icon name="restore" size={20} />
+      </span>
+      <h2 id="first-run-title" className="stp-h2">
+        Set up from the live survey
+      </h2>
+      <p>
+        Import <span className="stp-id">{SURVEY_ID}</span> and its published versions, and start a draft from the live
+        one. <InfoTip label="setting up from the live survey" text={IMPORT_HELP} />
+      </p>
+      {importLive.error ? <Notice tone="error">{importLive.error}</Notice> : null}
+      <div className="stp-actions">
+        <Button variant="primary" icon="restore" busy={importLive.busy} onClick={importLive.run}>
           Set up from the live survey
         </Button>
+        <Button variant="secondary" icon="plus" onClick={onNew}>
+          New survey
+        </Button>
       </div>
+    </section>
+  );
+}
+
+/** The same action, as one line above the list, once other surveys exist but the live one isn't set up. */
+function ImportLiveNotice() {
+  const importLive = useImportLive();
+  return (
+    <div className="stp-inline-notice">
+      <Icon name="info" size={16} />
+      <span>
+        The live survey (<span className="stp-id">{SURVEY_ID}</span>) isn&rsquo;t in the Studio yet.{" "}
+        <InfoTip label="setting up from the live survey" text={IMPORT_HELP} />
+      </span>
+      <Button size="sm" variant="secondary" icon="restore" busy={importLive.busy} onClick={importLive.run}>
+        Set up from the live survey
+      </Button>
+      {importLive.error ? <Notice tone="error">{importLive.error}</Notice> : null}
     </div>
   );
 }
@@ -266,7 +297,7 @@ function NewSurveyDialog({ existing, onClose }: { existing: SurveyDoc[]; onClose
       title="New survey"
       onClose={onClose}
       dismissable={!busy}
-      width={560}
+      width={520}
       footer={
         <>
           <Button variant="secondary" onClick={onClose} disabled={busy}>
@@ -284,12 +315,12 @@ function NewSurveyDialog({ existing, onClose }: { existing: SurveyDoc[]; onClose
           submit();
         }}
       >
-        <Field label="Title" hint="For the research team: it appears in the Studio, exports and the audit trail." error={submitted ? titleError : null}>
+        <Field label="Title" hint="Seen by the research team, in exports and in the activity log." error={submitted ? titleError : null}>
           {(p) => <input {...p} className="st-input" value={title} onChange={(e) => setTitle(e.target.value)} autoComplete="off" />}
         </Field>
         <Field
           label="Survey ID"
-          hint="Lower-case letters, numbers and underscores. It names every version (for example …_r1_0_0) and can’t be changed later."
+          hint="Lower-case letters, numbers and underscores. It names every version (…_r1_0_0) and can’t be changed later."
           error={submitted || (idTouched && effectiveId.length > 0) || (effectiveId.length >= 3 && idError) ? idError : null}
         >
           {(p) => (
@@ -311,8 +342,8 @@ function NewSurveyDialog({ existing, onClose }: { existing: SurveyDoc[]; onClose
           <label className="stp-radio">
             <input type="radio" name="start" checked={start === "blank"} onChange={() => setStart("blank")} />
             <span>
-              <strong>A blank survey</strong>
-              <small>A welcome message and a thank-you screen, ready for questions.</small>
+              <strong>Blank</strong>
+              <small>A start screen and a thank-you screen, ready for questions.</small>
             </span>
           </label>
           <label className={`stp-radio${published.length === 0 ? " disabled" : ""}`}>
@@ -328,7 +359,7 @@ function NewSurveyDialog({ existing, onClose }: { existing: SurveyDoc[]; onClose
               <small>
                 {published.length === 0
                   ? "No survey has published a version yet."
-                  : "A copy of its questions and screens. Question IDs stay as they are, so data can be compared."}
+                  : "Question IDs stay as they are, so data can be compared."}
               </small>
             </span>
           </label>

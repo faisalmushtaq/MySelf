@@ -1,15 +1,15 @@
-import { useRef, type ReactNode } from "react";
+import { useMemo, useRef, type ReactNode } from "react";
 import { atLeast } from "@myself/studio";
 import { useOnline, useStudioSession } from "../data/index.js";
 import { ROLE_NAMES } from "../format.js";
 import { Link, guardedAction, leaveStudio, navigate, type Route } from "../router.js";
-import { Icon } from "../ui/icons.js";
-import { Badge, MenuButton, VisuallyHidden, type MenuItem } from "../ui/kit.js";
+import { Icon, type IconName } from "../ui/icons.js";
+import { MenuButton, VisuallyHidden, type MenuItem } from "../ui/kit.js";
 
 /**
- * The frame around every Studio page: a quiet sticky header (wordmark, where
- * you are, the page's sections, who you are), a skip link, and the offline
- * banner. The survey being built is the loudest thing on screen; this is not.
+ * The frame around every Studio page: a quiet 48px header (the mark, where you
+ * are, the page's sections, who you are), a skip link, and the offline banner.
+ * The survey being built is the loudest thing on screen; this is not.
  */
 
 export interface ShellTab {
@@ -25,7 +25,7 @@ export function Shell({
   children,
   wide = false,
 }: {
-  /** Where you are, after the wordmark: a survey's title, "Playground". */
+  /** Where you are, after the mark: a survey's title, "Playground". */
   crumb?: ReactNode;
   tabs?: ShellTab[];
   /** Page-wide messages under the header (the playground label, a conflict). */
@@ -54,8 +54,11 @@ export function Shell({
       <header className="stp-header">
         <div className="stp-header-inner">
           <div className="stp-brand">
-            <Link to={{ name: "surveys" }} className="stp-wordmark">
-              MySelf <span>Studio</span>
+            <Link to={{ name: "surveys" }} className="stp-home">
+              <StudioMark />
+              <span>
+                <VisuallyHidden>MySelf </VisuallyHidden>Studio
+              </span>
             </Link>
             {crumb ? (
               <>
@@ -70,7 +73,7 @@ export function Shell({
             <nav className="stp-nav" aria-label="Survey">
               {tabs.map((t) => (
                 <Link key={t.label} to={t.to} className={`stp-nav-link${t.current ? " on" : ""}`} aria-current={t.current ? "page" : undefined}>
-                  {t.label}
+                  <span>{t.label}</span>
                 </Link>
               ))}
             </nav>
@@ -81,12 +84,9 @@ export function Shell({
         </div>
       </header>
       {!online ? (
-        <div className="stp-offline" role="status">
-          <Icon name="offline" size={16} />
-          <span>
-            <strong>You&rsquo;re offline.</strong> Changes stay in this tab and are saved when the connection returns.
-          </span>
-        </div>
+        <Banner tone="warn" icon="offline" title="You’re offline.">
+          Changes stay in this tab and save when the connection returns.
+        </Banner>
       ) : null}
       {banner}
       <main id="studio-main" ref={main} tabIndex={-1} className={`stp-main${wide ? " stp-main-wide" : ""}`}>
@@ -96,11 +96,56 @@ export function Shell({
   );
 }
 
+/** The MySelf mark: a small accent square with a white "M". Decorative — the words beside it carry the name. */
+export function StudioMark({ size = 20 }: { size?: number }) {
+  return (
+    <svg className="stp-mark" width={size} height={size} viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+      <rect width="20" height="20" rx="5" style={{ fill: "var(--st-accent)" }} />
+      <path d="M5.75 14V6.25L10 11.25L14.25 6.25V14" fill="none" stroke="#ffffff" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+/** Two letters for an avatar: from the display name, else the email's local part ("research.lead" → "RL"). */
+export function initialsOf(name: string | null | undefined, email: string | null | undefined): string {
+  const from = (name ?? "").trim() || (email ?? "").split("@")[0] || "";
+  const words = from.split(/[\s._-]+/).filter((w) => /[\p{L}\p{N}]/u.test(w));
+  if (words.length === 0) return "?";
+  const first = Array.from(words[0]!)[0] ?? "";
+  const last = words.length > 1 ? (Array.from(words[words.length - 1]!)[0] ?? "") : (Array.from(words[0]!)[1] ?? "");
+  return `${first}${last}`.toUpperCase();
+}
+
+export function Avatar({ name, email }: { name: string | null | undefined; email: string | null | undefined }) {
+  return (
+    <span className="stp-avatar" aria-hidden="true">
+      {initialsOf(name, email)}
+    </span>
+  );
+}
+
 function UserMenu() {
   const session = useStudioSession();
+  const { user, role, signOut } = session;
+  const isAdmin = atLeast(role, "admin");
+  const items = useMemo<MenuItem[]>(() => {
+    if (!user) return [];
+    const list: MenuItem[] = [
+      // Who is signed in, and as what — a label, not an action.
+      { label: user.email ?? "Signed in", onSelect: () => undefined, disabled: true, ...(role ? { hint: ROLE_NAMES[role] } : {}) },
+    ];
+    if (isAdmin) list.push({ label: "Who has access", icon: "user", onSelect: () => navigate({ name: "access" }) });
+    list.push(
+      { label: "Playground", icon: "play", onSelect: () => navigate({ name: "playground", tab: "edit", q: null }) },
+      { label: "Researcher view", icon: "external", onSelect: () => void leaveStudio() },
+      { label: "Sign out", icon: "logout", onSelect: () => void guardedAction(() => void signOut()) },
+    );
+    return list;
+  }, [user, role, isAdmin, signOut]);
+
   // A build with no study has nothing to sign in to (the playground's case).
   if (session.status === "unconfigured") return null;
-  if (!session.user) {
+  if (!user) {
     return (
       <div className="stp-user">
         <Link to={{ name: "login", next: null }} className="st-btn st-btn-secondary st-btn-sm">
@@ -109,34 +154,26 @@ function UserMenu() {
       </div>
     );
   }
-  const items: MenuItem[] = [];
-  if (atLeast(session.role, "admin")) {
-    items.push({ label: "Who has access", icon: "user", onSelect: () => navigate({ name: "access" }) });
-  }
-  items.push(
-    { label: "Playground (nothing saved)", icon: "play", onSelect: () => navigate({ name: "playground", tab: "edit", q: null }) },
-    { label: "Researcher view", icon: "external", onSelect: () => void leaveStudio() },
-    { label: "Sign out", icon: "logout", onSelect: () => void guardedAction(() => void session.signOut()) },
-  );
   return (
     <div className="stp-user">
       <MenuButton
         label="Account"
-        icon="user"
         items={items}
         buttonLabel={
-          <span className="stp-user-label">
-            <VisuallyHidden>Account: </VisuallyHidden>
-            <span className="stp-user-email">{session.user.email ?? "Signed in"}</span>
-            {session.role ? <Badge tone="muted">{ROLE_NAMES[session.role]}</Badge> : null}
-          </span>
+          <>
+            <Avatar name={user.displayName} email={user.email} />
+            <VisuallyHidden>
+              Account: {user.email ?? "signed in"}
+              {role ? `, ${ROLE_NAMES[role]}` : ""}
+            </VisuallyHidden>
+          </>
         }
       />
     </div>
   );
 }
 
-/** A page's title block: heading, one line of context, and its actions. */
+/** A page's title block: heading, one line of context, and its actions (top right). */
 export function PageHead({ title, lede, actions }: { title: string; lede?: ReactNode; actions?: ReactNode }) {
   return (
     <div className="stp-page-head">
@@ -145,6 +182,47 @@ export function PageHead({ title, lede, actions }: { title: string; lede?: React
         {lede ? <p className="stp-lede">{lede}</p> : null}
       </div>
       {actions ? <div className="stp-page-actions">{actions}</div> : null}
+    </div>
+  );
+}
+
+export type BannerTone = "neutral" | "warn" | "error" | "accent";
+
+const BANNER_ICONS: Record<BannerTone, IconName> = { neutral: "info", warn: "warning", error: "error", accent: "restore" };
+
+/**
+ * A page-wide message as one slim line under the header (DESIGN.md §5): an
+ * icon, a few words, and the action on the right. Only for states that block
+ * work. Errors are announced (role=alert); the rest are polite.
+ */
+export function Banner({
+  tone = "neutral",
+  icon,
+  title,
+  children,
+  action,
+  more,
+  role,
+}: {
+  tone?: BannerTone;
+  icon?: IconName;
+  title?: ReactNode;
+  children?: ReactNode;
+  action?: ReactNode;
+  /** Shown on its own row under the line (a disclosure's content, say). */
+  more?: ReactNode;
+  role?: "alert" | "status" | "note";
+}) {
+  return (
+    <div className={`stp-banner stp-banner-${tone}`} role={role ?? (tone === "error" ? "alert" : "status")}>
+      <Icon name={icon ?? BANNER_ICONS[tone]} size={16} />
+      <div className="stp-banner-text">
+        {title ? <strong>{title}</strong> : null}
+        {title && children ? " " : null}
+        {children ? <span className="stp-banner-detail">{children}</span> : null}
+      </div>
+      {action ? <div className="stp-banner-action">{action}</div> : null}
+      {more ? <div className="stp-banner-more">{more}</div> : null}
     </div>
   );
 }

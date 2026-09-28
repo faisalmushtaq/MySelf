@@ -4,8 +4,7 @@ import { EditorPage } from "../editor/EditorPage.js";
 import { PlaygroundMode } from "../mode.js";
 import { PreviewPage } from "../preview/PreviewPage.js";
 import { loadPlayground, PLAYGROUND_VERSION, type PlaygroundData } from "../playground-data.js";
-import { Shell, type ShellTab } from "../shell/Shell.js";
-import { Icon } from "../ui/icons.js";
+import { Banner, Shell, type ShellTab } from "../shell/Shell.js";
 import { Notice, Skeleton } from "../ui/kit.js";
 import { useToast } from "../ui/toast.js";
 
@@ -46,13 +45,9 @@ export function PlaygroundScreen({ tab, q }: { tab: "edit" | "preview"; q: strin
     { label: "Preview", to: { name: "playground", tab: "preview", q }, current: tab === "preview" },
   ];
   const banner = (
-    <div className="stp-playground-banner" role="note">
-      <Icon name="info" size={16} />
-      <span>
-        <strong>Playground — nothing here is saved.</strong> This is r{PLAYGROUND_VERSION}, the survey participants are
-        answering now, in this tab&rsquo;s memory only. Change anything; reloading puts it back.
-      </span>
-    </div>
+    <Banner role="note" icon="play" title="Playground · nothing is saved.">
+      The live survey (r{PLAYGROUND_VERSION}) in this tab only. Change anything; reloading puts it back.
+    </Banner>
   );
 
   return (

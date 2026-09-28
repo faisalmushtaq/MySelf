@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useId, useMemo, useRef, useState } from "react";
 import { atLeast, type StudioDraft, type StudioRole } from "@myself/studio";
 import { useDraftSession, type DraftSession } from "../data/draft-editor.js";
 import { usePublishedContext, useStudioSession, useSurvey, type DraftEditor } from "../data/index.js";
@@ -8,9 +8,9 @@ import { formatTime, ROLE_NAMES } from "../format.js";
 import { PreviewPage } from "../preview/PreviewPage.js";
 import { navigate, useNavigationGuard, type SurveyTab } from "../router.js";
 import { ChangeList, LoadError, changeHeadline } from "../shell/common.js";
-import { Shell, type ShellTab } from "../shell/Shell.js";
+import { Banner, Shell, type ShellTab } from "../shell/Shell.js";
 import { ConfirmDialog } from "../ui/dialog.js";
-import { Button, EmptyState, Notice, Skeleton } from "../ui/kit.js";
+import { Button, EmptyState, InfoTip, Skeleton } from "../ui/kit.js";
 import { SettingsScreen } from "./Settings.js";
 import { VersionsScreen } from "./Versions.js";
 
@@ -107,86 +107,88 @@ function DraftBanners({ draft, tab, role }: { draft: DraftSession; tab: SurveyTa
   if (save.kind === "conflict") banners.push(<ConflictBanner key="conflict" editor={editor} theirs={save.theirs} />);
   if (save.kind === "error") {
     banners.push(
-      <Notice
+      <Banner
         key="error"
         tone="error"
-        title="Your latest changes haven’t been saved"
+        title="Your latest changes aren’t saved."
         action={
           <Button size="sm" variant="secondary" icon="restart" onClick={() => void editor.saveNow()}>
             Retry now
           </Button>
         }
       >
-        {save.message} {save.retryAt ? `The Studio tries again by itself at ${formatTime(save.retryAt)}.` : ""} They&rsquo;re kept in
-        this tab until then.
-      </Notice>,
+        {save.message} {save.retryAt ? `The Studio retries at ${formatTime(save.retryAt)}. ` : ""}They&rsquo;re kept in this tab until then.
+      </Banner>,
     );
   }
   if (draft.listenerError) {
     banners.push(
-      <Notice
+      <Banner
         key="listener"
         tone="warn"
-        title="Lost touch with the saved draft"
+        title="Lost touch with the saved draft."
         action={
           <Button size="sm" variant="secondary" onClick={draft.reconnect}>
             Reconnect
           </Button>
         }
       >
-        {draft.listenerError} Other people&rsquo;s changes won&rsquo;t appear until this reconnects.
-      </Notice>,
+        Other people&rsquo;s changes won&rsquo;t appear until it reconnects.{" "}
+        <InfoTip label="the lost connection" text={draft.listenerError} />
+      </Banner>,
     );
   }
   if (draft.recovery) {
     const at = formatTime(draft.recovery.savedAt);
     banners.push(
       draft.recovery.kind === "recoverable" ? (
-        <Notice
+        <Banner
           key="recovery"
           tone="accent"
-          title="You have unsaved changes from before this page was reloaded"
+          title="Unsaved changes from before the reload."
           action={
-            <span className="stp-actions">
+            <>
               <Button size="sm" variant="primary" onClick={draft.recover}>
                 Recover them
               </Button>
               <Button size="sm" variant="ghost" onClick={draft.discardRecovery}>
                 Discard
               </Button>
-            </span>
+            </>
           }
         >
-          This tab kept a copy at {at}. Nobody has saved the draft since, so they can be put back exactly as they were.
-        </Notice>
+          This tab kept a copy at {at}, and nobody has saved since.
+        </Banner>
       ) : (
-        <Notice
+        <Banner
           key="recovery"
           tone="warn"
-          title="Unsaved changes from before this page was reloaded can’t be put back"
+          title="Unsaved changes from before the reload can’t be put back."
           action={
-            <span className="stp-actions">
+            <>
               <Button size="sm" variant="secondary" onClick={draft.downloadRecovery}>
                 Download them
               </Button>
               <Button size="sm" variant="ghost" onClick={draft.discardRecovery}>
                 Discard
               </Button>
-            </span>
+            </>
           }
         >
-          This tab kept a copy at {at}, but the draft has been saved since, and putting the copy back would overwrite
-          that. Download it to keep a record of what you&rsquo;d changed.
-        </Notice>
+          The copy from {at} would overwrite a later save.{" "}
+          <InfoTip
+            label="recovering changes"
+            text={`This tab kept a copy at ${at}, but the draft has been saved since, and putting the copy back would overwrite that. Download it to keep a record of what you’d changed.`}
+          />
+        </Banner>
       ),
     );
   }
   if (tab === "edit" && editor.status === "ready" && !atLeast(role, "editor")) {
     banners.push(
-      <Notice key="viewer" title="View only">
-        Your role is {ROLE_NAMES[role]}, so you can look at the draft but not change it. Ask an admin if you
-        need to edit.
-      </Notice>,
+      <Banner key="viewer" icon="eye" title="View only.">
+        You&rsquo;re a {ROLE_NAMES[role]}: ask an admin if you need to edit.
+      </Banner>,
     );
   }
   if (banners.length === 0) return null;
@@ -201,31 +203,46 @@ function ConflictBanner({
   theirs: { draft: StudioDraft; revision: number; by: string | null; at: Date | null };
 }) {
   const [confirmKeep, setConfirmKeep] = useState(false);
+  const [showDiff, setShowDiff] = useState(false);
+  const diffId = useId();
   const diff = useMemo(() => (editor.draft ? diffDrafts(theirs.draft, editor.draft) : null), [theirs.draft, editor.draft]);
   const who = theirs.by ?? "Someone else";
   return (
-    <div className="st-notice st-notice-warn stp-conflict" role="alert">
-      <div className="stp-conflict-text">
-        <strong>{who} saved this draft while you were editing</strong>
-        <p>
-          Their save{theirs.at ? ` at ${formatTime(theirs.at)}` : ""} and your unsaved changes both started from the same
-          version. Nothing has been overwritten, and the draft is read-only here until you choose which to keep.
-        </p>
-        {diff ? (
-          <details className="stp-details">
-            <summary>How yours differs from theirs — {changeHeadline(diff)}</summary>
+    <Banner
+      tone="warn"
+      role="alert"
+      title={`${who} saved this draft while you were editing${theirs.at ? ` (${formatTime(theirs.at)})` : ""}.`}
+      action={
+        <>
+          {diff ? (
+            <Button size="sm" variant="ghost" aria-expanded={showDiff} aria-controls={diffId} onClick={() => setShowDiff((v) => !v)}>
+              {showDiff ? "Hide differences" : "Show differences"}
+            </Button>
+          ) : null}
+          <Button size="sm" variant="primary" onClick={() => editor.resolveConflict("take_theirs")}>
+            Use their version
+          </Button>
+          <Button size="sm" variant="secondary" onClick={() => setConfirmKeep(true)}>
+            Keep mine
+          </Button>
+        </>
+      }
+      more={
+        diff && showDiff ? (
+          <div id={diffId}>
+            <p className="stp-flush stp-gap">
+              <strong>How yours differs from theirs:</strong> {changeHeadline(diff)}
+            </p>
             <ChangeList summary={diff} empty="Your version and theirs are the same." />
-          </details>
-        ) : null}
-      </div>
-      <div className="stp-conflict-actions">
-        <Button size="sm" variant="primary" onClick={() => editor.resolveConflict("take_theirs")}>
-          Use their version
-        </Button>
-        <Button size="sm" variant="secondary" onClick={() => setConfirmKeep(true)}>
-          Keep mine
-        </Button>
-      </div>
+          </div>
+        ) : null
+      }
+    >
+      Nothing is overwritten; the draft is read-only until you choose.{" "}
+      <InfoTip
+        label="the conflict"
+        text="Their save and your unsaved changes both started from the same version. Choose which to keep; the other is set aside."
+      />
       {confirmKeep ? (
         <ConfirmDialog
           title="Replace their changes with yours?"
@@ -247,6 +264,6 @@ function ConflictBanner({
           }}
         />
       ) : null}
-    </div>
+    </Banner>
   );
 }
