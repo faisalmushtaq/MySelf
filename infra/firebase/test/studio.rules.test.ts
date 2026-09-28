@@ -1,0 +1,758 @@
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import {
+  assertFails,
+  assertSucceeds,
+  initializeTestEnvironment,
+  type RulesTestContext,
+  type RulesTestEnvironment,
+  type TokenOptions,
+} from "@firebase/rules-unit-testing";
+import {
+  collection,
+  deleteDoc,
+  deleteField,
+  doc,
+  getDoc,
+  getDocs,
+  query,
+  serverTimestamp,
+  setDoc,
+  setLogLevel,
+  Timestamp,
+  updateDoc,
+  where,
+} from "firebase/firestore";
+// Straight from source, so this suite needs nothing built. Both files import
+// only types from elsewhere in the workspace, which disappear in compilation.
+import { paths } from "../../../packages/firebase/src/layout.js";
+import {
+  DRAFT_CLIENT_FIELDS,
+  MAX_DRAFT_CHARS,
+  ROLE_LEVEL,
+  STUDIO_ROLES,
+  type StudioRole,
+} from "../../../packages/studio/src/contract.js";
+
+/**
+ * MySelf Studio's rules — docs/16 §5.2 and §5.7.
+ *
+ * The Studio is where somebody can change what children are asked, so these
+ * tests matter more than most. Every rule is exercised from three sides: the
+ * person it is for, the person it is not for, and the person trying to get
+ * round it. The last group is the longest on purpose.
+ *
+ * The paths are the application's own (`paths` in @myself/firebase) and the
+ * numbers are the contract's (`ROLE_LEVEL`, `DRAFT_CLIENT_FIELDS`,
+ * `MAX_DRAFT_CHARS`), so a change to either that the rules do not follow fails
+ * here rather than in front of a researcher.
+ */
+
+let env: RulesTestEnvironment;
+type Db = ReturnType<RulesTestContext["firestore"]>;
+
+const STUDY = "ybm";
+const SURVEY = "ybm_nd2026_standard";
+const VERSION = "7.1.0";
+const HASH_HEX = "308f47ba".padEnd(64, "0");
+const DOMAIN = "brainpop.test";
+const T0 = Timestamp.fromDate(new Date("2026-09-28T09:00:00.000Z"));
+
+const P = {
+  surveys: paths.studioSurveys(STUDY),
+  survey: paths.studioSurvey(STUDY, SURVEY),
+  draft: paths.studioDraft(STUDY, SURVEY),
+  versions: paths.studioVersions(STUDY, SURVEY),
+  version: paths.studioVersion(STUDY, SURVEY, VERSION),
+  presences: paths.studioPresence(STUDY, SURVEY),
+  presence: (uid: string) => paths.studioPresenceOf(STUDY, SURVEY, uid),
+  published: paths.publishedPointer(STUDY, SURVEY),
+  publishedAll: `studies/${STUDY}/published`,
+  publicReleases: paths.publicReleases(STUDY),
+  publicRelease: paths.publicRelease(STUDY, HASH_HEX),
+  members: paths.studioMembers(STUDY),
+  member: (email: string) => paths.studioMember(STUDY, email),
+  access: paths.studioAccessConfig(STUDY),
+  auditLog: paths.studioAudit(STUDY),
+  auditRow: `${paths.studioAudit(STUDY)}/row_1`,
+};
+
+/**
+ * One member per role. The addresses are mixed case in the token and stored
+ * lower-cased, as the functions and `studio-access` store them, so every test
+ * that passes also proves the rules lower-case before they look.
+ */
+const MEMBERS: Record<StudioRole, string> = {
+  viewer: "Vera.Viewer@Example.org",
+  editor: "Ed.Editor@Example.org",
+  publisher: "Pat.Publisher@Example.org",
+  admin: "Ada.Admin@Example.org",
+};
+
+interface Caller {
+  uid: string;
+  email: string | null;
+  db: Db;
+}
+
+const caller = (uid: string, token: TokenOptions): Caller => ({
+  uid,
+  email: typeof token.email === "string" ? token.email : null,
+  db: env.authenticatedContext(uid, token).firestore(),
+});
+
+/** Signed in as the Studio signs people in: Google, with an address Google has verified. */
+const google = (uid: string, email: string, extra: TokenOptions = {}): Caller =>
+  caller(uid, { email, email_verified: true, firebase: { sign_in_provider: "google.com" }, ...extra });
+
+const member = (role: StudioRole): Caller => google(`u_${role}`, MEMBERS[role]);
+
+/** Listed, but never the caller in these tests: "somebody else's entry". */
+const OTHER_MEMBER = "someone.else@example.org";
+
+const nobody = (): Db => env.unauthenticatedContext().firestore();
+
+/** The draft as the functions create it. `revision` 3, so the next save is 4. */
+const draftDoc = () => ({
+  surveyId: SURVEY,
+  revision: 3,
+  content: "{}",
+  updatedAt: T0,
+  updatedBy: "u_someone",
+  updatedByEmail: "someone@example.org",
+  basedOn: { version: VERSION, hash: `sha256:${HASH_HEX}` },
+  createdAt: T0,
+});
+
+const seed = (write: (db: Db) => Promise<void>) =>
+  env.withSecurityRulesDisabled(async (ctx) => write(ctx.firestore()));
+
+const seedDraft = () => seed((db) => setDoc(doc(db, P.draft), draftDoc()));
+
+/**
+ * A save exactly as the Studio makes one: the next revision, the server's
+ * clock, the caller's own uid and the caller's list key (lower-cased address).
+ */
+const saveFields = (c: Caller, revision = 4) => ({
+  content: JSON.stringify({ savedAt: revision }),
+  revision,
+  updatedAt: serverTimestamp(),
+  updatedBy: c.uid,
+  updatedByEmail: (c.email ?? "").toLowerCase(),
+});
+
+const save = (c: Caller, override: Record<string, unknown> = {}, path = P.draft) =>
+  updateDoc(doc(c.db, path), { ...saveFields(c), ...override });
+
+const presenceFields = (c: Caller) => ({
+  uid: c.uid,
+  email: (c.email ?? "").toLowerCase(),
+  at: serverTimestamp(),
+  focus: "kss.q1",
+});
+
+// Named, so a failure says which request it was rather than only that one of
+// thirty was wrong.
+async function allowed(what: string, attempt: () => Promise<unknown>) {
+  try {
+    await assertSucceeds(attempt());
+  } catch (error) {
+    throw new Error(`expected to be ALLOWED: ${what}\n  ${(error as Error).message}`);
+  }
+}
+
+async function refused(what: string, attempt: () => Promise<unknown>) {
+  try {
+    await assertFails(attempt());
+  } catch (error) {
+    throw new Error(`expected to be REFUSED: ${what}\n  ${(error as Error).message}`);
+  }
+}
+
+/** Everything a Studio member of any role may read. */
+const memberReads = (db: Db): Array<[string, () => Promise<unknown>]> => [
+  ["get survey", () => getDoc(doc(db, P.survey))],
+  ["list surveys", () => getDocs(collection(db, P.surveys))],
+  ["get draft", () => getDoc(doc(db, P.draft))],
+  ["get version", () => getDoc(doc(db, P.version))],
+  ["list versions", () => getDocs(collection(db, P.versions))],
+  ["list presence", () => getDocs(collection(db, P.presences))],
+  ["get audit row", () => getDoc(doc(db, P.auditRow))],
+  ["list audit", () => getDocs(collection(db, P.auditLog))],
+];
+
+/** What only an admin may read: the list itself. */
+const adminReads = (db: Db): Array<[string, () => Promise<unknown>]> => [
+  ["list members", () => getDocs(collection(db, P.members))],
+  ["get another member's entry", () => getDoc(doc(db, P.member(OTHER_MEMBER)))],
+  ["get the domain rule", () => getDoc(doc(db, P.access))],
+];
+
+/**
+ * Every write a browser might attempt on something only functions write. None
+ * of these may succeed for anyone, whatever their role.
+ */
+const functionOnlyWrites = (db: Db): Array<[string, () => Promise<unknown>]> => [
+  ["create survey", () => setDoc(doc(db, paths.studioSurvey(STUDY, "new_survey")), { title: "x" })],
+  ["update survey", () => updateDoc(doc(db, P.survey), { title: "renamed" })],
+  ["delete survey", () => deleteDoc(doc(db, P.survey))],
+  ["create version", () => setDoc(doc(db, paths.studioVersion(STUDY, SURVEY, "8.0.0")), { hash: "sha256:x" })],
+  ["rewrite version", () => updateDoc(doc(db, P.version), { hash: "sha256:other" })],
+  ["delete version", () => deleteDoc(doc(db, P.version))],
+  ["repoint published", () => updateDoc(doc(db, P.published), { hash: "sha256:evil", generation: 99 })],
+  ["create published", () => setDoc(doc(db, paths.publishedPointer(STUDY, "other")), { hash: "sha256:evil" })],
+  ["delete published", () => deleteDoc(doc(db, P.published))],
+  ["create public release", () => setDoc(doc(db, paths.publicRelease(STUDY, "f".repeat(64))), { manifest: "{}" })],
+  ["rewrite public release", () => updateDoc(doc(db, P.publicRelease), { manifest: "{\"evil\":true}" })],
+  ["delete public release", () => deleteDoc(doc(db, P.publicRelease))],
+  ["add a member", () => setDoc(doc(db, P.member("new.person@example.org")), { email: "new.person@example.org", role: "admin" })],
+  ["change a member's role", () => updateDoc(doc(db, P.member(MEMBERS.viewer)), { role: "admin" })],
+  ["remove a member", () => deleteDoc(doc(db, P.member(MEMBERS.viewer)))],
+  ["set the domain rule", () => setDoc(doc(db, P.access), { domains: { "gmail.com": "admin" } })],
+  ["change the domain rule", () => updateDoc(doc(db, P.access), { domains: { [DOMAIN]: "admin" } })],
+  ["delete the domain rule", () => deleteDoc(doc(db, P.access))],
+  ["append audit", () => setDoc(doc(db, `${P.auditLog}/forged`), { action: "version.published" })],
+  ["rewrite audit", () => updateDoc(doc(db, P.auditRow), { actor: "someone else" })],
+  ["delete audit", () => deleteDoc(doc(db, P.auditRow))],
+];
+
+beforeAll(async () => {
+  // Several hundred refusals are the point of this file, and the SDK logs a
+  // warning for each one, which buries the result. A failing assertion still
+  // carries the rules' own explanation in its message.
+  setLogLevel("silent");
+  env = await initializeTestEnvironment({
+    projectId: "demo-myself",
+    firestore: {
+      rules: readFileSync(fileURLToPath(new URL("../firestore.rules", import.meta.url)), "utf8"),
+      host: "127.0.0.1",
+      port: 8181,
+    },
+  });
+});
+
+afterAll(async () => env?.cleanup());
+
+beforeEach(async () => {
+  await env.clearFirestore();
+  await seed(async (db) => {
+    for (const role of STUDIO_ROLES) {
+      const email = MEMBERS[role].toLowerCase();
+      await setDoc(doc(db, P.member(email)), {
+        email,
+        role,
+        addedAt: T0,
+        addedBy: "cli:test",
+        addedByEmail: null,
+        note: null,
+      });
+    }
+    await setDoc(doc(db, P.member(OTHER_MEMBER)), { email: OTHER_MEMBER, role: "viewer" });
+    await setDoc(doc(db, P.access), { domains: { [DOMAIN]: "editor" }, updatedAt: T0, updatedBy: "cli:test" });
+    await setDoc(doc(db, P.survey), {
+      surveyId: SURVEY,
+      study: STUDY,
+      title: "Yorkshire Brain Map",
+      createdAt: T0,
+      createdBy: "cli:test",
+      active: null,
+      latestVersion: VERSION,
+      versionCount: 1,
+      draftEditors: [],
+    });
+    await setDoc(doc(db, P.draft), draftDoc());
+    await setDoc(doc(db, P.version), { surveyId: SURVEY, version: VERSION, hash: `sha256:${HASH_HEX}` });
+    await setDoc(doc(db, P.published), {
+      surveyId: SURVEY,
+      study: STUDY,
+      hash: `sha256:${HASH_HEX}`,
+      version: VERSION,
+      releaseKey: "ybm_nd2026_standard_r7_1_0",
+      engineVersion: "0.1.0",
+      generation: 1,
+      publishedAt: T0,
+    });
+    await setDoc(doc(db, P.publicRelease), {
+      surveyId: SURVEY,
+      study: STUDY,
+      hash: `sha256:${HASH_HEX}`,
+      version: VERSION,
+      manifest: "{}",
+      bytes: 2,
+      publishedAt: T0,
+    });
+    await setDoc(doc(db, P.auditRow), {
+      at: T0,
+      actor: "cli:test",
+      actorEmail: null,
+      action: "access.member_set",
+      surveyId: null,
+      subject: "ada.admin@example.org",
+      detail: { role: "admin", via: "cli" },
+    });
+    await setDoc(doc(db, P.presence("u_admin")), {
+      uid: "u_admin",
+      email: "ada.admin@example.org",
+      at: T0,
+      focus: null,
+    });
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Authorised
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("Studio roles, as the contract defines them", () => {
+  it("are the numbers written into firestore.rules", () => {
+    // roleLevel() in the rules spells these out; they cannot import them.
+    expect(ROLE_LEVEL).toEqual({ viewer: 1, editor: 2, publisher: 3, admin: 4 });
+  });
+
+  it("give each role exactly the access its level implies", async () => {
+    for (const role of STUDIO_ROLES) {
+      await seedDraft();
+      const c = member(role);
+      const level = ROLE_LEVEL[role];
+
+      for (const [what, attempt] of memberReads(c.db)) {
+        await (level >= ROLE_LEVEL.viewer ? allowed : refused)(`${role}: ${what}`, attempt);
+      }
+      await (level >= ROLE_LEVEL.editor ? allowed : refused)(`${role}: save the draft`, () => save(c));
+      for (const [what, attempt] of adminReads(c.db)) {
+        await (level >= ROLE_LEVEL.admin ? allowed : refused)(`${role}: ${what}`, attempt);
+      }
+    }
+  });
+});
+
+describe("editors", () => {
+  it("save the draft one revision at a time, as themselves, on the server's clock", async () => {
+    const ed = member("editor");
+    await allowed("revision 4", () => save(ed));
+    await allowed("revision 5", () => save(ed, { revision: 5 }));
+    const stored = await getDoc(doc(ed.db, P.draft));
+    expect(stored.get("revision")).toBe(5);
+    expect(stored.get("updatedBy")).toBe("u_editor");
+    expect(stored.get("updatedByEmail")).toBe("ed.editor@example.org");
+    // Provenance the functions set is untouched by a save.
+    expect(stored.get("basedOn")).toEqual({ version: VERSION, hash: `sha256:${HASH_HEX}` });
+  });
+
+  it("change exactly the fields the contract lists, and the Studio's save touches no others", async () => {
+    expect([...DRAFT_CLIENT_FIELDS].sort()).toEqual(Object.keys(saveFields(member("editor"))).sort());
+  });
+
+  it("may save a draft right up to the size limit", async () => {
+    await allowed("content of MAX_DRAFT_CHARS", () =>
+      save(member("editor"), { content: "x".repeat(MAX_DRAFT_CHARS) }),
+    );
+  });
+
+  it("mark their own presence, and take it down again", async () => {
+    const ed = member("editor");
+    await allowed("create own presence", () => setDoc(doc(ed.db, P.presence(ed.uid)), presenceFields(ed)));
+    await allowed("update own presence", () =>
+      setDoc(doc(ed.db, P.presence(ed.uid)), { ...presenceFields(ed), focus: null }),
+    );
+    await allowed("delete own presence", () => deleteDoc(doc(ed.db, P.presence(ed.uid))));
+  });
+});
+
+describe("a domain rule", () => {
+  it("admits a verified Google account at that domain with the role it names", async () => {
+    // Mixed case in the domain as well as the name: matching is on the list key.
+    const x = google("u_x", `X.Person@BrainPOP.test`);
+    for (const [what, attempt] of memberReads(x.db)) await allowed(`domain editor: ${what}`, attempt);
+    await allowed("domain editor saves", () => save(x));
+    await allowed("domain editor marks presence", () => setDoc(doc(x.db, P.presence(x.uid)), presenceFields(x)));
+    // An editor, not an admin.
+    for (const [what, attempt] of adminReads(x.db)) await refused(`domain editor: ${what}`, attempt);
+  });
+
+  it("combines with a personal entry by taking the higher of the two", async () => {
+    await seed(async (db) => {
+      await setDoc(doc(db, P.member("boss@brainpop.test")), { email: "boss@brainpop.test", role: "admin" });
+      await setDoc(doc(db, P.member("reader@brainpop.test")), { email: "reader@brainpop.test", role: "viewer" });
+    });
+    // Listed above the domain's role: the listing wins.
+    const boss = google("u_boss", "boss@brainpop.test");
+    for (const [what, attempt] of adminReads(boss.db)) await allowed(`listed admin at domain: ${what}`, attempt);
+    // Listed below it: the domain still admits them as an editor. Narrowing one
+    // person at a domain means removing the domain rule and listing people.
+    await allowed("listed viewer at an editor domain saves", () => save(google("u_reader", "reader@brainpop.test")));
+  });
+
+  it("stops admitting anyone the moment it is removed", async () => {
+    const x = google("u_x", "x@brainpop.test");
+    await allowed("before", () => getDoc(doc(x.db, P.survey)));
+    await seed((db) => setDoc(doc(db, P.access), { domains: {}, updatedAt: T0, updatedBy: "cli:test" }));
+    await refused("after", () => getDoc(doc(x.db, P.survey)));
+  });
+
+  it("that is malformed admits nobody, and locks nobody listed out", async () => {
+    await seed((db) => setDoc(doc(db, P.access), { domains: "brainpop.test", updatedAt: T0, updatedBy: "cli:test" }));
+    await refused("domain account", () => getDoc(doc(google("u_x", "x@brainpop.test").db, P.survey)));
+    await allowed("listed editor", () => save(member("editor")));
+  });
+});
+
+describe("the existing owner", () => {
+  // An owner claim is an admin in the Studio, with or without a list entry,
+  // so there is somebody who can add the first member from Settings.
+  const owner = () => caller("u_owner", { role: "owner", email: "Owner@Leeds.test" });
+
+  it("reads, edits and sees the list without being on it", async () => {
+    const o = owner();
+    for (const [what, attempt] of memberReads(o.db)) await allowed(`owner: ${what}`, attempt);
+    for (const [what, attempt] of adminReads(o.db)) await allowed(`owner: ${what}`, attempt);
+    await allowed("owner saves", () => save(o));
+    await allowed("owner marks presence", () => setDoc(doc(o.db, P.presence(o.uid)), presenceFields(o)));
+  });
+
+  it("still cannot write anything only functions write", async () => {
+    const o = owner();
+    for (const [what, attempt] of functionOnlyWrites(o.db)) await refused(`owner: ${what}`, attempt);
+  });
+});
+
+describe("admins and members", () => {
+  it("an admin reads the list and the domain rule", async () => {
+    for (const [what, attempt] of adminReads(member("admin").db)) await allowed(`admin: ${what}`, attempt);
+    await allowed("admin queries the list", () =>
+      getDocs(query(collection(member("admin").db, P.members), where("role", "==", "editor"))),
+    );
+  });
+
+  it("every member reads their own entry, whatever the case of their address", async () => {
+    for (const role of STUDIO_ROLES) {
+      const c = member(role);
+      await allowed(`${role} reads own entry`, () => getDoc(doc(c.db, P.member(MEMBERS[role]))));
+    }
+  });
+});
+
+describe("what participants load", () => {
+  it("is readable signed out, one document at a time", async () => {
+    const db = nobody();
+    await allowed("get the live pointer", () => getDoc(doc(db, P.published)));
+    await allowed("get a release by hash", () => getDoc(doc(db, P.publicRelease)));
+    // A hash nobody published reads as absent, not as an error.
+    await allowed("get an unknown hash", () => getDoc(doc(db, paths.publicRelease(STUDY, "0".repeat(64)))));
+  });
+
+  it("is readable by an iPad, which is what loads it", async () => {
+    const db = caller("dev_a", { device: true, study: STUDY }).db;
+    await allowed("device gets the pointer", () => getDoc(doc(db, P.published)));
+    await allowed("device gets the release", () => getDoc(doc(db, P.publicRelease)));
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Unauthorised
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Asserts a caller has no Studio access at all: every read and every write is
+ * refused, and only the two public documents can be fetched.
+ */
+async function hasNoStudioAccess(who: string, c: Caller) {
+  for (const [what, attempt] of memberReads(c.db)) await refused(`${who}: ${what}`, attempt);
+  for (const [what, attempt] of adminReads(c.db)) await refused(`${who}: ${what}`, attempt);
+  await refused(`${who}: save the draft`, () => save(c));
+  await refused(`${who}: mark presence`, () => setDoc(doc(c.db, P.presence(c.uid)), presenceFields(c)));
+  for (const [what, attempt] of functionOnlyWrites(c.db)) await refused(`${who}: ${what}`, attempt);
+  await allowed(`${who}: get the live pointer`, () => getDoc(doc(c.db, P.published)));
+  await allowed(`${who}: get a public release`, () => getDoc(doc(c.db, P.publicRelease)));
+}
+
+describe("people not on the list", () => {
+  it("signed out: nothing but the two public documents", async () => {
+    const db = nobody();
+    for (const [what, attempt] of memberReads(db)) await refused(`signed out: ${what}`, attempt);
+    for (const [what, attempt] of adminReads(db)) await refused(`signed out: ${what}`, attempt);
+    await refused("signed out: own-looking member entry", () => getDoc(doc(db, P.member(MEMBERS.admin))));
+    await refused("signed out: save", () => updateDoc(doc(db, P.draft), { revision: 4 }));
+    for (const [what, attempt] of functionOnlyWrites(db)) await refused(`signed out: ${what}`, attempt);
+  });
+
+  it("a verified Google account nobody listed", async () => {
+    const stranger = google("u_stranger", "stranger@example.org");
+    await hasNoStudioAccess("unlisted", stranger);
+    // It may ask whether it is on the list, and learn only "no".
+    const own = await getDoc(doc(stranger.db, P.member(stranger.email!)));
+    expect(own.exists()).toBe(false);
+  });
+
+  it("a listed address Google has not verified", async () => {
+    await hasNoStudioAccess("unverified", google("u_ed2", MEMBERS.editor, { email_verified: false }));
+    await hasNoStudioAccess(
+      "no verification claim",
+      caller("u_ed3", { email: MEMBERS.editor, firebase: { sign_in_provider: "google.com" } }),
+    );
+  });
+
+  it("a listed, verified address from any provider but Google", async () => {
+    for (const provider of ["password", "custom", "github.com", "microsoft.com"] as const) {
+      await hasNoStudioAccess(
+        `provider ${provider}`,
+        google(`u_${provider}`, MEMBERS.admin, { firebase: { sign_in_provider: provider } }),
+      );
+    }
+  });
+
+  it("an anonymous sign-in, even one claiming a listed address", async () => {
+    await hasNoStudioAccess(
+      "anonymous",
+      google("u_anon", MEMBERS.admin, { firebase: { sign_in_provider: "anonymous" }, provider_id: "anonymous" }),
+    );
+  });
+
+  it("an iPad, even one carrying a listed, verified Google address or an owner claim", async () => {
+    const ipad = google("dev_a", MEMBERS.admin, { device: true, study: STUDY });
+    await hasNoStudioAccess("device with admin address", ipad);
+    await refused("device reads 'its' member entry", () => getDoc(doc(ipad.db, P.member(MEMBERS.admin))));
+    await hasNoStudioAccess(
+      "device with owner claim",
+      caller("dev_b", { device: true, study: STUDY, role: "owner", email: "owner@leeds.test" }),
+    );
+  });
+
+  it("researchers and analysts, whose claims give them the sittings but not the Studio", async () => {
+    for (const role of ["researcher", "analyst"]) {
+      await hasNoStudioAccess(`${role} claim`, caller(`u_${role}`, { role }));
+      await hasNoStudioAccess(
+        `${role} claim, signed in with Google`,
+        google(`u_${role}_g`, `${role}@example.org`, { role }),
+      );
+    }
+  });
+
+  it("someone removed from the list, on their very next request", async () => {
+    const ed = member("editor");
+    await allowed("before removal", () => save(ed));
+    await seed((db) => deleteDoc(doc(db, P.member(MEMBERS.editor))));
+    // Same token, no refresh: the rules read the list every time.
+    await refused("after removal: save", () => save(ed, { revision: 5 }));
+    await refused("after removal: read", () => getDoc(doc(ed.db, P.draft)));
+  });
+
+  it("an entry whose role is not a Studio role", async () => {
+    await seed((db) => setDoc(doc(db, P.member("odd@example.org")), { email: "odd@example.org", role: "superuser" }));
+    await hasNoStudioAccess("unknown role", google("u_odd", "odd@example.org"));
+  });
+});
+
+describe("viewers", () => {
+  it("read but do not write", async () => {
+    const v = member("viewer");
+    await refused("viewer saves", () => save(v));
+    await refused("viewer marks presence", () => setDoc(doc(v.db, P.presence(v.uid)), presenceFields(v)));
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Malicious
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("an editor trying to get round the draft rule", () => {
+  it("cannot skip, repeat or rewind a revision", async () => {
+    const ed = member("editor");
+    await refused("revision + 2", () => save(ed, { revision: 5 }));
+    await refused("same revision", () => save(ed, { revision: 3 }));
+    await refused("revision - 1", () => save(ed, { revision: 2 }));
+    await refused("revision as a string", () => save(ed, { revision: "4" }));
+    await refused("revision as a fraction", () => save(ed, { revision: 3.5 }));
+    await refused("revision removed", () => save(ed, { revision: deleteField() }));
+  });
+
+  it("cannot change where the draft came from or what it is", async () => {
+    const ed = member("editor");
+    await refused("basedOn", () => save(ed, { basedOn: { version: "9.9.9", hash: "sha256:evil" } }));
+    await refused("basedOn removed", () => save(ed, { basedOn: deleteField() }));
+    await refused("surveyId", () => save(ed, { surveyId: "another_survey" }));
+    await refused("createdAt", () => save(ed, { createdAt: serverTimestamp() }));
+    await refused("a field the contract does not have", () => save(ed, { role: "admin" }));
+    // A whole-document write that leaves provenance out is removing it.
+    await refused("set without provenance", () => setDoc(doc(ed.db, P.draft), saveFields(ed)));
+  });
+
+  it("cannot sign a save as somebody else", async () => {
+    const ed = member("editor");
+    await refused("another uid", () => save(ed, { updatedBy: "u_admin" }));
+    await refused("another address", () => save(ed, { updatedByEmail: "ada.admin@example.org" }));
+    // The contract is the list key: lower-cased. The token's own spelling is
+    // refused, so every stored address matches the list.
+    await refused("address not lower-cased", () => save(ed, { updatedByEmail: MEMBERS.editor }));
+    await refused("no address", () => save(ed, { updatedByEmail: deleteField() }));
+  });
+
+  it("cannot choose the time", async () => {
+    const ed = member("editor");
+    await refused("client Timestamp", () => save(ed, { updatedAt: Timestamp.now() }));
+    await refused("client Date", () => save(ed, { updatedAt: new Date() }));
+    await refused("time left as it was", () => save(ed, { updatedAt: T0 }));
+  });
+
+  it("cannot store anything but a string under the limit", async () => {
+    const ed = member("editor");
+    await refused("content as a map", () => save(ed, { content: { composition: {} } }));
+    await refused("content as a number", () => save(ed, { content: 42 }));
+    await refused("content as null", () => save(ed, { content: null }));
+    await refused("content one over the limit", () => save(ed, { content: "x".repeat(MAX_DRAFT_CHARS + 1) }));
+  });
+
+  it("cannot create, delete, or write a draft other than `current`", async () => {
+    const ed = member("editor");
+    await refused("create a draft for a new survey", () =>
+      setDoc(doc(ed.db, paths.studioDraft(STUDY, "new_survey")), { ...draftDoc(), ...saveFields(ed, 0) }),
+    );
+    await refused("create a second draft", () =>
+      setDoc(doc(ed.db, `${P.survey}/draft/other`), { ...draftDoc(), ...saveFields(ed) }),
+    );
+    await seed((db) => setDoc(doc(db, `${P.survey}/draft/other`), draftDoc()));
+    await refused("update a draft other than current", () => save(ed, {}, `${P.survey}/draft/other`));
+    await refused("delete the draft", () => deleteDoc(doc(ed.db, P.draft)));
+    // Not an admin either: a draft is removed by no client.
+    await refused("admin deletes the draft", () => deleteDoc(doc(member("admin").db, P.draft)));
+  });
+});
+
+describe("anyone trying to write what only functions write", () => {
+  it("is refused at every role, including admin", async () => {
+    for (const role of STUDIO_ROLES) {
+      for (const [what, attempt] of functionOnlyWrites(member(role).db)) await refused(`${role}: ${what}`, attempt);
+    }
+  });
+
+  it("cannot put themselves on the list, or raise their own role", async () => {
+    const ed = member("editor");
+    await refused("editor makes own entry admin", () =>
+      updateDoc(doc(ed.db, P.member(MEMBERS.editor)), { role: "admin" }),
+    );
+    await refused("editor overwrites own entry", () =>
+      setDoc(doc(ed.db, P.member(MEMBERS.editor)), { email: "ed.editor@example.org", role: "admin" }),
+    );
+    const stranger = google("u_stranger", "stranger@example.org");
+    await refused("stranger adds themselves", () =>
+      setDoc(doc(stranger.db, P.member(stranger.email!)), { email: "stranger@example.org", role: "viewer" }),
+    );
+    await refused("stranger adds their domain", () =>
+      setDoc(doc(stranger.db, P.access), { domains: { "example.org": "admin" } }),
+    );
+  });
+});
+
+describe("anyone trying to enumerate the public documents", () => {
+  it("cannot list them, signed out or as an admin", async () => {
+    for (const [who, db] of [
+      ["signed out", nobody()],
+      ["admin", member("admin").db],
+      ["owner", caller("u_owner", { role: "owner" }).db],
+    ] as const) {
+      await refused(`${who}: list published`, () => getDocs(collection(db, P.publishedAll)));
+      await refused(`${who}: list public releases`, () => getDocs(collection(db, P.publicReleases)));
+      await refused(`${who}: query public releases`, () =>
+        getDocs(query(collection(db, P.publicReleases), where("surveyId", "==", SURVEY))),
+      );
+    }
+  });
+});
+
+describe("presence", () => {
+  it("cannot be written for somebody else, or with someone else's details", async () => {
+    const ed = member("editor");
+    const admin = member("admin");
+    await refused("another uid's document", () =>
+      setDoc(doc(ed.db, P.presence(admin.uid)), presenceFields(admin)),
+    );
+    // Their slot, the editor's own details: overwriting (or taking down) the
+    // admin's marker by writing a truthful one in its place.
+    await refused("another uid's document, own details inside", () =>
+      setDoc(doc(ed.db, P.presence(admin.uid)), presenceFields(ed)),
+    );
+    await refused("own document, another uid inside", () =>
+      setDoc(doc(ed.db, P.presence(ed.uid)), { ...presenceFields(ed), uid: admin.uid }),
+    );
+    await refused("own document, another address", () =>
+      setDoc(doc(ed.db, P.presence(ed.uid)), { ...presenceFields(ed), email: "ada.admin@example.org" }),
+    );
+    await refused("client time", () =>
+      setDoc(doc(ed.db, P.presence(ed.uid)), { ...presenceFields(ed), at: Timestamp.now() }),
+    );
+    await refused("an extra field", () =>
+      setDoc(doc(ed.db, P.presence(ed.uid)), { ...presenceFields(ed), role: "admin" }),
+    );
+    await refused("focus that is not a question ID", () =>
+      setDoc(doc(ed.db, P.presence(ed.uid)), { ...presenceFields(ed), focus: { evil: true } }),
+    );
+    await refused("delete another's marker", () => deleteDoc(doc(ed.db, P.presence(admin.uid))));
+    await refused("signed out deletes a marker", () => deleteDoc(doc(nobody(), P.presence(admin.uid))));
+  });
+
+  it("can be taken down by its own account even after it is removed from the list", async () => {
+    const ed = member("editor");
+    await allowed("mark presence", () => setDoc(doc(ed.db, P.presence(ed.uid)), presenceFields(ed)));
+    await seed((db) => deleteDoc(doc(db, P.member(MEMBERS.editor))));
+    await refused("removed: update own marker", () => setDoc(doc(ed.db, P.presence(ed.uid)), presenceFields(ed)));
+    // Deleting your own marker can only ever remove what you wrote.
+    await allowed("removed: delete own marker", () => deleteDoc(doc(ed.db, P.presence(ed.uid))));
+  });
+});
+
+describe("anyone trying to read the list without being an admin", () => {
+  it("cannot read another member's entry or list them", async () => {
+    for (const role of ["viewer", "editor", "publisher"] as const) {
+      const c = member(role);
+      const other = role === "viewer" ? MEMBERS.admin : MEMBERS.viewer;
+      await refused(`${role}: another member's entry`, () => getDoc(doc(c.db, P.member(other))));
+      await refused(`${role}: list members`, () => getDocs(collection(c.db, P.members)));
+      await refused(`${role}: query own entry through a list`, () =>
+        getDocs(query(collection(c.db, P.members), where("email", "==", MEMBERS[role].toLowerCase()))),
+      );
+      await refused(`${role}: domain rule`, () => getDoc(doc(c.db, P.access)));
+    }
+    // A stranger cannot probe addresses to find out who has access.
+    const stranger = google("u_stranger", "stranger@example.org");
+    await refused("stranger probes an address", () => getDoc(doc(stranger.db, P.member(MEMBERS.admin))));
+  });
+});
+
+describe("anyone trying to pass for someone at the domain", () => {
+  it("is matched on the exact domain, and nothing that merely contains it", async () => {
+    const spoofs = [
+      "evil@brainpop.test.attacker.com",
+      "evil@attacker.com#@brainpop.test",
+      "evil@attacker.com@brainpop.test",
+      "evil@sub.brainpop.test",
+      "evil@xbrainpop.test",
+      "brainpop.test@attacker.com",
+      "evil@brainpop.testx",
+    ];
+    for (const [i, email] of spoofs.entries()) {
+      await hasNoStudioAccess(email, google(`u_spoof_${i}`, email));
+    }
+  });
+
+  it("gains nothing from an unverified or non-Google account at the domain", async () => {
+    await hasNoStudioAccess("unverified at domain", google("u_d1", "x@brainpop.test", { email_verified: false }));
+    await hasNoStudioAccess(
+      "password at domain",
+      google("u_d2", "x@brainpop.test", { firebase: { sign_in_provider: "password" } }),
+    );
+  });
+});
+
+describe("everything else in the Studio", () => {
+  it("is closed, even to an admin", async () => {
+    const db = member("admin").db;
+    await refused("unknown survey subcollection", () => getDoc(doc(db, `${P.survey}/secrets/x`)));
+    await refused("write unknown survey subcollection", () => setDoc(doc(db, `${P.survey}/secrets/x`), { a: 1 }));
+    await refused("unknown studio collection", () => getDoc(doc(db, `studies/${STUDY}/studioThings/x`)));
+    await refused("the study document", () => getDoc(doc(db, `studies/${STUDY}`)));
+    // Studio access is not access to the sittings.
+    await refused("sittings", () => getDoc(doc(db, paths.session(STUDY, "s1"))));
+    await refused("narratives", () => getDoc(doc(db, paths.narrative(STUDY, "s1"))));
+  });
+});
