@@ -90,14 +90,31 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(functio
 export function Tooltip({ text, children, side = "bottom" }: { text: string; children: ReactElement; side?: "top" | "bottom" }) {
   const id = useId();
   const [open, setOpen] = useState(false);
+  // Hover waits a moment so passing the pointer over a toolbar doesn't flash
+  // a trail of tooltips; keyboard focus shows it at once.
+  const timer = useRef<number | null>(null);
+  const clear = () => {
+    if (timer.current !== null) window.clearTimeout(timer.current);
+    timer.current = null;
+  };
+  useEffect(() => clear, []);
   if (!isValidElement(children)) return children;
   const child = children as ReactElement<Record<string, unknown>>;
   return (
     <span
       className="st-tip-anchor"
-      onMouseEnter={() => setOpen(true)}
-      onMouseLeave={() => setOpen(false)}
-      onFocus={() => setOpen(true)}
+      onMouseEnter={() => {
+        clear();
+        timer.current = window.setTimeout(() => setOpen(true), 300);
+      }}
+      onMouseLeave={() => {
+        clear();
+        setOpen(false);
+      }}
+      onFocus={() => {
+        clear();
+        setOpen(true);
+      }}
       onBlur={() => setOpen(false)}
       onKeyDown={(e) => {
         if (e.key === "Escape") setOpen(false);
@@ -111,6 +128,29 @@ export function Tooltip({ text, children, side = "bottom" }: { text: string; chi
       ) : null}
     </span>
   );
+}
+
+/**
+ * An ⓘ beside a label that explains it on hover or focus — the home for the
+ * explanations that would otherwise be a paragraph under every field
+ * (DESIGN.md §1). The explanation is also the button's description, so a
+ * screen reader hears it without opening anything.
+ */
+export function InfoTip({ text, label }: { text: string; label: string }) {
+  return (
+    <span className="st-infotip">
+      <Tooltip text={text}>
+        <button type="button" aria-label={`About ${label}`} onClick={(e) => e.preventDefault()}>
+          <Icon name="info" size={14} />
+        </button>
+      </Tooltip>
+    </span>
+  );
+}
+
+/** A small coloured dot that always sits beside words saying the same thing. */
+export function StatusDot({ tone = "neutral" }: { tone?: "neutral" | "accent" | "warn" | "danger" }) {
+  return <span className={`st-dot${tone === "neutral" ? "" : ` st-dot-${tone}`}`} aria-hidden="true" />;
 }
 
 export function Spinner({ label }: { label?: string }) {
