@@ -45,6 +45,7 @@ import {
   type CheckRecord,
 } from "./lib/releases.js";
 import { buildRuntime, type Runtime } from "./lib/runtime.js";
+import { sittingToResume } from "./lib/resume.js";
 import { ReviewScreen } from "./components/ReviewScreen.js";
 import { SurveyScreen } from "./components/SurveyScreen.js";
 
@@ -79,35 +80,10 @@ type Phase =
   | { kind: "finished"; session: SessionRow };
 
 /**
- * Which sitting a code resumes, and the release to render it with.
- *
- * PINNED: a sitting is only ever rendered under the release it started with. Its
- * saved position is an index into THAT release's questions, and the same index in
- * another release is a different question — so the newest unfinished sitting for
- * the code is found whatever its release, and comes back with its own.
- *
- * If that release cannot be loaded — which pruning is meant to make impossible —
- * this falls back to exactly the old rule: resume only a sitting of the release
- * running now, otherwise start a new one. The other sitting's row is not touched;
- * it stays on the device and uploads as the partial sitting it is.
+ * Which sitting a code resumes, and the release to render it with — pinned to
+ * the sitting's own release. The rule, and its fallback, is `lib/resume.ts`.
  */
-async function sittingToResume(
-  code: string,
-  current: Runtime,
-): Promise<{ session: SessionRow | undefined; runtime: Runtime }> {
-  const newest = await findResumableSession(code, { anyRelease: true });
-  if (!newest || newest.releaseHash === current.hash) return { session: newest, runtime: current };
-  try {
-    const pinned = await releaseForHash(newest.releaseHash);
-    if (pinned) {
-      const runtime = buildRuntime(pinned.manifest, pinned.source);
-      if (runtime.hash === newest.releaseHash) return { session: newest, runtime };
-    }
-  } catch {
-    // Treated as unavailable, below.
-  }
-  return { session: await findResumableSession(code, { releaseHash: current.hash }), runtime: current };
-}
+const resumeLookup = { find: findResumableSession, releaseForHash };
 
 export default function App({ initialRuntime }: { initialRuntime: Runtime }) {
   /**
@@ -486,7 +462,7 @@ export default function App({ initialRuntime }: { initialRuntime: Runtime }) {
       // active one for a new sitting, the sitting's own for a resumed one. Read
       // from here down instead of the names above, which are still the start
       // screen's until the next render.
-      const { session: existing, runtime: rt } = await sittingToResume(trimmed, runtime);
+      const { session: existing, runtime: rt } = await sittingToResume(trimmed, runtime, resumeLookup);
       const store = new AnswerStore();
       let session: SessionRow;
       if (existing) {

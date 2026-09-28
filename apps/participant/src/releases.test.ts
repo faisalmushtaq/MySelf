@@ -15,8 +15,10 @@ import {
   releaseService,
   SUPPORTED_ENGINE_VERSIONS,
   verifyRelease,
+  type LoadedRelease,
   type ReleaseCache,
 } from "./lib/releases.js";
+import { sittingToResume, type ResumeLookup } from "./lib/resume.js";
 import { buildRuntime } from "./lib/runtime.js";
 
 /**
@@ -523,6 +525,46 @@ describe("looking for a newer release", () => {
     expect(calls).toHaveLength(1);
   });
 
+  it("downloads a release pruned while the app was open again, rather than activating it from memory", async () => {
+    // A goes live, then B; with no sitting left under A the device prunes it. The
+    // study then rolls back to A. Activating A from what this page remembered
+    // would start sittings under a release the device no longer holds: the next
+    // launch would open on the built-in release and could not resume them.
+    const a = await nextRelease();
+    const b = await derived((body) => {
+      body["release"]["version"] = "7.3.0";
+      body["release"]["key"] = "ybm_nd2026_standard_r7_3_0";
+      body["composition"]["studyLabel"] = "Published again";
+    });
+    const docs: { pointer: Json | null; releases: Record<string, Json> } = {
+      pointer: pointerDoc(a.hash),
+      releases: {
+        [a.hash.slice(7)]: releaseDoc(a.hash, a.json),
+        [b.hash.slice(7)]: releaseDoc(b.hash, b.json),
+      },
+    };
+    const { transport, calls } = study(docs);
+    const cache = memoryCache();
+    const releases = service(cache, transport);
+
+    expect((await releases.refreshActiveRelease()).activeHash).toBe(a.hash);
+    docs.pointer = pointerDoc(b.hash);
+    expect((await releases.refreshActiveRelease()).activeHash).toBe(b.hash);
+
+    cache.rows.delete(a.hash); // what pruneCachedReleases does
+    expect(await releases.releaseForHash(a.hash)).toBeNull();
+
+    docs.pointer = pointerDoc(a.hash);
+    const before = calls.length;
+    const back = await releases.refreshActiveRelease();
+    expect(back.record.outcome).toMatchObject({ kind: "activated", hash: a.hash });
+    expect(calls.slice(before)).toEqual([`${SOURCE}/published/${SURVEY}`, `${SOURCE}/publicReleases/${a.hash.slice(7)}`]);
+    expect(cache.rows.get(a.hash)?.json).toBe(a.json);
+    // And so the next launch, offline, opens on it.
+    const startup = await service(cache, undefined, { online: false }).resolveStartupRelease();
+    expect(startup.hash).toBe(a.hash);
+  });
+
   it("asks once when several screens ask at the same moment", async () => {
     const { transport, calls } = study({ pointer: null });
     const releases = service(memoryCache(), transport);
@@ -569,6 +611,98 @@ describe("which sitting a code resumes", () => {
   it("can still be restricted to one release, which is the fallback", () => {
     expect(pickResumable(rows, { releaseHash: NEW })?.sessionId).toBe("ses_older_new");
     expect(pickResumable(rows, { releaseHash: `sha256:${"d".repeat(64)}` })).toBeUndefined();
+  });
+});
+
+/**
+ * The release a resumed sitting is drawn with (App's Start, through lib/resume.ts).
+ *
+ * The case that matters is the one that only happens when something has already
+ * gone wrong: a sitting whose release this device cannot open. It must never be
+ * drawn with the release on screen — its saved position would land on a different
+ * question — so it is left alone and the old same-release rule applies.
+ */
+describe("which release a resumed sitting is drawn with", () => {
+  const row = (sessionId: string, releaseHash: string, updatedAt: string): SessionRow => ({
+    sessionId,
+    participantCode: "NDC0042",
+    releaseKey: "k",
+    releaseHash,
+    state: "in_progress",
+    currentIndex: 7,
+    startedAt: "2026-09-28T09:00:00.000Z",
+    updatedAt,
+    eventCount: 10,
+  });
+
+  /** The device's rows for the code, and the releases it can open. */
+  function device(rows: SessionRow[], held: Record<string, LoadedRelease | Error>): ResumeLookup {
+    return {
+      find: async (_code, scope) => pickResumable(rows, scope),
+      releaseForHash: async (hash) => {
+        const found = held[hash];
+        if (found instanceof Error) throw found;
+        return found ?? null;
+      },
+    };
+  }
+
+  it("draws the newest unfinished sitting with its own release, not the one on screen", async () => {
+    const next = await nextRelease();
+    const verified = await verifyRelease(next.json, next.hash);
+    if (!verified.ok) throw new Error(verified.reason);
+    const onScreen = buildRuntime(verified.manifest, "cached");
+    const old = row("ses_old", R710_HASH, "2026-09-28T10:00:00.000Z");
+
+    const chosen = await sittingToResume("NDC0042", onScreen, device([old], { [R710_HASH]: BUILT_IN }));
+    expect(chosen.session?.sessionId).toBe("ses_old");
+    expect(chosen.runtime.hash).toBe(R710_HASH);
+    expect(chosen.runtime).not.toBe(onScreen);
+    // Drawn with that release's content, not the newer one on screen.
+    expect(onScreen.manifest.composition.studyLabel).toBe("Published from the Studio");
+    expect(chosen.runtime.manifest.composition.studyLabel).toBe(BUILT_IN.manifest.composition.studyLabel);
+  });
+
+  it("keeps the release on screen when the sitting was started under it", async () => {
+    const onScreen = buildRuntime(BUILT_IN.manifest);
+    const lookup = device([row("ses_same", R710_HASH, "2026-09-28T10:00:00.000Z")], {});
+    const chosen = await sittingToResume("NDC0042", onScreen, lookup);
+    expect(chosen).toEqual({ session: expect.objectContaining({ sessionId: "ses_same" }), runtime: onScreen });
+    expect(chosen.runtime).toBe(onScreen);
+  });
+
+  it("falls back to the old same-release rule when the sitting's release cannot be opened", async () => {
+    const onScreen = buildRuntime(BUILT_IN.manifest);
+    const missing = `sha256:${"e".repeat(64)}`;
+    const rows = [
+      row("ses_unopenable", missing, "2026-09-28T11:00:00.000Z"),
+      row("ses_on_screen", R710_HASH, "2026-09-28T09:00:00.000Z"),
+    ];
+    // Not held at all, and a cache that throws: both leave the sitting alone.
+    for (const held of [{}, { [missing]: new Error("IndexedDB went away") }]) {
+      const chosen = await sittingToResume("NDC0042", onScreen, device(rows, held));
+      expect(chosen.session?.sessionId).toBe("ses_on_screen");
+      expect(chosen.runtime).toBe(onScreen);
+    }
+    // With no sitting of the release on screen, a new sitting is started instead.
+    const alone = await sittingToResume("NDC0042", onScreen, device([rows[0]!], {}));
+    expect(alone).toEqual({ session: undefined, runtime: onScreen });
+  });
+
+  it("never pairs a sitting with a release whose hash is not the sitting's", async () => {
+    // A cache that answered for one hash with another release's manifest.
+    const onScreen = buildRuntime(BUILT_IN.manifest);
+    const next = await nextRelease();
+    const verified = await verifyRelease(next.json, next.hash);
+    if (!verified.ok) throw new Error(verified.reason);
+    const wrong: LoadedRelease = { manifest: verified.manifest, hash: next.hash, source: "cached" };
+    const asked = `sha256:${"f".repeat(64)}`;
+    const chosen = await sittingToResume(
+      "NDC0042",
+      onScreen,
+      device([row("ses_x", asked, "2026-09-28T11:00:00.000Z")], { [asked]: wrong }),
+    );
+    expect(chosen).toEqual({ session: undefined, runtime: onScreen });
   });
 });
 
