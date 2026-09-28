@@ -67,7 +67,9 @@ export type IconName =
   | "welcome"
   | "flag"
   | "external"
-  | "compare";
+  | "compare"
+  | "import"
+  | "keyboard";
 
 const paths: Record<IconName, JSX.Element> = {
   plus: <path d="M10 4v12M4 10h12" />,
@@ -154,6 +156,8 @@ const paths: Record<IconName, JSX.Element> = {
   flag: <path d="M5 18V3M5 4h10l-2 3.5L15 11H5" />,
   external: <path d="M11 3h6v6M17 3l-8 8M14 12v5H3V6h5" />,
   compare: <path d="M7 3v14M13 3v14M3 7h4M13 13h4M3 13l4-3M17 7l-4 3" />,
+  import: <path d="M10 3v9M6.5 8.5L10 12l3.5-3.5M3.5 13v3.5h13V13" />,
+  keyboard: <path d="M2.5 5.5h15v9h-15zM5.5 8.5h1M9.5 8.5h1M13.5 8.5h1M6.5 11.5h7" />,
 };
 
 export function Icon({ name, size = 18, ...rest }: { name: IconName; size?: number } & SVGProps<SVGSVGElement>) {

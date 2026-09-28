@@ -6,7 +6,7 @@ import { Link } from "../router.js";
 import { ChangeList, changeHeadline } from "../shell/common.js";
 import { Dialog } from "../ui/dialog.js";
 import { Icon } from "../ui/icons.js";
-import { Button, Notice, Spinner } from "../ui/kit.js";
+import { Button, InfoTip, Notice, Spinner } from "../ui/kit.js";
 import { useEditor, type EditorContextValue } from "./context.js";
 import { PUBLIC_SURVEY_URL } from "./publish/links.js";
 import {
@@ -27,6 +27,7 @@ import {
   type PublishState,
 } from "./publish/machine.js";
 import { versionOptions } from "./publish/version.js";
+import { IssueText } from "./node/controls.js";
 import { groupIssues, selectionFor } from "./validation/select.js";
 import "./publish.css";
 
@@ -256,7 +257,9 @@ function IssuesToFix({ issues, goTo, severity }: { issues: Issue[]; goTo: (i: Is
                 {g.label}
                 {g.context ? <span className="sto-pub-issue-context"> in {g.context}</span> : null}
               </span>
-              <span>{issue.message}</span>
+              <span>
+                <IssueText issue={issue} label="this check" />
+              </span>
             </span>
             <Button size="sm" variant="ghost" onClick={() => goTo(issue)} aria-label={`Go to ${g.label}`}>
               Go to
@@ -342,15 +345,6 @@ function StepBody({
           <Heading headingRef={headingRef}>{warnings.length === 1 ? "Review 1 warning" : `Review ${warnings.length} warnings`}</Heading>
           <p className="sto-pub-sub">Nothing stops this being published. Warnings are worth a look, but don&rsquo;t block it.</p>
           <IssuesToFix issues={warnings} goTo={goTo} severity="warning" />
-          <label className={`sto-pub-check${problem ? " has-error" : ""}`}>
-            <input type="checkbox" checked={s.reviewed} onChange={(e) => dispatch({ type: "review", reviewed: e.target.checked })} aria-describedby={problem ? `${noteId}-review` : undefined} />
-            <span>I&rsquo;ve reviewed these warnings</span>
-          </label>
-          {problem ? (
-            <p id={`${noteId}-review`} className="sto-pub-problem">
-              <Icon name="error" size={14} /> {problem}
-            </p>
-          ) : null}
         </>
       );
     }
@@ -384,6 +378,7 @@ function StepBody({
 
     case "version": {
       const options = versionOptions(s.latest, s.required);
+      const why = options.find((o) => o.reason)?.reason ?? null;
       return (
         <>
           <Heading headingRef={headingRef}>Version number</Heading>
@@ -408,12 +403,19 @@ function StepBody({
                 <span className="sto-pub-version-text">
                   <span className="sto-pub-version-title">
                     {o.title}
-                    {o.required && s.latest ? <span className="sto-pub-rec">Needed for these changes</span> : null}
+                    {o.required && s.latest ? (
+                      <span className="sto-pub-rec">
+                        Needed for these changes
+                        {/* Why a smaller one won't do, said once rather than on every greyed-out row. */}
+                        {why ? <InfoTip text={why} label="why this is needed" /> : null}
+                      </span>
+                    ) : null}
                   </span>
                   <small id={`${noteId}-${o.bump}-m`}>{o.meaning}</small>
                   {o.reason ? (
                     <small className="sto-pub-why" id={`${noteId}-${o.bump}-r`}>
-                      <Icon name="lock" size={12} /> Not allowed: {o.reason}
+                      <Icon name="lock" size={12} /> Not allowed
+                      <span className="st-sr">: {o.reason}</span>
                     </small>
                   ) : null}
                 </span>
@@ -614,6 +616,41 @@ function FailureDetail({ s }: { s: PublishState }) {
   }
 }
 
+/**
+ * "I've reviewed these warnings", in the footer beside Continue: however long
+ * the list of warnings, the box to tick is never scrolled out of sight of the
+ * button it unblocks. Pressing Continue without it says why, and puts focus
+ * on the box.
+ */
+function ReviewedCheck({ s, dispatch }: { s: PublishState; dispatch: Dispatch }) {
+  const id = useId();
+  const box = useRef<HTMLInputElement | null>(null);
+  const problem = s.attempted ? blocker(s) : null;
+  useEffect(() => {
+    if (problem) box.current?.focus();
+  }, [problem]);
+  return (
+    <div className="sto-pub-foot-check">
+      <label className={`sto-pub-check${problem ? " has-error" : ""}`}>
+        <input
+          ref={box}
+          type="checkbox"
+          checked={s.reviewed}
+          onChange={(e) => dispatch({ type: "review", reviewed: e.target.checked })}
+          aria-describedby={problem ? `${id}-review` : undefined}
+          aria-invalid={problem ? true : undefined}
+        />
+        <span>I&rsquo;ve reviewed these warnings</span>
+      </label>
+      {problem ? (
+        <p id={`${id}-review`} className="sto-pub-problem">
+          <Icon name="error" size={14} /> {problem}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
 function Footer({ s, dispatch, close }: { s: PublishState; dispatch: Dispatch; close: () => void }) {
   const v = versionLabel(chosenVersion(s));
   const back = (
@@ -651,6 +688,7 @@ function Footer({ s, dispatch, close }: { s: PublishState; dispatch: Dispatch; c
     case "checks":
       return (
         <>
+          <ReviewedCheck s={s} dispatch={dispatch} />
           {cancel}
           {next}
         </>

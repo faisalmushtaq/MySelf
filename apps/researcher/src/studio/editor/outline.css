@@ -154,17 +154,6 @@
   width: 16px;
   height: 16px;
 }
-/* Tooltips at the column's edges open inwards, so they are never cut off. */
-.sto-chips .st-tip {
-  left: 0;
-  transform: none;
-}
-.sto-tools-end .st-tip,
-.sto-search .st-tip {
-  left: auto;
-  right: 0;
-  transform: none;
-}
 
 /* Floats under the header rather than pushing the tree down: the rows must
    not move under the pointer mid-drag. */
@@ -727,8 +716,7 @@ button.sto-type-option:hover {
   font-weight: 400;
 }
 .sto-type-unavailable {
-  padding-top: 12px;
-  border-top: 1px solid var(--st-border);
+  margin-top: 4px;
 }
 
 .sto-move-list {

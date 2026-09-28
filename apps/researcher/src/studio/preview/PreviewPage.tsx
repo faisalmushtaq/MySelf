@@ -66,7 +66,9 @@ const DEVICES: Record<Device, { label: string; width: number; height: number; ic
 };
 
 /** Space kept around the device inside the stage. Its caption is for screen readers, so takes none. */
-const STAGE_PAD = 32;
+const STAGE_PAD = 16;
+
+const PROMISE = "Answers stay in this tab and are never saved or sent.";
 
 /** Wait this long after the last edit before recompiling, so typing stays smooth. */
 const RECOMPILE_MS = 350;
@@ -428,6 +430,21 @@ function LivePreview({
             </optgroup>
           </select>
         </div>
+        {/* News about the run, then the promise and the size: the toolbar's
+            right end, instead of a line of their own above the device. */}
+        <p className="st-pv-announce" role="status">
+          {announcement ? (
+            <>
+              <Icon name="info" size={14} /> {announcement}
+            </>
+          ) : null}
+        </p>
+        <span className="st-pv-promise">
+          <Icon name="lock" size={12} />
+          Never saved or sent
+          <InfoTip text={PROMISE} label="the preview" />
+        </span>
+        <span className="st-pv-divider" aria-hidden="true" />
         <span className="st-pv-scale">
           {spec.width} × {spec.height} · {percent}%
         </span>
@@ -473,7 +490,6 @@ function LivePreview({
 
       <div className="st-pv-body">
         <div className="st-pv-stage">
-          <PreviewBanner announcement={announcement} />
           <div className="st-pv-canvas" ref={stageRef}>
             <figure className={`st-pv-device st-pv-device-${device}`}>
               <div className="st-pv-screen" style={{ width: Math.round(spec.width * scale), height: Math.round(spec.height * scale) }}>
@@ -512,12 +528,12 @@ function LivePreview({
   );
 }
 
-/** The promise the preview makes, on screen the whole time, and any news about the run. */
+/** The promise the preview makes, as a line across the page while there is no preview to run. */
 function PreviewBanner({ announcement }: { announcement: string | null }) {
   return (
     <div className="st-pv-banner">
       <Icon name="lock" size={14} />
-      <p>Answers stay in this tab and are never saved or sent.</p>
+      <p>{PROMISE}</p>
       <p className="st-pv-announce" role="status">
         {announcement ? (
           <>

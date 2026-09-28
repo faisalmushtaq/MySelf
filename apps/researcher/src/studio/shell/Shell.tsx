@@ -24,6 +24,7 @@ export function Shell({
   banner,
   children,
   wide = false,
+  menuItems,
 }: {
   /** Where you are, after the mark: a survey's title, "Playground". */
   crumb?: ReactNode;
@@ -33,6 +34,8 @@ export function Shell({
   children: ReactNode;
   /** Full width for the editor; list pages keep a readable measure. */
   wide?: boolean;
+  /** Extra account-menu items for this page, such as the editor's keyboard shortcuts. */
+  menuItems?: MenuItem[] | undefined;
 }) {
   const main = useRef<HTMLElement | null>(null);
   const online = useOnline();
@@ -80,7 +83,7 @@ export function Shell({
           ) : (
             <span className="stp-nav-spacer" />
           )}
-          <UserMenu />
+          <UserMenu extra={menuItems} />
         </div>
       </header>
       {!online ? (
@@ -124,7 +127,7 @@ export function Avatar({ name, email }: { name: string | null | undefined; email
   );
 }
 
-function UserMenu() {
+function UserMenu({ extra }: { extra?: MenuItem[] | undefined }) {
   const session = useStudioSession();
   const { user, role, signOut } = session;
   const isAdmin = atLeast(role, "admin");
@@ -133,6 +136,7 @@ function UserMenu() {
     const list: MenuItem[] = [
       // Who is signed in, and as what — a label, not an action.
       { label: user.email ?? "Signed in", onSelect: () => undefined, disabled: true, ...(role ? { hint: ROLE_NAMES[role] } : {}) },
+      ...(extra ?? []),
     ];
     if (isAdmin) list.push({ label: "Who has access", icon: "user", onSelect: () => navigate({ name: "access" }) });
     list.push(
@@ -141,7 +145,7 @@ function UserMenu() {
       { label: "Sign out", icon: "logout", onSelect: () => void guardedAction(() => void signOut()) },
     );
     return list;
-  }, [user, role, isAdmin, signOut]);
+  }, [user, role, isAdmin, signOut, extra]);
 
   // A build with no study has nothing to sign in to (the playground's case).
   if (session.status === "unconfigured") return null;

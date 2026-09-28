@@ -4,13 +4,14 @@ import { useDraftSession, type DraftSession } from "../data/draft-editor.js";
 import { usePublishedContext, useStudioSession, useSurvey, type DraftEditor } from "../data/index.js";
 import { diffDrafts } from "../data/model-adapter.js";
 import { EditorPage } from "../editor/EditorPage.js";
+import { SHOW_SHORTCUTS_EVENT } from "../editor/Toolbar.js";
 import { formatTime, ROLE_NAMES } from "../format.js";
 import { PreviewPage } from "../preview/PreviewPage.js";
 import { navigate, useNavigationGuard, type SurveyTab } from "../router.js";
 import { ChangeList, LoadError, changeHeadline } from "../shell/common.js";
 import { Banner, Shell, type ShellTab } from "../shell/Shell.js";
 import { ConfirmDialog } from "../ui/dialog.js";
-import { Button, EmptyState, InfoTip, Skeleton } from "../ui/kit.js";
+import { Button, EmptyState, InfoTip, Skeleton, type MenuItem } from "../ui/kit.js";
 import { SettingsScreen } from "./Settings.js";
 import { VersionsScreen } from "./Versions.js";
 
@@ -50,6 +51,15 @@ export function SurveyLayout({ surveyId, tab, q }: { surveyId: string; tab: Surv
     to: { name: "survey", surveyId, tab: t, q: t === "edit" || t === "preview" ? q : null },
     current: t === tab,
   }));
+
+  // The editor's shortcuts, from the account menu (the "?" key opens them too).
+  const menuItems = useMemo<MenuItem[] | undefined>(
+    () =>
+      tab === "edit"
+        ? [{ label: "Keyboard shortcuts", icon: "keyboard", shortcut: "?", onSelect: () => window.dispatchEvent(new Event(SHOW_SHORTCUTS_EVENT)) }]
+        : undefined,
+    [tab],
+  );
 
   const title = survey.status === "ready" && survey.data ? survey.data.title : surveyId;
   const role: StudioRole = session.role ?? "viewer";
@@ -93,7 +103,13 @@ export function SurveyLayout({ surveyId, tab, q }: { surveyId: string; tab: Surv
   }
 
   return (
-    <Shell crumb={<span title={title}>{title}</span>} tabs={tabs} wide={tab === "edit" || tab === "preview"} banner={<DraftBanners draft={draft} tab={tab} role={role} />}>
+    <Shell
+      crumb={<span title={title}>{title}</span>}
+      tabs={tabs}
+      wide={tab === "edit" || tab === "preview"}
+      banner={<DraftBanners draft={draft} tab={tab} role={role} />}
+      menuItems={menuItems}
+    >
       {content}
     </Shell>
   );

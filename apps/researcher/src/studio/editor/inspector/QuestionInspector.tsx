@@ -29,7 +29,6 @@ import {
   conditionSummary,
   dependentsOf,
   keyProblem,
-  notAvailableFor,
   parseNumber,
   requiredChoice,
   suggestedKey,
@@ -141,7 +140,6 @@ function Answer({ itemKey, item, issues, write, can, why }: SectionProps) {
   const ctx = useEditor();
   const label = (what: string) => `Change the ${what} of ${itemKey}`;
   const f = (field: string) => ({ field, issues: issues.byField.get(field), readOnly: !can(field), lockedReason: why(field) });
-  const unavailable = notAvailableFor(item.responseType);
   const { value, storedOptional } = requiredChoice(item);
   const layoutId = useId();
 
@@ -274,7 +272,7 @@ function Answer({ itemKey, item, issues, write, can, why }: SectionProps) {
   }
 
   const answerable = item.responseType !== "info";
-  if (!answerable && !type && unavailable.length === 0) return null;
+  if (!answerable && !type) return null;
   return (
     <Group title="Answer">
       {answerable ? (
@@ -317,17 +315,6 @@ function Answer({ itemKey, item, issues, write, can, why }: SectionProps) {
         </>
       ) : null}
       {type}
-      {unavailable.length > 0 ? (
-        <Disclosure summary="Not available yet" className="sti-unavailable">
-          <ul>
-            {unavailable.map((u) => (
-              <li key={u.label}>
-                <strong>{u.label}.</strong> {u.reason}
-              </li>
-            ))}
-          </ul>
-        </Disclosure>
-      ) : null}
     </Group>
   );
 }

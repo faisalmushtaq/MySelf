@@ -24,7 +24,22 @@ test.beforeAll(async () => {
 });
 test.afterAll(async () => study?.close());
 
-async function shot(page: Page, name: string): Promise<void> {
+/** Dismiss every toast still showing (they last 6 s, and the Studio's own navigation keeps them). */
+async function clearToasts(page: Page): Promise<void> {
+  for (const button of await page.locator(".st-toasts").getByRole("button", { name: "Dismiss" }).all()) {
+    await button.click().catch(() => undefined);
+  }
+}
+
+/**
+ * One picture. Toasts left over from an earlier step are dismissed (unless the
+ * picture is of one) — but never while a dialog is open, where a click outside
+ * it is not ours to make — and the pointer is parked in the corner, so no row
+ * or button shows the hover state of the last click.
+ */
+async function shot(page: Page, name: string, { keepToasts = false }: { keepToasts?: boolean } = {}): Promise<void> {
+  if (!keepToasts && (await page.locator(".st-overlay").count()) === 0) await clearToasts(page);
+  await page.mouse.move(0, 0);
   await page.waitForTimeout(400); // let transitions settle
   await page.screenshot({ path: `${OUT}/${name}.png`, fullPage: false });
 }
@@ -53,18 +68,24 @@ test("photograph every Studio screen", async ({ page, browser }) => {
   await expect(page.getByRole("button", { name: /Set up from the live survey/ })).toBeVisible();
   await shot(page, "03-surveys-empty");
   await page.getByRole("button", { name: /Set up from the live survey/ }).click();
+  // Setting up opens the new draft in the editor; the list is one step back.
+  const search = page.getByPlaceholder(/Search/);
+  await expect(search).toBeVisible({ timeout: 60_000 });
+  await page.goto("researcher/#/surveys");
+  await expect(page.getByRole("table", { name: "Surveys" })).toBeVisible({ timeout: 30_000 });
   await expect(page.getByText(/r7\.1\.0/).first()).toBeVisible({ timeout: 60_000 });
   await shot(page, "04-surveys");
 
-  // The editor.
+  // The editor, once the live version it started from is known.
   await page.goto("researcher/#/surveys/ybm_nd2026_standard/edit");
-  const search = page.getByPlaceholder(/Search/);
   await expect(search).toBeVisible({ timeout: 60_000 });
+  await expect(page.getByText(/^r7\.1\.0 · /).first()).toBeVisible({ timeout: 30_000 });
   await shot(page, "05-editor-overview");
 
   await search.fill("smartphone");
   await page.getByRole("treeitem", { name: /Do you have your own smartphone/i }).first().click();
   await search.fill("");
+  await search.blur();
   await shot(page, "06-editor-choice-question");
 
   await page.goto("researcher/#/surveys/ybm_nd2026_standard/edit?q=ybm_gaming.top_games");
@@ -131,7 +152,7 @@ test("photograph every Studio screen", async ({ page, browser }) => {
   await shot(page, "20-publish-confirm");
   await publish.getByRole("button", { name: /^Publish r?8/ }).click();
   await expect(page.getByText(/8\.0\.0 is live/)).toBeVisible({ timeout: 60_000 });
-  await shot(page, "21-published");
+  await shot(page, "21-published", { keepToasts: true });
   await page.keyboard.press("Escape");
 
   // Preview, versions, settings, access.
@@ -141,8 +162,11 @@ test("photograph every Studio screen", async ({ page, browser }) => {
 
   await page.goto("researcher/#/surveys/ybm_nd2026_standard/versions");
   await expect(page.getByText(/8\.0\.0/).first()).toBeVisible({ timeout: 30_000 });
+  // The sittings column fills in once the count comes back (a cold function, the first time).
+  await expect(page.getByRole("status", { name: "Counting sittings" })).toHaveCount(0, { timeout: 60_000 });
   await shot(page, "23-versions");
-  const compare = page.getByRole("button", { name: /Compare/ }).first();
+  // r7.1.0 against the draft: the draft is r8.0.0 now, so comparing that would show nothing.
+  const compare = page.getByRole("button", { name: /^Compare .* with the draft$/ }).nth(1);
   if (await compare.count()) {
     await compare.click();
     await page.waitForTimeout(800);

@@ -1,11 +1,14 @@
+import { useEffect, useLayoutEffect, useState } from "react";
 import type { StudioRole, SurveyDoc } from "@myself/studio";
 import type { DraftEditor, Loadable, PublishedContext, StudioUser } from "../data/index.js";
+import { Icon } from "../ui/icons.js";
 import { EmptyState, Skeleton } from "../ui/kit.js";
-import { EditorProvider } from "./context.js";
+import { EditorProvider, useEditor } from "./context.js";
 import { Inspector } from "./Inspector.js";
 import { NodeEditor } from "./NodeEditor.js";
 import { Outline } from "./Outline.js";
 import { PublishDialog } from "./PublishDialog.js";
+import { encodeSelection } from "./selection.js";
 import { Toolbar } from "./Toolbar.js";
 import { ValidationPanel } from "./ValidationPanel.js";
 import "./editor.css";
@@ -53,20 +56,58 @@ export function EditorPage({ surveyId, survey, editor, context, role, user }: Ed
     <EditorProvider surveyId={surveyId} survey={survey} editor={editor} draft={draft} context={context} role={role} user={user}>
       <div className="ste-workspace">
         <Toolbar />
-        <div className="ste-columns">
-          <aside className="ste-left" aria-label="Survey outline">
-            <Outline />
-          </aside>
-          <section className="ste-centre" aria-label="Editor">
-            <NodeEditor />
-          </section>
-          <aside className="ste-right" aria-label="Settings for the selection">
-            <Inspector />
-          </aside>
-        </div>
+        <Columns />
         <ValidationPanel />
         <PublishDialog />
       </div>
     </EditorProvider>
+  );
+}
+
+/**
+ * The three columns. On a phone they stack, and the outline — some 150 rows —
+ * folds behind a "Questions" button above the editor, so opening a question
+ * shows that question, not the middle of a long list. It folds away again as
+ * soon as something is chosen from it. Wider windows never see the button.
+ */
+function Columns() {
+  const { selection } = useEditor();
+  const selected = encodeSelection(selection);
+  const [outlineOpen, setOutlineOpen] = useState(false);
+  useEffect(() => setOutlineOpen(false), [selected]);
+  // Unfolded, the list opens at the selection, in the middle of its own box
+  // (the page itself stays where it is).
+  useLayoutEffect(() => {
+    if (!outlineOpen) return;
+    const column = document.getElementById("ste-outline");
+    const row = column?.querySelector<HTMLElement>('[role="treeitem"][aria-selected="true"] > .sto-row');
+    if (!column || !row) return;
+    const box = column.getBoundingClientRect();
+    const at = row.getBoundingClientRect();
+    column.scrollTop += at.top - box.top - (box.height - at.height) / 2;
+  }, [outlineOpen]);
+  return (
+    <div className={`ste-columns${outlineOpen ? " is-outline-open" : ""}`}>
+      <button
+        type="button"
+        className="ste-outline-toggle"
+        aria-expanded={outlineOpen}
+        aria-controls="ste-outline"
+        onClick={() => setOutlineOpen((open) => !open)}
+      >
+        <Icon name="section" size={16} />
+        <span>Questions</span>
+        <Icon name="chevron-down" size={16} />
+      </button>
+      <aside id="ste-outline" className="ste-left" aria-label="Survey outline">
+        <Outline />
+      </aside>
+      <section className="ste-centre" aria-label="Editor">
+        <NodeEditor />
+      </section>
+      <aside className="ste-right" aria-label="Settings for the selection">
+        <Inspector />
+      </aside>
+    </div>
   );
 }

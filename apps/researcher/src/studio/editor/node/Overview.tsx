@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { outline, summariseIssues } from "@myself/studio";
+import { outline } from "@myself/studio";
 import { Icon, type IconName } from "../../ui/icons.js";
 import { Button } from "../../ui/kit.js";
 import { useEditor } from "../context.js";
@@ -30,7 +30,6 @@ export function Overview() {
     }
     return { questions, conditional, licensed: licensed.size };
   }, [o]);
-  const { errors, warnings } = summariseIssues(ctx.issues);
 
   const go = (selection: Selection) => ctx.select(selection);
   const shortcuts: { icon: IconName; label: string; hint: string; selection: Selection }[] = [
@@ -57,11 +56,6 @@ export function Overview() {
           <p className="stn-lead">Select a question on the left, or add one.</p>
         </div>
         <div className="stn-row-actions">
-          {errors + warnings > 0 ? (
-            <Button size="sm" variant="ghost" icon={errors > 0 ? "error" : "warning"} onClick={() => ctx.setValidationOpen(true)}>
-              {errors > 0 ? `${errors} problem${errors === 1 ? "" : "s"} to fix` : `${warnings} warning${warnings === 1 ? "" : "s"}`}
-            </Button>
-          ) : null}
           <Button size="sm" variant="primary" icon="plus" onClick={() => setAdding(true)} disabled={!ctx.canEdit}>
             Add question
           </Button>

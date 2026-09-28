@@ -59,7 +59,12 @@ function expectIssue(issues: Issue[], code: string, location: Partial<IssueLocat
   expect(found.map((i) => i.code), `expected ${code} among ${issues.map((i) => i.code).join(", ")}`).toContain(code);
   const match = found.find((i) => Object.entries(location).every(([k, v]) => (i.location as Loose)[k] === v));
   expect(match, `no ${code} at ${JSON.stringify(location)}; got ${JSON.stringify(found.map((i) => i.location))}`).toBeDefined();
-  expect(match!.message.length).toBeGreaterThan(20);
+  // A short line to scan, under a heading that already names the place; any
+  // longer advice goes in the hint.
+  expect(match!.message.length).toBeGreaterThanOrEqual(10);
+  expect(match!.message.length, match!.message).toBeLessThan(80);
+  expect(match!.message).not.toMatch(/\.$/);
+  if (match!.hint !== undefined) expect(match!.hint.length).toBeGreaterThan(10);
   return match!;
 }
 
@@ -71,7 +76,11 @@ describe("the live survey", () => {
     const issues = validateDraft(live, fullContext);
     expect(errors(issues)).toEqual([]);
     // Printed so the wording researchers will see can be reviewed.
-    console.info(warnings(issues).map((w) => `${w.code} @ ${w.location.itemKey ?? w.location.sectionKey ?? w.location.kind}\n  ${w.message}`).join("\n"));
+    console.info(
+      warnings(issues)
+        .map((w) => `${w.code} @ ${w.location.itemKey ?? w.location.sectionKey ?? w.location.kind}\n  ${w.message}${w.hint ? `\n  (${w.hint})` : ""}`)
+        .join("\n"),
+    );
     expect(warnings(issues).map((w) => w.code).sort()).toEqual([
       "question.free_text_identifying",
       "question.free_text_identifying",
@@ -121,8 +130,21 @@ describe("question errors", () => {
         item(d, "ybm_intro_consent.intro").stem = { text: "  " };
       }),
     );
-    expectIssue(issues, "question.text_missing", { kind: "question", itemKey: "kss.q1", sectionKey: "sleep", field: "stem" });
-    expectIssue(issues, "question.text_missing", { itemKey: "ybm_intro_consent.intro", field: "stem" });
+    const question = expectIssue(issues, "question.text_missing", { kind: "question", itemKey: "kss.q1", sectionKey: "sleep", field: "stem" });
+    const info = expectIssue(issues, "question.text_missing", { itemKey: "ybm_intro_consent.intro", field: "stem" });
+    // Shown beside the empty box, under a heading naming the question: short, and never the ID again.
+    expect(question.message).toBe("Add the question text");
+    expect(info.message).toBe("Add the text participants read");
+    expect(question.hint).toMatch(/delete/);
+  });
+
+  it("says each thing in a short line, with the advice in the hint", () => {
+    // The place is the heading the message sits under, so the message never names it.
+    for (const issue of validateDraft(live, fullContext)) {
+      expect(issue.message).not.toContain(issue.location.itemKey ?? "\u0000");
+      expect(issue.message.length).toBeLessThan(60);
+      expect(issue.hint?.length ?? 0).toBeGreaterThan(20);
+    }
   });
 
   it("an ID that is not a valid key", () => {

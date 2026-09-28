@@ -77,8 +77,30 @@
   background-position: right 6px center;
 }
 
+/* The run's news (empty, it takes no room), the promise and the size, at the right. */
+.st-pv-toolbar > .st-pv-announce {
+  margin: 0 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 500;
+  color: var(--st-text);
+}
+.st-pv-promise {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--st-text-tertiary);
+  white-space: nowrap;
+}
+.st-pv-promise .st-infotip {
+  margin-left: 0;
+}
 .st-pv-scale {
-  margin-left: auto;
   font-size: 12px;
   line-height: 16px;
   color: var(--st-text-tertiary);

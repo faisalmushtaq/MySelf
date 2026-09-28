@@ -276,6 +276,11 @@ Rules:
   - "Show if…", "Reporting label", "ID".
 - Status in two or three words: "Saved", "Live r7.1.0", "2 errors", "Draft
   differs from live".
+- Checks (validation) messages are one short line that never names the
+  question or screen: the heading it sits under, or the field it sits beside,
+  already does. "Add the question text", "Collects identifying information
+  and is required". Why it matters and what to do go behind an ⓘ (the
+  issue's `hint`). "Errors" and "warnings" are the only words for them.
 - Sentence case everywhere. No exclamation marks.
 - Keep British English.
 - Explanations that must stay (licence, ethics, identity, publishing

@@ -42,9 +42,9 @@ export function selectionFor(issue: Issue, outline?: Outline): Selection {
 export interface IssueGroup {
   /** Stable key for the list. */
   id: string;
-  /** Where, in words: "Start screen", a section's title, a question's text and ID. */
+  /** Where, in words: "Start screen", a section's title, a block's name, a question's text and ID. */
   label: string;
-  /** The section a question is in, when the label is a question. */
+  /** The section a question or block is in, when the label is one. */
   context: string | null;
   issues: Issue[];
 }
@@ -65,12 +65,16 @@ interface Place {
 export function groupIssues(issues: readonly Issue[], outline: Outline): GroupedIssues {
   const questionPlace = new Map<string, { text: string; section: string; order: number }>();
   const sectionPlace = new Map<string, { title: string; order: number }>();
+  const blockPlace = new Map<string, { name: string; section: string; order: number }>();
   const STEP = 100_000;
   outline.sections.forEach((section, i) => {
     const base = (i + 1) * STEP;
     sectionPlace.set(section.key, { title: section.title, order: base });
     let n = 0;
     for (const block of section.blocks) {
+      // Just before its first question: a block's own problems (its condition,
+      // its order) read before those of the questions in it.
+      blockPlace.set(`${section.key}\u0000${block.refKey}`, { name: block.name, section: section.title, order: base + 0.5 + n });
       for (const q of block.questions) questionPlace.set(q.itemKey, { text: q.text, section: section.title, order: base + 1 + n++ });
     }
   });
@@ -92,6 +96,10 @@ export function groupIssues(issues: readonly Issue[], outline: Outline): Grouped
         context: null,
         order: end - 1,
       };
+    }
+    if (at.kind === "block" && at.sectionKey && at.refKey) {
+      const b = blockPlace.get(`${at.sectionKey}\u0000${at.refKey}`);
+      if (b) return { id: `b:${at.sectionKey}:${at.refKey}`, label: `“${shortText(b.name, 70)}”`, context: b.section, order: b.order };
     }
     if ((at.kind === "section" || at.kind === "block" || at.kind === "question" || at.kind === "option") && at.sectionKey) {
       const s = sectionPlace.get(at.sectionKey);

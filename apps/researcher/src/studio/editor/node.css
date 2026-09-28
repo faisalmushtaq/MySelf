@@ -151,6 +151,45 @@
   margin-right: 6px;
   font-family: var(--st-font);
 }
+.stn-head-end {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+/* When the row is crowded the ID gives way (ellipsis), never the number. */
+.stn-head-end .stn-meta {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+.stn-meta > .st-num {
+  flex: none;
+}
+.stn-meta-id {
+  min-width: 0;
+}
+/* "Shown to some": the question has a condition, which sits at the page's foot. */
+.stn-if {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 4px;
+  margin: -2px -4px;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--st-text-tertiary);
+  border-radius: var(--st-radius-sm);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.stn-if:hover {
+  color: var(--st-text);
+  background: var(--st-bg-muted);
+}
 
 /* A page: title and one line under it, actions on the right. */
 .stn-pagehead {
@@ -200,10 +239,13 @@
   gap: 6px;
   margin-bottom: 20px;
 }
+/* One line where there is room; on a phone the actions drop to a line of
+   their own instead of squeezing the words to one per line. */
 .stn-notice {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
+  gap: 4px 8px;
   min-height: 36px;
   padding: 3px 4px 3px 12px;
   border: 1px solid var(--st-border);
@@ -226,9 +268,11 @@
 }
 .stn-notice-actions {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 4px;
   flex: none;
+  max-width: 100%;
   margin-left: auto;
 }
 .stn-notice-accent {
@@ -699,6 +743,12 @@
 .studio .stn-field-invalid .st-input.stn-sectiontitle,
 .studio .stn-field-invalid .st-input.stn-lede {
   border-color: var(--st-danger);
+}
+.studio .stn-field-invalid .st-input.stn-stem:focus-visible,
+.studio .stn-field-invalid .st-input.stn-sectiontitle:focus-visible,
+.studio .stn-field-invalid .st-input.stn-lede:focus-visible {
+  border-color: var(--st-danger);
+  box-shadow: 0 0 0 2px #ffffff, 0 0 0 4px rgba(185, 28, 28, 0.35);
 }
 .stn-stem-ro,
 .stn-sectiontitle-ro {
@@ -1766,8 +1816,11 @@
   .stn-head {
     flex-wrap: wrap;
   }
-  .stn-meta {
+  .stn-head-end {
     flex: 1 1 100%;
+  }
+  .stn-meta {
+    flex: 1 1 auto;
     min-width: 0;
   }
 }

@@ -63,6 +63,14 @@ describe("grouping issues for the panel", () => {
     expect(grouped.warnings.map((g) => g.id)).toEqual(["q:ybm_gaming.social_pct"]);
   });
 
+  it("names a block's own problems by the block, in its section", () => {
+    const sdq = o.sections.find((s) => s.key === "wellbeing")!.blocks[1]!;
+    const grouped = groupIssues([issue({ kind: "block", sectionKey: "wellbeing", refKey: sdq.refKey, field: "displayIf" })], o);
+    expect(grouped.errors).toHaveLength(1);
+    expect(grouped.errors[0]!.label).toBe(`“${sdq.name}”`);
+    expect(grouped.errors[0]!.context).toBe(o.sections.find((s) => s.key === "wellbeing")!.title);
+  });
+
   it("groups the live survey's own warnings under their questions", () => {
     const grouped = groupIssues(validateDraft(draft), o);
     expect(grouped.errors).toEqual([]);

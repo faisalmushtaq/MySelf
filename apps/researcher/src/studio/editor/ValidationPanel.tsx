@@ -4,6 +4,7 @@ import { Icon } from "../ui/icons.js";
 import { Button, EmptyState, IconButton, InfoTip, Spinner } from "../ui/kit.js";
 import { useEditor } from "./context.js";
 import { VALIDATION_PANEL_ID, VALIDATION_TOGGLE_ID } from "./Toolbar.js";
+import { IssueText } from "./node/controls.js";
 import { groupIssues, selectionFor, type IssueGroup } from "./validation/select.js";
 import "./validation.css";
 
@@ -135,13 +136,26 @@ function Panel() {
   };
 
   const total = counts.errors + counts.warnings;
-  const summary = !ctx.issuesFresh
-    ? "Checking…"
-    : total === 0
-      ? "No issues"
-      : [counts.errors > 0 ? plural(counts.errors, "error") : null, counts.warnings > 0 ? plural(counts.warnings, "warning") : null]
-          .filter(Boolean)
-          .join(" · ");
+  // Each count in its own colour — errors red, warnings amber — with the words saying the same.
+  const parts = [
+    counts.errors > 0 ? <span key="e" className="sto-vp-sum-err">{plural(counts.errors, "error")}</span> : null,
+    counts.warnings > 0 ? <span key="w" className="sto-vp-sum-warn">{plural(counts.warnings, "warning")}</span> : null,
+  ].filter(Boolean);
+  const summary = !ctx.issuesFresh ? (
+    "Checking…"
+  ) : total === 0 ? (
+    "No errors or warnings"
+  ) : (
+    <>
+      {parts[0]}
+      {parts.length > 1 ? (
+        <span className="sto-vp-sum-sep" aria-hidden="true">
+          ·
+        </span>
+      ) : null}
+      {parts[1]}
+    </>
+  );
 
   return (
     <section
@@ -163,7 +177,7 @@ function Panel() {
             text="Errors must be fixed before publishing; warnings don’t block it. Branching only shows or hides questions based on earlier answers, so every path moves forward — these checks cover conditions that point at later or missing questions."
           />
         </div>
-        <p className={`sto-vp-summary${counts.errors > 0 ? " has-errors" : counts.warnings > 0 ? " has-warnings" : " is-clear"}`} role="status">
+        <p className="sto-vp-summary" role="status">
           {!ctx.issuesFresh ? <Spinner /> : null}
           {summary}
         </p>
@@ -171,7 +185,7 @@ function Panel() {
       </header>
       <div className="sto-vp-body">
         {total === 0 ? (
-          <EmptyState icon="check" title="No issues">
+          <EmptyState icon="check" title="All checks passed">
             <p>Nothing blocks publishing.</p>
           </EmptyState>
         ) : (
@@ -226,7 +240,9 @@ export function IssueList({
               return (
                 <li key={`${issue.code}:${i}`}>
                   <Icon name={severity === "error" ? "error" : "warning"} size={16} />
-                  <span className="sto-vp-message">{issue.message}</span>
+                  <span className="sto-vp-message">
+                    <IssueText issue={issue} label="this check" />
+                  </span>
                   <Button size="sm" variant="ghost" onClick={() => onGo(issue)} aria-label={`Go to ${word ? `the ${word} of ` : ""}${g.label}`}>
                     Go to
                   </Button>

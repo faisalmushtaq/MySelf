@@ -205,12 +205,14 @@
 .stp-nav-link.on {
   color: var(--st-text);
 }
+/* Inside the nav's own box, which clips (it scrolls sideways on a phone):
+   hung a pixel lower, half the bar was cut off. */
 .stp-nav-link.on::after {
   content: "";
   position: absolute;
   left: 10px;
   right: 10px;
-  bottom: -1px;
+  bottom: 0;
   height: 2px;
   border-radius: 2px 2px 0 0;
   background: var(--st-accent);
@@ -721,16 +723,11 @@
   margin: 40px auto 0;
   text-align: center;
 }
+/* DESIGN.md §5 empty state: a 32px tertiary icon, no box. */
 .stp-first-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 40px;
-  height: 40px;
-  margin-bottom: 16px;
-  border-radius: var(--st-radius-lg);
-  border: 1px solid var(--st-border);
-  color: var(--st-text-secondary);
+  display: block;
+  margin: 0 auto 12px;
+  color: var(--st-text-tertiary);
 }
 .stp-first .stp-h2 {
   margin-bottom: 4px;
@@ -833,11 +830,22 @@
   max-width: 640px;
   margin-top: 16px;
 }
+/* Box, role, button — the same columns in every add form, so the People and
+   Whole organisations forms line up. The role's description sits under the
+   Role box (and the button's column), not under the address. */
 .stp-inline-fields {
   display: grid;
-  grid-template-columns: minmax(200px, 1fr) 160px auto;
+  grid-template-columns: minmax(200px, 1fr) 160px 104px;
   gap: 0 8px;
   align-items: start;
+}
+.stp-inline-fields > .stp-role-hint {
+  grid-column: 2 / -1;
+  grid-row: 2;
+}
+.stp-inline-fields > .stp-inline-submit {
+  grid-column: 3;
+  grid-row: 1;
 }
 .stp-inline-fields .st-field {
   margin-bottom: 0;
@@ -928,27 +936,47 @@
 .stp-vtable {
   table-layout: fixed;
 }
+/* Narrow columns for short facts, so the release note — the one column with
+   something to read — gets the room (about 320px of the 960). */
 .stp-vtable .stp-col-toggle {
-  width: 40px;
+  width: 32px;
   padding-right: 0;
 }
 .stp-vtable .stp-col-version {
-  width: 84px;
+  width: 72px;
 }
 .stp-vtable .stp-col-status {
-  width: 100px;
+  width: 96px;
 }
 .stp-vtable .stp-col-when {
-  width: 148px;
+  width: 112px;
 }
 .stp-vtable .stp-col-by {
-  width: 176px;
+  width: 160px;
 }
 .stp-vtable .stp-col-sittings {
-  width: 104px;
+  width: 96px;
 }
 .stp-vtable .stp-col-actions {
-  width: 132px;
+  width: 72px;
+}
+/* A count still on its way: a short shimmering bar where the number goes. */
+.stp-skel-inline {
+  display: inline-flex;
+  vertical-align: middle;
+}
+.stp-skel-inline > span {
+  width: 48px;
+  height: 10px;
+  border-radius: var(--st-radius-sm);
+  background: linear-gradient(90deg, var(--st-bg-muted), #ececee, var(--st-bg-muted));
+  background-size: 200% 100%;
+  animation: st-shimmer 1.4s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .stp-skel-inline > span {
+    animation: none;
+  }
 }
 .stp-version-label {
   font-family: var(--st-mono);
@@ -1112,10 +1140,27 @@
 .stp-role-text {
   display: inline-flex;
   align-items: center;
-  padding-left: 11px;
+}
+/* A role in a table is quiet until pointed at: no box at rest, and its text
+   pulled back to the column's edge, under "Role" like every other value. */
+.stp-table .stp-role-select {
+  margin-left: -11px;
+  border-color: transparent;
+  background-color: transparent;
+}
+.stp-table .stp-role-select:hover,
+.stp-table .stp-role-select:focus-visible {
+  border-color: var(--st-border-strong);
+  background-color: var(--st-bg);
+}
+/* People and Whole organisations stacked: Role at the same place in both.
+   The rules table's Role spans what is Role, Added and Added by above. */
+.stp-members .stp-cell-action,
+.stp-rules .stp-cell-action {
+  width: 52px;
 }
 .stp-rules .stp-col-role {
-  width: 152px;
+  width: 492px;
 }
 
 /* ── Narrow screens ───────────────────────────────────────────────────── */
@@ -1159,6 +1204,17 @@
   }
   .stp-hide-narrow {
     display: none;
+  }
+  .stp-rules .stp-col-role {
+    width: 152px;
+  }
+  .stp-inline-fields > .stp-role-hint,
+  .stp-inline-fields > .stp-inline-submit {
+    grid-column: auto;
+    grid-row: auto;
+  }
+  .stp-role-hint {
+    margin-top: -6px;
   }
   .stp-inline-fields {
     grid-template-columns: 1fr;

@@ -578,7 +578,8 @@ function StartScreen({
           <span>Dyslexia-friendly reading mode</span>
         </label>
       </details>
-      <p className="hint demo-note">Studio preview of the current draft · answers stay in this tab</p>
+      {/* No "answers stay in this tab" note here: the strip at the top of the
+          frame and the Studio's toolbar both say so already. */}
       {contact && (
         <p className="start-footer">
           {contact.ethicsReference && <>Ethics reference {contact.ethicsReference}. </>}

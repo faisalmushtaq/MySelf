@@ -100,6 +100,21 @@ interface MenuState {
 const quote = (text: string, max = 60) => `“${shortText(text || "(no text yet)", max)}”`;
 
 /**
+ * Scroll a row into view within the outline's own column, clear of its sticky
+ * search header (the column's scroll-padding, editor.css). Where the outline
+ * doesn't scroll on its own — a phone, where the columns stack — the page is
+ * left where it is: scrolling the window down to the row would push the editor
+ * for what was just opened off the screen.
+ */
+function revealRow(id: string): void {
+  const row = document.getElementById(rowDomId(id))?.querySelector<HTMLElement>(":scope > .sto-row");
+  if (!row) return;
+  const column = row.closest<HTMLElement>(".ste-left");
+  if (column && getComputedStyle(column).overflowY === "visible") return;
+  row.scrollIntoView({ block: "nearest" });
+}
+
+/**
  * Where "add a question after this one" puts it, in words. REVIEW FIX: after a
  * question of a licensed or protected block, addQuestion puts the new question
  * after the WHOLE block (nothing can go inside it), but the picker and the
@@ -152,6 +167,8 @@ export function Outline() {
 
   // ── Selection: mark it, open what it is inside, bring it into view ───────
   const selectedId = encodeSelection(ctx.selection);
+  const selectedIdRef = useRef(selectedId);
+  selectedIdRef.current = selectedId;
   useLayoutEffect(() => {
     store.set({ selected: selectedId });
   }, [store, selectedId]);
@@ -173,6 +190,14 @@ export function Outline() {
     scrollTo.current = { id: selectedId, tries: 0 };
   }, [selectedId, expand]);
 
+  // Clearing the search or a filter redraws the whole tree from the top: bring
+  // the selection back into view rather than lose the researcher's place.
+  const wasFiltering = useRef(tree.filtering);
+  useEffect(() => {
+    if (wasFiltering.current && !tree.filtering && selectedIdRef.current) scrollTo.current = { id: selectedIdRef.current, tries: 0 };
+    wasFiltering.current = tree.filtering;
+  }, [tree.filtering]);
+
   useEffect(() => {
     // REVIEW FIX: these used to test `tree.byId`, which also holds the rows
     // inside a collapsed section or block. So after "Collapse all" the tab
@@ -188,7 +213,7 @@ export function Outline() {
       if (tree.shown.has(target.id)) {
         scrollTo.current = null;
         store.set({ active: target.id });
-        document.getElementById(rowDomId(target.id))?.querySelector(":scope > .sto-row")?.scrollIntoView({ block: "nearest" });
+        revealRow(target.id);
       } else if (!tree.byId.has(target.id) || ++target.tries > 2) {
         // Filtered out, or still folded after its section and block were
         // opened: give up rather than jump there later, out of the blue.
@@ -201,7 +226,7 @@ export function Outline() {
       store.set({ active: focus });
       const el = document.getElementById(rowDomId(focus));
       el?.focus();
-      el?.querySelector(":scope > .sto-row")?.scrollIntoView({ block: "nearest" });
+      revealRow(focus);
     } else if (focus && !tree.byId.has(focus)) {
       focusAfter.current = null;
     }
@@ -852,10 +877,10 @@ export function Outline() {
         </div>
         <div className="sto-tools">
           <div className="sto-chips" role="group" aria-label="Show only">
-            <Tooltip text="Show only questions with issues">
+            <Tooltip text="Show only questions with errors or warnings">
               <button type="button" className="sto-chip" aria-pressed={withProblems} onClick={() => setWithProblems((v) => !v)}>
                 <Icon name={withProblems ? "check" : "warning"} size={12} />
-                Issues
+                Checks
                 {problemCount > 0 ? <span className="sto-chip-count">{problemCount}</span> : null}
               </button>
             </Tooltip>

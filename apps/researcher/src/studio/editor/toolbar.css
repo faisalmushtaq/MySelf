@@ -44,16 +44,6 @@
 .sto-tb-status .sto-tb-sep {
   margin: 0;
 }
-/* Tooltips at the window's edges open inwards. */
-.sto-tb-status .st-tip {
-  left: 0;
-  transform: none;
-}
-.sto-tb-actions > .st-tip-anchor:last-child .st-tip {
-  left: auto;
-  right: 0;
-  transform: none;
-}
 
 /* ── Save state: a dot and a word ─────────────────────────────────────── */
 .sto-save {
@@ -220,17 +210,6 @@
 .sto-tipwrap:hover .sto-tip,
 .sto-tipwrap:focus-within .sto-tip {
   opacity: 1;
-}
-
-/* Shortcuts: tucked at the far end, a quiet glyph rather than a badge. */
-.sto-help {
-  font: inherit;
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--st-text-tertiary);
-}
-.sto-help:hover {
-  color: var(--st-text);
 }
 
 /* ── Who else is here ──────────────────────────────────────────────────── */

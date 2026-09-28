@@ -5,7 +5,6 @@ import {
   conditionSummary,
   dependentsOf,
   keyProblem,
-  notAvailableFor,
   parseNumber,
   refusal,
   requiredChoice,
@@ -108,16 +107,6 @@ describe("what depends on a question", () => {
     const used = /"instrument":"([a-z_]+)","item":"([a-z_0-9]+)"/.exec(on)!;
     const deps = dependentsOf(d, `${used[1]}.${used[2]}`);
     expect(deps.sections.map((s) => s.sectionKey)).toContain("social_media");
-  });
-});
-
-describe("settings not offered", () => {
-  it("lists what the participant app ignores, with reasons", () => {
-    const multi = notAvailableFor("multi_choice").map((u) => u.label);
-    expect(multi).toEqual(expect.arrayContaining(["Minimum selections", "Randomised option order", "Image, audio or video"]));
-    expect(notAvailableFor("text_short").map((u) => u.label)).toEqual(expect.arrayContaining(["Minimum characters", "Placeholder text"]));
-    expect(notAvailableFor("date").map((u) => u.label)).toContain("Earliest and latest year");
-    for (const u of notAvailableFor("single_choice")) expect(u.reason.length).toBeGreaterThan(20);
   });
 });
 

@@ -24,11 +24,22 @@ import "./toolbar.css";
 
 export const VALIDATION_TOGGLE_ID = "sto-validation-toggle";
 export const VALIDATION_PANEL_ID = "sto-validation";
+/**
+ * Asks the editor to show its keyboard shortcuts: the account menu's
+ * "Keyboard shortcuts" item sends it, since the menu lives in the page's
+ * header, outside the editor (DESIGN.md §4 keeps "?" out of the toolbar).
+ */
+export const SHOW_SHORTCUTS_EVENT = "studio:show-shortcuts";
 
 export function Toolbar() {
   const ctx = useEditor();
   const [shortcuts, setShortcuts] = useState(false);
   useEditorShortcuts(() => setShortcuts(true));
+  useEffect(() => {
+    const show = () => setShortcuts(true);
+    window.addEventListener(SHOW_SHORTCUTS_EVENT, show);
+    return () => window.removeEventListener(SHOW_SHORTCUTS_EVENT, show);
+  }, []);
   const title = ctx.draft.composition.title;
 
   return (
@@ -48,18 +59,6 @@ export function Toolbar() {
         <ValidationBadge />
         <PreviewLink />
         <PublishButton />
-        <Tooltip text="Keyboard shortcuts (?)">
-          <button
-            type="button"
-            className="st-iconbtn st-iconbtn-ghost st-iconbtn-md sto-help"
-            aria-label="Keyboard shortcuts"
-            aria-haspopup="dialog"
-            aria-keyshortcuts="?"
-            onClick={() => setShortcuts(true)}
-          >
-            <span aria-hidden="true">?</span>
-          </button>
-        </Tooltip>
       </div>
       {shortcuts ? <ShortcutsDialog playground={ctx.playground} onClose={() => setShortcuts(false)} /> : null}
     </div>
