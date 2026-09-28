@@ -1,4 +1,5 @@
 import { shortText, type Issue, type Outline } from "@myself/studio";
+import { UNTITLED_QUESTION } from "../outline/model.js";
 import type { Selection } from "../selection.js";
 
 /**
@@ -97,7 +98,7 @@ export function groupIssues(issues: readonly Issue[], outline: Outline, before?:
     if ((at.kind === "question" || at.kind === "option") && at.itemKey) {
       const q = questionPlace.get(at.itemKey);
       if (q) {
-        const said = q.text.trim() ? `“${shortText(q.text, 70)}”` : "Untitled question";
+        const said = q.text.trim() ? `“${shortText(q.text, 70)}”` : UNTITLED_QUESTION;
         return { id: `q:${at.itemKey}`, label: `${said} (${at.itemKey})`, context: q.section, order: q.order };
       }
       const text = archived.get(at.itemKey);

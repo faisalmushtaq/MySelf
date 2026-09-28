@@ -171,7 +171,13 @@ describe("lockedDifferences", () => {
     });
     expect(lockedDifferences(tampered, without, library).map((x) => x.change)).toEqual(["scale", "scoring"]);
     // With no library options to compare with, they can't be vouched for.
-    expect(lockedDifferences(baseline, without, { reference: library.reference }).map((x) => x.change)).toEqual(["scale", "scoring"]);
+    const unchecked = lockedDifferences(baseline, without, { reference: library.reference });
+    expect(unchecked.map((x) => x.change)).toEqual(["scale", "scoring"]);
+    // Each part reads as whole sentences: the hint behind the ⓘ is shown on its own.
+    for (const x of unchecked) {
+      expect(x.message).toMatch(/instrument library\. [A-Z]/);
+      expect(x.detail).toMatch(/^[A-Z]/);
+    }
   });
 });
 

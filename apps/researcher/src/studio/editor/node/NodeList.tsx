@@ -1,6 +1,7 @@
 import { memo } from "react";
 import type { OutlineBlock } from "@myself/studio";
 import { Icon } from "../../ui/icons.js";
+import { UNTITLED_QUESTION } from "../outline/model.js";
 import type { Selection } from "../selection.js";
 import { TYPE_ICONS, typeLabel } from "./types.js";
 
@@ -64,7 +65,7 @@ export const NodeList = memo(
                       <Icon name={TYPE_ICONS[q.studioType]} size={16} />
                       <span className="st-sr">{typeLabel(q.studioType)}: </span>
                     </span>
-                    <span className="stn-nodelist-text">{q.text || "(no text yet)"}</span>
+                    <span className="stn-nodelist-text">{q.text.trim() ? q.text : <em>{UNTITLED_QUESTION}</em>}</span>
                     {q.hasCondition ? (
                       <span className="stn-nodelist-if" title="Shown only to some participants">
                         <Icon name="branch" size={14} />

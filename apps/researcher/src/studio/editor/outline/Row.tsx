@@ -3,7 +3,7 @@ import { QUESTION_TYPES, type QuestionTypeId } from "@myself/studio";
 import { Icon, type IconName } from "../../ui/icons.js";
 import { VisuallyHidden } from "../../ui/kit.js";
 import { rowDomId } from "./keys.js";
-import { describeCount, hasIssues, tierPhrase, type IssueCount, type TreeNode } from "./model.js";
+import { UNTITLED_QUESTION, describeCount, hasIssues, tierPhrase, type IssueCount, type TreeNode } from "./model.js";
 import { useRowState, type RowStore } from "./store.js";
 
 /**
@@ -384,7 +384,7 @@ function RowText({ node, labelId, descId }: { node: TreeNode; labelId: string; d
       return (
         <>
           <span className="sto-text" id={labelId} title={q.text.trim() || undefined}>
-            {q.text.trim() ? <Highlight text={q.text} ranges={node.textMatch} /> : <em>(No question text yet)</em>}
+            {q.text.trim() ? <Highlight text={q.text} ranges={node.textMatch} /> : <em>{UNTITLED_QUESTION}</em>}
           </span>
           <span id={descId} className="st-sr">
             {TYPE_LABELS.get(q.studioType) ?? "Question"}, question {q.number}, ID {q.itemKey}

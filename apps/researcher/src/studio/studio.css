@@ -758,7 +758,11 @@
   position: absolute;
   top: calc(100% + 4px);
   z-index: 70;
+  /* As wide as its longest item: anchored to a small button, the list would
+     otherwise shrink to its minimum and wrap an item's name. */
+  width: max-content;
   min-width: 200px;
+  max-width: min(320px, calc(100vw - 32px));
   list-style: none;
   margin: 0;
   padding: 4px;

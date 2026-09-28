@@ -1586,6 +1586,10 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.stn-nodelist-text em {
+  font-style: normal;
+  color: var(--st-text-tertiary);
+}
 
 /* Facts: label left, value right, no boxes */
 .stn-facts {

@@ -100,7 +100,13 @@ interface MenuState {
 
 const quote = (text: string, max = 60) => `“${shortText(text || "(no text yet)", max)}”`;
 
-/** How far a row brought into view stays from the sticky search header, and from the column's bottom edge. */
+/**
+ * How far a row brought into view stays from the sticky search header, and
+ * from the column's bottom edge. The bottom margin shows what comes next when
+ * the keyboard moves down the list, or a row is revealed from elsewhere; a row
+ * just clicked gets none, so a whole row near the bottom never slides away
+ * under the pointer.
+ */
 const REVEAL_GAP_TOP = 8;
 const REVEAL_GAP_BOTTOM = 40;
 
@@ -114,7 +120,7 @@ const REVEAL_GAP_BOTTOM = 40;
  * the page is left where it is: scrolling the window down to the row would
  * push the editor for what was just opened off the screen.
  */
-function revealRow(id: string): void {
+function revealRow(id: string, gapBottom = REVEAL_GAP_BOTTOM): void {
   const row = document.getElementById(rowDomId(id))?.querySelector<HTMLElement>(":scope > .sto-row");
   if (!row) return;
   const column = row.closest<HTMLElement>(".ste-left");
@@ -127,11 +133,16 @@ function revealRow(id: string): void {
   const inner = box.top + column.clientTop;
   const head = column.querySelector<HTMLElement>(".sto-head")?.offsetHeight ?? 0;
   const top = inner + head + REVEAL_GAP_TOP;
-  const bottom = inner + column.clientHeight - REVEAL_GAP_BOTTOM;
+  const bottom = inner + column.clientHeight - gapBottom;
   const r = row.getBoundingClientRect();
   if (r.top < top) column.scrollTop -= top - r.top;
   // Never so far that the row's top goes under the header, in a very short column.
   else if (r.bottom > bottom) column.scrollTop += Math.min(r.bottom - bottom, r.top - top);
+}
+
+/** The bottom margin for revealing a row: none for the row the pointer pressed, while it has focus. */
+function gapBelow(id: string, pressed: string | null): number {
+  return pressed === id && document.activeElement?.id === rowDomId(id) ? 0 : REVEAL_GAP_BOTTOM;
 }
 
 /**
@@ -184,6 +195,9 @@ export function Outline() {
   const focusAfter = useRef<string | null>(null);
   // `tries`: how many trees the target has been hidden in (see the effect below).
   const scrollTo = useRef<{ id: string; tries: number } | null>(null);
+  // The row the pointer last pressed, until the keyboard moves on or focus
+  // leaves the tree (see `gapBelow`).
+  const pressed = useRef<string | null>(null);
 
   // ── Selection: mark it, open what it is inside, bring it into view ───────
   const selectedId = encodeSelection(ctx.selection);
@@ -233,7 +247,7 @@ export function Outline() {
       if (tree.shown.has(target.id)) {
         scrollTo.current = null;
         store.set({ active: target.id });
-        revealRow(target.id);
+        revealRow(target.id, gapBelow(target.id, pressed.current));
       } else if (!tree.byId.has(target.id) || ++target.tries > 2) {
         // Filtered out, or still folded after its section and block were
         // opened: give up rather than jump there later, out of the blue.
@@ -257,6 +271,7 @@ export function Outline() {
   const focusRow = useCallback(
     (id: string | undefined) => {
       if (!id) return;
+      pressed.current = null;
       store.set({ active: id });
       document.getElementById(rowDomId(id))?.focus({ preventScroll: true });
       revealRow(id);
@@ -722,6 +737,7 @@ export function Outline() {
   const onTreeKeyDown = (e: ReactKeyboardEvent<HTMLUListElement>) => {
     const target = e.target as HTMLElement;
     if (target.getAttribute("role") !== "treeitem") return;
+    pressed.current = null;
     const id = target.dataset["rowId"] ?? "";
     const i = tree.visible.findIndex((n) => n.id === id);
     const node = tree.visible[i];
@@ -973,13 +989,19 @@ export function Outline() {
             aria-describedby="sto-tree-help"
             className="sto-tree"
             onKeyDown={onTreeKeyDown}
+            onPointerDown={(e) => {
+              pressed.current = (e.target as HTMLElement).closest<HTMLElement>("[data-row-id]")?.dataset["rowId"] ?? null;
+            }}
+            onBlur={(e) => {
+              if (!e.currentTarget.contains(e.relatedTarget as Node | null)) pressed.current = null;
+            }}
             onFocus={(e) => {
               const id = (e.target as HTMLElement).dataset["rowId"];
               if (!id) return;
               store.set({ active: id });
               // Tabbing in is scrolled by the browser, after this event and
               // blind to the sticky header: settle the row once it has.
-              requestAnimationFrame(() => revealRow(id));
+              requestAnimationFrame(() => revealRow(id, gapBelow(id, pressed.current)));
             }}
           >
             {tree.roots.map((node) => (

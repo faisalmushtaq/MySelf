@@ -505,9 +505,9 @@ function introducedRegistries(
       out.push(
         difference(
           { instrument, refKey, itemKey: `${instrument}.${String(item["key"])}`, change: "scale" },
-          `The answer options of ${name} (${scaleKey}) can't be checked against the instrument library,`,
+          `The answer options of ${name} (${scaleKey}) can't be checked against the instrument library.`,
           "Answer options can't be checked against the library",
-          "so they can't be shown to be the licensed ones. Add the instrument again from the library.",
+          "They can't be shown to be the licensed ones. Add the instrument again from the library.",
         ),
       );
     } else if (canonicalJson(normaliseScale(draft.scales?.[scaleKey])) !== canonicalJson(normaliseScale(expected))) {

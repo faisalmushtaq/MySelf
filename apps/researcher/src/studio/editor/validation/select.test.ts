@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { extractDraft, outline, shortText, validateDraft, type Issue, type IssueLocation } from "@myself/studio";
+import { UNTITLED_QUESTION } from "../outline/model.js";
 import { groupIssues, selectionFor } from "./select.js";
 
 const r710 = JSON.parse(readFileSync(resolve(__dirname, "../../../../../../releases/ybm_nd2026_standard_r7.1.0.manifest.json"), "utf8"));
@@ -80,6 +81,14 @@ describe("grouping issues for the panel", () => {
     expect(removed.location.itemKey).toBe(first.itemKey);
     expect(groupIssues([removed], outline(edited)).errors[0]!.label).toBe(`Question ${first.itemKey}`);
     expect(groupIssues([removed], outline(edited), o).errors[0]!.label).toBe(`“${shortText(first.text, 70)}” (${first.itemKey})`);
+  });
+
+  it("calls a question with no text what the outline calls it", () => {
+    const blank = structuredClone(o);
+    const section = blank.sections.find((s) => s.blocks.some((b) => b.questions.some((x) => x.itemKey === "ybm_smartphone.own")))!;
+    section.blocks.flatMap((b) => b.questions).find((x) => x.itemKey === "ybm_smartphone.own")!.text = "";
+    const grouped = groupIssues([issue({ kind: "question", itemKey: "ybm_smartphone.own", sectionKey: section.key, field: "stem" })], blank);
+    expect(grouped.errors[0]!.label).toBe(`${UNTITLED_QUESTION} (ybm_smartphone.own)`);
   });
 
   it("groups the live survey's own warnings under their questions", () => {

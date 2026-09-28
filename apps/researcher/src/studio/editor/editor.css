@@ -94,6 +94,13 @@
   .stp-app:has(> .stp-main-wide) {
     height: auto;
   }
+  /* The page grows with what is on it. Held to the window's height, the
+     workspace ended a window down while the question ran on past it, and the
+     toolbar, sticky only within the workspace, scrolled away with it. */
+  .stp-app:has(> .stp-main-wide) > .stp-main-wide:has(> .ste-workspace),
+  .ste-workspace {
+    flex: none;
+  }
   .ste-columns {
     display: block;
   }

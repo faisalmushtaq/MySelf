@@ -314,7 +314,8 @@ export function defaultExpanded(kind: NodeKind, block?: Pick<BlockInfo, "tier">)
   return true;
 }
 
-const EMPTY_TEXT = "(No question text yet)";
+/** What a question with no text yet is called wherever it is listed: the outline, the section page, the checks. */
+export const UNTITLED_QUESTION = "Untitled question";
 
 export function buildTree(o: Outline, index: IssueIndex, opts: TreeOptions): Tree {
   const query = opts.query.trim();
@@ -531,7 +532,7 @@ export function buildTree(o: Outline, index: IssueIndex, opts: TreeOptions): Tre
         kind: "question",
         level,
         parentId: null,
-        label: q.text.trim() ? shortText(q.text, 90) : EMPTY_TEXT,
+        label: q.text.trim() ? shortText(q.text, 90) : UNTITLED_QUESTION,
         expandable: false,
         expanded: false,
         children: [],
@@ -631,7 +632,7 @@ export function buildTree(o: Outline, index: IssueIndex, opts: TreeOptions): Tre
             kind: "archived",
             level: 2,
             parentId: null,
-            label: a.text.trim() ? shortText(a.text, 90) : EMPTY_TEXT,
+            label: a.text.trim() ? shortText(a.text, 90) : UNTITLED_QUESTION,
             expandable: false,
             expanded: false,
             children: [],
