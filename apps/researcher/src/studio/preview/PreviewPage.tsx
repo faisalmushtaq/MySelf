@@ -3,7 +3,7 @@ import type { PresentableUnit } from "@myself/engine";
 import { responseScale, type ReleaseManifest, type ResponseScale } from "@myself/schema";
 import { previewRelease, type StudioDraft } from "@myself/studio";
 import { flattenManifest, type FlattenedRelease } from "@participant/lib/flatten.js";
-import { Button, EmptyState, Notice, Segmented, Skeleton } from "../ui/kit.js";
+import { Button, EmptyState, InfoTip, Segmented, Skeleton } from "../ui/kit.js";
 import { Icon, type IconName } from "../ui/icons.js";
 import { describeCondition, type DescribeContext } from "./model-adapter.js";
 import {
@@ -65,9 +65,8 @@ const DEVICES: Record<Device, { label: string; width: number; height: number; ic
   phone: { label: "Phone", width: 390, height: 844, icon: "phone" },
 };
 
-/** Space kept around the device inside the stage, and for its caption. */
-const STAGE_PAD = 24;
-const CAPTION = 34;
+/** Space kept around the device inside the stage. Its caption is for screen readers, so takes none. */
+const STAGE_PAD = 32;
 
 /** Wait this long after the last edit before recompiling, so typing stays smooth. */
 const RECOMPILE_MS = 350;
@@ -177,26 +176,27 @@ export function PreviewPage({ surveyId, draft, startAt = null }: PreviewPageProp
             <Skeleton lines={4} label="Preparing the preview" />
           </div>
         ) : (
-          <EmptyState icon="eye" title="Nothing to preview yet">
-            When the survey&apos;s draft has loaded, it appears here exactly as a participant would meet it.
-          </EmptyState>
+          <div className="st-pv-blocked">
+            <EmptyState icon="eye" title="Nothing to preview yet">
+              <p>The draft appears here once it has loaded.</p>
+            </EmptyState>
+          </div>
         )}
       </section>
     );
   }
 
   if (compiled.error || !compiled.manifest || !compiled.flattened || !compiled.fingerprint) {
+    // The schema's complaints: nothing can run, so this is the whole page.
+    const lines = (compiled.error ?? "The draft could not be compiled.").split("\n");
     return (
       <section className="st-pv" aria-label="Participant preview">
         <PreviewBanner announcement={null} />
-        <div className="st-pv-blocked">
-          <Notice tone="error" title="This draft can't be previewed yet">
-            <p className="st-pv-p">
-              Part of the survey isn&apos;t in a shape the participant app can read, so there is nothing to show.
-              Fix what is listed here and the preview will appear.
-            </p>
-            <ProblemList lines={(compiled.error ?? "The draft could not be compiled.").split("\n")} schema />
-          </Notice>
+        <div className="st-pv-blocked" role="alert">
+          <EmptyState icon="error" title="This draft can’t be previewed yet">
+            <p>Part of it isn’t in a shape the participant app can read. Fix the problems below and the preview appears.</p>
+          </EmptyState>
+          <ProblemList lines={lines} schema />
         </div>
       </section>
     );
@@ -338,10 +338,10 @@ function LivePreview({
     load(here === undefined ? latest.current.chosenStart : here);
     announce(
       here === null
-        ? "The draft changed, so the preview reloaded on the start screen."
+        ? "Draft changed — reloaded on the start screen."
         : here !== undefined
-          ? "The draft changed, so the preview restarted on the same screen. Answers given so far were cleared."
-          : "The draft changed, so the preview restarted.",
+          ? "Draft changed — restarted on the same screen, answers cleared."
+          : "Draft changed — preview restarted.",
     );
   }, [frameReady, fingerprintOf, load, announce, unitKeys]);
 
@@ -363,7 +363,7 @@ function LivePreview({
     }
     if (!loaded.current) return;
     load(chosenStart);
-    announce(`Preview restarted from ${startLabel(chosenStart)}.`);
+    announce(`Restarted from ${startLabel(chosenStart)}.`);
   }, [chosenStart, load]);
 
   const jump = useCallback((target: string) => {
@@ -376,10 +376,7 @@ function LivePreview({
 
   const spec = DEVICES[device];
   const scale = stage
-    ? Math.max(
-        0.15,
-        Math.min(1, (stage.width - STAGE_PAD * 2) / spec.width, (stage.height - STAGE_PAD * 2 - CAPTION) / spec.height),
-      )
+    ? Math.max(0.15, Math.min(1, (stage.width - STAGE_PAD * 2) / spec.width, (stage.height - STAGE_PAD * 2) / spec.height))
     : 0.5;
   const percent = Math.round(scale * 100);
   const entries = useMemo(() => pathEntries(units, state), [units, state]);
@@ -395,12 +392,14 @@ function LivePreview({
           onChange={onDevice}
           options={(Object.keys(DEVICES) as Device[]).map((d) => ({ value: d, label: DEVICES[d].label, icon: DEVICES[d].icon }))}
         />
+        <span className="st-pv-divider" aria-hidden="true" />
         <Button
           icon="restart"
           size="sm"
+          variant="ghost"
           onClick={() => {
             load(chosenStart);
-            announce(`Preview restarted from ${startLabel(chosenStart)}.`);
+            announce(`Restarted from ${startLabel(chosenStart)}.`);
           }}
         >
           Restart
@@ -413,7 +412,7 @@ function LivePreview({
             value={selectValue}
             onChange={(e) => onChooseStart(e.target.value || null)}
           >
-            <option value="">The start screen</option>
+            <option value="">Start screen</option>
             {runs.map((run) => (
               <optgroup key={`${run.sectionKey}-${run.indices[0]}`} label={run.title}>
                 {run.indices.map((i) => (
@@ -434,49 +433,70 @@ function LivePreview({
         </span>
       </div>
 
-      <PreviewBanner announcement={announcement} />
-
       {failures.length > 0 || state?.phase === "error" ? (
         <div className="st-pv-notices">
           {state?.phase === "error" ? (
-            <Notice tone="error" title="The preview couldn't run this draft">
-              <ProblemList lines={(state.error ?? "").split("\n")} schema />
-            </Notice>
+            <div className="st-pv-line st-pv-line-error" role="alert">
+              <p className="st-pv-line-head">
+                <Icon name="error" size={16} />
+                <strong>The preview couldn’t run this draft</strong>
+              </p>
+              <div className="st-pv-line-body">
+                <ProblemList lines={(state.error ?? "").split("\n")} schema />
+              </div>
+            </div>
           ) : null}
           {failures.length > 0 ? (
-            <Notice tone="warn" title="Publishing will be refused until these are fixed">
-              <p className="st-pv-p">
-                {failures.length === 1 ? "One problem" : `${failures.length} problems`}. The preview still runs, so you
-                can see the effect of each.
-              </p>
-              <ProblemList lines={failures} initial={2} />
-            </Notice>
+            <div className="st-pv-line st-pv-line-warn" role="status">
+              <details>
+                <summary className="st-pv-line-head">
+                  <Icon name="warning" size={16} />
+                  <strong>
+                    {failures.length === 1 ? "1 problem blocks publishing" : `${failures.length} problems block publishing`}
+                  </strong>
+                  <span className="st-pv-line-first" aria-hidden="true">
+                    {failures[0]}
+                  </span>
+                  <span className="st-pv-line-chev" aria-hidden="true">
+                    <Icon name="chevron-down" size={16} />
+                  </span>
+                </summary>
+                <div className="st-pv-line-body">
+                  <p className="st-pv-line-hint">The preview still runs, so you can see the effect of each.</p>
+                  <ProblemList lines={failures} initial={failures.length} />
+                </div>
+              </details>
+            </div>
           ) : null}
         </div>
       ) : null}
 
       <div className="st-pv-body">
-        <div className="st-pv-stage" ref={stageRef}>
-          <figure className={`st-pv-device st-pv-device-${device}`}>
-            <div className="st-pv-screen" style={{ width: Math.round(spec.width * scale), height: Math.round(spec.height * scale) }}>
-              <iframe
-                ref={iframeRef}
-                src={`${import.meta.env.BASE_URL}preview.html`}
-                title={`Participant preview of ${title}, at ${spec.label.toLowerCase()} size`}
-                // Our own page, on our own origin — the frame and the Studio
-                // check each other's messages by origin. The sandbox is for
-                // what the page must not do: navigate the Studio away from
-                // unsaved work, open windows or submit forms.
-                sandbox="allow-scripts allow-same-origin"
-                width={spec.width}
-                height={spec.height}
-                style={{ transform: `scale(${scale})` }}
-              />
-            </div>
-            <figcaption className="st-pv-caption">
-              {spec.label}, {spec.width} × {spec.height} pixels, shown at {percent}%
-            </figcaption>
-          </figure>
+        <div className="st-pv-stage">
+          <PreviewBanner announcement={announcement} />
+          <div className="st-pv-canvas" ref={stageRef}>
+            <figure className={`st-pv-device st-pv-device-${device}`}>
+              <div className="st-pv-screen" style={{ width: Math.round(spec.width * scale), height: Math.round(spec.height * scale) }}>
+                <iframe
+                  ref={iframeRef}
+                  src={`${import.meta.env.BASE_URL}preview.html`}
+                  title={`Participant preview of ${title}, at ${spec.label.toLowerCase()} size`}
+                  // Our own page, on our own origin — the frame and the Studio
+                  // check each other's messages by origin. The sandbox is for
+                  // what the page must not do: navigate the Studio away from
+                  // unsaved work, open windows or submit forms.
+                  sandbox="allow-scripts allow-same-origin"
+                  width={spec.width}
+                  height={spec.height}
+                  style={{ transform: `scale(${scale})` }}
+                />
+              </div>
+              {/* The toolbar shows the size and scale; this says it for a screen reader. */}
+              <figcaption className="st-sr">
+                {spec.label}, {spec.width} × {spec.height} pixels, shown at {percent}%
+              </figcaption>
+            </figure>
+          </div>
         </div>
         <PathPanel
           units={units}
@@ -496,10 +516,8 @@ function LivePreview({
 function PreviewBanner({ announcement }: { announcement: string | null }) {
   return (
     <div className="st-pv-banner">
-      <Icon name="lock" size={16} />
-      <p>
-        <strong>Preview</strong> — answers stay in this tab and are never saved or sent.
-      </p>
+      <Icon name="lock" size={14} />
+      <p>Answers stay in this tab and are never saved or sent.</p>
       <p className="st-pv-announce" role="status">
         {announcement ? (
           <>
@@ -559,7 +577,27 @@ const STATE_ICON: Record<PathState, IconName | null> = {
   not_reached: null,
 };
 
-/** A row's state in words — the icon and colour only repeat this. */
+/**
+ * What a row shows beside its question: the answer, or a word where the icon
+ * alone might be unclear. "Not reached" — most rows, most of the time — is
+ * left to its empty ring, and a hidden row's condition sits under it.
+ */
+function metaText(entry: PathEntry, explained: boolean): string | null {
+  if (entry.answer !== null) return entry.answer;
+  switch (entry.state) {
+    case "current":
+      return "On screen";
+    case "shown":
+      return "Seen";
+    case "hidden":
+      return explained ? null : "Hidden";
+    case "answered":
+    case "not_reached":
+      return null;
+  }
+}
+
+/** A row's state in words, read with its question — the icon and colour only repeat this. */
 function stateText(entry: PathEntry): string {
   const answer = entry.answer === null ? "" : `Answer: ${entry.answer}`;
   switch (entry.state) {
@@ -577,13 +615,16 @@ function stateText(entry: PathEntry): string {
   }
 }
 
+/** A hidden row none of whose condition's questions has an answer yet. */
+const waitingOnAll = (entry: PathEntry): boolean => entry.drivers.length > 0 && entry.drivers.every((d) => d.answer === null);
+
 /** Why a row is hidden: its condition, and where the answers it reads stand now. */
 function whyHidden(unit: PresentableUnit, entry: PathEntry, ctx: DescribeContext): string[] {
   if (!unit.displayIf) return [];
-  const lines = [`Shown only when ${describeCondition(unit.displayIf, ctx)}.`];
+  const lines = [`Shown only if ${describeCondition(unit.displayIf, ctx)}.`];
   if (entry.drivers.length > 0) {
-    if (entry.drivers.every((d) => d.answer === null)) {
-      lines.push(`Waiting for an answer to ${entry.drivers.map((d) => ctx.questionLabel(d.itemKey)).join(" and ")}.`);
+    if (waitingOnAll(entry)) {
+      lines.push(`Waiting on ${entry.drivers.map((d) => ctx.questionLabel(d.itemKey)).join(" and ")}.`);
     } else {
       lines.push(
         `Right now: ${entry.drivers.map((d) => `${ctx.questionLabel(d.itemKey)} — ${d.answer ?? "not answered yet"}`).join("; ")}.`,
@@ -655,22 +696,26 @@ function PathPanel({
     }
   }, [currentIndex]);
 
+  // Where the run is, in a few words. Always one line, so the list never
+  // jumps as the run moves between the start screen and the questions.
   const where =
     state === null
-      ? "Starting the preview…"
+      ? "Starting…"
       : state.phase === "start"
-        ? "On the start screen."
+        ? "On the start screen"
         : state.phase === "finished"
-          ? "On the completion screen."
+          ? "On the completion screen"
           : state.phase === "review"
-            ? "On the review screen."
+            ? "On the review screen"
             : state.phase === "checkin"
-              ? "On the check-in shown after several skipped questions."
+              ? "On the skipped-questions check-in"
               : state.phase === "pace"
-                ? "On the “No rush” screen shown after very quick answers."
+                ? "On the “No rush” screen"
                 : state.phase === "error"
-                  ? "Stopped: the draft couldn't be run."
-                  : null;
+                  ? "Stopped — the draft couldn’t run"
+                  : currentIndex !== null
+                    ? `Screen ${currentIndex + 1} of ${units.length}`
+                    : null;
 
   const visibleRuns = runs
     .map((run) => ({ ...run, indices: run.indices.filter((i) => filter === "all" || entries[i]?.state === "hidden") }))
@@ -679,26 +724,28 @@ function PathPanel({
   return (
     <aside className="st-pv-path" aria-labelledby={headingId}>
       <div className="st-pv-path-head">
-        <h2 id={headingId}>Path</h2>
+        <div className="st-pv-path-top">
+          <h2 id={headingId}>Path</h2>
+          <InfoTip label="the path" text="Every screen in order. Choose one to jump there; answers given so far are kept." />
+          <Segmented
+            label="Show in the path"
+            value={filter}
+            onChange={setFilter}
+            options={[
+              { value: "all", label: "All" },
+              { value: "hidden", label: `Hidden ${counts.hidden}` },
+            ]}
+          />
+        </div>
         <p className="st-pv-path-sum">
-          {counts.answered} answered · {counts.hidden} hidden · {counts.notReached} not reached
+          {where ? <span className="st-pv-where">{where}</span> : null}
+          <span>
+            {counts.answered} answered · {counts.hidden} hidden · {counts.notReached} not reached
+          </span>
         </p>
-        {where ? <p className="st-pv-where">{where}</p> : null}
-        <Segmented
-          label="Show in the path"
-          value={filter}
-          onChange={setFilter}
-          options={[
-            { value: "all", label: "Every screen" },
-            { value: "hidden", label: `Hidden (${counts.hidden})` },
-          ]}
-        />
-        <p className="st-pv-path-hint">Choose a screen to jump there. Answers given so far are kept.</p>
       </div>
       <div className="st-pv-path-list" ref={listRef}>
-        {visibleRuns.length === 0 ? (
-          <p className="st-pv-path-none">Nothing is hidden by the answers given so far.</p>
-        ) : null}
+        {visibleRuns.length === 0 ? <p className="st-pv-path-none">Nothing hidden by the answers so far</p> : null}
         {visibleRuns.map((run) => (
           <section key={`${run.sectionKey}-${run.indices[0]}`} className="st-pv-section" aria-label={run.title}>
             <h3>{run.title}</h3>
@@ -719,6 +766,7 @@ function PathPanel({
                   entries[prev]?.state === "hidden" &&
                   whyHidden(units[prev]!, entries[prev]!, describeCtx).join(" ") === why.join(" ");
                 const icon = STATE_ICON[entry.state];
+                const meta = metaText(entry, why.length > 0);
                 return (
                   <li key={i} data-index={i} className={`st-pv-row st-pv-row-${entry.state}`}>
                     <button
@@ -731,20 +779,31 @@ function PathPanel({
                       <span className="st-pv-mark" aria-hidden="true">
                         {icon ? <Icon name={icon} size={14} /> : null}
                       </span>
-                      <span className="st-pv-row-main">
-                        <span className="st-pv-row-q">{labels[i]}</span>
-                        <span className="st-pv-row-state">{stateText(entry)}</span>
+                      {/* One line each; the full question is in the tooltip and the button's name. */}
+                      <span className="st-pv-row-q" title={labels[i]}>
+                        {labels[i]}
                       </span>
+                      {meta ? (
+                        <span className="st-pv-row-meta" aria-hidden="true" title={meta}>
+                          {meta}
+                        </span>
+                      ) : null}
+                      <span className="st-sr">{` ${stateText(entry)}`}</span>
                     </button>
                     {why.length > 0 ? (
-                      <div id={whyId} className={`st-pv-why${repeat ? " st-pv-why-repeat" : ""}`}>
+                      <div id={whyId} className="st-pv-why">
                         {repeat ? (
                           <>
-                            <p aria-hidden="true">Hidden by the same condition as the row above.</p>
+                            <p aria-hidden="true">Same condition as above</p>
                             <span className="st-sr">{why.join(" ")}</span>
                           </>
                         ) : (
-                          why.map((line) => <p key={line}>{line}</p>)
+                          why.map((line, n) => (
+                            // "Waiting on …" only names the condition's questions again: one line of it is enough.
+                            <p key={line} className={n > 0 && waitingOnAll(entry) ? "st-pv-why-brief" : undefined}>
+                              {line}
+                            </p>
+                          ))
                         )}
                       </div>
                     ) : null}
