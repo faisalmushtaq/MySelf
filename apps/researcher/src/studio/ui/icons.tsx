@@ -25,6 +25,7 @@ export type IconName =
   | "lock"
   | "unlock"
   | "eye"
+  | "eye-off"
   | "publish"
   | "undo"
   | "redo"
@@ -91,6 +92,7 @@ const paths: Record<IconName, JSX.Element> = {
   lock: <path d="M5 9h10v8H5zM7 9V6a3 3 0 0 1 6 0v3" />,
   unlock: <path d="M5 9h10v8H5zM7 9V6a3 3 0 0 1 5.8-1" />,
   eye: <path d="M2 10s3-5.5 8-5.5S18 10 18 10s-3 5.5-8 5.5S2 10 2 10zM10 12.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z" />,
+  "eye-off": <path d="M4.5 6.3C2.9 7.8 2 10 2 10s3 5.5 8 5.5c1.4 0 2.6-.4 3.7-1M8 4.8c.6-.2 1.3-.3 2-.3 5 0 8 5.5 8 5.5s-.7 1.3-2 2.7M8.2 8.3a2.5 2.5 0 0 0 3.5 3.5M3 3l14 14" />,
   publish: <path d="M10 14V3M5.5 7.5L10 3l4.5 4.5M4 17h12" />,
   undo: <path d="M7 5L3 9l4 4M3 9h9a4 4 0 0 1 0 8H9" />,
   redo: <path d="M13 5l4 4-4 4M17 9H8a4 4 0 0 0 0 8h3" />,

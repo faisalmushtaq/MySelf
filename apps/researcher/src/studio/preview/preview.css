@@ -1,0 +1,400 @@
+/*
+ * The Studio's preview page.
+ *
+ * The participant's screen is the loudest thing here, as it should be: it sits
+ * on a quiet stage at its real proportions, and everything around it — the
+ * device switch, restart, the path — is small type on white with hairline
+ * rules. State in the path is carried by an icon and a word as well as by the
+ * accent (docs/11 §5), so nothing depends on seeing green.
+ *
+ * Scoped under .st-pv. Uses the researcher tokens and the Studio kit's classes.
+ */
+
+.st-pv {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 560px;
+  background: var(--canvas);
+  color: var(--text);
+  font-family: var(--font-ui);
+  font-size: 15px;
+  line-height: 1.45;
+}
+
+/* Our own focus ring, so it shows whether or not the host wraps this in .studio. */
+.st-pv :focus {
+  outline: none;
+}
+.st-pv :focus-visible {
+  box-shadow: 0 0 0 2px var(--canvas), 0 0 0 4px var(--accent);
+}
+
+/* ── Toolbar ──────────────────────────────────────────────────────────── */
+.st-pv-toolbar {
+  flex: none;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem 0.9rem;
+  padding: 0.6rem 1rem;
+  background: var(--paper);
+  border-bottom: 1px solid var(--hairline);
+}
+
+.st-pv-startfrom {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 0 1 380px;
+  min-width: 220px;
+}
+.st-pv-startfrom label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+}
+.st-pv-startfrom .st-select {
+  min-height: 32px;
+  padding: 0.2rem 0.5rem;
+  font-size: 0.88rem;
+  min-width: 0;
+  text-overflow: ellipsis;
+}
+
+.st-pv-scale {
+  margin-left: auto;
+  font-size: 0.82rem;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* ── The promise, always in view ─────────────────────────────────────── */
+.st-pv-banner {
+  flex: none;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.3rem 0.55rem;
+  padding: 0.45rem 1rem;
+  background: var(--accent-wash);
+  border-bottom: 1px solid rgba(6, 120, 67, 0.22);
+  font-size: 0.86rem;
+}
+.st-pv-banner > .st-icon {
+  color: var(--accent);
+}
+.st-pv-banner p {
+  margin: 0;
+}
+.st-pv-announce {
+  margin-left: auto !important;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-weight: 500;
+}
+.st-pv-announce:empty {
+  display: none;
+}
+
+/* ── Notices and the blocked state ───────────────────────────────────── */
+.st-pv-notices {
+  flex: none;
+  display: grid;
+  gap: 0.6rem;
+  padding: 0.75rem 1rem 0;
+}
+.st-pv-blocked {
+  width: 100%;
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 2rem 1rem;
+}
+.st-pv-p {
+  margin: 0 0 0.35rem;
+}
+.st-pv-problems {
+  margin: 0.3rem 0 0;
+  padding-left: 1.1rem;
+  display: grid;
+  gap: 0.25rem;
+  font-size: 0.88rem;
+}
+.st-pv-path-code {
+  font: 0.8rem ui-monospace, SFMono-Regular, Menlo, monospace;
+  background: rgba(0, 0, 0, 0.05);
+  padding: 0.05rem 0.3rem;
+  border-radius: 4px;
+  overflow-wrap: anywhere;
+}
+.st-pv-more {
+  margin-top: 0.35rem;
+  font-size: 0.88rem;
+}
+.st-pv-more summary {
+  cursor: pointer;
+  font-weight: 500;
+  width: fit-content;
+  border-radius: 4px;
+}
+
+/* ── Stage and device ────────────────────────────────────────────────── */
+.st-pv-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+
+/* The stage's size never depends on what is in it (the device is placed
+   absolutely), so measuring it to scale the device cannot feed back. */
+.st-pv-stage {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  min-height: 420px;
+  overflow: hidden;
+  background-color: var(--off-white);
+  background-image: radial-gradient(rgba(0, 0, 0, 0.07) 1px, transparent 1px);
+  background-size: 18px 18px;
+}
+
+.st-pv-device {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.st-pv-screen {
+  position: relative;
+  flex: none;
+  overflow: hidden;
+  background: var(--canvas);
+  border: 1px solid var(--hairline-strong);
+  border-radius: 8px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05), 0 10px 30px rgba(0, 0, 0, 0.06);
+}
+.st-pv-device-tablet .st-pv-screen {
+  border-radius: 14px;
+}
+.st-pv-device-phone .st-pv-screen {
+  border-radius: 20px;
+}
+
+/* The frame keeps the device's real CSS size, so the participant's own
+   breakpoints apply, and is scaled down as a picture of it. */
+.st-pv-screen iframe {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: block;
+  border: 0;
+  transform-origin: 0 0;
+  background: var(--canvas);
+}
+
+.st-pv-caption {
+  flex: none;
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Path ────────────────────────────────────────────────────────────── */
+.st-pv-path {
+  flex: none;
+  width: 340px;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--paper);
+  border-left: 1px solid var(--hairline);
+}
+
+.st-pv-path-head {
+  flex: none;
+  display: grid;
+  gap: 0.45rem;
+  justify-items: start;
+  padding: 0.85rem 1rem 0.75rem;
+  border-bottom: 1px solid var(--hairline);
+}
+.st-pv-path-head h2 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+}
+.st-pv-path-sum,
+.st-pv-where,
+.st-pv-path-hint {
+  margin: 0;
+  font-size: 0.84rem;
+}
+.st-pv-path-sum {
+  font-variant-numeric: tabular-nums;
+}
+.st-pv-where {
+  font-weight: 500;
+}
+.st-pv-path-hint {
+  font-size: 0.8rem;
+}
+
+.st-pv-path-list {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-bottom: 1rem;
+}
+.st-pv-path-none {
+  margin: 1rem;
+  font-size: 0.88rem;
+}
+
+.st-pv-section h3 {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  margin: 0;
+  padding: 0.65rem 1rem 0.35rem;
+  background: var(--paper);
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+}
+.st-pv-section ol {
+  list-style: none;
+  margin: 0;
+  padding: 0 0.5rem;
+}
+
+.st-pv-row-btn {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  width: 100%;
+  min-height: 40px;
+  padding: 0.4rem 0.5rem;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.st-pv-row-btn:hover {
+  background: var(--off-white);
+}
+
+.st-pv-mark {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  margin-top: 1px;
+  border-radius: 50%;
+  border: 1px solid var(--hairline-strong);
+  background: var(--paper);
+}
+.st-pv-row-main {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+.st-pv-row-q {
+  font-size: 0.87rem;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+.st-pv-row-state {
+  font-size: 0.77rem;
+  overflow-wrap: anywhere;
+}
+
+/* States. Each has its own icon and words; colour only reinforces them. */
+.st-pv-row-current .st-pv-row-btn {
+  background: var(--accent-wash);
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+.st-pv-row-current .st-pv-mark {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+.st-pv-row-current .st-pv-row-state {
+  color: var(--accent);
+  font-weight: 600;
+}
+.st-pv-row-answered .st-pv-mark {
+  border-color: rgba(6, 120, 67, 0.5);
+  color: var(--accent);
+}
+.st-pv-row-hidden .st-pv-mark {
+  border-style: dashed;
+}
+.st-pv-row-hidden .st-pv-row-state {
+  font-weight: 600;
+}
+.st-pv-row-not_reached .st-pv-mark {
+  border-color: var(--hairline);
+}
+
+.st-pv-why {
+  margin: 0 0.5rem 0.4rem 2.55rem;
+  padding: 0.4rem 0.6rem;
+  border-left: 2px dashed var(--hairline-strong);
+  background: var(--off-white);
+  border-radius: 0 6px 6px 0;
+  font-size: 0.79rem;
+  line-height: 1.4;
+}
+.st-pv-why p {
+  margin: 0;
+}
+.st-pv-why p + p {
+  margin-top: 0.25rem;
+}
+.st-pv-why-repeat {
+  background: transparent;
+  padding-top: 0.1rem;
+  padding-bottom: 0.1rem;
+}
+
+/* ── Narrow windows: the path goes under the device ──────────────────── */
+@media (max-width: 960px) {
+  .st-pv-body {
+    flex-direction: column;
+  }
+  .st-pv-stage {
+    flex: none;
+    height: min(72vh, 760px);
+  }
+  .st-pv-path {
+    width: auto;
+    max-height: 60vh;
+    border-left: 0;
+    border-top: 1px solid var(--hairline);
+  }
+  .st-pv-scale {
+    margin-left: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .st-pv-row-btn {
+    transition: none;
+  }
+}
