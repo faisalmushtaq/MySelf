@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { shouldReloadOnto, updateGate } from "./lib/updates.js";
+import { mayActivateWaitingBuild, shouldReloadOnto, updateGate } from "./lib/updates.js";
 
 /**
  * When the app may reload itself onto a new build.
@@ -87,5 +87,70 @@ describe("the gate over a school day", () => {
     gate.hold();
     gate.release();
     expect(reload).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * A downloaded build takes over only when the gate says so (docs/16 R11).
+ *
+ * In "autoUpdate" mode a new build took control the moment it installed and the
+ * plugin reloaded the page itself, so the rules above were being consulted too
+ * late. The build now waits, and being told to take over is held back by the
+ * same rule as the reload it leads to.
+ */
+describe("a new build waiting to take over", () => {
+  it("is told to take over at once when nobody is mid-sitting", () => {
+    const activate = vi.fn();
+    const gate = updateGate({ hadControllerAtLoad: true, reload: vi.fn() });
+    gate.buildWaiting(activate);
+    expect(activate).toHaveBeenCalledTimes(1);
+    expect(mayActivateWaitingBuild({ sittingInProgress: false })).toBe(true);
+  });
+
+  it("waits for the sitting in progress, then takes over and reloads between participants", () => {
+    const activate = vi.fn();
+    const reload = vi.fn();
+    const gate = updateGate({ hadControllerAtLoad: true, reload });
+
+    gate.hold();
+    gate.buildWaiting(activate);
+    expect(activate).not.toHaveBeenCalled();
+    expect(gate.waiting()).toBe(true);
+    expect(mayActivateWaitingBuild({ sittingInProgress: true })).toBe(false);
+
+    gate.release();
+    expect(activate).toHaveBeenCalledTimes(1);
+    // Taking over is what fires `controllerchange`; the reload follows from it.
+    gate.tookOver();
+    expect(reload).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not reload if a sitting starts between taking over and the new build arriving", () => {
+    // Told to take over at the start screen, and a child pressed Start before the
+    // new worker had control: the reload waits for the next start screen.
+    const reload = vi.fn();
+    const gate = updateGate({ hadControllerAtLoad: true, reload });
+    gate.buildWaiting(vi.fn());
+    gate.hold();
+    gate.tookOver();
+    expect(reload).not.toHaveBeenCalled();
+    gate.release();
+    expect(reload).toHaveBeenCalledTimes(1);
+  });
+
+  it("applies only the newest of several builds that arrive during one sitting", () => {
+    const first = vi.fn();
+    const second = vi.fn();
+    const gate = updateGate({ hadControllerAtLoad: true, reload: vi.fn() });
+    gate.hold();
+    gate.buildWaiting(first);
+    gate.buildWaiting(second);
+    gate.release();
+    expect(first).not.toHaveBeenCalled();
+    expect(second).toHaveBeenCalledTimes(1);
+    // And once only, however many participants follow.
+    gate.hold();
+    gate.release();
+    expect(second).toHaveBeenCalledTimes(1);
   });
 });

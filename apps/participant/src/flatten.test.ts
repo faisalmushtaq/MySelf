@@ -2,11 +2,71 @@ import { describe, expect, it } from "vitest";
 import { AnswerStore, Walker } from "@myself/engine";
 import { releaseManifest } from "@myself/schema";
 import rawManifest from "../../../releases/ybm_nd2026_standard_r7.0.0.manifest.json";
+import r710 from "../../../releases/ybm_nd2026_standard_r7.1.0.manifest.json";
 import { flattenManifest, reminderOf } from "./lib/flatten.js";
 import { resolveText } from "./lib/pipes.js";
 
 const manifest = releaseManifest.parse(rawManifest);
 const flattened = flattenManifest(manifest);
+
+describe("placements that show part of a form (D-49)", () => {
+  /**
+   * r7.1.0 with the SDQ split in two: its first placement stays in "How you've
+   * been feeling" but shows three questions in an order of its own, and the rest
+   * move to a new section after it. Built by editing the composition only — the
+   * flattening never looks at the hash, so there is none to keep right.
+   */
+  const split = (() => {
+    const raw = JSON.parse(JSON.stringify(r710)) as {
+      composition: { sections: { key: string; title: string; components: Record<string, unknown>[] }[] };
+    };
+    const sections = raw.composition.sections;
+    const wellbeing = sections.findIndex((s) => s.key === "wellbeing");
+    const sdq = sections[wellbeing]!.components.find(
+      (c) => (c["ref"] as { instrument?: string } | undefined)?.instrument === "sdq25_s",
+    )!;
+    sdq["items"] = ["q3", "q1", "q2"];
+    const rest = Array.from({ length: 22 }, (_, i) => `q${i + 4}`);
+    sections.splice(wellbeing + 1, 0, {
+      key: "more_feelings",
+      title: "A few more",
+      components: [{ ...sdq, items: rest }],
+    });
+    return flattenManifest(releaseManifest.parse(raw));
+  })();
+
+  const sdqUnits = split.units.filter((u) => u.instrument === "sdq25_s");
+
+  it("shows the subset's questions in the subset's order, not the form's", () => {
+    const first = sdqUnits.filter((u) => u.sectionKey === "wellbeing").map((u) => u.item.key);
+    expect(first).toEqual(["__instructions_sdq25_s", "q3", "q1", "q2"]);
+  });
+
+  it("administers every question once across the two placements", () => {
+    const questions = sdqUnits.map((u) => u.item.key).filter((k) => !k.startsWith("__"));
+    expect(questions).toHaveLength(25);
+    expect(new Set(questions).size).toBe(25);
+    expect(sdqUnits.filter((u) => u.sectionKey === "more_feelings")[1]?.item.key).toBe("q4");
+  });
+
+  it("gives the second placement its own instructions key and keeps the first one's", () => {
+    // The first keeps the key every earlier release used, so its timing and
+    // events line up with theirs; the second is numbered, so no two units share one.
+    const instructions = sdqUnits.filter((u) => u.item.key.startsWith("__instructions_"));
+    expect(instructions.map((u) => [u.sectionKey, u.item.key])).toEqual([
+      ["wellbeing", "__instructions_sdq25_s"],
+      ["more_feelings", "__instructions_sdq25_s_2"],
+    ]);
+  });
+
+  it("changes nothing for a release that uses no subsets", () => {
+    const whole = flattenManifest(releaseManifest.parse(r710));
+    expect(whole.units.filter((u) => u.instrument === "sdq25_s").map((u) => u.item.key)).toEqual([
+      "__instructions_sdq25_s",
+      ...Array.from({ length: 25 }, (_, i) => `q${i + 1}`),
+    ]);
+  });
+});
 
 describe("manifest flattening", () => {
   it("produces the full YBM unit list with instruction cards", () => {
