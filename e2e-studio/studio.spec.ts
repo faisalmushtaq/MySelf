@@ -72,7 +72,7 @@ test("a researcher publishes a change and the public survey runs it, with histor
   // Into the editor for the survey.
   await page.goto("researcher/#/surveys/ybm_nd2026_standard/edit");
   await expect(page.getByPlaceholder("Search questions by text or ID")).toBeVisible({ timeout: 60_000 });
-  await expect(page.getByText("Draft matches the live version")).toBeVisible();
+  await expect(page.getByText("In sync with live")).toBeVisible();
 
   // ── An edit that validation must catch ─────────────────────────────────────
   await findQuestion(page, "Do you have your own smartphone");

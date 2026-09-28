@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { outline, summariseIssues, type Issue } from "@myself/studio";
 import { Icon } from "../ui/icons.js";
-import { Button, EmptyState, IconButton, Spinner } from "../ui/kit.js";
+import { Button, EmptyState, IconButton, InfoTip, Spinner } from "../ui/kit.js";
 import { useEditor } from "./context.js";
 import { VALIDATION_PANEL_ID, VALIDATION_TOGGLE_ID } from "./Toolbar.js";
 import { groupIssues, selectionFor, type IssueGroup } from "./validation/select.js";
@@ -138,7 +138,7 @@ function Panel() {
   const summary = !ctx.issuesFresh
     ? "Checking…"
     : total === 0
-      ? "No problems"
+      ? "No issues"
       : [counts.errors > 0 ? plural(counts.errors, "error") : null, counts.warnings > 0 ? plural(counts.warnings, "warning") : null]
           .filter(Boolean)
           .join(" · ");
@@ -154,24 +154,25 @@ function Panel() {
       onKeyDown={onKeyDown}
     >
       <header className="sto-vp-head">
-        <h2 id="sto-vp-title" ref={heading} tabIndex={-1}>
-          Checks
-        </h2>
+        <div className="sto-vp-title">
+          <h2 id="sto-vp-title" ref={heading} tabIndex={-1}>
+            Checks
+          </h2>
+          <InfoTip
+            label="checks"
+            text="Errors must be fixed before publishing; warnings don’t block it. Branching only shows or hides questions based on earlier answers, so every path moves forward — these checks cover conditions that point at later or missing questions."
+          />
+        </div>
+        <p className={`sto-vp-summary${counts.errors > 0 ? " has-errors" : counts.warnings > 0 ? " has-warnings" : " is-clear"}`} role="status">
+          {!ctx.issuesFresh ? <Spinner /> : null}
+          {summary}
+        </p>
         <IconButton icon="close" label="Close checks" onClick={close} />
       </header>
       <div className="sto-vp-body">
-        <p className={`sto-vp-summary${counts.errors > 0 ? " has-errors" : counts.warnings > 0 ? " has-warnings" : ""}`} role="status">
-          {!ctx.issuesFresh ? <Spinner /> : <Icon name={counts.errors > 0 ? "error" : total > 0 ? "warning" : "check"} size={18} />}
-          <strong>{summary}</strong>
-        </p>
-        <p className="sto-vp-lede">Errors must be fixed before publishing. Warnings are worth a look but don&rsquo;t block it.</p>
-        <p className="sto-vp-lede sto-vp-quiet">
-          Branching in MySelf shows or hides questions based on earlier answers, so every path moves forward to the end; the
-          checks below cover conditions that point at later or missing questions.
-        </p>
         {total === 0 ? (
-          <EmptyState icon="check" title="Everything checks out">
-            <p>Nothing stops this draft being published.</p>
+          <EmptyState icon="check" title="No issues">
+            <p>Nothing blocks publishing.</p>
           </EmptyState>
         ) : (
           <>
@@ -190,6 +191,11 @@ function plural(n: number, word: string): string {
   return `${n} ${n === 1 ? word : `${word}s`}`;
 }
 
+/**
+ * One severity's issues, grouped by the place they are about (in survey
+ * order): the place as a quiet line, then a row per issue — its icon, its
+ * message and a way to it.
+ */
 export function IssueList({
   title,
   count,
@@ -206,13 +212,12 @@ export function IssueList({
   return (
     <section className={`sto-vp-sev sto-vp-${severity}`} aria-labelledby={`sto-vp-${severity}`}>
       <h3 id={`sto-vp-${severity}`}>
-        <Icon name={severity === "error" ? "error" : "warning"} size={16} />
         {title} <span className="sto-vp-count">{count}</span>
       </h3>
       {groups.map((g) => (
         <div key={g.id} className="sto-vp-group">
           <h4>
-            {g.label}
+            <span className="sto-vp-place">{g.label}</span>
             {g.context ? <span className="sto-vp-context"> in {g.context}</span> : null}
           </h4>
           <ul>
@@ -220,8 +225,9 @@ export function IssueList({
               const word = fieldWord(issue.location.field);
               return (
                 <li key={`${issue.code}:${i}`}>
+                  <Icon name={severity === "error" ? "error" : "warning"} size={16} />
                   <span className="sto-vp-message">{issue.message}</span>
-                  <Button size="sm" variant="secondary" onClick={() => onGo(issue)} aria-label={`Go to ${word ? `the ${word} of ` : ""}${g.label}`}>
+                  <Button size="sm" variant="ghost" onClick={() => onGo(issue)} aria-label={`Go to ${word ? `the ${word} of ` : ""}${g.label}`}>
                     Go to
                   </Button>
                 </li>

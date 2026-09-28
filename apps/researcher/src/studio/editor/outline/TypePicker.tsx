@@ -37,7 +37,7 @@ export function TypePicker({ where, onChoose, onClose }: { where: string; onChoo
   };
 
   return (
-    <Dialog title="Add a question" description={<p className="stp-flush">It goes {where}. Choose what kind of answer it takes.</p>} onClose={onClose} width={680} initialFocus=".sto-type-option">
+    <Dialog title="Add a question" description={<p className="stp-flush">It goes {where}.</p>} onClose={onClose} width={640} initialFocus=".sto-type-option">
       <div className="sto-types" onKeyDown={onKeyDown}>
         {GROUPS.map((g) => {
           const types = creatable.filter((t) => t.group === g.id);
@@ -74,7 +74,7 @@ export function TypePicker({ where, onChoose, onClose }: { where: string; onChoo
                   </span>
                   <span className="sto-type-text">
                     <strong>{t.label}</strong>
-                    <small>Questions of this kind that are already in a survey can still be edited, but new ones can&rsquo;t be made in the Studio.</small>
+                    <small>Existing ones can still be edited, but new ones can&rsquo;t be made here.</small>
                   </span>
                 </div>
               </li>

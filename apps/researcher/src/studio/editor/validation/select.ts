@@ -81,7 +81,10 @@ export function groupIssues(issues: readonly Issue[], outline: Outline): Grouped
     const at = issue.location;
     if ((at.kind === "question" || at.kind === "option") && at.itemKey) {
       const q = questionPlace.get(at.itemKey);
-      if (q) return { id: `q:${at.itemKey}`, label: `“${shortText(q.text, 70)}” (${at.itemKey})`, context: q.section, order: q.order };
+      if (q) {
+        const said = q.text.trim() ? `“${shortText(q.text, 70)}”` : "Untitled question";
+        return { id: `q:${at.itemKey}`, label: `${said} (${at.itemKey})`, context: q.section, order: q.order };
+      }
       const text = archived.get(at.itemKey);
       return {
         id: `q:${at.itemKey}`,

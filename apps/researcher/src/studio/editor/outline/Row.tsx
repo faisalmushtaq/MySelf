@@ -86,10 +86,29 @@ export function IssueMarker({ count, id }: { count: IssueCount; id?: string }) {
   if (!hasIssues(count)) return null;
   const error = count.errors > 0;
   return (
-    <span id={id} className={`sto-issue ${error ? "sto-issue-error" : "sto-issue-warn"}`} title={describeCount(count)}>
+    <span id={id} className={`sto-ind sto-issue ${error ? "sto-issue-error" : "sto-issue-warn"}`} data-tip={capitalise(describeCount(count))}>
       <Icon name={error ? "error" : "warning"} size={14} />
       <span aria-hidden="true">{count.errors + count.warnings}</span>
       <VisuallyHidden>{describeCount(count)}</VisuallyHidden>
+    </span>
+  );
+}
+
+/**
+ * A trailing indicator: a 14px icon whose name is on hover (a CSS tooltip, so
+ * 150 rows carry no tooltip state) and, for screen readers, in the row's
+ * description — the icon itself is decorative.
+ */
+function Indicator({ icon, tip }: { icon: IconName | "asterisk"; tip: string }) {
+  return (
+    <span className="sto-ind" data-tip={tip} aria-hidden="true">
+      {icon === "asterisk" ? (
+        <svg viewBox="0 0 20 20" width={14} height={14} fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" aria-hidden="true" focusable="false" className="st-icon">
+          <path d="M10 4.5v11M5.2 7.25l9.6 5.5M5.2 12.75l9.6-5.5" />
+        </svg>
+      ) : (
+        <Icon name={icon} size={14} />
+      )}
     </span>
   );
 }
@@ -150,10 +169,14 @@ export const TreeItem = memo(
       handlers.activate(node.id);
     };
 
-    const described = [descId, hasIssues(node.issues) ? issueId : null].filter(Boolean).join(" ");
+    const hasDesc = node.kind === "question" || node.kind === "section" || node.kind === "block" || node.kind === "archived";
+    const described = [hasDesc ? descId : null, hasIssues(node.issues) ? issueId : null].filter(Boolean).join(" ");
+    const header = isHeader(node);
     const classes = [
       "sto-row",
       `sto-row-${node.kind}`,
+      header ? "is-header" : "",
+      idOnlyMatch(node) ? "has-id-match" : "",
       state.selected ? "is-selected" : "",
       state.drop ? `drop-${state.drop}` : "",
       state.refused ? "drop-refused" : "",
@@ -166,7 +189,7 @@ export const TreeItem = memo(
       <li
         role="treeitem"
         id={dom}
-        className="sto-item"
+        className={`sto-item sto-item-${node.kind}`}
         data-row-id={node.id}
         aria-level={node.level}
         aria-expanded={node.expandable ? node.expanded : undefined}
@@ -177,7 +200,9 @@ export const TreeItem = memo(
       >
         <div
           className={classes}
-          style={{ ["--sto-level" as string]: node.level }}
+          // Sections are headers and their rows sit flush beneath them; only a
+          // block's own questions step in, under the block's name.
+          style={{ ["--sto-indent" as string]: `${Math.max(0, node.level - 2) * 24}px` }}
           draggable={canDrag || undefined}
           onDragStart={canDrag ? (e) => handlers.dragStart(node.id, e) : undefined}
           onDragEnd={canDrag ? handlers.dragEnd : undefined}
@@ -197,25 +222,27 @@ export const TreeItem = memo(
               <Icon name="grip" size={14} />
             </span>
           ) : null}
-          {node.expandable ? (
-            <span
-              className="sto-chev"
-              aria-hidden="true"
-              onClick={(e) => {
-                e.stopPropagation();
-                handlers.toggle(node.id);
-              }}
-            >
-              <Icon name={node.expanded ? "chevron-down" : "chevron-right"} size={16} />
+          {header ? null : (
+            <span className={`sto-icon${isAdd ? " sto-icon-add" : ""}`} aria-hidden="true" data-tip={iconTip(node)}>
+              <Icon name={rowIcon(node)} size={node.kind === "block" ? 14 : 16} />
             </span>
-          ) : (
-            <span className="sto-chev-space" aria-hidden="true" />
           )}
-          <span className={`sto-icon${isAdd ? " sto-icon-add" : ""}`} aria-hidden="true">
-            <Icon name={rowIcon(node)} size={16} />
+          <span className="sto-main">
+            <RowText node={node} labelId={labelId} descId={descId} />
+            {node.expandable ? (
+              <span
+                className="sto-chev"
+                aria-hidden="true"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handlers.toggle(node.id);
+                }}
+              >
+                <Icon name={node.expanded ? "chevron-down" : "chevron-right"} size={14} />
+              </span>
+            ) : null}
           </span>
-          <RowText node={node} labelId={labelId} descId={descId} />
-          <IssueMarker count={node.issues} id={issueId} />
+          <Trailing node={node} issueId={issueId} />
           {menu ? (
             <button
               type="button"
@@ -230,10 +257,12 @@ export const TreeItem = memo(
             >
               <Icon name="more" size={16} />
             </button>
-          ) : null}
+          ) : isAdd ? null : (
+            <span className="sto-more-space" aria-hidden="true" />
+          )}
         </div>
         {node.expanded && node.children.length > 0 ? (
-          <ul role="group" className="sto-group">
+          <ul role="group" className={`sto-group sto-group-${node.kind}`}>
             {node.children.map((child) => (
               <TreeItem key={child.id} node={child} />
             ))}
@@ -245,56 +274,74 @@ export const TreeItem = memo(
   (a, b) => a.node.treeSig === b.node.treeSig && a.node.id === b.node.id,
 );
 
-function RowText({ node, labelId, descId }: { node: TreeNode; labelId: string; descId: string }) {
+/**
+ * The search found this row by its ID alone, so the ID is shown (with the
+ * match marked) — otherwise its text, already on the row, says why it is here.
+ */
+function idOnlyMatch(node: TreeNode): boolean {
+  return node.idMatch.length > 0 && node.textMatch.length === 0;
+}
+
+/** Sections and the archive are drawn as quiet group headers rather than rows with an icon. */
+function isHeader(node: TreeNode): boolean {
+  return node.kind === "section" || node.kind === "archive";
+}
+
+/** What a block's lock (or branch) means, on hover; the row's name says it for screen readers. */
+function iconTip(node: TreeNode): string | undefined {
+  if (node.kind !== "block" || !node.block) return undefined;
+  const b = node.block;
+  if (b.tier === "editable" && !b.unlocked && b.condition) return b.condition;
+  return capitalise(tierPhrase(b));
+}
+
+const count = (n: number) => (n === 1 ? "1 question" : `${n} questions`);
+
+/**
+ * The right-hand end of a row: a question's number and ID (on hover and
+ * selection), its indicators, its problems, and for a group its size. Icons
+ * only; what each means is on hover and in the row's description.
+ */
+function Trailing({ node, issueId }: { node: TreeNode; issueId: string }) {
+  const issues = <IssueMarker count={node.issues} id={issueId} />;
   switch (node.kind) {
     case "question": {
       const q = node.question!;
       return (
-        <span className="sto-main">
-          <span className="sto-text" id={labelId}>
-            {q.text.trim() ? <Highlight text={q.text} ranges={node.textMatch} /> : <em>(No question text yet)</em>}
-          </span>
-          <span className="sto-meta sto-meta-line" id={descId}>
-            <VisuallyHidden>{TYPE_LABELS.get(q.studioType) ?? "Question"}, question {q.number}, ID </VisuallyHidden>
-            <span className="sto-num" aria-hidden="true">
-              {q.number}
-            </span>
-            <code className="sto-id" title={q.itemKey}>
-              <Highlight text={q.itemKey} ranges={node.idMatch} />
-            </code>
-            {q.required === "hard" ? <span className="sto-flag">Required</span> : null}
-            {q.hasCondition ? (
-              <span className="sto-flag">
-                <Icon name="branch" size={12} />
-                Condition
-              </span>
+        <span className="sto-trail">
+          <span className="sto-qmeta" aria-hidden="true">
+            {idOnlyMatch(node) ? (
+              <code className="sto-id" title={q.itemKey}>
+                <Highlight text={q.itemKey} ranges={node.idMatch} />
+              </code>
             ) : null}
-            {q.identifying ? (
-              <span className="sto-flag">
-                <Icon name="user" size={12} />
-                Identifying
-              </span>
-            ) : null}
+            <span className="sto-num">{q.number}</span>
           </span>
+          {q.required === "hard" ? <Indicator icon="asterisk" tip="Required" /> : null}
+          {q.hasCondition ? <Indicator icon="branch" tip="Has a condition" /> : null}
+          {q.identifying ? <Indicator icon="user" tip="Identifying" /> : null}
+          {issues}
         </span>
       );
     }
+    case "archived":
+      return (
+        <span className="sto-trail">
+          <span className="sto-qmeta" aria-hidden="true">
+            <code className="sto-id" title={node.archived!.itemKey}>
+              <Highlight text={node.archived!.itemKey} ranges={node.idMatch} />
+            </code>
+          </span>
+        </span>
+      );
     case "section": {
       const s = node.section!;
       return (
-        <span className="sto-main">
-          <span className="sto-text sto-text-strong" id={labelId}>
-            <Highlight text={node.label} ranges={node.textMatch} />
-          </span>
-          <span className="sto-meta" id={descId}>
-            <span>{s.questionCount === 1 ? "1 question" : `${s.questionCount} questions`}</span>
-            {s.condition ? (
-              <span className="sto-flag sto-flag-wrap" title={s.condition}>
-                <Icon name="branch" size={12} />
-                {s.condition}
-              </span>
-            ) : null}
-            {s.fixed ? <VisuallyHidden>. Holds a protected module, so its place is fixed</VisuallyHidden> : null}
+        <span className="sto-trail">
+          {s.condition ? <Indicator icon="branch" tip={s.condition} /> : null}
+          {issues}
+          <span className="sto-count" aria-hidden="true">
+            {s.questionCount}
           </span>
         </span>
       );
@@ -302,67 +349,115 @@ function RowText({ node, labelId, descId }: { node: TreeNode; labelId: string; d
     case "block": {
       const b = node.block!;
       return (
-        <span className="sto-main">
-          <span className="sto-text sto-text-strong" id={labelId}>
+        <span className="sto-trail">
+          {b.condition && b.tier !== "editable" ? <Indicator icon="branch" tip={b.condition} /> : null}
+          {issues}
+          <span className="sto-count" aria-hidden="true">
+            {b.questionCount}
+          </span>
+        </span>
+      );
+    }
+    case "archive":
+      return (
+        <span className="sto-trail">
+          <span className="sto-count" aria-hidden="true">
+            {node.label.replace(/\D+/g, "")}
+          </span>
+        </span>
+      );
+    default:
+      return hasIssues(node.issues) ? <span className="sto-trail">{issues}</span> : null;
+  }
+}
+
+/**
+ * The row's name (its accessible name, by id) and, visually hidden, its
+ * description: everything the trailing icons and hover-only meta show, in
+ * words, so nothing is only seen.
+ */
+function RowText({ node, labelId, descId }: { node: TreeNode; labelId: string; descId: string }) {
+  switch (node.kind) {
+    case "question": {
+      const q = node.question!;
+      const flags = [q.required === "hard" ? "required" : null, q.hasCondition ? "has a condition" : null, q.identifying ? "identifying" : null].filter(Boolean);
+      return (
+        <>
+          <span className="sto-text" id={labelId} title={q.text.trim() || undefined}>
+            {q.text.trim() ? <Highlight text={q.text} ranges={node.textMatch} /> : <em>(No question text yet)</em>}
+          </span>
+          <span id={descId} className="st-sr">
+            {TYPE_LABELS.get(q.studioType) ?? "Question"}, question {q.number}, ID {q.itemKey}
+            {flags.length > 0 ? `, ${flags.join(", ")}` : ""}
+          </span>
+        </>
+      );
+    }
+    case "section": {
+      const s = node.section!;
+      return (
+        <>
+          <span className="sto-text" id={labelId}>
+            <Highlight text={node.label} ranges={node.textMatch} />
+          </span>
+          <span id={descId} className="st-sr">
+            {count(s.questionCount)}
+            {s.condition ? `. ${s.condition}` : ""}
+            {s.fixed ? ". Holds a protected module, so its place is fixed" : ""}
+          </span>
+        </>
+      );
+    }
+    case "block": {
+      const b = node.block!;
+      return (
+        <>
+          <span className="sto-text" id={labelId} title={b.name}>
             <Highlight text={b.name} ranges={node.textMatch} />
             <VisuallyHidden> ({tierPhrase(b)})</VisuallyHidden>
           </span>
-          <span className="sto-meta" id={descId}>
-            {b.tier !== "editable" || b.unlocked ? (
-              <span className={`sto-tier sto-tier-${b.tier}`} aria-hidden="true">
-                {capitalise(tierPhrase(b))}
-              </span>
-            ) : null}
-            <span>{b.questionCount === 1 ? "1 question" : `${b.questionCount} questions`}</span>
-            {b.condition ? (
-              <span className="sto-flag sto-flag-wrap" title={b.condition}>
-                <Icon name="branch" size={12} />
-                {b.condition}
-              </span>
-            ) : null}
+          <span id={descId} className="st-sr">
+            {count(b.questionCount)}
+            {b.condition ? `. ${b.condition}` : ""}
           </span>
-        </span>
+        </>
       );
     }
     case "archived": {
       const a = node.archived!;
       return (
-        <span className="sto-main">
-          <span className="sto-text" id={labelId}>
+        <>
+          <span className="sto-text" id={labelId} title={a.text}>
             <Highlight text={a.text} ranges={node.textMatch} />
           </span>
-          <span className="sto-meta" id={descId}>
-            <VisuallyHidden>Archived question, ID </VisuallyHidden>
-            <code className="sto-id">
-              <Highlight text={a.itemKey} ranges={node.idMatch} />
-            </code>
-          </span>
-        </span>
+          <span id={descId} className="st-sr">Archived question, ID {a.itemKey}</span>
+        </>
       );
     }
+    case "archive":
+      return (
+        <span className="sto-text" id={labelId}>
+          Archived
+          <VisuallyHidden> {node.label.slice("Archived".length).trim()}</VisuallyHidden>
+        </span>
+      );
     case "add-question":
       return (
-        <span className="sto-main">
-          <span className="sto-text sto-text-add" id={labelId}>
-            <span aria-hidden="true">Add question</span>
-            <VisuallyHidden>{node.label}</VisuallyHidden>
-          </span>
+        <span className="sto-text sto-text-add" id={labelId}>
+          <span aria-hidden="true">Add question</span>
+          <VisuallyHidden>{node.label}</VisuallyHidden>
         </span>
       );
     case "add-section":
       return (
-        <span className="sto-main">
-          <span className="sto-text sto-text-add" id={labelId}>
-            Add section
-          </span>
+        <span className="sto-text sto-text-add" id={labelId}>
+          Add section
         </span>
       );
     default:
       return (
-        <span className="sto-main">
-          <span className="sto-text sto-text-strong" id={labelId}>
-            <Highlight text={node.label} ranges={node.textMatch} />
-          </span>
+        <span className="sto-text" id={labelId}>
+          <Highlight text={node.label} ranges={node.textMatch} />
         </span>
       );
   }
