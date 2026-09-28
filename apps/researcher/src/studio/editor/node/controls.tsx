@@ -9,7 +9,7 @@ import {
 } from "react";
 import type { Issue } from "@myself/studio";
 import { Icon, type IconName } from "../../ui/icons.js";
-import { AutoTextarea } from "../../ui/kit.js";
+import { AutoTextarea, InfoTip, Tooltip } from "../../ui/kit.js";
 
 /**
  * The editor's form controls.
@@ -129,6 +129,29 @@ export function hasError(issues: readonly Issue[] | undefined, local?: string | 
 }
 
 // ---------------------------------------------------------------------------
+// Tips
+// ---------------------------------------------------------------------------
+
+/**
+ * A padlock that says why something can't be changed, on hover or focus. The
+ * same words are also the locked value's description (by id), so a screen
+ * reader hears them with the value without having to find the padlock.
+ */
+export function LockTip({ reason, label = "Why this can't be changed" }: { reason: string; label?: string }) {
+  return (
+    <span className="stn-locktip">
+      <Tooltip text={reason}>
+        <button type="button" aria-label={label} onClick={(e) => e.preventDefault()}>
+          <Icon name="lock" size={14} />
+        </button>
+      </Tooltip>
+    </span>
+  );
+}
+
+const plain = (node: ReactNode, fallback: string): string => (typeof node === "string" ? node : fallback);
+
+// ---------------------------------------------------------------------------
 // Fields
 // ---------------------------------------------------------------------------
 
@@ -139,7 +162,14 @@ export interface TextFieldProps {
   value: string;
   onCommit: (next: string) => void;
   validate?: (next: string) => string | null;
+  /** One short visible line under the box. Longer explanations go in `info`. */
   hint?: ReactNode;
+  /** An explanation behind an ⓘ beside the label; also the box's description. */
+  info?: string;
+  /** The ⓘ's name ("About …"), when the label is not plain text. */
+  infoLabel?: string;
+  /** Read to screen readers as the box's description, never shown. */
+  describe?: string;
   issues?: readonly Issue[] | undefined;
   /** Shown as text, with the reason, instead of a box. */
   readOnly?: boolean;
@@ -157,6 +187,14 @@ export interface TextFieldProps {
   /** A unit shown beside the box, e.g. "characters". */
   suffix?: string | undefined;
   spellCheck?: boolean;
+  /** The label is for screen readers only: the box speaks for itself (the question text). */
+  hideLabel?: boolean;
+  /** Label on the left, a narrow box on the right (the settings panel's rows). */
+  inline?: boolean;
+  /** Something to put at the end of the box's row, e.g. a copy button. */
+  trailing?: ReactNode;
+  /** Extra class on the field's wrapper. */
+  className?: string;
 }
 
 /** A labelled text box that writes as it is typed, with its messages. */
@@ -168,6 +206,9 @@ export function TextField(props: TextFieldProps) {
     onCommit,
     validate,
     hint,
+    info,
+    infoLabel,
+    describe,
     issues,
     readOnly,
     lockedReason,
@@ -181,14 +222,19 @@ export function TextField(props: TextFieldProps) {
     after,
     suffix,
     spellCheck,
+    hideLabel,
+    inline,
+    trailing,
+    className: fieldClassName,
   } = props;
   const id = useId();
   const synced = useSyncedText(value, onCommit, validate);
   const hintId = hint ? `${id}-hint` : undefined;
+  const infoId = info || describe ? `${id}-info` : undefined;
   const msgId = `${id}-msg`;
   const showMsgs = !!synced.localError || (issues?.length ?? 0) > 0;
   const describedBy =
-    [suffix ? `${id}-unit` : null, hintId, showMsgs ? msgId : null, lockedReason && readOnly ? `${id}-lock` : null].filter(Boolean).join(" ") ||
+    [suffix ? `${id}-unit` : null, hintId, infoId, showMsgs ? msgId : null, lockedReason && readOnly ? `${id}-lock` : null].filter(Boolean).join(" ") ||
     undefined;
   const invalid = hasError(issues, synced.localError);
   const className = `st-input${mono ? " st-input-mono" : ""}${inputClassName ? ` ${inputClassName}` : ""}`;
@@ -237,24 +283,34 @@ export function TextField(props: TextFieldProps) {
     />
   );
 
+  const labelEl = (
+    <label htmlFor={id} id={`${id}-label`} className="stn-label">
+      {label}
+      {optional ? <span className="stn-optional"> (optional)</span> : null}
+      {readOnly ? <span className="st-sr"> (can't be changed)</span> : null}
+    </label>
+  );
+
   return (
-    <div className={`stn-field${invalid ? " stn-field-invalid" : ""}`}>
-      <label htmlFor={id} id={`${id}-label`} className="stn-label">
-        {label}
-        {optional ? <span className="stn-optional"> (optional)</span> : null}
-        {readOnly ? (
-          <span className="stn-label-lock">
-            <Icon name="lock" size={13} />
-            <span className="st-sr"> (can't be changed)</span>
-          </span>
-        ) : null}
-      </label>
-      {suffix ? (
+    <div className={`stn-field${inline ? " stn-field-inline" : ""}${invalid ? " stn-field-invalid" : ""}${fieldClassName ? ` ${fieldClassName}` : ""}`}>
+      {hideLabel ? (
+        <div className="st-sr">{labelEl}</div>
+      ) : (
+        <div className="stn-labelrow">
+          {labelEl}
+          {info ? <InfoTip text={info} label={infoLabel ?? plain(label, "this field")} /> : null}
+          {readOnly && lockedReason ? <LockTip reason={lockedReason} label={`Why ${plain(label, "this")} can't be changed`} /> : null}
+        </div>
+      )}
+      {suffix || trailing ? (
         <div className="stn-inputrow">
           {box}
-          <span id={`${id}-unit`} className="stn-suffix">
-            {suffix}
-          </span>
+          {suffix ? (
+            <span id={`${id}-unit`} className="stn-suffix">
+              {suffix}
+            </span>
+          ) : null}
+          {trailing}
         </div>
       ) : (
         box
@@ -264,10 +320,15 @@ export function TextField(props: TextFieldProps) {
           {hint}
         </div>
       ) : null}
+      {infoId ? (
+        <span id={infoId} className="st-sr">
+          {info ?? describe}
+        </span>
+      ) : null}
       {readOnly && lockedReason ? (
-        <div id={`${id}-lock`} className="stn-hint stn-lockreason">
+        <span id={`${id}-lock`} className="st-sr">
           {lockedReason}
-        </div>
+        </span>
       ) : null}
       {showMsgs ? <IssueMessages id={msgId} issues={issues} local={synced.localError} /> : null}
       {after}
@@ -283,16 +344,33 @@ export interface NumberFieldProps {
   onCommit: (next: number | null) => void;
   parse: (text: string) => { ok: true; value: number | null } | { ok: false; message: string };
   hint?: ReactNode;
+  info?: string;
   issues?: readonly Issue[] | undefined;
   readOnly?: boolean;
   lockedReason?: string | null;
   placeholder?: string;
   suffix?: string;
   optional?: boolean;
+  inline?: boolean;
 }
 
 /** A number box that writes as it is typed, once what is typed is a number the setting takes. */
-export function NumberField({ label, field, value, onCommit, parse, hint, issues, readOnly, lockedReason, placeholder, suffix, optional }: NumberFieldProps) {
+export function NumberField({
+  label,
+  field,
+  value,
+  onCommit,
+  parse,
+  hint,
+  info,
+  issues,
+  readOnly,
+  lockedReason,
+  placeholder,
+  suffix,
+  optional,
+  inline,
+}: NumberFieldProps) {
   const commit = useCallback(
     (text: string) => {
       const parsed = parse(text);
@@ -300,10 +378,13 @@ export function NumberField({ label, field, value, onCommit, parse, hint, issues
     },
     [parse, onCommit, value],
   );
-  const validate = useCallback((text: string) => {
-    const parsed = parse(text);
-    return parsed.ok ? null : parsed.message;
-  }, [parse]);
+  const validate = useCallback(
+    (text: string) => {
+      const parsed = parse(text);
+      return parsed.ok ? null : parsed.message;
+    },
+    [parse],
+  );
   return (
     <TextField
       label={label}
@@ -312,14 +393,15 @@ export function NumberField({ label, field, value, onCommit, parse, hint, issues
       onCommit={commit}
       validate={validate}
       hint={hint}
+      {...(info ? { info } : {})}
       issues={issues}
       readOnly={readOnly ?? false}
       lockedReason={lockedReason ?? null}
       placeholder={placeholder ?? (optional ? "No limit" : "")}
       inputClassName="stn-number"
       emptyText={optional ? "No limit" : "Not set"}
-      optional={optional ?? false}
       suffix={suffix}
+      inline={inline ?? false}
     />
   );
 }
@@ -331,19 +413,24 @@ export function ReadOnlyValue({
   children,
   reason,
   mono,
+  inline,
 }: {
   label: ReactNode;
   field?: string;
   children: ReactNode;
-  reason?: ReactNode;
+  reason?: string | null | undefined;
   mono?: boolean;
+  inline?: boolean;
 }) {
   const id = useId();
   return (
-    <div className="stn-field">
-      <span className="stn-label" id={`${id}-label`}>
-        {label}
-      </span>
+    <div className={`stn-field${inline ? " stn-field-inline" : ""}`}>
+      <div className="stn-labelrow">
+        <span className="stn-label" id={`${id}-label`}>
+          {label}
+        </span>
+        {reason ? <LockTip reason={reason} label={`Why ${plain(label, "this")} can't be changed`} /> : null}
+      </div>
       <div
         className={`stn-readonly${mono ? " stn-mono" : ""}`}
         data-field={field}
@@ -356,53 +443,111 @@ export function ReadOnlyValue({
         {children}
       </div>
       {reason ? (
-        <div id={`${id}-why`} className="stn-hint stn-lockreason">
+        <span id={`${id}-why`} className="st-sr">
           {reason}
-        </div>
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * A setting that is on or off: its label on the left, an ⓘ with what it does,
+ * the switch on the right (DESIGN.md §5). A real checkbox with role=switch, so
+ * it works everywhere; `field` goes on the checkbox itself, so a jump from the
+ * checks panel lands on the switch rather than on the ⓘ beside it.
+ */
+export function SwitchRow({
+  label,
+  info,
+  checked,
+  onChange,
+  disabled,
+  field,
+}: {
+  label: string;
+  info?: string;
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+  disabled?: boolean;
+  field?: string;
+}) {
+  const id = useId();
+  const infoId = `${id}-info`;
+  return (
+    <div className={`stn-switchrow${disabled ? " disabled" : ""}`}>
+      <label htmlFor={id} className="stn-switchrow-label">
+        {label}
+      </label>
+      {info ? <InfoTip text={info} label={label} /> : null}
+      <span className={`st-switch stn-switchrow-switch${disabled ? " disabled" : ""}`}>
+        <input
+          id={id}
+          type="checkbox"
+          role="switch"
+          data-field={field}
+          checked={checked}
+          disabled={disabled}
+          onChange={(e) => onChange(e.target.checked)}
+          aria-describedby={info ? infoId : undefined}
+        />
+        <label htmlFor={id}>
+          <span className="st-switch-track" aria-hidden="true">
+            <span className="st-switch-thumb" />
+          </span>
+        </label>
+      </span>
+      {info ? (
+        <span id={infoId} className="st-sr">
+          {info}
+        </span>
       ) : null}
     </div>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Banners and panels
+// Notices and panels
 // ---------------------------------------------------------------------------
 
-/** A banner saying what is locked and why, with what can be done about it. */
+/**
+ * One slim line saying what is locked (or unlocked, or special) about what is
+ * shown, with the why behind an ⓘ and what can be done about it on the right.
+ */
 export function LockBanner({
   icon = "lock",
   tone = "neutral",
   title,
-  children,
+  info,
+  infoLabel,
   actions,
 }: {
   icon?: IconName;
   tone?: "neutral" | "accent" | "warn";
   title: string;
-  children?: ReactNode;
+  info?: string | null | undefined;
+  infoLabel?: string;
   actions?: ReactNode;
 }) {
   return (
-    <div className={`stn-banner stn-banner-${tone}`} role="note">
-      <span className="stn-banner-icon">
-        <Icon name={icon} size={18} />
-      </span>
-      <div className="stn-banner-text">
-        <strong>{title}</strong>
-        {children ? <div>{children}</div> : null}
-      </div>
-      {actions ? <div className="stn-banner-actions">{actions}</div> : null}
+    <div className={`stn-notice stn-notice-${tone}`} role="note">
+      <Icon name={icon} size={16} />
+      <span className="stn-notice-text">{title}</span>
+      {info ? <InfoTip text={info} label={infoLabel ?? title} /> : null}
+      {actions ? <span className="stn-notice-actions">{actions}</span> : null}
     </div>
   );
 }
 
 /**
- * A titled block of the editor. `field` marks it as the target of a jump to a
- * field that is a whole list (options, statements) rather than one box.
+ * A titled part of the editor, set off by a hairline. `field` marks it as the
+ * target of a jump to a field that is a whole list (options, statements)
+ * rather than one box.
  */
 export function Panel({
   title,
   description,
+  info,
   field,
   children,
   actions,
@@ -410,7 +555,9 @@ export function Panel({
   className,
 }: {
   title: ReactNode;
+  /** One short line under the title. Anything longer goes in `info`. */
   description?: ReactNode;
+  info?: string;
   field?: string;
   children: ReactNode;
   actions?: ReactNode;
@@ -422,6 +569,7 @@ export function Panel({
     <section className={`stn-panel${className ? ` ${className}` : ""}`} data-field={field} tabIndex={field ? -1 : undefined}>
       <header className="stn-panel-head">
         <H className="stn-panel-title">{title}</H>
+        {info ? <InfoTip text={info} label={plain(title, "this part")} /> : null}
         {actions ? <div className="stn-panel-actions">{actions}</div> : null}
       </header>
       {description ? <div className="stn-panel-desc">{description}</div> : null}
@@ -450,7 +598,7 @@ export function Disclosure({
     <details className={`stn-details${className ? ` ${className}` : ""}`} open={open} onToggle={(e) => setOpen((e.currentTarget as HTMLDetailsElement).open)}>
       <summary>
         <span className="stn-details-chevron">
-          <Icon name="chevron-right" size={16} />
+          <Icon name="chevron-right" size={14} />
         </span>
         <span>{summary}</span>
       </summary>
@@ -460,12 +608,15 @@ export function Disclosure({
 }
 
 /** A plain-language key/value list. */
-export function Facts({ rows }: { rows: { label: string; value: ReactNode }[] }) {
+export function Facts({ rows }: { rows: { label: string; value: ReactNode; info?: string }[] }) {
   return (
     <dl className="stn-facts">
       {rows.map((r) => (
         <div key={r.label}>
-          <dt>{r.label}</dt>
+          <dt>
+            {r.label}
+            {r.info ? <InfoTip text={r.info} label={r.label} /> : null}
+          </dt>
           <dd>{r.value}</dd>
         </div>
       ))}
@@ -473,7 +624,7 @@ export function Facts({ rows }: { rows: { label: string; value: ReactNode }[] })
   );
 }
 
-/** A small uppercase label for a group of settings — the lab site's eyebrow. */
+/** A small label for a group of settings. */
 export function Eyebrow({ children, id }: { children: ReactNode; id?: string }) {
   return (
     <p className="stn-eyebrow" id={id}>

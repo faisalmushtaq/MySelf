@@ -16,8 +16,8 @@ import "./node.css";
 
 /**
  * The centre of the editor: whatever is selected, edited as the participant
- * will meet it — a question as a card, a section with its contents, the start
- * and completion screens as screens.
+ * will meet it — a question in large type, editable in place, a section with
+ * its contents, the start and completion screens as screens.
  *
  * It also carries out jumps from the validation panel: once the selection is
  * drawn here and in the settings panel, the field at fault is focused.
@@ -85,10 +85,7 @@ function Missing({ what }: { what: "question" | "section" | "block" }) {
           </Button>
         }
       >
-        <p>
-          It may have been deleted, moved or renamed — by you, by an undo, or by someone else editing the draft. Choose something from the
-          outline on the left.
-        </p>
+        <p>It may have been deleted, moved or renamed. Choose something from the outline.</p>
       </EmptyState>
     </div>
   );

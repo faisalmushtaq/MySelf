@@ -1,5 +1,5 @@
 import { useId, useState } from "react";
-import { instrumentName, MIN_UNLOCK_REASON, protectedModule, relockModule, unlockModule } from "@myself/studio";
+import { instrumentName, MIN_UNLOCK_REASON, protectedModule, relockModule, unlockModule, type StudioDraft } from "@myself/studio";
 import { formatDateTime } from "../../format.js";
 import { Dialog } from "../../ui/dialog.js";
 import { Button } from "../../ui/kit.js";
@@ -94,16 +94,11 @@ export function UnlockDialog({ instrument, onClose }: { instrument: string; onCl
 }
 
 /** Who unlocked a module, when and why — shown while it stays unlocked. */
-export function UnlockedNote({ instrument }: { instrument: string }) {
-  const ctx = useEditor();
-  const unlock = Object.prototype.hasOwnProperty.call(ctx.draft.unlocked, instrument) ? ctx.draft.unlocked[instrument] : undefined;
+export function unlockedText(draft: StudioDraft, instrument: string): string | null {
+  const unlock = Object.prototype.hasOwnProperty.call(draft.unlocked, instrument) ? draft.unlocked[instrument] : undefined;
   if (!unlock) return null;
   const when = new Date(unlock.at);
-  return (
-    <>
-      Unlocked by {unlock.by} on {formatDateTime(Number.isNaN(when.getTime()) ? null : when)}: “{unlock.reason}”
-    </>
-  );
+  return `Unlocked by ${unlock.by} on ${formatDateTime(Number.isNaN(when.getTime()) ? null : when)}: “${unlock.reason}”. Changes made while it is open stay when it is locked again.`;
 }
 
 /** Lock a protected module again. Changes made while it was open stay. */

@@ -8,6 +8,7 @@ import { useEditor } from "../context.js";
 import { LockBanner, Panel } from "./controls.js";
 import { publishedPending } from "./locks.js";
 import { archivedTierOf, kindLabel } from "./options.js";
+import { StoredAs } from "./OptionsEditor.js";
 import { TYPE_ICONS, typeLabel } from "./types.js";
 import { UnlockDialog } from "./UnlockDialog.js";
 
@@ -37,6 +38,7 @@ export function ArchivedQuestion({ record }: { record: ArchivedRecord }) {
   const at = new Date(record.archivedAt);
   const siblings = tier === "locked" ? draft.archived.filter((a) => a.refKey === record.refKey).length : 1;
   const protectedModuleKey = tier === "protected" ? record.itemKey.slice(0, record.itemKey.indexOf(".")) : null;
+  const glyph = item.responseType === "rank_group" ? null : item.responseType === "multi_choice" ? "check" : "radio";
 
   const restore = () => {
     const out: { restored?: string[] } = {};
@@ -71,47 +73,54 @@ export function ArchivedQuestion({ record }: { record: ArchivedRecord }) {
       : tier === "protected"
         ? "It belongs to a protected module. Unlock the module to delete it."
         : null;
+  const when = formatDateTime(Number.isNaN(at.getTime()) ? null : at);
 
   return (
     <div className="stn-node">
-      <header className="stn-node-head">
-        <p className="stn-crumbs">Archived question</p>
-        <h2 className="stn-title" tabIndex={-1} data-editor-heading>
-          Archived
-          <span className="stn-title-id">{record.itemKey}</span>
+      <header className="stn-head">
+        <p className="stn-crumbs">Archive</p>
+        <h2 className="stn-meta" tabIndex={-1} data-editor-heading>
+          <span>Archived question</span>
+          <span className="stn-meta-id">{record.itemKey}</span>
         </h2>
       </header>
-      <div className="stn-banners">
-        <LockBanner icon="archive" title="Archived — not asked">
-          Archived {formatDateTime(Number.isNaN(at.getTime()) ? null : at)} by {record.archivedBy}. Its ID and reporting label stay
-          reserved, and any answers already recorded under them stay readable. Restore it to ask it again.
-        </LockBanner>
+      <div className="stn-notices">
+        <LockBanner
+          icon="archive"
+          title="Archived · not asked"
+          info={`Archived ${when} by ${record.archivedBy}. Its ID and reporting label stay reserved, and any answers already recorded under them stay readable. Restore it to ask it again.`}
+          infoLabel="the archive"
+        />
       </div>
-      <article className="stn-card stn-card-archived" aria-label="The archived question">
-        <div className="stn-card-top">
-          <span className="stn-typechip">
-            <Icon name={TYPE_ICONS[type]} size={16} />
-            {typeLabel(type)}
-          </span>
-        </div>
+      <article className="stn-canvas stn-canvas-archived" aria-label="The archived question">
         <p className="stn-stem-ro">{item.stem.text}</p>
         {item.lede ? <p className="stn-lede-ro">{item.lede.text}</p> : null}
-        {scale ? (
-          <ol className="stn-opts">
-            {scale.options.map((o) => (
-              <li key={o.code} className="stn-opt readonly">
-                <div className="stn-opt-main">
-                  <span className="stn-opt-text">{o.label}</span>
-                </div>
-                <div className="stn-opt-meta">
-                  {o.kind && o.kind !== "substantive" ? <span className="stn-kind">{kindLabel(o.kind)}</span> : null}
-                  <span className="stn-code">Stored as {o.code}</span>
-                </div>
-              </li>
-            ))}
-          </ol>
-        ) : null}
-        <p className="stn-hint">
+        <div className="stn-answer">
+          <div className="stn-answer-head">
+            <span className="stn-h">Answer</span>
+            <span className="stn-typetag">
+              <Icon name={TYPE_ICONS[type]} size={14} />
+              {typeLabel(type)}
+            </span>
+          </div>
+          {scale ? (
+            <ol className="stn-opts">
+              {scale.options.map((o) => (
+                <li key={o.code} className={`stn-opt readonly${glyph ? "" : " no-glyph"}`}>
+                  {glyph ? <span className={`stn-opt-glyph stn-glyph-${glyph}`} aria-hidden="true" /> : null}
+                  <div className="stn-opt-main">
+                    <span className="stn-opt-text">{o.label}</span>
+                  </div>
+                  <div className="stn-opt-meta">
+                    {o.kind && o.kind !== "substantive" ? <span className="stn-kind">{kindLabel(o.kind)}</span> : null}
+                    <StoredAs code={o.code} />
+                  </div>
+                </li>
+              ))}
+            </ol>
+          ) : null}
+        </div>
+        <p className="stn-inline-note">
           Reporting label <code>{item.variable}</code>
         </p>
       </article>
@@ -122,7 +131,14 @@ export function ArchivedQuestion({ record }: { record: ArchivedRecord }) {
             <label className="stn-label" htmlFor={selectId}>
               Section
             </label>
-            <select id={selectId} className="st-select" value={target} onChange={(e) => setTarget(e.target.value)} disabled={!ctx.canEdit}>
+            <select
+              id={selectId}
+              className="st-select"
+              value={target}
+              onChange={(e) => setTarget(e.target.value)}
+              disabled={!ctx.canEdit}
+              aria-describedby={`${selectId}-hint`}
+            >
               {sections.map((s) => (
                 <option key={s.key} value={s.key}>
                   {s.title}
@@ -130,48 +146,50 @@ export function ArchivedQuestion({ record }: { record: ArchivedRecord }) {
                 </option>
               ))}
             </select>
-            <p className="stn-hint">
-              {target === record.sectionKey
-                ? "It goes back exactly where it was."
-                : original
-                  ? "It goes at the end of that section."
-                  : "The section it was in has gone, so it goes at the end of the section you choose."}
-              {siblings > 1 ? ` Its questionnaire is licensed and only asked whole, so all ${siblings} of its archived questions come back together.` : ""}
-            </p>
           </div>
           <Button variant="primary" icon="restore" onClick={restore} disabled={!ctx.canEdit || !target || protectedModuleKey !== null}>
             Restore
           </Button>
         </div>
+        <p id={`${selectId}-hint`} className="stn-hint">
+          {target === record.sectionKey
+            ? "It goes back exactly where it was."
+            : original
+              ? "It goes at the end of that section."
+              : "Its section has gone, so it goes at the end of the one you choose."}
+          {siblings > 1 ? ` All ${siblings} archived questions of its licensed questionnaire come back together.` : ""}
+        </p>
         {protectedModuleKey ? (
           // REVIEW FIX: a protected module's question can only be restored once
           // the module is unlocked (the model refuses otherwise), and when the
           // whole module is archived there is nowhere else to unlock it from.
-          <div className="stn-row-actions">
-            <p className="stn-hint stn-lockreason">
-              <Icon name="lock" size={14} /> It belongs to a protected module. Unlock the module to restore it.
-            </p>
-            <Button size="sm" variant="secondary" icon="unlock" onClick={() => setUnlocking(true)} disabled={!ctx.canEdit}>
-              Unlock…
-            </Button>
+          <div className="stn-notices stn-gap">
+            <LockBanner
+              title="Protected module · unlock to restore"
+              info="It belongs to a protected module. Unlock the module to restore it."
+              infoLabel="this lock"
+              actions={
+                <Button size="sm" variant="secondary" icon="unlock" onClick={() => setUnlocking(true)} disabled={!ctx.canEdit}>
+                  Unlock…
+                </Button>
+              }
+            />
           </div>
         ) : null}
       </Panel>
 
       <Panel title="Delete permanently">
         {deleteBlocked ? (
-          <p className="stn-hint stn-lockreason">
+          <p className="stn-inline-note">
             <Icon name="lock" size={14} /> {deleteBlocked}
           </p>
         ) : (
-          <>
-            <p className="stn-flush">It was never published, so no answers were recorded under it. Deleting it frees its ID.</p>
-            <div className="stn-row-actions">
-              <Button variant="danger" icon="trash" onClick={() => setConfirmDelete(true)} disabled={!ctx.canEdit}>
-                Delete permanently
-              </Button>
-            </div>
-          </>
+          <div className="stn-actionrow">
+            <p className="stn-flush stn-muted">Never published, so nothing was recorded under it. Deleting frees its ID.</p>
+            <Button variant="secondary" className="stn-danger-btn" icon="trash" onClick={() => setConfirmDelete(true)} disabled={!ctx.canEdit}>
+              Delete permanently
+            </Button>
+          </div>
         )}
       </Panel>
       {confirmDelete ? (

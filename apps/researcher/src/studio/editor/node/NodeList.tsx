@@ -1,7 +1,6 @@
 import { memo } from "react";
 import type { OutlineBlock } from "@myself/studio";
 import { Icon } from "../../ui/icons.js";
-import { Badge } from "../../ui/kit.js";
 import type { Selection } from "../selection.js";
 import { TYPE_ICONS, typeLabel } from "./types.js";
 
@@ -29,7 +28,7 @@ function signature(blocks: OutlineBlock[]): string {
 
 export const NodeList = memo(
   function NodeList({ blocks, sectionKey, withBlocks, select }: NodeListProps) {
-    if (blocks.length === 0) return <p className="stn-hint">Nothing here yet.</p>;
+    if (blocks.length === 0) return <p className="stn-inline-note">Nothing here yet.</p>;
     return (
       <div className="stn-nodelist">
         {blocks.map((b) => (
@@ -40,28 +39,29 @@ export const NodeList = memo(
                 className="stn-nodelist-blockname"
                 onClick={() => select({ kind: "block", sectionKey, componentIndex: b.componentIndex })}
               >
-                <span>{b.name}</span>
-                {b.tier === "locked" ? (
-                  <Badge icon="lock">Licensed</Badge>
-                ) : b.tier === "protected" ? (
-                  <Badge tone="warn" icon="lock">
-                    Protected
-                  </Badge>
+                <span className="stn-nodelist-blocktitle">{b.name}</span>
+                {b.tier === "locked" || b.tier === "protected" ? (
+                  <span className="stn-nodelist-flag" title={b.tier === "locked" ? "Licensed questionnaire" : "Protected module"}>
+                    <Icon name="lock" size={14} />
+                    <span className="st-sr">{b.tier === "locked" ? " (licensed)" : " (protected)"}</span>
+                  </span>
                 ) : null}
                 {b.hasCondition ? (
-                  <Badge tone="accent" icon="branch">
-                    Conditional
-                  </Badge>
+                  <span className="stn-nodelist-flag" title="Shown only to some participants">
+                    <Icon name="branch" size={14} />
+                    <span className="st-sr"> (shown only to some)</span>
+                  </span>
                 ) : null}
+                <Icon name="chevron-right" size={14} className="st-icon stn-nodelist-chevron" />
               </button>
             ) : null}
             <ol className="stn-nodelist-questions">
               {b.questions.map((q) => (
                 <li key={q.itemKey}>
                   <button type="button" className="stn-nodelist-q" onClick={() => select({ kind: "question", itemKey: q.itemKey })}>
-                    <span className="stn-nodelist-num">{q.position + 1}</span>
+                    <span className="stn-nodelist-num st-num">{q.position + 1}</span>
                     <span className="stn-nodelist-icon" title={typeLabel(q.studioType)}>
-                      <Icon name={TYPE_ICONS[q.studioType]} size={15} />
+                      <Icon name={TYPE_ICONS[q.studioType]} size={16} />
                       <span className="st-sr">{typeLabel(q.studioType)}: </span>
                     </span>
                     <span className="stn-nodelist-text">{q.text || "(no text yet)"}</span>

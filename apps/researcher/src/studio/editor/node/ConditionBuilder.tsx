@@ -2,7 +2,8 @@ import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "rea
 import type { LogicExpr } from "@myself/schema";
 import { describeCondition, type ConditionJoin, type ConditionTest, type Issue } from "@myself/studio";
 import { ConfirmDialog } from "../../ui/dialog.js";
-import { Button, IconButton, Segmented } from "../../ui/kit.js";
+import { Icon } from "../../ui/icons.js";
+import { Button, IconButton, InfoTip, Segmented } from "../../ui/kit.js";
 import { useEditor } from "../context.js";
 import {
   buildLogic,
@@ -98,21 +99,35 @@ export function ConditionBuilder({ subject, noun, expr, onWrite, readOnly, locke
   if (readOnly) {
     body = (
       <div className="stn-cond-readonly" data-field="displayIf" tabIndex={-1}>
-        <p className="stn-cond-sentence">{sentence ?? `Shown to everyone who reaches ${who}.`}</p>
-        {lockedReason ? <p className="stn-hint stn-lockreason">{lockedReason}</p> : null}
+        <p className={`stn-cond-sentence${sentence ? " set" : ""}`}>
+          <Icon name="branch" size={14} />
+          <span>{sentence ?? `Shown to everyone who reaches ${who}.`}</span>
+        </p>
+        {lockedReason ? (
+          <p className="stn-inline-note">
+            <Icon name="lock" size={14} /> <span>{lockedReason}</span>
+          </p>
+        ) : null}
       </div>
     );
   } else if (parsed.kind === "complex" && !replacing) {
     body = (
       <div className="stn-cond-readonly" data-field="displayIf" tabIndex={-1}>
-        <p className="stn-cond-sentence">{sentence}</p>
-        <p className="stn-hint">
-          This condition uses more than the simple builder can show — groups within groups, or one part of an answer — so it is
-          shown in words and can't be edited here. Replace it with a simple condition, or remove it.
+        <p className="stn-cond-sentence set">
+          <Icon name="branch" size={14} />
+          <span>{sentence}</span>
+        </p>
+        <p className="stn-inline-note">
+          Too complex for the simple builder, so it can't be edited here.
+          <InfoTip
+            text="This condition uses more than the simple builder can show — groups within groups, or one part of an answer — so it is shown in words. Replace it with a simple condition, or remove it."
+            label="complex conditions"
+          />
         </p>
         <div className="stn-row-actions">
           <Button
             size="sm"
+            variant="secondary"
             icon="branch"
             onClick={() => {
               setReplacing(true);
@@ -130,14 +145,18 @@ export function ConditionBuilder({ subject, noun, expr, onWrite, readOnly, locke
   } else if (!state) {
     body = (
       <div className="stn-cond-none" data-field="displayIf" tabIndex={-1}>
-        <p className="stn-cond-sentence">Shown to everyone who reaches {who}.</p>
+        <p className="stn-cond-sentence">
+          <Icon name="branch" size={14} />
+          <span>Shown to everyone who reaches {who}.</span>
+        </p>
         {earlier.length === 0 ? (
-          <p className="stn-hint">
-            A condition can only use answers given earlier, and nothing with an answer is asked before {who}.
+          <p className="stn-inline-note">
+            Nothing with an answer is asked before {who}.
+            <InfoTip text={`A condition can only use answers given earlier, and nothing with an answer is asked before ${who}.`} label="conditions" />
           </p>
         ) : (
-          <Button size="sm" icon="branch" onClick={() => setState({ join: "all", rows: [emptyRule()] })}>
-            Add a condition
+          <Button size="sm" variant="ghost" icon="plus" onClick={() => setState({ join: "all", rows: [emptyRule()] })}>
+            Add condition
           </Button>
         )}
       </div>
@@ -147,7 +166,7 @@ export function ConditionBuilder({ subject, noun, expr, onWrite, readOnly, locke
       <div className="stn-cond" data-field="displayIf">
         {state.rows.length > 1 ? (
           <div className="stn-cond-join">
-            <span id={`${headingId}-join`}>Show {who} only if</span>
+            <span id={`${headingId}-join`}>Show {who} if</span>
             <Segmented<ConditionJoin>
               label="How the rules combine"
               value={state.join}
@@ -157,10 +176,10 @@ export function ConditionBuilder({ subject, noun, expr, onWrite, readOnly, locke
               ]}
               onChange={(join) => update({ ...state, join })}
             />
-            <span>of these are true:</span>
+            <span>of these are true</span>
           </div>
         ) : (
-          <p className="stn-cond-join">Show {who} only if:</p>
+          <p className="stn-cond-join">Show {who} only if</p>
         )}
         <ol className="stn-rules">
           {state.rows.map((row, i) => (
@@ -177,7 +196,7 @@ export function ConditionBuilder({ subject, noun, expr, onWrite, readOnly, locke
         </ol>
         <div className="stn-row-actions">
           <Button size="sm" variant="ghost" icon="plus" onClick={() => setState({ ...state, rows: [...state.rows, emptyRule()] })}>
-            Add a rule
+            Add rule
           </Button>
           {replacing ? (
             <Button
@@ -193,15 +212,17 @@ export function ConditionBuilder({ subject, noun, expr, onWrite, readOnly, locke
           ) : null}
         </div>
         {sentence ? (
-          <p className="stn-cond-sentence" aria-live="polite">
-            {incomplete ? <span className="stn-cond-pending">Saved so far: </span> : null}
-            {sentence}.
+          <p className="stn-cond-sentence set" aria-live="polite">
+            <Icon name="branch" size={14} />
+            <span>
+              {incomplete ? <span className="stn-cond-pending">Saved so far: </span> : null}
+              {sentence}.
+            </span>
           </p>
         ) : null}
         {incomplete ? (
-          <p className="stn-hint">
-            {expr ? "The condition above stays in place" : "Nothing is saved"} until every rule says which question, what to check and
-            which answer.
+          <p className="stn-inline-note">
+            {expr ? "The saved condition stays" : "Nothing is saved"} until every rule has a question, a check and an answer.
           </p>
         ) : null}
       </div>
@@ -215,9 +236,6 @@ export function ConditionBuilder({ subject, noun, expr, onWrite, readOnly, locke
       </span>
       {body}
       <IssueMessages issues={issues} />
-      <p className="stn-hint stn-cond-skip">
-        Conditions can only use answers given earlier. To skip ahead, hide the questions in between — the survey always moves forward.
-      </p>
       {confirmRemove ? (
         <ConfirmDialog
           title="Remove this condition?"

@@ -213,10 +213,10 @@ export function StatementsEditor({ itemKey, statements, editable, issues }: { it
       issues={issues}
       footer={
         <div className="stn-row-actions">
-          <Button size="sm" icon="plus" onClick={add}>
-            Add a statement
+          <Button size="sm" variant="ghost" icon="plus" onClick={add}>
+            Add statement
           </Button>
-          <span id={hintId} className="stn-hint">
+          <span id={hintId} className="st-sr">
             Each statement's ID is how its tick is stored, so it stays the same when the words change.
           </span>
         </div>
@@ -244,7 +244,7 @@ export function StatementsEditor({ itemKey, statements, editable, issues }: { it
                 />
                 Must be ticked to continue
               </label>
-              <span>
+              <span className="stn-list-key">
                 Stored as <code>{s.key}</code>
               </span>
             </div>
@@ -302,8 +302,8 @@ export function FieldsEditor({ itemKey, fields, editable, issues }: { itemKey: s
       issues={issues}
       footer={
         <div className="stn-row-actions">
-          <Button size="sm" icon="plus" onClick={add}>
-            Add a box
+          <Button size="sm" variant="ghost" icon="plus" onClick={add}>
+            Add box
           </Button>
         </div>
       }
@@ -336,7 +336,7 @@ export function FieldsEditor({ itemKey, fields, editable, issues }: { itemKey: s
                 />
                 Must be filled in
               </label>
-              <span>
+              <span className="stn-list-key">
                 Stored as <code>{f.key}</code>
               </span>
             </div>
@@ -393,8 +393,8 @@ export function GroupsEditor({ itemKey, groups, editable, issues }: { itemKey: s
       issues={issues}
       footer={
         <div className="stn-row-actions">
-          <Button size="sm" icon="plus" onClick={add}>
-            Add a group
+          <Button size="sm" variant="ghost" icon="plus" onClick={add}>
+            Add group
           </Button>
         </div>
       }
@@ -416,9 +416,9 @@ export function GroupsEditor({ itemKey, groups, editable, issues }: { itemKey: s
                   checked={g.ranked ?? false}
                   onChange={(e) => write((list) => list.map((x) => (x.key === g.key ? { ...x, ranked: e.target.checked } : x)))}
                 />
-                Participants rank the options in this group
+                Ranked within the group
               </label>
-              <span>
+              <span className="stn-list-key">
                 Stored as <code>{g.key}</code>
               </span>
             </div>

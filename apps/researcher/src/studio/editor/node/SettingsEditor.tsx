@@ -1,8 +1,7 @@
 import { useCallback, useMemo } from "react";
 import { updateSettings } from "@myself/studio";
-import { Switch } from "../../ui/kit.js";
 import { useEditor } from "../context.js";
-import { Facts, IssueMessages, Panel, TextField } from "./controls.js";
+import { Facts, IssueMessages, Panel, SwitchRow, TextField } from "./controls.js";
 import { issuesAt, screenIssues } from "./issues.js";
 import { unlessUnchanged } from "./unchanged.js";
 
@@ -31,14 +30,13 @@ export function SettingsEditor() {
   const readOnly = !ctx.canEdit;
   return (
     <div className="stn-node">
-      <header className="stn-node-head">
-        <p className="stn-crumbs">Survey settings</p>
+      <header className="stn-pagehead">
         <h2 className="stn-title" tabIndex={-1} data-editor-heading>
           Survey settings
         </h2>
       </header>
       <IssueMessages issues={issues.general} />
-      <Panel title="Name">
+      <Panel title="General">
         <TextField
           label="Survey title"
           field="title"
@@ -46,30 +44,27 @@ export function SettingsEditor() {
           readOnly={readOnly}
           lockedReason={ctx.readOnlyReason}
           validate={validateTitle}
-          hint="What researchers know it by, in the survey list, versions and exports. Participants don't see it — they see the study label on the start screen."
+          info="What researchers know it by, in the survey list, versions and exports. Participants don't see it — they see the study label on the start screen."
           issues={issuesAt(issues, "title")}
           onCommit={(title) =>
             // Stored trimmed: no undo step for a space at the end (unchanged.ts).
             ctx.run("Rename the survey", (d) => unlessUnchanged(d, updateSettings(d, { title }).draft, (x) => x.composition.title))
           }
         />
+        <SwitchRow
+          label="Participants can go back"
+          field="allowBackNavigation"
+          checked={c.allowBackNavigation !== false}
+          disabled={readOnly}
+          onChange={(allowBackNavigation) => {
+            if (ctx.run("Change whether participants can go back", (d) => updateSettings(d, { allowBackNavigation }).draft)) {
+              ctx.announce(allowBackNavigation ? "Participants can go back." : "Participants can't go back.");
+            }
+          }}
+          info="When off, there is no Back button: each answer is final once the participant moves on. They can still change answers from the review screen at the end, if the survey has one."
+        />
       </Panel>
-      <Panel title="Moving through the survey">
-        <div data-field="allowBackNavigation">
-          <Switch
-            label="Participants can go back to earlier questions"
-            checked={c.allowBackNavigation !== false}
-            disabled={readOnly}
-            onChange={(allowBackNavigation) => {
-              if (ctx.run("Change whether participants can go back", (d) => updateSettings(d, { allowBackNavigation }).draft)) {
-                ctx.announce(allowBackNavigation ? "Participants can go back." : "Participants can't go back.");
-              }
-            }}
-            hint="When off, there is no Back button: each answer is final once the participant moves on. They can still change answers from the review screen at the end, if the survey has one."
-          />
-        </div>
-      </Panel>
-      <Panel title="About this survey" description="Set when the survey was created. Changing any of these would make it a different survey.">
+      <Panel title="About this survey" info="Set when the survey was created. Changing any of these would make it a different survey.">
         <Facts
           rows={[
             { label: "Survey ID", value: <code>{ctx.draft.surveyId}</code> },

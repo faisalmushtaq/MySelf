@@ -14,9 +14,9 @@ import {
 } from "@myself/studio";
 import { ConfirmDialog } from "../../ui/dialog.js";
 import { Icon } from "../../ui/icons.js";
-import { Button, IconButton, Notice } from "../../ui/kit.js";
+import { Button, IconButton, InfoTip, Notice, Tooltip } from "../../ui/kit.js";
 import { useEditor } from "../context.js";
-import { Disclosure, IssueMessages, useSyncedText } from "./controls.js";
+import { IssueMessages, useSyncedText } from "./controls.js";
 import { focusSoon } from "./focus.js";
 import type { FieldIssues } from "./issues.js";
 import { unlessUnchanged } from "./unchanged.js";
@@ -40,7 +40,7 @@ import {
  * A choice question's options, edited as the participant will see them.
  *
  * What a researcher sees here is the label; what the data records is the
- * option's value, shown beside it as "Stored as 3". The value never changes —
+ * option's value, shown beside it as "= 3". The value never changes —
  * not when the option is reworded, not when it is moved — which is what keeps
  * answers comparable from one version to the next, and why a removed value is
  * retired rather than handed to a new option.
@@ -51,6 +51,7 @@ import {
  */
 
 type ScaleOption = ScaleInput["options"][number];
+type Glyph = "radio" | "check" | "none";
 
 /** The option list a question uses in a draft, for comparing before and after an edit. */
 function scaleOfQuestion(draft: StudioDraft, itemKey: string): ScaleInput | null {
@@ -63,11 +64,14 @@ export function OptionsEditor({
   scaleKey,
   issues,
   statementNoun = "option",
+  glyph = "radio",
 }: {
   itemKey: string;
   scaleKey: string;
   issues: FieldIssues;
   statementNoun?: string;
+  /** What each row is drawn with, as the participant sees it: a radio, a tick box, or nothing (items to sort). */
+  glyph?: Glyph;
 }) {
   const ctx = useEditor();
   const { draft } = ctx;
@@ -236,6 +240,7 @@ export function OptionsEditor({
   };
 
   const usersCount = shared.live.length + 1;
+  const quietReason = !access.editable && (access.why === "locked" || access.why === "protected");
 
   return (
     <div className="stn-options" data-field="options" tabIndex={-1} aria-describedby={helpId}>
@@ -250,16 +255,21 @@ export function OptionsEditor({
         />
       ) : null}
       {!access.editable ? (
-        <p className="stn-hint stn-lockreason">
-          <Icon name="lock" size={14} /> {access.reason}
+        // A licensed or protected question already says so at the top; here the
+        // reason is only the list's description.
+        <p className={quietReason ? "st-sr" : "stn-inline-note"}>
+          {quietReason ? null : <Icon name="lock" size={14} />} {access.reason}
         </p>
       ) : null}
-      <p id={helpId} className="stn-hint">
+      <p id={helpId} className="st-sr">
         {editable
           ? "Each option's stored value never changes — not when it is reworded, not when it is moved — so answers stay comparable across versions. Drag the handle to reorder, or use the arrow keys on it."
           : "Each option's stored value never changes, so answers stay comparable across versions."}
       </p>
-      <ol className={`stn-opts${editable ? " editable" : ""}`} aria-label={`${statementNoun === "option" ? "Options" : "Items"}, in the order participants see them`}>
+      <ol
+        className={`stn-opts${editable ? " editable" : ""}`}
+        aria-label={`${statementNoun === "option" ? "Options" : "Items"}, in the order participants see them`}
+      >
         {scale.options.map((option, index) => (
           <OptionRow
             key={option.code}
@@ -267,6 +277,7 @@ export function OptionsEditor({
             index={index}
             count={scale.options.length}
             editable={editable}
+            glyph={glyph}
             removeBlockedReason={blocked}
             issues={issues.byOption.get(option.code)}
             relabel={relabelWarning(publishedCodes, option)}
@@ -282,28 +293,28 @@ export function OptionsEditor({
       </ol>
       <IssueMessages issues={[...(issues.byField.get("scale") ?? []), ...(issues.byField.get("options") ?? []), ...orphanIssues]} />
       {retired.length > 0 ? (
-        <p className="stn-hint">
-          Retired values, never reused: {retired.map((r) => `${r.code} (“${r.label}”)`).join(", ")}.
+        <p className="stn-inline-note">
+          Retired: {retired.map((r) => `${r.code} “${r.label}”`).join(", ")}
+          <InfoTip text="Values of removed options are retired, never given to a new option, so answers already recorded keep their meaning." label="retired values" />
         </p>
       ) : null}
       {editable ? (
-        <div className="stn-row-actions">
-          <Button size="sm" icon="plus" onClick={addNew}>
+        <div className="stn-addrow">
+          <Button size="sm" variant="ghost" icon="plus" onClick={addNew}>
             Add option
           </Button>
           {otherReason === null ? (
-            <Button size="sm" variant="ghost" icon="plus" onClick={addOther} aria-describedby={`${helpId}-other`}>
-              Add “Other (please specify)”
-            </Button>
+            <>
+              <Button size="sm" variant="ghost" icon="plus" onClick={addOther} aria-describedby={`${helpId}-other`}>
+                Add ‘Other’
+              </Button>
+              <InfoTip text={otherText(shared.live.length > 0)} label="Add ‘Other’" />
+              <span id={`${helpId}-other`} className="st-sr">
+                {otherText(shared.live.length > 0)}
+              </span>
+            </>
           ) : null}
         </div>
-      ) : null}
-      {editable && otherReason === null ? (
-        <p id={`${helpId}-other`} className="stn-hint">
-          “Other” adds the option and a short text question straight after this one, shown only when “Other” is chosen, so the
-          text gets its own column.
-          {shared.live.length > 0 ? " This question gets its own copy of the options first, so the others don't gain an “Other”." : ""}
-        </p>
       ) : null}
       {added ? (
         <div className="stn-gap">
@@ -316,7 +327,7 @@ export function OptionsEditor({
               </Button>
             }
           >
-            “Please tell us what” is asked straight after this question, only to participants who choose “Other”.
+            Asked straight after this one, only to participants who choose “Other”.
             {added.forked ? " This question now has its own copy of the options." : ""}
           </Notice>
         </div>
@@ -344,6 +355,28 @@ export function OptionsEditor({
   );
 }
 
+const otherText = (shared: boolean) =>
+  `Adds an “Other” option and a short text question straight after this one, shown only when “Other” is chosen, so the text gets its own column.${
+    shared ? " This question gets its own copy of the options first, so the others don't gain an “Other”." : ""
+  }`;
+
+/**
+ * The value an option is stored as, shown as "= 3". It never changes — not
+ * when the option is reworded or moved — which is what keeps answers
+ * comparable from one version to the next.
+ */
+export function StoredAs({ code }: { code: number }) {
+  return (
+    <Tooltip text={`Stored as ${code} — never changes`}>
+      <span className="stn-code">
+        <span aria-hidden="true">= {code}</span>
+        <span className="st-sr">Stored as {code}</span>
+      </span>
+    </Tooltip>
+  );
+}
+
+/** "Shared list": one line saying the options are shared, with the way out of sharing them. */
 function SharedNotice({
   count,
   others,
@@ -360,6 +393,8 @@ function SharedNotice({
   onFork: () => void;
 }) {
   const { draft, select } = useEditor();
+  const [open, setOpen] = useState(false);
+  const listId = useId();
   const textOf = (itemKey: string) => {
     const [instrument, key] = [itemKey.slice(0, itemKey.indexOf(".")), itemKey.slice(itemKey.indexOf(".") + 1)];
     for (const def of Object.values(draft.instruments)) {
@@ -371,34 +406,39 @@ function SharedNotice({
   };
   const first = others.slice(0, 2).map((k) => `“${textOf(k)}”`);
   const more = others.length - first.length;
+  const info = `Also used by ${first.join(", ")}${more > 0 ? ` and ${more} more` : ""}.${
+    editable ? ` Changes to the options apply to all ${count} questions${archived > 0 ? `, and to ${archived} archived question${archived === 1 ? "" : "s"}` : ""}.` : ""
+  }`;
   return (
     <div className="stn-shared" role="note">
-      <p className="stn-flush">
-        <Icon name="copy" size={15} /> <strong>This list is shared by {count} questions:</strong> this one, {first.join(", ")}
-        {more > 0 ? ` and ${more} more` : ""}.
-        {editable
-          ? ` Changes apply to all of them${archived > 0 ? `, and to ${archived} archived question${archived === 1 ? "" : "s"}` : ""}.`
-          : ""}
-      </p>
-      <div className="stn-row-actions">
-        {canFork ? (
-          <Button size="sm" variant="secondary" onClick={onFork}>
-            Give this question its own list
-          </Button>
-        ) : null}
-        <Disclosure summary={`See all ${count - 1} other question${count === 2 ? "" : "s"}`}>
-          <ul className="stn-links">
-            {others.map((k) => (
-              <li key={k}>
-                <button type="button" className="stp-textlink" onClick={() => select({ kind: "question", itemKey: k })}>
-                  {textOf(k)}
-                </button>{" "}
-                <code>{k}</code>
-              </li>
-            ))}
-          </ul>
-        </Disclosure>
+      <div className="stn-notice stn-notice-neutral">
+        <Icon name="copy" size={16} />
+        <span className="stn-notice-text">
+          Shared list · {editable ? `edits apply to all ${count} questions` : `used by ${count} questions`}
+        </span>
+        <InfoTip text={info} label="the shared list" />
+        <span className="stn-notice-actions">
+          <button type="button" className="stn-textbtn" aria-expanded={open} aria-controls={listId} onClick={() => setOpen((o) => !o)}>
+            <Icon name={open ? "chevron-down" : "chevron-right"} size={14} />
+            {`${count - 1} other question${count === 2 ? "" : "s"}`}
+          </button>
+          {canFork ? (
+            <Button size="sm" variant="secondary" onClick={onFork}>
+              Give this question its own list
+            </Button>
+          ) : null}
+        </span>
       </div>
+      <ul id={listId} className="stn-links" hidden={!open}>
+        {others.map((k) => (
+          <li key={k}>
+            <button type="button" className="stp-textlink" onClick={() => select({ kind: "question", itemKey: k })}>
+              {textOf(k)}
+            </button>{" "}
+            <code>{k}</code>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
@@ -408,6 +448,7 @@ interface RowProps {
   index: number;
   count: number;
   editable: boolean;
+  glyph: Glyph;
   removeBlockedReason: string | null;
   issues: Issue[] | undefined;
   relabel: string | null;
@@ -442,6 +483,7 @@ function rowPropsEqual(a: RowProps, b: RowProps): boolean {
     a.index === b.index &&
     a.count === b.count &&
     a.editable === b.editable &&
+    a.glyph === b.glyph &&
     a.removeBlockedReason === b.removeBlockedReason &&
     a.relabel === b.relabel &&
     a.marker === b.marker &&
@@ -452,7 +494,8 @@ function rowPropsEqual(a: RowProps, b: RowProps): boolean {
 }
 
 const OptionRow = memo(function OptionRow(props: RowProps) {
-  const { option, index, count, editable, removeBlockedReason, issues, relabel, marker, onLabel, onDescription, onKind, onMove, onRemove, drag } = props;
+  const { option, index, count, editable, glyph, removeBlockedReason, issues, relabel, marker, onLabel, onDescription, onKind, onMove, onRemove, drag } =
+    props;
   const code = option.code;
   const id = useId();
   const [showDescription, setShowDescription] = useState(!!option.description);
@@ -468,6 +511,7 @@ const OptionRow = memo(function OptionRow(props: RowProps) {
   const kind = option.kind ?? "substantive";
   const msgId = `${id}-msgs`;
   const hasMsgs = !!label.localError || (issues?.length ?? 0) > 0 || !!relabel;
+  const mark = glyph === "none" ? null : <span className={`stn-opt-glyph stn-glyph-${glyph}`} aria-hidden="true" />;
 
   const moveKeys = (e: KeyboardEvent<HTMLElement>, part: string, requireAlt: boolean) => {
     if (e.key !== "ArrowUp" && e.key !== "ArrowDown") return;
@@ -479,25 +523,26 @@ const OptionRow = memo(function OptionRow(props: RowProps) {
 
   if (!editable) {
     return (
-      <li className="stn-opt readonly" data-row-code={code}>
+      <li className={`stn-opt readonly${glyph === "none" ? " no-glyph" : ""}`} data-row-code={code}>
+        {mark}
         <div className="stn-opt-main">
           <span className="stn-opt-text" data-option-code={code} tabIndex={-1}>
             {option.label}
           </span>
           {option.description ? <span className="stn-opt-desc">{option.description}</span> : null}
+          <IssueMessages issues={issues} />
         </div>
         <div className="stn-opt-meta">
           {kind !== "substantive" ? <span className="stn-kind">{kindLabel(kind)}</span> : null}
-          <span className="stn-code">Stored as {code}</span>
+          <StoredAs code={code} />
         </div>
-        <IssueMessages issues={issues} />
       </li>
     );
   }
 
   return (
     <li
-      className={`stn-opt${marker ? ` drop-${marker}` : ""}`}
+      className={`stn-opt${glyph === "none" ? " no-glyph" : ""}${kind !== "substantive" ? " has-kind" : ""}${marker ? ` drop-${marker}` : ""}`}
       data-row-code={code}
       onDragOver={(e) => drag.over(index, e)}
       onDrop={(e) => drag.drop(index, e)}
@@ -517,8 +562,9 @@ const OptionRow = memo(function OptionRow(props: RowProps) {
         onKeyDown={(e) => moveKeys(e, "handle", false)}
         aria-label={`Reorder “${option.label}”, ${position}. Use the up and down arrow keys to move it.`}
       >
-        <Icon name="grip" size={18} />
+        <Icon name="grip" size={16} />
       </button>
+      {mark}
       <div className="stn-opt-main">
         <input
           className="stn-opt-label"
@@ -535,43 +581,11 @@ const OptionRow = memo(function OptionRow(props: RowProps) {
             className="stn-opt-descinput"
             data-part="description"
             aria-label={`Description of ${position} (optional)`}
-            placeholder="Optional description shown under the label"
+            placeholder="Description (optional)"
             autoComplete="off"
             {...description.bind}
           />
         ) : null}
-        <div className="stn-opt-meta">
-          <span className="stn-code" title="The value recorded in the data when this option is chosen. It never changes.">
-            Stored as {code}
-          </span>
-          <select
-            className="stn-kind-select"
-            data-part="kind"
-            aria-label={`Kind of ${position}`}
-            value={kind}
-            onChange={(e) => onKind(code, e.target.value as NonNullable<OptionKind>)}
-          >
-            {OPTION_KINDS.filter((k) => k.value !== "other_specify" || kind === "other_specify").map((k) => (
-              <option key={k.value} value={k.value}>
-                {k.label}
-              </option>
-            ))}
-          </select>
-          {!showDescription ? (
-            <button
-              type="button"
-              className="stn-linkbtn"
-              data-part="add-description"
-              onClick={() => {
-                setShowDescription(true);
-                // REVIEW FIX: this button disappears; carry on in the box it opened.
-                focusSoon(`[data-row-code="${code}"] [data-part="description"]`);
-              }}
-            >
-              Add a description
-            </button>
-          ) : null}
-        </div>
         {hasMsgs ? (
           <div id={msgId}>
             <IssueMessages issues={issues} local={label.localError} />
@@ -587,10 +601,43 @@ const OptionRow = memo(function OptionRow(props: RowProps) {
           </div>
         ) : null}
       </div>
+      <div className="stn-opt-meta">
+        {!showDescription ? (
+          <button
+            type="button"
+            className="stn-opt-reveal stn-textbtn"
+            data-part="add-description"
+            aria-label={`Add a description to ${position}`}
+            onClick={() => {
+              setShowDescription(true);
+              // REVIEW FIX: this button disappears; carry on in the box it opened.
+              focusSoon(`[data-row-code="${code}"] [data-part="description"]`);
+            }}
+          >
+            <Icon name="plus" size={14} />
+            Description
+          </button>
+        ) : null}
+        <select
+          className="stn-kind-select stn-opt-reveal"
+          data-part="kind"
+          aria-label={`Kind of ${position}`}
+          value={kind}
+          onChange={(e) => onKind(code, e.target.value as NonNullable<OptionKind>)}
+        >
+          {OPTION_KINDS.filter((k) => k.value !== "other_specify" || kind === "other_specify").map((k) => (
+            <option key={k.value} value={k.value}>
+              {k.label}
+            </option>
+          ))}
+        </select>
+        <StoredAs code={code} />
+      </div>
       <IconButton
         icon="trash"
         size="sm"
         variant="danger"
+        className="stn-opt-remove"
         data-part="remove"
         label={removeBlockedReason ? `Can't remove “${option.label}”: a choice question needs at least two options` : `Remove “${option.label}”`}
         aria-disabled={removeBlockedReason ? true : undefined}

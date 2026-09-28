@@ -202,7 +202,7 @@ export function ruleFor(draft: StudioDraft, question: EarlierQuestion): RuleRow 
   };
 }
 
-/** An empty rule, for "Add a rule" before a question is chosen. */
+/** An empty rule, for "Add rule" before a question is chosen. */
 export function emptyRule(): RuleRow {
   return { id: newRowId(), itemKey: "", test: "", code: null, value: "", valueType: "number" };
 }

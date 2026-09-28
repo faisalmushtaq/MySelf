@@ -17,10 +17,10 @@ import type { ItemDefinition } from "@myself/schema";
 /**
  * Why part of a survey can't be changed, said before anyone tries.
  *
- * Every lock the Studio enforces is shown where it applies — a banner on the
- * question or block saying what it is, why it is fixed and what can still
- * change — and every control the model would refuse is shown read-only, never
- * as an input that fails. The words here are the banner's.
+ * Every lock the Studio enforces is shown where it applies — one slim line on
+ * the question or block saying what it is, with why it is fixed and what can
+ * still change behind its ⓘ — and every control the model would refuse is
+ * shown read-only, never as an input that fails. The words here are the ⓘ's.
  */
 
 /** Plain names for the question fields a locked questionnaire may still change. */

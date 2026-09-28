@@ -50,7 +50,7 @@ export function focusField(field: string): boolean {
   }
   openAncestors(target);
   // A box itself; else, in a list or panel, the first thing to type in, then
-  // the first button (e.g. "Add a condition"); else the panel.
+  // the first button (e.g. "Add condition"); else the panel.
   const box = target.matches(CONTROL)
     ? target
     : (target.querySelector<HTMLElement>('input[type="radio"]:checked') ??
@@ -114,7 +114,7 @@ export function focusSoon(selector: string | readonly string[], opts: { select?:
 
 /**
  * REVIEW FIX: many actions here remove or disable the very control that was
- * pressed — "Add a condition" becomes the rule builder, "Archive" turns the
+ * pressed — "Add condition" becomes the rule builder, "Archive" turns the
  * question into its archived view, "Unlock…" becomes "Lock again", a dialog
  * closes onto a button that is no longer there. The browser then drops focus
  * to <body>, and a keyboard or screen-reader user is thrown back to the top of

@@ -1,7 +1,8 @@
 import { useMemo, type ReactNode } from "react";
 import { liveQuestions, summariseIssues, type ArchivedQuestion } from "@myself/studio";
 import { formatDateTime, toDate, versionLabel } from "../../format.js";
-import { Badge, Button } from "../../ui/kit.js";
+import { Icon } from "../../ui/icons.js";
+import { Button, InfoTip } from "../../ui/kit.js";
 import { useEditor } from "../context.js";
 import { Facts } from "../node/controls.js";
 import { ageBandLabel, READING_LEVELS } from "../node/SettingsEditor.js";
@@ -23,11 +24,14 @@ export function SurveyFacts({ tip }: { tip?: ReactNode }) {
 
   return (
     <div className="sti">
-      <header className="sti-head">
-        <p className="sti-eyebrow">Survey</p>
-      </header>
-      {tip ? <div className="sti-tip">{tip}</div> : null}
-      <section className="sti-group" aria-label="About this survey">
+      <section className="sti-group" aria-labelledby="sti-facts-survey">
+        <div className="sti-titlerow">
+          <h3 className="sti-title" id="sti-facts-survey">
+            Survey
+          </h3>
+          {typeof tip === "string" ? <InfoTip text={tip} label="this screen" /> : null}
+        </div>
+        {tip && typeof tip !== "string" ? <div className="sti-note">{tip}</div> : null}
         <Facts
           rows={[
             { label: "Survey ID", value: <code>{draft.surveyId}</code> },
@@ -37,37 +41,35 @@ export function SurveyFacts({ tip }: { tip?: ReactNode }) {
             {
               label: "Live version",
               value: active
-                ? `${versionLabel(active.version)}, published ${formatDateTime(toDate(active.publishedAt))}`
+                ? `${versionLabel(active.version)} · ${formatDateTime(toDate(active.publishedAt))}`
                 : ctx.publishedStatus === "loading"
                   ? "Loading…"
                   : "Not published yet",
             },
-            ...(ctx.editor.basedOn ? [{ label: "Draft started from", value: versionLabel(ctx.editor.basedOn.version) }] : []),
-            { label: "Questions", value: `${questions.size}${newQuestions > 0 ? ` (${newQuestions} not yet published)` : ""}` },
+            ...(ctx.editor.basedOn ? [{ label: "Draft from", value: versionLabel(ctx.editor.basedOn.version) }] : []),
+            { label: "Questions", value: `${questions.size}${newQuestions > 0 ? ` (${newQuestions} new)` : ""}` },
             { label: "Archived", value: String(draft.archived.length) },
           ]}
         />
       </section>
       <section className="sti-group" aria-labelledby="sti-facts-checks">
-        <h3 className="sti-title" id="sti-facts-checks">
-          Checks
-        </h3>
-        <p className="sti-status">
-          {errors > 0 ? (
-            <Badge tone="error" icon="error">
-              {errors} to fix before publishing
-            </Badge>
-          ) : (
-            <Badge tone="accent" icon="check">
-              Nothing stops publishing
-            </Badge>
-          )}{" "}
+        <div className="sti-titlerow">
+          <h3 className="sti-title" id="sti-facts-checks">
+            Checks
+          </h3>
+        </div>
+        <ul className="sti-checks">
+          <li className={errors > 0 ? "sti-check-error" : "sti-check-ok"}>
+            <Icon name={errors > 0 ? "error" : "check"} size={16} />
+            {errors > 0 ? `${errors} error${errors === 1 ? "" : "s"} to fix before publishing` : "No errors"}
+          </li>
           {warnings > 0 ? (
-            <Badge tone="warn" icon="warning">
-              {warnings} to check
-            </Badge>
+            <li className="sti-check-warn">
+              <Icon name="warning" size={16} />
+              {warnings} warning{warnings === 1 ? "" : "s"}
+            </li>
           ) : null}
-        </p>
+        </ul>
         {errors + warnings > 0 ? (
           <Button size="sm" variant="secondary" onClick={() => ctx.setValidationOpen(true)}>
             See the list
@@ -77,9 +79,11 @@ export function SurveyFacts({ tip }: { tip?: ReactNode }) {
       </section>
       {unlocked.length > 0 ? (
         <section className="sti-group" aria-labelledby="sti-facts-unlocked">
-          <h3 className="sti-title" id="sti-facts-unlocked">
-            Unlocked for editing
-          </h3>
+          <div className="sti-titlerow">
+            <h3 className="sti-title" id="sti-facts-unlocked">
+              Unlocked for editing
+            </h3>
+          </div>
           <ul className="sti-links">
             {unlocked.map((k) => (
               <li key={k}>
@@ -99,22 +103,22 @@ export function ArchivedFacts({ record }: { record: ArchivedQuestion }) {
   const at = new Date(record.archivedAt);
   return (
     <div className="sti">
-      <header className="sti-head">
-        <p className="sti-eyebrow">Archived question</p>
-        <p className="sti-id">
-          <code>{record.itemKey}</code>
-        </p>
-      </header>
-      <section className="sti-group" aria-label="About this archived question">
+      <section className="sti-group" aria-labelledby="sti-facts-archived">
+        <div className="sti-titlerow">
+          <h3 className="sti-title" id="sti-facts-archived">
+            Archived question
+          </h3>
+        </div>
         <Facts
           rows={[
-            { label: "Question ID", value: <code>{record.itemKey}</code> },
+            { label: "ID", value: <code>{record.itemKey}</code> },
             { label: "Reporting label", value: <code>{record.item.variable}</code> },
-            { label: "Archived", value: `${formatDateTime(Number.isNaN(at.getTime()) ? null : at)} by ${record.archivedBy}` },
+            { label: "Archived", value: formatDateTime(Number.isNaN(at.getTime()) ? null : at) },
+            { label: "By", value: record.archivedBy },
             {
               label: "Published",
               value: ctx.publishedItemKeys.has(record.itemKey)
-                ? "Yes — its ID and label stay reserved for good"
+                ? "Yes — ID and label reserved for good"
                 : // REVIEW FIX: not "No" while what has been published is still unknown.
                   ctx.publishedStatus !== "ready"
                   ? "Checking…"

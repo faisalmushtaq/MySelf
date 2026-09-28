@@ -1,7 +1,7 @@
 import { useId, useMemo, useState } from "react";
 import { editTier, moveBlock } from "@myself/studio";
 import { Icon } from "../../ui/icons.js";
-import { Badge, Button } from "../../ui/kit.js";
+import { Button, InfoTip } from "../../ui/kit.js";
 import { useEditor } from "../context.js";
 import { findBlock, type BlockRef } from "../node/BlockEditor.js";
 import { Facts } from "../node/controls.js";
@@ -67,41 +67,58 @@ export function BlockInspector({ sectionKey, componentIndex }: BlockRef) {
 
   return (
     <div className="sti">
-      <header className="sti-head">
-        <p className="sti-eyebrow">Block settings</p>
-      </header>
-      <section className="sti-group" aria-label="About this block">
+      <section className="sti-group" aria-labelledby="sti-block-facts">
+        <div className="sti-titlerow">
+          <h3 className="sti-title" id="sti-block-facts">
+            Block
+          </h3>
+        </div>
         <Facts
           rows={[
             {
               label: "Kind",
               value:
                 tier === "locked" ? (
-                  <Badge icon="lock">Licensed questionnaire</Badge>
+                  <span className="sti-flag">
+                    <Icon name="lock" size={14} /> Licensed
+                  </span>
                 ) : tier === "protected" ? (
-                  <Badge tone="warn" icon="lock">
-                    Protected module
-                  </Badge>
+                  <span className="sti-flag">
+                    <Icon name="lock" size={14} /> Protected
+                  </span>
                 ) : (
                   "Study module"
                 ),
             },
             { label: "Section", value: sections[p.sectionIndex]?.title ?? sectionKey },
-            { label: "Position in section", value: `${componentIndex + 1} of ${count}` },
-            { label: "Questions", value: p.subset ? `${p.items.length} (a chosen set, in this order)` : `${p.items.length} (all of it)` },
+            { label: "Position", value: `${componentIndex + 1} of ${count}` },
+            { label: "Questions", value: p.subset ? `${p.items.length} (a chosen set)` : `${p.items.length} (all of it)` },
           ]}
         />
       </section>
       <section className="sti-group" aria-labelledby="sti-block-move">
-        <h3 className="sti-title" id="sti-block-move">
-          Move
-        </h3>
+        <div className="sti-titlerow">
+          <h3 className="sti-title" id="sti-block-move">
+            Move
+          </h3>
+          {tier === "locked" ? (
+            <InfoTip text="A licensed questionnaire always moves whole, so its questions stay together in their validated order." label="moving a licensed block" />
+          ) : null}
+        </div>
         <div className="sti-actions">
-          <Button size="sm" icon="arrow-up" data-move="up" onClick={() => moveWithin(componentIndex - 1, "up")} disabled={!ctx.canEdit || moves.up !== null}>
+          <Button
+            size="sm"
+            variant="secondary"
+            icon="arrow-up"
+            data-move="up"
+            onClick={() => moveWithin(componentIndex - 1, "up")}
+            disabled={!ctx.canEdit || moves.up !== null}
+          >
             Move up
           </Button>
           <Button
             size="sm"
+            variant="secondary"
             icon="arrow-down"
             data-move="down"
             onClick={() => moveWithin(componentIndex + 1, "down")}
@@ -117,28 +134,38 @@ export function BlockInspector({ sectionKey, componentIndex }: BlockRef) {
         ))}
         <div className="stn-field">
           <label className="stn-label" htmlFor={selectId}>
-            Move to another section
+            Move to section
           </label>
-          <select id={selectId} className="st-select" value={target} onChange={(e) => setTarget(e.target.value)} disabled={!ctx.canEdit}>
-            <option value="">Choose a section…</option>
-            {sections
-              .filter((s) => s.key !== sectionKey)
-              .map((s) => (
-                <option key={s.key} value={s.key}>
-                  {s.title}
-                </option>
-              ))}
-          </select>
+          <div className="stn-inputrow">
+            <select
+              id={selectId}
+              className="st-select"
+              value={target}
+              onChange={(e) => setTarget(e.target.value)}
+              disabled={!ctx.canEdit}
+              aria-describedby={toOther ? `${selectId}-why` : undefined}
+            >
+              <option value="">Choose a section…</option>
+              {sections
+                .filter((s) => s.key !== sectionKey)
+                .map((s) => (
+                  <option key={s.key} value={s.key}>
+                    {s.title}
+                  </option>
+                ))}
+            </select>
+            <Button size="sm" variant="secondary" onClick={moveTo} disabled={!ctx.canEdit || !destination || toOther !== null}>
+              Move
+            </Button>
+          </div>
           {toOther ? (
-            <p className="sti-note">
+            <p id={`${selectId}-why`} className="sti-note">
               <Icon name="lock" size={14} /> {toOther}
             </p>
-          ) : null}
+          ) : (
+            <p className="sti-note">Moves it to the end of that section.</p>
+          )}
         </div>
-        <Button size="sm" onClick={moveTo} disabled={!ctx.canEdit || !destination || toOther !== null}>
-          Move to the end of that section
-        </Button>
-        {tier === "locked" ? <p className="sti-note">A licensed questionnaire always moves whole, so its questions stay together in their validated order.</p> : null}
       </section>
     </div>
   );

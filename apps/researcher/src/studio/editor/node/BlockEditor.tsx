@@ -13,14 +13,14 @@ import {
 } from "@myself/studio";
 import { ConfirmDialog } from "../../ui/dialog.js";
 import { Icon } from "../../ui/icons.js";
-import { Badge, Button } from "../../ui/kit.js";
+import { Button } from "../../ui/kit.js";
 import { useEditor } from "../context.js";
 import { ConditionBuilder } from "./ConditionBuilder.js";
 import { Facts, IssueMessages, LockBanner, Panel } from "./controls.js";
 import { blockIssues } from "./issues.js";
 import { protectedBanner } from "./locks.js";
 import { NodeList } from "./NodeList.js";
-import { relock, UnlockDialog, UnlockedNote } from "./UnlockDialog.js";
+import { relock, UnlockDialog, unlockedText } from "./UnlockDialog.js";
 
 /**
  * A block: one placement of a questionnaire or study module in a section.
@@ -106,57 +106,84 @@ export function BlockEditor({ sectionKey, componentIndex }: BlockRef) {
         ? "It holds the questions the participant code is built from, which can never be removed."
         : null;
 
+  const lockNotice =
+    tier === "locked" ? (
+      <LockBanner
+        title="Licensed questionnaire · wording locked"
+        info="Its wording, options, codes and question order are fixed by its licence and by the evidence it was validated on. You can move the whole block, show it only to some participants, remove it whole, and make each question required or not."
+        infoLabel="the licence"
+      />
+    ) : tier === "protected" && protection ? (
+      <LockBanner
+        title={protection.reason === "ethics" ? "Ethics-approved consent · locked" : "Participant identifiers · locked"}
+        info={`${protectedBanner(protection).title}. ${protectedBanner(protection).body}`}
+        infoLabel="this lock"
+        actions={
+          <Button size="sm" variant="secondary" icon="unlock" onClick={() => setUnlocking(true)} disabled={!ctx.canEdit}>
+            Unlock…
+          </Button>
+        }
+      />
+    ) : protection && unlocked ? (
+      <LockBanner
+        tone="accent"
+        icon="unlock"
+        title="Unlocked for editing"
+        info={unlockedText(draft, p.instrument)}
+        infoLabel="the unlock"
+        actions={
+          <Button size="sm" variant="secondary" icon="lock" onClick={() => relock(ctx, p.instrument)} disabled={!ctx.canEdit}>
+            Lock again
+          </Button>
+        }
+      />
+    ) : null;
+
   return (
     <div className="stn-node">
-      <header className="stn-node-head">
+      <header className="stn-head">
         <nav className="stn-crumbs" aria-label="Where this block is">
           <button type="button" className="stn-crumb" onClick={() => ctx.select({ kind: "section", sectionKey })}>
             {section.title}
           </button>
-          <Icon name="chevron-right" size={14} />
+          <Icon name="chevron-right" size={12} className="st-icon stn-crumb-sep" />
           <span>Block {componentIndex + 1}</span>
         </nav>
-        <h2 className="stn-title" tabIndex={-1} data-editor-heading>
-          {name}
-          {def?.abbreviation ? <span className="stn-title-id">{def.abbreviation}</span> : null}
-        </h2>
       </header>
-
-      <div className="stn-banners">
-        {tier === "locked" ? (
-          <LockBanner title="A licensed questionnaire">
-            Its wording, options, codes and question order can't be changed: they are fixed by its licence and by the evidence it was
-            validated on. You can move the whole block, show it only to some participants, remove it whole, and make each question
-            required or not.
-          </LockBanner>
-        ) : tier === "protected" && protection ? (
-          <LockBanner
-            tone="warn"
-            title={protectedBanner(protection).title}
-            actions={
-              <Button size="sm" variant="secondary" icon="unlock" onClick={() => setUnlocking(true)} disabled={!ctx.canEdit}>
-                Unlock…
-              </Button>
-            }
-          >
-            {protectedBanner(protection).body}
-          </LockBanner>
-        ) : protection && unlocked ? (
-          <LockBanner
-            tone="accent"
-            icon="unlock"
-            title="Unlocked for editing"
-            actions={
-              <Button size="sm" variant="secondary" icon="lock" onClick={() => relock(ctx, p.instrument)} disabled={!ctx.canEdit}>
-                Lock again
-              </Button>
-            }
-          >
-            <UnlockedNote instrument={p.instrument} />
-          </LockBanner>
-        ) : null}
+      <div className="stn-pagehead">
+        <div className="stn-titlerow">
+          <h2 className="stn-title" tabIndex={-1} data-editor-heading>
+            {name}
+          </h2>
+          {def?.abbreviation ? <span className="stn-title-meta">{def.abbreviation}</span> : null}
+        </div>
+        {def?.construct ? <p className="stn-lead">{def.construct}</p> : null}
       </div>
+
+      {lockNotice ? <div className="stn-notices">{lockNotice}</div> : null}
       <IssueMessages issues={[...issues.general, ...(issues.byField.get("items") ?? [])]} />
+
+      <Panel title={`Questions · ${p.items.length}`} description={p.subset ? `A chosen ${p.items.length} of the module's questions, in this order.` : undefined}>
+        <NodeList blocks={blocks} sectionKey={sectionKey} withBlocks={false} select={ctx.select} />
+      </Panel>
+
+      <Panel
+        title="Condition"
+        field="displayIf"
+        info="Conditions can only use answers given earlier. To skip ahead, hide the questions in between — the survey always moves forward."
+      >
+        <ConditionBuilder
+          subject={{ kind: "block", sectionKey, componentIndex }}
+          noun={tier === "locked" ? "questionnaire" : "block"}
+          expr={component.displayIf}
+          readOnly={!ctx.canEdit || tier === "protected"}
+          lockedReason={tier === "protected" ? "Every participant must see a protected module, so it can't be shown only to some." : ctx.readOnlyReason}
+          issues={issues.byField.get("displayIf")}
+          onWrite={(next) =>
+            ctx.run(`Change when the block ${p.instrument} in ${sectionKey} is shown`, (d) => setBlockCondition(d, sectionKey, componentIndex, next).draft)
+          }
+        />
+      </Panel>
 
       <Panel title={tier === "locked" ? "About this questionnaire" : "About this module"}>
         <Facts
@@ -177,50 +204,27 @@ export function BlockEditor({ sectionKey, componentIndex }: BlockRef) {
         />
         {p.form?.instructions ? (
           <div className="stn-instructions">
-            <p className="stn-eyebrow">Instructions shown before its first question</p>
+            <p className="stn-subhead">Instructions before its first question</p>
             <blockquote>{p.form.instructions}</blockquote>
           </div>
         ) : null}
       </Panel>
 
-      <Panel
-        title={`Its questions · ${p.items.length}`}
-        description={p.subset ? `This block shows ${p.items.length} of the module's questions, in this order.` : undefined}
-      >
-        <NodeList blocks={blocks} sectionKey={sectionKey} withBlocks={false} select={ctx.select} />
-      </Panel>
-
-      <Panel title="When it's shown" field="displayIf">
-        <ConditionBuilder
-          subject={{ kind: "block", sectionKey, componentIndex }}
-          noun={tier === "locked" ? "questionnaire" : "block"}
-          expr={component.displayIf}
-          readOnly={!ctx.canEdit || tier === "protected"}
-          lockedReason={tier === "protected" ? "Every participant must see a protected module, so it can't be shown only to some." : ctx.readOnlyReason}
-          issues={issues.byField.get("displayIf")}
-          onWrite={(next) =>
-            ctx.run(`Change when the block ${p.instrument} in ${sectionKey} is shown`, (d) => setBlockCondition(d, sectionKey, componentIndex, next).draft)
-          }
-        />
-      </Panel>
-
       <Panel title="Remove block">
         {removeBlocked ? (
-          <p className="stn-hint stn-lockreason">
+          <p className="stn-inline-note">
             <Icon name="lock" size={14} /> {removeBlocked}
           </p>
         ) : (
-          <>
-            <p className="stn-flush">
-              Removing the block archives its {p.items.length} question{p.items.length === 1 ? "" : "s"}. They stop being asked, their IDs stay
-              reserved, and any of them can be restored{tier === "locked" ? " — which brings the whole questionnaire back" : ""}.
+          <div className="stn-actionrow">
+            <p className="stn-flush stn-muted">
+              Archives its {p.items.length} question{p.items.length === 1 ? "" : "s"}; any can be restored
+              {tier === "locked" ? ", which brings the whole questionnaire back" : ""}.
             </p>
-            <div className="stn-row-actions">
-              <Button variant="danger" icon="archive" onClick={() => setConfirmRemove(true)} disabled={!ctx.canEdit}>
-                Remove block
-              </Button>
-            </div>
-          </>
+            <Button variant="secondary" className="stn-danger-btn" icon="archive" onClick={() => setConfirmRemove(true)} disabled={!ctx.canEdit}>
+              Remove block
+            </Button>
+          </div>
         )}
       </Panel>
 
@@ -240,11 +244,6 @@ export function BlockEditor({ sectionKey, componentIndex }: BlockRef) {
         />
       ) : null}
       {unlocking ? <UnlockDialog instrument={p.instrument} onClose={() => setUnlocking(false)} /> : null}
-      {tier === "locked" ? (
-        <p className="stn-hint">
-          <Badge icon="lock">Licensed</Badge> Required and ‘Prefer not to say’ can be set on each question from the settings panel.
-        </p>
-      ) : null}
     </div>
   );
 }

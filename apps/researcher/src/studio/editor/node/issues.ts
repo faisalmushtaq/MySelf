@@ -199,7 +199,7 @@ export interface FocusRecord {
 /**
  * Where to put focus back when the control holding it has gone (focus.ts,
  * `useFocusRescue`): the nearest field around it that is still on screen —
- * "Add a condition" becomes the rule builder, "Add ‘More information’" its
+ * "Add condition" becomes the rule builder, "+ More information" its
  * boxes — and failing that, the heading of whatever the centre now shows.
  */
 export function rescueSelectors(record: FocusRecord): string[] {

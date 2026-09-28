@@ -38,18 +38,30 @@ export function WelcomeEditor() {
 
   return (
     <div className="stn-node">
-      <header className="stn-node-head">
-        <p className="stn-crumbs">Start screen</p>
+      <header className="stn-pagehead">
         <h2 className="stn-title" tabIndex={-1} data-editor-heading>
           Start screen
         </h2>
-        <p className="stn-lead">
-          These appear on the first screen, before any question: a participant types the code the research team gave them to begin.
-        </p>
+        <p className="stn-lead">The first screen, where participants enter the code the research team gave them.</p>
       </header>
 
       <WelcomePreview />
       <IssueMessages issues={issues.general} />
+
+      <Panel title="Study label">
+        <TextField
+          label="Study label"
+          hideLabel
+          field="studyLabel"
+          value={c.studyLabel ?? ""}
+          placeholder="e.g. Notre Dame · 2026"
+          readOnly={readOnly}
+          hint="Shown above the code box. The survey's title isn't shown to participants."
+          issues={issuesAt(issues, "studyLabel")}
+          onCommit={(text) => write("Edit the study label", { studyLabel: text.trim() ? text : null })}
+          emptyText="None"
+        />
+      </Panel>
 
       <Panel title="Participant code" field="participantCode">
         {code ? (
@@ -60,7 +72,8 @@ export function WelcomeEditor() {
               value={code.label ?? ""}
               placeholder="Your participant code"
               readOnly={readOnly}
-              hint="The box's label. Left empty, it reads “Your participant code”."
+              info="The label above the box. Left empty, it reads “Your participant code”."
+              infoLabel="the code box's label"
               issues={issuesAt(issues, "participantCode.label")}
               onCommit={(text) => write("Edit the start screen", { participantCode: { label: text.trim() ? text : null } })}
               emptyText="Your participant code (the default)"
@@ -72,50 +85,60 @@ export function WelcomeEditor() {
               multiline
               value={code.instructions ?? ""}
               readOnly={readOnly}
-              hint="Where the code comes from, and what to do without one."
+              info="Where the code comes from, and what to do without one."
+              infoLabel="the instructions"
               issues={issuesAt(issues, "participantCode.instructions")}
               onCommit={(text) => write("Edit the start screen", { participantCode: { instructions: text.trim() ? text : null } })}
               emptyText="No instructions"
             />
-            <TextField
-              label="Example in the empty box"
-              field="participantCode.placeholder"
-              optional
-              value={code.placeholder ?? ""}
-              readOnly={readOnly}
-              hint="Shown greyed out in the box until something is typed, e.g. NDC0042."
-              issues={issuesAt(issues, "participantCode.placeholder")}
-              onCommit={(text) => write("Edit the start screen", { participantCode: { placeholder: text.trim() ? text : null } })}
-              emptyText="None"
-            />
-            <TextField
-              label="Format hint"
-              field="participantCode.hint"
-              value={code.hint}
-              readOnly={readOnly}
-              hint="Shown when a code doesn't match the format, so a mistyped code can be put right."
-              issues={issuesAt(issues, "participantCode.hint")}
-              onCommit={(text) => write("Edit the start screen", { participantCode: { hint: text } })}
-              emptyText="No hint"
-            />
-            <TextField
-              label="Format (pattern)"
-              field="participantCode.pattern"
-              value={code.pattern}
-              mono
-              spellCheck={false}
-              readOnly={readOnly}
-              validate={validatePattern}
-              hint={<PatternExplanation pattern={code.pattern} />}
-              issues={issuesAt(issues, "participantCode.pattern")}
-              onCommit={(pattern) => write("Edit the start screen format", { participantCode: { pattern } })}
-            />
-            <PatternTester pattern={code.pattern} label="Test a code" />
+            <div className="stn-pair">
+              <TextField
+                label="Placeholder"
+                field="participantCode.placeholder"
+                optional
+                value={code.placeholder ?? ""}
+                readOnly={readOnly}
+                info="Shown greyed out in the empty box until something is typed, e.g. NDC0042."
+                infoLabel="the placeholder"
+                issues={issuesAt(issues, "participantCode.placeholder")}
+                onCommit={(text) => write("Edit the start screen", { participantCode: { placeholder: text.trim() ? text : null } })}
+                emptyText="None"
+              />
+              <TextField
+                label="Format hint"
+                field="participantCode.hint"
+                value={code.hint}
+                readOnly={readOnly}
+                info="Shown when a code doesn't match the format, so a mistyped code can be put right."
+                infoLabel="the format hint"
+                issues={issuesAt(issues, "participantCode.hint")}
+                onCommit={(text) => write("Edit the start screen", { participantCode: { hint: text } })}
+                emptyText="No hint"
+              />
+            </div>
+            <div className="stn-pair">
+              <TextField
+                label="Format"
+                field="participantCode.pattern"
+                value={code.pattern}
+                mono
+                spellCheck={false}
+                readOnly={readOnly}
+                validate={validatePattern}
+                info="A regular expression every code must match."
+                infoLabel="the format"
+                hint={<PatternExplanation pattern={code.pattern} />}
+                issues={issuesAt(issues, "participantCode.pattern")}
+                onCommit={(pattern) => write("Edit the start screen format", { participantCode: { pattern } })}
+              />
+              <PatternTester pattern={code.pattern} label="Test a code" />
+            </div>
             {code.variable ? (
               <ReadOnlyValue
-                label="Stored in the data as"
+                label="Stored as"
                 field="participantCode.variable"
                 mono
+                inline
                 reason="The code's column in the data. Earlier sittings are stored under it, so it stays as it is."
               >
                 {code.variable}
@@ -126,28 +149,14 @@ export function WelcomeEditor() {
         ) : (
           <>
             <IssueMessages issues={issues.byField.get("participantCode")} />
-            <p className="stn-flush">This survey doesn't ask for a participant code yet.</p>
-            <div className="stn-row-actions">
-              <Button icon="plus" disabled={readOnly} onClick={() => write("Set up the participant code", { participantCode: DEFAULT_CODE })}>
+            <div className="stn-actionrow">
+              <p className="stn-flush stn-muted">Not asked for yet.</p>
+              <Button size="sm" variant="secondary" icon="plus" disabled={readOnly} onClick={() => write("Set up the participant code", { participantCode: DEFAULT_CODE })}>
                 Ask for a participant code
               </Button>
             </div>
           </>
         )}
-      </Panel>
-
-      <Panel title="About the study">
-        <TextField
-          label="Study label"
-          field="studyLabel"
-          optional
-          value={c.studyLabel ?? ""}
-          readOnly={readOnly}
-          hint="A short label shown above the code box, e.g. “Notre Dame · 2026”. The survey's full title isn't shown to participants."
-          issues={issuesAt(issues, "studyLabel")}
-          onCommit={(text) => write("Edit the study label", { studyLabel: text.trim() ? text : null })}
-          emptyText="None"
-        />
       </Panel>
 
       <ContactPanel />
@@ -191,9 +200,9 @@ export function PatternTester({ pattern, label }: { pattern: string; label: stri
         spellCheck={false}
         aria-describedby={`${id}-result`}
       />
-      <p id={`${id}-result`} className={`stn-tester-result ${result.status}`} aria-live="polite">
+      <p id={`${id}-result`} className={`stn-tester-result stn-tester-${result.status}`} aria-live="polite">
         {result.status === "empty" ? (
-          "Nothing is saved from this box — it is only for trying the format."
+          "Only for trying the format; nothing is saved."
         ) : (
           <>
             <Icon name={result.status === "match" ? "check" : result.status === "invalid" ? "error" : "close"} size={15} />
@@ -223,7 +232,7 @@ function ContactPanel() {
   return (
     <Panel
       title="Contact"
-      description="Shown quietly on the first screen, so a participant or a parent knows who to ask."
+      info="Shown quietly on the first screen, so a participant or a parent knows who to ask."
       field="contact"
       actions={
         contact && !readOnly ? (
@@ -235,26 +244,28 @@ function ContactPanel() {
     >
       {contact || open ? (
         <>
-          <TextField
-            label="Email"
-            field="contact.email"
-            value={contact?.email ?? ""}
-            readOnly={readOnly}
-            validate={validateEmail}
-            issues={issuesAt(issues, "contact.email")}
-            onCommit={(email) => write({ contact: { email: email.trim() } })}
-          />
-          <TextField
-            label="Ethics reference"
-            field="contact.ethicsReference"
-            optional
-            value={contact?.ethicsReference ?? ""}
-            readOnly={readOnly || !contact}
-            lockedReason={!contact ? "Add an email address first." : null}
-            issues={issuesAt(issues, "contact.ethicsReference")}
-            onCommit={(text) => write({ contact: { ethicsReference: text.trim() ? text : null } })}
-            emptyText="None"
-          />
+          <div className="stn-pair">
+            <TextField
+              label="Email"
+              field="contact.email"
+              value={contact?.email ?? ""}
+              readOnly={readOnly}
+              validate={validateEmail}
+              issues={issuesAt(issues, "contact.email")}
+              onCommit={(email) => write({ contact: { email: email.trim() } })}
+            />
+            <TextField
+              label="Ethics reference"
+              field="contact.ethicsReference"
+              optional
+              value={contact?.ethicsReference ?? ""}
+              readOnly={readOnly || !contact}
+              lockedReason={!contact ? "Add an email address first." : null}
+              issues={issuesAt(issues, "contact.ethicsReference")}
+              onCommit={(text) => write({ contact: { ethicsReference: text.trim() ? text : null } })}
+              emptyText="None"
+            />
+          </div>
           <TextField
             label="Note"
             field="contact.note"
@@ -269,8 +280,9 @@ function ContactPanel() {
           />
         </>
       ) : (
-        <div className="stn-row-actions">
-          <Button icon="plus" disabled={readOnly} onClick={() => setOpen(true)}>
+        <div className="stn-actionrow">
+          <p className="stn-flush stn-muted">No contact details.</p>
+          <Button size="sm" variant="secondary" icon="plus" disabled={readOnly} onClick={() => setOpen(true)}>
             Add contact details
           </Button>
         </div>
@@ -304,7 +316,7 @@ function WelcomePreview() {
           </p>
         ) : null}
       </div>
-      <figcaption className="stn-hint">A sketch of the start screen. Use Preview to see it exactly.</figcaption>
+      <figcaption className="stn-hint">Sketch · open Preview to see it exactly</figcaption>
     </figure>
   );
 }
