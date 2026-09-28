@@ -687,6 +687,23 @@ export default function App() {
   const goBack = useCallback(
     async (from: number) => {
       if (phase.kind !== "running") return;
+      /**
+       * Editing one answer from the summary: "Back" returns to the summary.
+       *
+       * THE BUG THIS FIXES. A participant who has finished can open the summary,
+       * tap a question to change it, and land back on that question with
+       * `fromReview` set — so pressing Next returns them to the summary. But
+       * pressing Back rebuilt the running phase WITHOUT `fromReview`, dropping
+       * them into the ordinary survey with no way back to the end except walking
+       * every remaining question again. From the summary you came, so to the
+       * summary Back goes.
+       */
+      if (phase.fromReview) {
+        await leaveItem(from, false);
+        await appendEvent(phase.session, "review.returned", unitKeyOf(from), undefined, from, tMono());
+        setPhase({ kind: "review", session: phase.session });
+        return;
+      }
       const w = new Walker(flattened.units, storeRef.current, manifest.composition.allowBackNavigation);
       const prev = w.back(from);
       if (prev !== null) {
@@ -1061,6 +1078,7 @@ export default function App() {
           onAdvance={(f, k) => void advance(f, k)}
           onBack={(f) => void goBack(f)}
           onEvent={emit}
+          reviewEdit={phase.fromReview === true}
         />
       )}
 
