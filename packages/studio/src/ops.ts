@@ -22,16 +22,19 @@ import {
   identityRoleOf,
   instrumentDef,
   instrumentName,
+  isUnlocked,
   itemsOf,
   PROTECTED_MODULES,
+  protectedModule,
   scaleUsage,
   shortText,
   StudioOpError,
   studioTypeOf,
+  type EditTier,
   type FoundQuestion,
   type QuestionPlacementRef,
 } from "./model.js";
-import { definedQuestions, formOf, normaliseRef, placements, splitItemKey } from "./walk.js";
+import { definedQuestions, formOf, liveQuestions, normaliseRef, placements, splitItemKey } from "./walk.js";
 
 /**
  * The Studio's editing operations.
@@ -133,7 +136,7 @@ function tierError(d: StudioDraft, instrument: string, tier: "locked" | "protect
       "locked",
     );
   }
-  const p = PROTECTED_MODULES[instrument];
+  const p = protectedModule(instrument);
   const why = p?.reason === "ethics" ? "covered by the ethics approval" : "safe for participant linkage";
   return new StudioOpError(
     `You can't ${action} yet: “${name}” is protected. ${p?.explanation ?? ""} To change it, unlock it first and ` +
@@ -339,6 +342,68 @@ function checkIndex(index: number, max: number, what: string): void {
   }
 }
 
+/**
+ * The ethics-protected module (still locked) that some other question is now
+ * asked before, or in the middle of; null if there is none.
+ */
+function askedBeforeConsent(d: StudioDraft): string | null {
+  const order = liveQuestions(d);
+  for (const [key, p] of Object.entries(PROTECTED_MODULES)) {
+    if (p.reason !== "ethics" || editTier(d, key) !== "protected") continue;
+    let last = -1;
+    order.forEach((q, i) => {
+      if (q.instrument === key) last = i;
+    });
+    if (last >= 0 && order.slice(0, last).some((q) => q.instrument !== key)) return key;
+  }
+  return null;
+}
+
+/**
+ * Refuse an edit that would ask anything before the protected consent module.
+ *
+ * Refusing to move the consent block itself is not enough on its own: moving
+ * another section or block in front of it, adding a section before it, or
+ * moving a question into its section ahead of it would all have participants
+ * answer questions before they have read the approved introduction and given
+ * consent (docs/16 R4). Only a change that newly does so is refused, so a draft
+ * already in that state can still be edited back out of it.
+ */
+function keepConsentFirst(before: StudioDraft, after: StudioDraft, action: string): void {
+  const key = askedBeforeConsent(after);
+  if (!key || askedBeforeConsent(before) === key) return;
+  throw new StudioOpError(
+    `You can't ${action}: it would be asked before “${instrumentName(after, key)}”. Participants read the ethics-approved ` +
+      `introduction and give their consent before they are asked anything else, so nothing may come before it while ` +
+      `it is protected. Put it after the consent instead.`,
+    "protected",
+  );
+}
+
+/**
+ * The tier an archived question's instrument has: its live definition's if the
+ * draft still has one, otherwise that of the definition the record carries.
+ */
+function archivedTier(d: StudioDraft, record: ArchivedQuestion): EditTier {
+  const { instrument } = splitItemKey(record.itemKey);
+  if (instrumentDef(d, instrument)) return editTier(d, instrument);
+  const shell = record.instrumentShell ?? d.archived.find((a) => a.refKey === record.refKey && a.instrumentShell)?.instrumentShell;
+  if (shell && shell.licence.modifiable !== "yes") return "locked";
+  return protectedModule(instrument) && !isUnlocked(d, instrument) ? "protected" : "editable";
+}
+
+/** The name of an archived question's instrument, from the draft or the definition the record carries. */
+function archivedName(d: StudioDraft, record: ArchivedQuestion): string {
+  const { instrument } = splitItemKey(record.itemKey);
+  const shell = record.instrumentShell ?? d.archived.find((a) => a.refKey === record.refKey && a.instrumentShell)?.instrumentShell;
+  return instrumentDef(d, instrument)?.def.name ?? shell?.name ?? instrument;
+}
+
+/** Archived questions that use an option list. */
+function archivedUsers(d: StudioDraft, scaleKey: string): ArchivedQuestion[] {
+  return d.archived.filter((a) => "scale" in a.item && a.item.scale === scaleKey);
+}
+
 // ---------------------------------------------------------------------------
 // Sections
 // ---------------------------------------------------------------------------
@@ -391,6 +456,7 @@ export function moveSection(draft: StudioDraft, sectionKey: string, toIndex: num
   if (guarded && from !== toIndex) throw tierError(d, guarded, "protected", "move this section");
   const [section] = sections.splice(from, 1);
   sections.splice(toIndex, 0, section!);
+  keepConsentFirst(draft, d, "move this section there");
   return { draft: d };
 }
 
@@ -436,6 +502,7 @@ export function moveBlock(
   source.components.splice(from.componentIndex, 1);
   checkIndex(to.index, target.components.length, "in that section");
   target.components.splice(to.index, 0, component);
+  keepConsentFirst(draft, d, "move this block there");
   return { draft: d };
 }
 
@@ -586,6 +653,7 @@ export function addQuestion(draft: StudioDraft, req: AddQuestionRequest): { draf
   });
   if (scale) d.scales[scale.key] = scale;
   placeNewItem(d, target.refKey, item, target.component, target.where);
+  keepConsentFirst(draft, d, "add a question there");
   return { draft: d, itemKey: `${target.instrument}.${key}` };
 }
 
@@ -734,9 +802,14 @@ export function updateQuestion(
       if (opts.published?.has(itemKey)) throw publishedError(q.item, what, `change its ${what}`);
     }
     if (field === "identifying" && value === false) refuseIdentity(itemKey, q.item, "stop treating its answer as identifying");
+    // Pointing a participant-code question at another option list changes the
+    // codes ingest derives the participant code from, exactly as editing its
+    // options would (which `optionTarget` refuses), so it is refused the same way.
+    if (field === "scale" || field === "scaleVersion") refuseIdentity(itemKey, q.item, "change its options", ["linkage"]);
     if (field === "key") newKey = checkNewKey(d, q, value, opts.reserved);
     if (field === "variable") checkNewVariable(d, q.item.variable, value, opts.reserved);
-    if (field === "scale" && (typeof value !== "string" || !d.scales[value])) {
+    // Own property only: "constructor" is a valid scale key, and `d.scales.constructor` is not a list.
+    if (field === "scale" && (typeof value !== "string" || !Object.prototype.hasOwnProperty.call(d.scales, value))) {
       throw new StudioOpError(`There is no option list “${String(value)}” in this survey.`, "not_found");
     }
     if (field === "pattern" && typeof value === "string") checkPattern(value, "answer");
@@ -829,6 +902,13 @@ function renameQuestion(d: StudioDraft, instrument: string, from: string, to: st
     if (s.instrument !== instrument) continue;
     for (const step of s.steps) if ("items" in step) step.items = step.items.map(swap);
   }
+  // Archived neighbours record where they stood by key, so a restore puts them
+  // back beside this question under its new key rather than losing their place.
+  for (const a of d.archived) {
+    if (splitItemKey(a.itemKey).instrument !== instrument || !a.position) continue;
+    a.position.formAfter = a.position.formAfter.map(swap);
+    if (a.position.placement) a.position.placement.after = a.position.placement.after.map(swap);
+  }
   const fromId = `${instrument}.${from}`;
   const note = d.notes[fromId];
   if (note) {
@@ -860,8 +940,11 @@ const KEPT_ON_TYPE_CHANGE = [
  * Change a question's type in place, keeping its ID, variable, wording,
  * condition, settings and notes, and rebuilding what is specific to the type.
  * A choice question keeps its options when it becomes another choice type,
- * except Yes/No, whose options are the type. Answer checks (`crossChecks`)
- * are dropped: they are defined for one kind of answer.
+ * except when the options are what makes the type: a question becoming Yes/No
+ * gets the Yes/No list, and a Yes/No question becoming single choice or a
+ * rating gets that type's starting options (with the Yes/No list it would
+ * still read as Yes/No). Answer checks (`crossChecks`) are dropped: they are
+ * defined for one kind of answer.
  *
  * Refused once published unless `force`: recorded answers would share a column
  * with answers of another kind. The editor offers `replaceWithNewType` instead.
@@ -883,7 +966,16 @@ export function changeQuestionType(
   const oldScale = "scale" in old ? old.scale : null;
   if (studioTypeOf(old, oldScale ? d.scales[oldScale] : null) === typeId) return { draft: d, itemKey };
 
-  const keepScale = oldScale !== null && typeId !== "yes_no" && CHOICE_TYPES.includes(typeId);
+  // The options are kept only if, with them, the question reads back as the
+  // type asked for. A Yes/No list is what makes a question Yes/No, so keeping
+  // it for "Single choice" or "Rating scale" would leave the question a Yes/No
+  // question and the change silently undone; those get the new type's options.
+  const keepScale =
+    oldScale !== null &&
+    typeId !== "yes_no" &&
+    CHOICE_TYPES.includes(typeId) &&
+    studioTypeOf(templateFor(typeId, { key: old.key, variable: old.variable, text: old.stem.text, scaleKey: oldScale }).item, d.scales[oldScale]) ===
+      typeId;
   const scaleKey = CHOICE_TYPES.includes(typeId) && !keepScale ? generateScaleKey(q.instrument, q.key, takenScaleKeys(d)) : undefined;
   const { item, scale } = templateFor(typeId, {
     key: old.key,
@@ -1000,6 +1092,7 @@ export function moveQuestion(draft: StudioDraft, itemKey: string, to: { sectionK
     insertAt(keys, q.key, dest.where, (k) => k);
     if (source.items) source.items = keys;
     else orderForm(d, q.refKey, keys);
+    keepConsentFirst(draft, d, "move this question there");
     return { draft: d };
   }
 
@@ -1020,6 +1113,7 @@ export function moveQuestion(draft: StudioDraft, itemKey: string, to: { sectionK
     else if (dest.before && comps.includes(dest.before)) at = comps.indexOf(dest.before);
     comps.splice(at, 0, component);
   }
+  keepConsentFirst(draft, d, "move this question there");
   return { draft: d };
 }
 
@@ -1189,7 +1283,7 @@ export function restoreQuestion(
       throw new StudioOpError(`${quoted(record.item)} can't be restored: the block it belonged to is no longer in this survey.`, "not_found");
     }
     const locked = shell.licence.modifiable !== "yes";
-    if (!locked && PROTECTED_MODULES[instrument] && !d.unlocked[instrument]) {
+    if (!locked && protectedModule(instrument) && !isUnlocked(d, instrument)) {
       throw tierError(d, instrument, "protected", "restore this question");
     }
     const def = structuredClone(shell);
@@ -1202,6 +1296,7 @@ export function restoreQuestion(
     // exactly that — and needs no subset, unless it had one before.
     const keys = !locked && was && !was.wholeForm ? [record.item.key] : null;
     comps.splice(was ? Math.min(was.componentIndex, comps.length) : comps.length, 0, newPlacement(def, null, keys));
+    keepConsentFirst(draft, d, "restore this question there");
     return { draft: d, itemKey, restored: take(records) };
   }
 
@@ -1218,6 +1313,7 @@ export function restoreQuestion(
     comps.splice(was ? Math.min(was.componentIndex, comps.length) : comps.length, 0, newPlacement(existing, null, [record.item.key]));
   }
   // A whole-form placement shows the form in order, so the form position is its position.
+  keepConsentFirst(draft, d, "restore this question there");
   return { draft: d, itemKey, restored: take([record]) };
 }
 
@@ -1247,6 +1343,19 @@ export function deleteQuestion(draft: StudioDraft, itemKey: string, opts: { publ
       removeInstrument(d, q.refKey);
     }
   } else {
+    // The archive is not a way round the tiers. A licensed questionnaire leaves
+    // whole and must come back whole, so deleting one of its archived questions
+    // would let it be restored with a question missing; a protected module's
+    // archived question is as protected as a live one.
+    const tier = archivedTier(d, d.archived[archivedIndex]!);
+    if (tier === "locked") {
+      throw new StudioOpError(
+        `You can't delete a single question of “${archivedName(d, d.archived[archivedIndex]!)}”: it is a licensed, ` +
+          `validated questionnaire, which is only valid when asked whole. It stays archived, and restoring it brings back the whole questionnaire.`,
+        "locked",
+      );
+    }
+    if (tier === "protected") throw tierError(d, splitItemKey(itemKey).instrument, "protected", "delete this question");
     const [record] = d.archived.splice(archivedIndex, 1);
     // Another archived question of the same instrument may need the shell to be restored.
     const heir = d.archived.find((a) => a.refKey === record!.refKey);
@@ -1285,6 +1394,22 @@ function optionTarget(d: StudioDraft, itemKey: string, action: string): { q: Fou
       throw new StudioOpError(
         `You can't ${action}: these options are shared with ${quoted(other.item)} in “${instrumentName(d, other.instrument)}”, ` +
           `whose options can't change${tier === "protected" ? " while it is protected" : ""}. Give this question its own copy of the options first.`,
+        tier === "editable" ? "linkage" : tier,
+      );
+    }
+  }
+  // Archived questions share the list too, and come back with whatever it then
+  // says: with a licensed questionnaire's block removed, editing the list
+  // through a question that shares it would otherwise restore that
+  // questionnaire with changed options.
+  for (const record of archivedUsers(d, scaleKey)) {
+    const tier = archivedTier(d, record);
+    const linkage = identityRoleOf(record.itemKey, record.item) === "linkage";
+    if (tier !== "editable" || linkage) {
+      throw new StudioOpError(
+        `You can't ${action}: these options are shared with ${quoted(record.item)} (archived) in ` +
+          `“${archivedName(d, record)}”, whose options can't change` +
+          `${tier === "protected" ? " while it is protected" : ""}. Give this question its own copy of the options first.`,
         tier === "editable" ? "linkage" : tier,
       );
     }
@@ -1362,12 +1487,19 @@ export function updateOption(
 /**
  * Remove an option. If the list has been published, its value is retired: kept
  * in the draft so no later option can take it.
+ *
+ * `published` is either whether the list has been published, or — safer — the
+ * set of question IDs any version has published: the value is then retired if
+ * any question using the list, live or archived, was published. That matters
+ * after `forkScale`: a question's own copy has a new key no version has
+ * published, yet the question's recorded answers are coded against its values,
+ * so "has this list's key been published?" would wrongly answer no.
  */
 export function removeOption(
   draft: StudioDraft,
   itemKey: string,
   code: number,
-  opts: { published: boolean; at: string },
+  opts: { published: boolean | ReadonlySet<string>; at: string },
 ): { draft: StudioDraft } {
   const d = clone(draft);
   const { scaleKey, scale } = optionTarget(d, itemKey, "remove an option");
@@ -1375,9 +1507,15 @@ export function removeOption(
   if (scale.options.length <= 2) {
     throw new StudioOpError("A choice question needs at least two options. Add another before removing this one.", "invalid");
   }
+  const published =
+    typeof opts.published === "boolean"
+      ? opts.published
+      : [...scaleUsage(d, scaleKey), ...archivedUsers(d, scaleKey).map((a) => a.itemKey)].some((k) =>
+          (opts.published as ReadonlySet<string>).has(k),
+        );
   scale.options = scale.options.filter((o) => o !== option);
   if (scale.options.some((o) => o.position !== undefined)) scale.options.forEach((o, i) => (o.position = i + 1));
-  if (opts.published) {
+  if (published) {
     const retired = (d.retiredCodes[scaleKey] ??= []);
     if (!retired.some((r) => r.code === code)) retired.push({ code, label: option.label, retiredAt: opts.at });
   }
@@ -1402,7 +1540,11 @@ export function moveOption(draft: StudioDraft, itemKey: string, code: number, to
  * Give a question its own copy of an option list it shares, so its options can
  * change without changing the others'. The copy keeps the list's retired values,
  * which were retired for this question's data too. A list only this question
- * uses is left as it is.
+ * uses — counting archived questions, which come back with the list as it then
+ * is — is left as it is.
+ *
+ * The copy's key is new, so no version has published it; the values in it may
+ * still have been answered (see `removeOption`'s `published`).
  */
 export function forkScale(draft: StudioDraft, itemKey: string): { draft: StudioDraft; scaleKey: string } {
   const d = clone(draft);
@@ -1413,7 +1555,9 @@ export function forkScale(draft: StudioDraft, itemKey: string): { draft: StudioD
   const from = q.item.scale;
   const scale = d.scales[from];
   if (!scale) throw new StudioOpError(`The option list “${from}” is missing from this survey.`, "not_found");
-  if (scaleUsage(d, from).length <= 1) return { draft: d, scaleKey: from };
+  // Archived users count: otherwise a list shared only with an archived
+  // licensed questionnaire could neither be edited (optionTarget refuses) nor forked.
+  if (scaleUsage(d, from).length + archivedUsers(d, from).length <= 1) return { draft: d, scaleKey: from };
   const scaleKey = generateScaleKey(q.instrument, q.key, takenScaleKeys(d));
   d.scales[scaleKey] = { ...structuredClone(scale), key: scaleKey };
   const retired = d.retiredCodes[from];
@@ -1429,12 +1573,18 @@ export function forkScale(draft: StudioDraft, itemKey: string): { draft: StudioD
  * question, shown only when "Other" is chosen. The option's own `textEntry`
  * stays off because the participant app does not render it; the follow-up
  * question is what collects the text, with its own column.
+ *
+ * "Other" belongs to one question. If its option list is shared (a Likert set,
+ * or the survey-wide Yes/No list), the question is given its own copy first
+ * (`forkScale`, whose key is returned as `scaleKey`): adding "Other" to the
+ * shared list would give every question using it an "Other" option with no
+ * follow-up to say what.
  */
 export function addOtherOption(
   draft: StudioDraft,
   itemKey: string,
   opts: { reserved?: ReservedIds; publishedCodes?: ReadonlySet<number> } = {},
-): { draft: StudioDraft; code: number; followUpItemKey: string } {
+): { draft: StudioDraft; code: number; followUpItemKey: string; scaleKey: string } {
   const q = live(draft, itemKey);
   if (q.item.responseType !== "single_choice" && q.item.responseType !== "multi_choice") {
     throw new StudioOpError(`Only a single- or multiple-choice question can have an “Other” option.`, "invalid");
@@ -1442,7 +1592,10 @@ export function addOtherOption(
   if (draft.scales[q.item.scale]?.options.some((o) => o.kind === "other_specify")) {
     throw new StudioOpError(`${quoted(q.item)} already has an “Other” option.`, "invalid");
   }
-  const added = addOption(draft, itemKey, { label: "Other", kind: "other_specify" }, opts.publishedCodes ? { publishedCodes: opts.publishedCodes } : {});
+  requireEditable(draft, q.instrument, "add an “Other” option");
+  refuseIdentity(itemKey, q.item, "add an “Other” option", ["linkage"]);
+  const own = forkScale(draft, itemKey);
+  const added = addOption(own.draft, itemKey, { label: "Other", kind: "other_specify" }, opts.publishedCodes ? { publishedCodes: opts.publishedCodes } : {});
   const d = added.draft;
   const key = uniqueSlug(`${q.key.slice(0, 58).replace(/_+$/, "")}_other`, takenKeys(d, q.instrument, opts.reserved), 64);
   const variable = generateVariable(`${q.item.variable.slice(0, MAX_VARIABLE_LENGTH - 6).replace(/_+$/, "")}_other`, takenVariables(d, opts.reserved));
@@ -1450,7 +1603,7 @@ export function addOtherOption(
   item.displayIf = toLogic([{ itemKey, test: "selected", code: added.code }], "all");
   const at = findQuestion(d, itemKey)!.placements[0];
   placeNewItem(d, q.refKey, item, at ? componentAt(d, at.sectionIndex, at.componentIndex) : null, { after: q.key });
-  return { draft: d, code: added.code, followUpItemKey: `${q.instrument}.${key}` };
+  return { draft: d, code: added.code, followUpItemKey: `${q.instrument}.${key}`, scaleKey: own.scaleKey };
 }
 
 // ---------------------------------------------------------------------------
@@ -1585,11 +1738,11 @@ export const MIN_UNLOCK_REASON = 20;
  * is kept verbatim and goes into the audit log with the draft.
  */
 export function unlockModule(draft: StudioDraft, instrumentKey: string, req: OpActor & { reason: string }): { draft: StudioDraft } {
-  const protectedModule = PROTECTED_MODULES[instrumentKey];
-  if (!protectedModule) throw new StudioOpError(`“${instrumentKey}” is not protected, so it does not need unlocking.`, "invalid");
+  const protection = protectedModule(instrumentKey);
+  if (!protection) throw new StudioOpError(`“${instrumentKey}” is not protected, so it does not need unlocking.`, "invalid");
   if (req.reason.trim().length < MIN_UNLOCK_REASON) {
     throw new StudioOpError(
-      `Say in a sentence why this change is ${protectedModule.reason === "ethics" ? "covered by the ethics approval" : "safe for participant linkage"} ` +
+      `Say in a sentence why this change is ${protection.reason === "ethics" ? "covered by the ethics approval" : "safe for participant linkage"} ` +
         `(at least ${MIN_UNLOCK_REASON} characters). It is kept with the survey's history.`,
       "invalid",
     );

@@ -74,6 +74,20 @@ export const PROTECTED_MODULES: Readonly<Record<string, ProtectedModule>> = {
 };
 
 /**
+ * The protection on a module, or null. An own-property lookup: instrument keys
+ * are slugs, and "constructor" is a valid slug that a plain `PROTECTED_MODULES[key]`
+ * would resolve to Object's constructor — truthy, and so "protected".
+ */
+export function protectedModule(instrumentKey: string): ProtectedModule | null {
+  return Object.prototype.hasOwnProperty.call(PROTECTED_MODULES, instrumentKey) ? PROTECTED_MODULES[instrumentKey]! : null;
+}
+
+/** Whether a protected module has been unlocked in this draft (own property only, as above). */
+export function isUnlocked(draft: StudioDraft, instrumentKey: string): boolean {
+  return Object.prototype.hasOwnProperty.call(draft.unlocked, instrumentKey);
+}
+
+/**
  * The four questions the participant code is derived from at ingest
  * (packages/store/src/ingest.ts, `secretParts`). They are looked up by these
  * exact IDs, so none may be removed, re-keyed or change type — even with
@@ -137,7 +151,7 @@ export function instrumentName(draft: StudioDraft, instrumentKey: string): strin
 export function editTier(draft: StudioDraft, instrumentKey: string): EditTier {
   const found = instrumentDef(draft, instrumentKey);
   if (found && found.def.licence.modifiable !== "yes") return "locked";
-  if (PROTECTED_MODULES[instrumentKey] && !draft.unlocked[instrumentKey]) return "protected";
+  if (protectedModule(instrumentKey) && !isUnlocked(draft, instrumentKey)) return "protected";
   return "editable";
 }
 

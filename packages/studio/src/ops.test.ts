@@ -649,3 +649,144 @@ describe("the edited survey as a whole", () => {
     expect(administered(manifest)).toHaveLength(147 + 2);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Holes found in review: each test failed before the fix it names.
+// ---------------------------------------------------------------------------
+
+describe("consent comes first while it is protected", () => {
+  const consentFirst = (draft: StudioDraft) => {
+    const order = administered(publishable(draft));
+    const last = order.map((k) => k.startsWith("ybm_intro_consent.")).lastIndexOf(true);
+    return last >= 0 && order.slice(0, last).every((k) => k.startsWith("ybm_intro_consent."));
+  };
+
+  it("refuses every way of asking something before the consent", () => {
+    const before = (fn: () => unknown) => {
+      const error = refusal(fn);
+      expect(error.code).toBe("protected");
+      expect(error.message).toMatch(/asked before “YBM introduction and consent”/);
+    };
+    before(() => ops.moveSection(live(), "gaming", 0));
+    before(() => ops.moveBlock(live(), { sectionKey: "gaming", componentIndex: 0 }, { sectionKey: "welcome", index: 0 }));
+    before(() => ops.moveQuestion(live(), "ybm_smartphone.own", { sectionKey: "welcome", index: 0 }));
+    const first = ops.addSection(live(), { title: "Before anything", index: 0 });
+    before(() => ops.addQuestion(first.draft, { sectionKey: first.sectionKey, typeId: "short_text" }));
+    const archived = ops.archiveQuestion(first.draft, "ybm_smartphone.own", actor).draft;
+    before(() => ops.restoreQuestion(archived, "ybm_smartphone.own", { sectionKey: first.sectionKey }));
+    // Restoring it where it was is fine.
+    publishable(ops.restoreQuestion(ops.removeSection(archived, first.sectionKey).draft, "ybm_smartphone.own").draft);
+  });
+
+  it("still allows anything after it, and anything at all once the consent is unlocked", () => {
+    const after = ops.moveQuestion(live(), "ybm_smartphone.own", { sectionKey: "welcome", index: 3 }).draft;
+    expect(consentFirst(after)).toBe(true);
+    const unlocked = ops.unlockModule(live(), "ybm_intro_consent", { ...actor, reason: "Amendment 4 lets the pupils see a warm-up question first." }).draft;
+    const moved = ops.moveSection(unlocked, "gaming", 0).draft;
+    expect(consentFirst(moved)).toBe(false);
+  });
+});
+
+describe("changing type always gives the type asked for", () => {
+  const creatableTypes = QUESTION_TYPES.filter((t) => t.canCreate).map((t) => t.id);
+
+  it.each(creatableTypes)("turns a %s question into every other type, each reading back as asked and freezing cleanly", (from) => {
+    const added = ops.addQuestion(live(), { sectionKey: "gaming", typeId: from, text: "Pick one" });
+    for (const to of creatableTypes) {
+      const { draft } = ops.changeQuestionType(deepFreeze(added.draft), added.itemKey, to);
+      expect(studioTypeOf(findQuestion(draft, added.itemKey)!.item, scaleOf(draft, added.itemKey)), `${from} → ${to}`).toBe(to);
+      publishable(draft);
+    }
+  });
+
+  it("gives a Yes/No question new options when it becomes single choice or a rating (the Yes/No list would keep it Yes/No)", () => {
+    const { draft } = ops.changeQuestionType(live(), "ybm_smartphone.own", "rating");
+    expect(scaleOf(draft, "ybm_smartphone.own")!.options).toHaveLength(5);
+    // The shared Yes/No list is untouched for everyone else.
+    expect(draft.scales["scale.yes_no"]).toEqual(live().scales["scale.yes_no"]);
+    expect(scaleOf(draft, "ybm_smartphone.sm_use")!.key).toBe("scale.yes_no");
+  });
+});
+
+describe("participant-code questions keep their options", () => {
+  it("refuses pointing one at another option list, even when unlocked", () => {
+    const unlocked = ops.unlockModule(live(), "ybm_identity", { ...actor, reason: "Clarifying the wording for Year 7 pupils." }).draft;
+    const error = refusal(() => ops.updateQuestion(unlocked, "ybm_identity.ps_birth_month", { scale: "scale.yes_no" }));
+    expect(error.code).toBe("linkage");
+    expect(error.message).toMatch(/participant code is built from/);
+  });
+});
+
+describe("the archive is not a way round the tiers", () => {
+  it("refuses editing a licensed questionnaire's options through a question sharing them after its block is removed", () => {
+    const added = ops.addQuestion(live(), { sectionKey: "wellbeing", typeId: "single_choice", text: "Same again?" });
+    const shared = ops.updateQuestion(added.draft, added.itemKey, { scale: "scale.sdq_3pt" }).draft;
+    const removed = deepFreeze(ops.removeBlock(shared, "wellbeing", 1, actor).draft);
+    const error = refusal(() => ops.updateOption(removed, added.itemKey, 0, { label: "Changed" }));
+    expect(error.code).toBe("locked");
+    expect(error.message).toMatch(/\(archived\) in “Strengths and Difficulties/);
+    // Its own copy can change, and the questionnaire comes back as licensed.
+    const forked = ops.forkScale(removed, added.itemKey);
+    expect(forked.scaleKey).not.toBe("scale.sdq_3pt");
+    const edited = ops.updateOption(forked.draft, added.itemKey, 0, { label: "Changed" }).draft;
+    const restored = ops.restoreQuestion(edited, "sdq25_s.q1").draft;
+    expect(restored.scales["scale.sdq_3pt"]).toEqual(live().scales["scale.sdq_3pt"]);
+    publishable(restored);
+  });
+
+  it("refuses deleting one archived question of a licensed questionnaire, or of a protected module", () => {
+    const removed = ops.removeBlock(live(), "wellbeing", 1, actor).draft;
+    const error = refusal(() => ops.deleteQuestion(removed, "sdq25_s.q3", { published: new Set() }));
+    expect(error.code).toBe("locked");
+    expect(error.message).toMatch(/Strengths and Difficulties/);
+    expect(ops.restoreQuestion(removed, "sdq25_s.q1").restored).toHaveLength(25);
+
+    const reason = "Amendment 4 removes the old introduction paragraph.";
+    const unlocked = ops.unlockModule(live(), "ybm_intro_consent", { ...actor, reason }).draft;
+    const archived = ops.archiveQuestion(unlocked, "ybm_intro_consent.intro", actor).draft;
+    const relocked = ops.relockModule(archived, "ybm_intro_consent").draft;
+    expect(refusal(() => ops.deleteQuestion(relocked, "ybm_intro_consent.intro", { published: new Set() })).code).toBe("protected");
+    expect(ops.deleteQuestion(archived, "ybm_intro_consent.intro", { published: new Set() }).draft.archived).toEqual([]);
+  });
+});
+
+describe("options belong to the right questions", () => {
+  it("gives a question sharing its list its own copy before adding “Other”", () => {
+    const before = live();
+    const { draft, scaleKey, followUpItemKey } = ops.addOtherOption(before, "ybm_smartphone.own");
+    expect(scaleKey).not.toBe("scale.yes_no");
+    expect(scaleOf(draft, "ybm_smartphone.own")!.options.map((o) => o.label)).toEqual(["Yes", "No", "Other"]);
+    // Every other Yes/No question is exactly as it was.
+    expect(draft.scales["scale.yes_no"]).toEqual(before.scales["scale.yes_no"]);
+    expect(findQuestion(draft, followUpItemKey)!.item.displayIf).toBeDefined();
+    publishable(draft);
+  });
+
+  it("retires a removed value when a question using the list was published, even though its own copy's key never was", () => {
+    const forked = ops.forkScale(live(), "ybm_smartphone.sm_use");
+    const added = ops.addOption(forked.draft, "ybm_smartphone.sm_use", { label: "Sometimes" });
+    const published = new Set(["ybm_smartphone.sm_use"]);
+    const removed = ops.removeOption(added.draft, "ybm_smartphone.sm_use", 2, { published, at: actor.at }).draft;
+    expect(removed.retiredCodes[forked.scaleKey]).toEqual([{ code: 2, label: "No", retiredAt: actor.at }]);
+    expect(ops.addOption(removed, "ybm_smartphone.sm_use", { label: "Never" }).code).toBe(4);
+    // A set that names none of the list's questions retires nothing.
+    const unpublished = ops.removeOption(added.draft, "ybm_smartphone.sm_use", 2, { published: new Set(["kss.q1"]), at: actor.at }).draft;
+    expect(unpublished.retiredCodes[forked.scaleKey]).toBeUndefined();
+  });
+});
+
+describe("small holes", () => {
+  it("treats only the named modules as protected, never an inherited property", () => {
+    expect(refusal(() => ops.unlockModule(live(), "constructor", { ...actor, reason: "a long enough reason to be accepted" })).message).toMatch(
+      /is not protected/,
+    );
+    expect(refusal(() => ops.updateQuestion(live(), "ybm_smartphone.age_smartphone", { scale: "constructor" })).code).toBe("not_found");
+  });
+
+  it("keeps an archived neighbour's place when the question beside it is re-keyed", () => {
+    const archived = ops.archiveQuestion(live(), "ybm_smartphone.age_smartphone", actor).draft;
+    const renamed = ops.updateQuestion(archived, "ybm_smartphone.own", { key: "own_phone" }).draft;
+    const order = administered(publishable(ops.restoreQuestion(renamed, "ybm_smartphone.age_smartphone").draft));
+    expect(order.indexOf("ybm_smartphone.age_smartphone")).toBe(order.indexOf("ybm_smartphone.own_phone") + 1);
+  });
+});
