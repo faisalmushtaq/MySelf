@@ -1,0 +1,826 @@
+/*
+ * MySelf Studio — the platform around the editor: the header, sign-in, the
+ * survey list, versions and access.
+ *
+ * Built on studio.css (the kit) and the researcher tokens (docs/11 §1, §6):
+ * near-white canvas, black text, the green accent only for state, --warn for
+ * problems, hairlines rather than shadows. Everything is prefixed `stp-` so it
+ * never collides with the editor's or the preview's own styles.
+ */
+
+/* ── Links and small utilities ────────────────────────────────────────── */
+.studio a:not(.st-btn) {
+  color: inherit;
+}
+.studio a.st-btn {
+  text-decoration: none;
+}
+.stp-main a:not(.st-btn):not(.stp-nav-link),
+.stp-auth a:not(.st-btn) {
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+.stp-main a:not(.st-btn):not(.stp-nav-link):hover {
+  text-decoration-thickness: 2px;
+}
+.studio code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.86em;
+  background: var(--off-white);
+  border-radius: 4px;
+  padding: 0.05rem 0.3rem;
+}
+/* Headings receive focus after a page change so screen readers announce the
+   page; they are not controls, so they show no ring. */
+.studio h1[tabindex="-1"]:focus,
+.studio h1[tabindex="-1"]:focus-visible,
+.stp-main:focus,
+.stp-main:focus-visible {
+  box-shadow: none;
+  outline: none;
+}
+.stp-muted {
+  color: var(--muted);
+}
+.stp-gap {
+  margin-bottom: 1rem;
+}
+.stp-gap-top {
+  margin-top: 0.75rem;
+}
+.stp-flush {
+  margin-top: 0;
+}
+.stp-actions {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+}
+.stp-stack {
+  display: grid;
+  gap: 1.25rem;
+}
+.stp-textlink {
+  border: 0;
+  background: none;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+/* ── Shell ────────────────────────────────────────────────────────────── */
+.stp-app {
+  min-height: 100vh;
+  background: var(--canvas);
+}
+.stp-skip {
+  position: absolute;
+  left: 0.75rem;
+  top: -100px;
+  z-index: 300;
+  padding: 0.6rem 1rem;
+  background: #111;
+  color: #fff !important;
+  border-radius: var(--st-radius);
+  text-decoration: none;
+}
+.stp-skip:focus,
+.stp-skip:focus-visible {
+  top: 0.6rem;
+}
+.stp-header {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background: var(--canvas);
+  border-bottom: 1px solid var(--hairline);
+}
+.stp-header-inner {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  min-height: var(--st-header);
+  padding: 0 1.25rem;
+}
+.stp-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  min-width: 0;
+  flex: 0 1 auto;
+}
+.stp-wordmark {
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  font-size: 1.02rem;
+  white-space: nowrap;
+  text-decoration: none;
+  padding: 0.25rem 0.1rem;
+}
+.stp-wordmark span {
+  font-weight: 400;
+}
+.stp-crumb-sep {
+  color: var(--hairline-strong);
+  font-weight: 300;
+}
+.stp-crumb {
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 34ch;
+}
+.stp-nav {
+  display: flex;
+  align-items: stretch;
+  gap: 0.25rem;
+  align-self: stretch;
+  margin: 0 auto;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.stp-nav-spacer {
+  flex: 1;
+}
+.stp-nav-link {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 0.85rem;
+  text-decoration: none;
+  font-weight: 500;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  white-space: nowrap;
+  color: var(--text);
+}
+.stp-nav-link:hover {
+  border-bottom-color: var(--hairline-strong);
+}
+/* Current page: weight AND an underline, never colour alone. */
+.stp-nav-link.on {
+  font-weight: 600;
+  border-bottom-color: var(--accent);
+}
+.stp-nav-link:focus-visible {
+  box-shadow: inset 0 0 0 2px var(--accent);
+  border-radius: 4px;
+}
+.stp-user {
+  flex: none;
+  margin-left: auto;
+}
+.stp-nav + .stp-user {
+  margin-left: 0;
+}
+.stp-user-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.stp-user-email {
+  max-width: 24ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-weight: 400;
+}
+.stp-offline,
+.stp-playground-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.55rem 1.25rem;
+  font-size: 0.9rem;
+  border-bottom: 1px solid var(--hairline);
+}
+.stp-offline {
+  background: var(--warn-wash);
+  color: var(--text);
+}
+.stp-offline > .st-icon {
+  color: var(--warn);
+}
+.stp-playground-banner {
+  background: var(--off-white);
+}
+.stp-main {
+  display: block;
+}
+.stp-banners {
+  display: grid;
+  gap: 0.6rem;
+  max-width: 1100px;
+  margin: 1rem auto 0;
+  padding: 0 1.5rem;
+}
+
+/* ── Pages ────────────────────────────────────────────────────────────── */
+.stp-page {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 2rem 1.5rem 4rem;
+}
+.stp-page-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+.stp-h1 {
+  font-size: 1.6rem;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  margin: 0;
+}
+.stp-lede {
+  margin: 0.4rem 0 0;
+  max-width: 70ch;
+}
+.stp-h2 {
+  font-size: 1.08rem;
+  font-weight: 600;
+  margin: 0 0 0.35rem;
+}
+.stp-h3 {
+  font-size: 0.95rem;
+  font-weight: 600;
+  margin: 0 0 0.6rem;
+}
+.stp-section-title {
+  margin-top: 0.5rem;
+}
+.stp-section-lede {
+  margin: 0 0 0.9rem;
+}
+.stp-card {
+  background: var(--paper);
+  border: 1px solid var(--hairline);
+  border-radius: var(--st-radius-lg);
+  padding: 1.25rem 1.35rem;
+}
+.stp-card > p:last-child {
+  margin-bottom: 0;
+}
+.stp-details {
+  margin-top: 0.9rem;
+  border-top: 1px solid var(--hairline);
+  padding-top: 0.75rem;
+}
+.stp-details > summary {
+  cursor: pointer;
+  font-weight: 500;
+  width: fit-content;
+  list-style-position: outside;
+  margin-left: 1rem;
+}
+.stp-details[open] > summary {
+  margin-bottom: 0.75rem;
+}
+
+/* ── Sign-in ──────────────────────────────────────────────────────────── */
+.stp-auth {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem 1rem;
+  background: var(--canvas);
+}
+.stp-auth-card {
+  width: 100%;
+  max-width: 480px;
+  background: var(--paper);
+  border: 1px solid var(--hairline);
+  border-radius: 14px;
+  padding: 2.25rem 2.25rem 2rem;
+}
+.stp-auth-card.wide {
+  max-width: 560px;
+}
+.stp-auth-card p {
+  line-height: 1.55;
+}
+.stp-auth-mark {
+  margin: 0 0 1.75rem;
+  font-size: 1.15rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.stp-auth-mark span {
+  font-weight: 400;
+}
+.stp-auth-mark::after {
+  content: "";
+  display: block;
+  width: 28px;
+  height: 3px;
+  margin-top: 0.6rem;
+  border-radius: 2px;
+  background: var(--accent);
+}
+.stp-auth-title {
+  font-size: 1.45rem;
+  line-height: 1.25;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  margin: 0 0 0.9rem;
+}
+.stp-auth-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin: 1.5rem 0 0.5rem;
+}
+.stp-auth-small {
+  font-size: 0.9rem;
+  margin: 1rem 0 0;
+}
+.stp-auth-foot {
+  margin-top: 1.25rem;
+  font-size: 0.9rem;
+}
+.stp-checking {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin: 0;
+  min-height: 40px;
+}
+.stp-auth-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  max-width: 320px;
+  padding: 1.5rem;
+}
+
+/* ── Surveys ──────────────────────────────────────────────────────────── */
+.stp-survey-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.75rem;
+}
+.stp-survey {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem 1.5rem;
+  transition: border-color 0.15s;
+}
+.stp-survey:hover {
+  border-color: var(--hairline-strong);
+}
+.stp-survey-main {
+  min-width: 0;
+  flex: 1 1 420px;
+}
+.stp-survey-title {
+  font-size: 1.12rem;
+  font-weight: 600;
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+.stp-survey-title a {
+  text-decoration: none !important;
+}
+.stp-survey-title a:hover {
+  text-decoration: underline !important;
+}
+.stp-survey-id {
+  margin: 0.25rem 0 0.6rem;
+  font-size: 0.85rem;
+}
+.stp-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+.stp-survey-meta {
+  margin: 0.6rem 0 0;
+  font-size: 0.88rem;
+  color: var(--muted);
+}
+.stp-survey-actions {
+  display: flex;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
+.stp-first-run {
+  display: grid;
+  gap: 1rem;
+}
+.stp-import {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.25rem;
+  align-items: center;
+  justify-content: space-between;
+  border-color: rgba(6, 120, 67, 0.35);
+  background: linear-gradient(0deg, var(--accent-wash), var(--accent-wash)), var(--paper);
+  padding: 1.5rem;
+}
+.stp-import > div:first-child {
+  flex: 1 1 420px;
+}
+.stp-import p {
+  margin: 0.35rem 0 0;
+  max-width: 68ch;
+}
+.stp-import.compact {
+  padding: 1rem 1.25rem;
+}
+.stp-first-alt p {
+  margin: 0.2rem 0 1rem;
+  max-width: 68ch;
+}
+
+/* ── Forms inside dialogs and cards ───────────────────────────────────── */
+.stp-fieldset {
+  border: 0;
+  padding: 0;
+  margin: 0 0 1rem;
+  display: grid;
+  gap: 0.5rem;
+}
+.stp-fieldset > legend {
+  margin-bottom: 0.4rem;
+  padding: 0;
+}
+.stp-radio {
+  display: flex;
+  gap: 0.7rem;
+  align-items: flex-start;
+  padding: 0.7rem 0.85rem;
+  border: 1px solid var(--hairline);
+  border-radius: var(--st-radius);
+  cursor: pointer;
+}
+.stp-radio:has(input:checked) {
+  border-color: var(--accent);
+  background: var(--accent-wash);
+}
+.stp-radio input {
+  margin-top: 0.2rem;
+  accent-color: var(--accent);
+  width: 16px;
+  height: 16px;
+}
+.stp-radio span {
+  display: grid;
+  gap: 0.15rem;
+}
+.stp-radio small {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+.stp-radio.disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+.stp-indent {
+  padding: 0.5rem 0 0 1.9rem;
+}
+.stp-inline-form {
+  margin-top: 1.25rem;
+  padding-top: 1.1rem;
+  border-top: 1px solid var(--hairline);
+}
+.stp-inline-fields {
+  display: grid;
+  grid-template-columns: minmax(220px, 2fr) minmax(160px, 1fr) auto;
+  gap: 0 0.9rem;
+  align-items: start;
+}
+.stp-inline-submit {
+  padding-top: 1.45rem;
+}
+@media (max-width: 720px) {
+  .stp-inline-fields {
+    grid-template-columns: 1fr;
+  }
+  .stp-inline-submit {
+    padding-top: 0;
+  }
+}
+
+/* ── Conflict ─────────────────────────────────────────────────────────── */
+.stp-conflict {
+  flex-wrap: wrap;
+}
+.stp-conflict-text {
+  flex: 1 1 420px;
+}
+.stp-conflict-text p {
+  margin: 0.3rem 0 0;
+}
+.stp-conflict-actions {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  align-items: flex-start;
+}
+
+/* ── In-page tabs ─────────────────────────────────────────────────────── */
+.stp-tabs {
+  display: flex;
+  gap: 0.25rem;
+  border-bottom: 1px solid var(--hairline);
+  margin-bottom: 1.25rem;
+}
+.stp-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-height: 40px;
+  padding: 0 0.9rem;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  background: none;
+  font: inherit;
+  font-weight: 500;
+  cursor: pointer;
+}
+.stp-tab:hover {
+  border-bottom-color: var(--hairline-strong);
+}
+.stp-tab.on {
+  font-weight: 600;
+  border-bottom-color: var(--accent);
+}
+.stp-tab:focus-visible {
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+.stp-tab-count,
+.stp-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.5rem;
+  height: 1.25rem;
+  padding: 0 0.35rem;
+  border-radius: 999px;
+  background: var(--off-white);
+  font-size: 0.78rem;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+.stp-tabpanel:focus-visible {
+  box-shadow: var(--st-focus);
+}
+
+/* ── Versions ─────────────────────────────────────────────────────────── */
+.stp-versions {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.9rem;
+}
+.stp-version.live {
+  border-color: rgba(6, 120, 67, 0.45);
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+.stp-version-head {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.6rem;
+}
+.stp-version-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+.stp-version-title .stp-h2 {
+  margin: 0;
+  font-size: 1.2rem;
+  font-variant-numeric: tabular-nums;
+}
+.stp-version-meta {
+  margin: 0.3rem 0 0.75rem;
+  font-size: 0.88rem;
+  color: var(--muted);
+}
+.stp-version-note {
+  margin: 0 0 0.9rem;
+  max-width: 75ch;
+  white-space: pre-line;
+}
+.stp-facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.75rem 1.25rem;
+  margin: 0;
+}
+.stp-facts > div {
+  min-width: 0;
+}
+.stp-facts dt {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 0.2rem;
+}
+.stp-facts dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.stp-facts-wide {
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+}
+.stp-changes {
+  display: grid;
+  gap: 1rem;
+}
+.stp-changes-note {
+  margin: 0;
+  font-size: 0.88rem;
+}
+.stp-change-group h4 {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin: 0 0 0.4rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+.stp-change-group ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--hairline);
+}
+.stp-change-group li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.45rem 0;
+  border-bottom: 1px solid var(--hairline);
+  font-size: 0.92rem;
+}
+.stp-compare-pick {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0 0.9rem;
+  margin-bottom: 0.5rem;
+}
+.stp-compare-pick .st-field {
+  flex: 1 1 260px;
+}
+.stp-compare-arrow {
+  padding-bottom: 1.6rem;
+  font-size: 1.1rem;
+}
+.stp-audit {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid var(--hairline);
+}
+.stp-audit li {
+  display: grid;
+  grid-template-columns: 9.5rem 1fr;
+  gap: 1rem;
+  padding: 0.6rem 0;
+  border-bottom: 1px solid var(--hairline);
+  font-size: 0.92rem;
+}
+.stp-audit time {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+@media (max-width: 560px) {
+  .stp-audit li {
+    grid-template-columns: 1fr;
+    gap: 0.1rem;
+  }
+}
+
+/* ── Access ───────────────────────────────────────────────────────────── */
+.stp-table-wrap {
+  overflow-x: auto;
+  margin-top: 0.75rem;
+}
+.stp-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.92rem;
+}
+.stp-table th,
+.stp-table td {
+  text-align: left;
+  vertical-align: top;
+  padding: 0.6rem 0.75rem 0.6rem 0;
+  border-bottom: 1px solid var(--hairline);
+}
+.stp-table thead th {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding-top: 0;
+}
+.stp-cell-email {
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+.stp-cell-action {
+  width: 1%;
+  text-align: right;
+}
+.stp-role-select {
+  min-width: 9.5rem;
+  min-height: 36px;
+  padding: 0.3rem 0.5rem;
+}
+.stp-rules {
+  list-style: none;
+  margin: 0.75rem 0 0;
+  padding: 0;
+  border-top: 1px solid var(--hairline);
+}
+.stp-rules li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.45rem 0;
+  border-bottom: 1px solid var(--hairline);
+}
+.stp-roles {
+  display: grid;
+  gap: 0.6rem;
+  margin: 0.5rem 0 1rem;
+}
+.stp-roles > div {
+  display: grid;
+  grid-template-columns: 7.5rem 1fr;
+  gap: 1rem;
+}
+.stp-roles dt {
+  font-weight: 600;
+}
+.stp-roles dd {
+  margin: 0;
+}
+
+/* Text to be typed exactly (a version, a domain) is shown exactly, not in
+   the label's capitals. */
+.studio .st-field-label strong {
+  text-transform: none;
+  letter-spacing: 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.9rem;
+}
+
+/* ── Narrow screens ───────────────────────────────────────────────────── */
+@media (max-width: 760px) {
+  .stp-nav + .stp-user {
+    margin-left: auto;
+  }
+  .stp-header-inner {
+    flex-wrap: wrap;
+    gap: 0.25rem 0.75rem;
+    padding: 0.4rem 1rem 0;
+  }
+  .stp-nav {
+    order: 3;
+    width: 100%;
+    margin: 0;
+    min-height: 40px;
+  }
+  .stp-crumb {
+    max-width: 18ch;
+  }
+  .stp-user-email {
+    display: none;
+  }
+  .stp-page {
+    padding: 1.5rem 1rem 3rem;
+  }
+  .stp-banners {
+    padding: 0 1rem;
+  }
+  .stp-auth-card {
+    padding: 1.75rem 1.4rem;
+  }
+}

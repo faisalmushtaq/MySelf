@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { buildBidsExport, buildDemoSessions, buildZip, summarise, wideTable, type Dataset } from "@myself/store";
 import { DataTable, downloadCsv } from "./components/DataTable.js";
 import { Linkage } from "./components/Linkage.js";
@@ -51,7 +51,40 @@ const plural = (n: number, noun: string): string => `${n} ${noun}${n === 1 ? "" 
 
 type Tab = "overview" | "table" | "linkage" | "mystory" | "data";
 
+/**
+ * MySelf Studio (docs/16) lives at `#/…` addresses on the same page, loaded as
+ * its own chunk only when one is opened. Any other address is this view,
+ * exactly as before.
+ */
+const StudioRoot = lazy(() => import("./studio/StudioRoot.js"));
+
+function subscribeToHash(listener: () => void): () => void {
+  window.addEventListener("hashchange", listener);
+  // The Studio's router also announces address changes it makes without one.
+  window.addEventListener("studio:navigate", listener);
+  return () => {
+    window.removeEventListener("hashchange", listener);
+    window.removeEventListener("studio:navigate", listener);
+  };
+}
+
 export default function App() {
+  const inStudio = useSyncExternalStore(
+    subscribeToHash,
+    () => window.location.hash.startsWith("#/"),
+    () => false,
+  );
+  if (inStudio) {
+    return (
+      <Suspense fallback={<p className="working">Opening MySelf Studio…</p>}>
+        <StudioRoot />
+      </Suspense>
+    );
+  }
+  return <ResearcherView />;
+}
+
+function ResearcherView() {
   const [dataset, setDataset] = useState<Dataset | null>(null);
   const [issues, setIssues] = useState<{
     rejected: { sessionId: string; reason: string }[];
@@ -198,6 +231,13 @@ export default function App() {
                       : "Data in and out"}
             </button>
           ))}
+          <a
+            className="tab"
+            href="#/surveys"
+            style={{ display: "inline-flex", alignItems: "center", textDecoration: "none", color: "var(--accent)" }}
+          >
+            Survey Studio&nbsp;<span aria-hidden="true">→</span>
+          </a>
         </nav>
       </header>
 
