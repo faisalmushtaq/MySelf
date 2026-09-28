@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { userInfo } from "node:os";
 import { initializeApp, applicationDefault, cert } from "firebase-admin/app";
 import { FieldValue, getFirestore } from "firebase-admin/firestore";
+import consumerDomains from "./src/studio/consumer-domains.json" with { type: "json" };
 
 /**
  * Who may use MySelf Studio — administered from a machine with admin
@@ -31,20 +32,12 @@ import { FieldValue, getFirestore } from "firebase-admin/firestore";
 
 const ROLES = ["viewer", "editor", "publisher", "admin"];
 
-/** Consumer mail domains: admitting one would admit everybody with an address there. */
-const CONSUMER_DOMAINS = new Set([
-  "gmail.com",
-  "googlemail.com",
-  "outlook.com",
-  "hotmail.com",
-  "live.com",
-  "yahoo.com",
-  "icloud.com",
-  "me.com",
-  "aol.com",
-  "proton.me",
-  "protonmail.com",
-]);
+/**
+ * Consumer mail domains: admitting one would admit everybody with an address
+ * there. The same file the `studioSetDomain` function refuses them from
+ * (src/studio/domains.ts), so the command line and the Settings page agree.
+ */
+const CONSUMER_DOMAINS = new Set(consumerDomains);
 
 const args = process.argv.slice(2);
 const flag = (name) => {
