@@ -114,6 +114,38 @@ jobs:
           path: test-results/
           retention-days: 7
 
+  # MySelf Studio, the whole loop (docs/16 §9): sign in, edit, be stopped by
+  # validation, fix, preview, publish through the real studioPublish, then the
+  # public survey loads the new version and a sitting on it is filed stamped
+  # with it — while a sitting recorded earlier stays exactly as it was. Auth,
+  # Firestore and Functions all run as emulators, so nothing between the
+  # browser and the database is mocked.
+  studio:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm -r build
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm test:e2e:studio
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: studio-trace
+          path: test-results/
+          retention-days: 7
+
   # Security rules are the access control on Firebase, so an untested rules
   # change is an untested security change. This runs them against the real
   # Firestore emulator, from both sides of every rule.
