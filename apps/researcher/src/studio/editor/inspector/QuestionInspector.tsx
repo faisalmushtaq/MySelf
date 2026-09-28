@@ -19,8 +19,9 @@ import { useEditor } from "../context.js";
 import { Disclosure, IssueMessages, NumberField, ReadOnlyValue, TextField } from "../node/controls.js";
 import { noteRename } from "../node/identity.js";
 import { questionIssues, type FieldIssues } from "../node/issues.js";
-import { identifierLock, questionLock, tierAllows, type QuestionLock } from "../node/locks.js";
+import { identifierLock, publishedPending, questionLock, tierAllows, type QuestionLock } from "../node/locks.js";
 import { useQuestionWriter, type WriteQuestion } from "../node/QuestionEditor.js";
+import { unlessUnchanged } from "../node/unchanged.js";
 import { PRESENTATIONS } from "../node/types.js";
 import { PatternExplanation, PatternTester } from "../node/WelcomeEditor.js";
 import { patternError } from "../node/pattern.js";
@@ -444,8 +445,10 @@ function Identity({ itemKey, stableId, item, lock, issues, write, can, why }: Se
   const { draft } = ctx;
   const instrument = itemKey.slice(0, itemKey.indexOf("."));
   const key = itemKey.slice(itemKey.indexOf(".") + 1);
-  const keyLock = ctx.canEdit ? identifierLock(lock, "ID") : ctx.readOnlyReason;
-  const variableLock = ctx.canEdit ? identifierLock(lock, "reporting label") : ctx.readOnlyReason;
+  // REVIEW FIX: both lock once published, so neither can change before that is known.
+  const pending = publishedPending(ctx.publishedStatus);
+  const keyLock = ctx.canEdit ? (identifierLock(lock, "ID") ?? pending) : ctx.readOnlyReason;
+  const variableLock = ctx.canEdit ? (identifierLock(lock, "reporting label") ?? pending) : ctx.readOnlyReason;
   const notes = draft.notes[itemKey]?.codingNotes ?? "";
 
   const rename = useCallback(
@@ -580,7 +583,12 @@ function Identity({ itemKey, stableId, item, lock, issues, write, can, why }: Se
         readOnly={!ctx.canEdit}
         lockedReason={ctx.readOnlyReason}
         hint="For analysts: how to code or clean this column. Kept with the draft only — never published."
-        onCommit={(t) => ctx.run(`Edit the coding notes of ${itemKey}`, (d) => setQuestionNotes(d, itemKey, { codingNotes: t.trim() ? t : null }).draft)}
+        onCommit={(t) =>
+          ctx.run(`Edit the coding notes of ${itemKey}`, (d) =>
+            // Stored trimmed: no undo step for a space at the end (unchanged.ts).
+            unlessUnchanged(d, setQuestionNotes(d, itemKey, { codingNotes: t.trim() ? t : null }).draft, (x) => x.notes[itemKey]),
+          )
+        }
         emptyText="None"
       />
       <TextField
@@ -638,7 +646,9 @@ function Status({ itemKey, item, lock }: { itemKey: string; item: ItemDefinition
         : lock.identityRole === "linkage"
           ? "The participant code is built from this answer, so it can never be removed."
           : null;
-  const deleteBlocked = lock.published ? "Published questions are archived, never deleted." : archiveBlocked;
+  // REVIEW FIX: only a never-published question may be deleted, so not before that is known.
+  const pending = publishedPending(ctx.publishedStatus);
+  const deleteBlocked = lock.published ? "Published questions are archived, never deleted." : (pending ?? archiveBlocked);
 
   const archive = () => {
     setConfirm(null);
@@ -665,6 +675,10 @@ function Status({ itemKey, item, lock }: { itemKey: string; item: ItemDefinition
             </Badge>{" "}
             {baselineHas && live ? `In the live version, ${versionLabel(live)}.` : "In an earlier published version."} Its ID and reporting label
             are fixed, and removing it archives it.
+          </>
+        ) : pending ? (
+          <>
+            <Badge tone="muted">Checking</Badge> {pending}
           </>
         ) : (
           <>

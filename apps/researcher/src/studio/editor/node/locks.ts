@@ -125,6 +125,24 @@ export function identifierLock(lock: QuestionLock, what: "ID" | "reporting label
   return null;
 }
 
+/**
+ * Why a change that depends on what has been published has to wait, or null
+ * once that is known.
+ *
+ * REVIEW FIX: until the published versions have loaded (or when they fail to),
+ * `publishedItemKeys` is empty, so every question looked never-published: its
+ * type could be changed in place, its ID and reporting label renamed, the
+ * question deleted outright, and a removed option's value freed for reuse —
+ * on questions participants have already answered, which is how recorded
+ * answers end up meaning two things. Those changes wait until it is known.
+ */
+export function publishedPending(status: "loading" | "ready" | "error"): string | null {
+  if (status === "ready") return null;
+  return status === "loading"
+    ? "Checking what has been published. This can change once that is known."
+    : "What has been published couldn't be loaded, so this can't be changed safely. Reload the page to try again.";
+}
+
 /** Why a question's type can't change, or null when it can (a published question is offered a replacement instead). */
 export function typeLock(lock: QuestionLock): string | null {
   if (lock.tier === "locked") return "Part of a licensed questionnaire: its question types are fixed.";

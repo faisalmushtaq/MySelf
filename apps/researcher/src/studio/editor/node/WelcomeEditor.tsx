@@ -1,11 +1,12 @@
 import { useCallback, useId, useMemo, useState } from "react";
-import { updateWelcome, type WelcomePatch } from "@myself/studio";
+import { updateWelcome, type StudioDraft, type WelcomePatch } from "@myself/studio";
 import { Icon } from "../../ui/icons.js";
 import { Button } from "../../ui/kit.js";
 import { useEditor } from "../context.js";
 import { IssueMessages, Panel, ReadOnlyValue, TextField } from "./controls.js";
 import { issuesAt, screenIssues } from "./issues.js";
 import { explainPattern, isAnchored, patternError, testPattern } from "./pattern.js";
+import { unlessUnchanged } from "./unchanged.js";
 
 /**
  * The start screen: the first thing a participant sees, before any question.
@@ -18,6 +19,9 @@ const DEFAULT_CODE = {
   hint: "Letters and numbers, between 3 and 16 characters",
 };
 
+/** What `updateWelcome` can change. */
+const welcomePart = (d: StudioDraft) => [d.composition.participantCode, d.composition.studyLabel, d.composition.contact];
+
 export function WelcomeEditor() {
   const ctx = useEditor();
   const { draft } = ctx;
@@ -26,7 +30,8 @@ export function WelcomeEditor() {
   const issues = useMemo(() => screenIssues(ctx.issues, "welcome"), [ctx.issues]);
   const readOnly = !ctx.canEdit;
   const write = useCallback(
-    (label: string, patch: WelcomePatch) => ctx.run(label, (d) => updateWelcome(d, patch).draft),
+    // No undo step for an edit that changes nothing, e.g. spaces in an empty box (unchanged.ts).
+    (label: string, patch: WelcomePatch) => ctx.run(label, (d) => unlessUnchanged(d, updateWelcome(d, patch).draft, welcomePart)),
     [ctx],
   );
   const validatePattern = useCallback((text: string) => (text.trim() ? patternError(text) : "The code needs a format, or any text at all would be accepted."), []);
@@ -213,7 +218,7 @@ function ContactPanel() {
     (text: string) => (!text.trim() ? "A contact needs an email address." : /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(text.trim()) ? null : "Enter an email address, like name@example.ac.uk."),
     [],
   );
-  const write = (patch: WelcomePatch) => ctx.run("Edit the contact details", (d) => updateWelcome(d, patch).draft);
+  const write = (patch: WelcomePatch) => ctx.run("Edit the contact details", (d) => unlessUnchanged(d, updateWelcome(d, patch).draft, welcomePart));
 
   return (
     <Panel

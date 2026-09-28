@@ -190,6 +190,24 @@ export function focusSelectors(field: string): string[] {
   return [...new Set(out)];
 }
 
+/** Where focus was when the control holding it disappeared: its panel and the `data-field` containers around it, innermost first. */
+export interface FocusRecord {
+  panel: string;
+  fields: readonly string[];
+}
+
+/**
+ * Where to put focus back when the control holding it has gone (focus.ts,
+ * `useFocusRescue`): the nearest field around it that is still on screen —
+ * "Add a condition" becomes the rule builder, "Add ‘More information’" its
+ * boxes — and failing that, the heading of whatever the centre now shows.
+ */
+export function rescueSelectors(record: FocusRecord): string[] {
+  const out = record.fields.map((f) => `${record.panel} [data-field="${cssString(f)}"]`);
+  out.push(".ste-centre [data-editor-heading]");
+  return [...new Set(out)];
+}
+
 function cssString(value: string): string {
   return value.replace(/["\\]/g, "\\$&");
 }

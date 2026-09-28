@@ -6,8 +6,10 @@ import { Icon } from "../../ui/icons.js";
 import { Button } from "../../ui/kit.js";
 import { useEditor } from "../context.js";
 import { LockBanner, Panel } from "./controls.js";
+import { publishedPending } from "./locks.js";
 import { archivedTierOf, kindLabel } from "./options.js";
 import { TYPE_ICONS, typeLabel } from "./types.js";
+import { UnlockDialog } from "./UnlockDialog.js";
 
 /**
  * An archived question: no longer asked, kept whole so it can come back.
@@ -25,6 +27,7 @@ export function ArchivedQuestion({ record }: { record: ArchivedRecord }) {
   const original = sections.find((s) => s.key === record.sectionKey);
   const [target, setTarget] = useState(original?.key ?? sections[0]?.key ?? "");
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [unlocking, setUnlocking] = useState(false);
   const selectId = useId();
   const item = record.item;
   const scale = "scale" in item ? draft.scales[item.scale] : undefined;
@@ -33,6 +36,7 @@ export function ArchivedQuestion({ record }: { record: ArchivedRecord }) {
   const tier = archivedTierOf(draft, record);
   const at = new Date(record.archivedAt);
   const siblings = tier === "locked" ? draft.archived.filter((a) => a.refKey === record.refKey).length : 1;
+  const protectedModuleKey = tier === "protected" ? record.itemKey.slice(0, record.itemKey.indexOf(".")) : null;
 
   const restore = () => {
     const out: { restored?: string[] } = {};
@@ -56,9 +60,13 @@ export function ArchivedQuestion({ record }: { record: ArchivedRecord }) {
     }
   };
 
+  // REVIEW FIX: deleting is only for a question never published, so it waits until that is known.
+  const pending = publishedPending(ctx.publishedStatus);
   const deleteBlocked = published
     ? "It has been published, so it can't be deleted: its ID stays reserved and the answers recorded under it stay readable."
-    : tier === "locked"
+    : pending
+      ? pending
+      : tier === "locked"
       ? "It belongs to a licensed questionnaire, which is only valid asked whole. It stays archived, and restoring it brings back the whole questionnaire."
       : tier === "protected"
         ? "It belongs to a protected module. Unlock the module to delete it."
@@ -131,10 +139,23 @@ export function ArchivedQuestion({ record }: { record: ArchivedRecord }) {
               {siblings > 1 ? ` Its questionnaire is licensed and only asked whole, so all ${siblings} of its archived questions come back together.` : ""}
             </p>
           </div>
-          <Button variant="primary" icon="restore" onClick={restore} disabled={!ctx.canEdit || !target}>
+          <Button variant="primary" icon="restore" onClick={restore} disabled={!ctx.canEdit || !target || protectedModuleKey !== null}>
             Restore
           </Button>
         </div>
+        {protectedModuleKey ? (
+          // REVIEW FIX: a protected module's question can only be restored once
+          // the module is unlocked (the model refuses otherwise), and when the
+          // whole module is archived there is nowhere else to unlock it from.
+          <div className="stn-row-actions">
+            <p className="stn-hint stn-lockreason">
+              <Icon name="lock" size={14} /> It belongs to a protected module. Unlock the module to restore it.
+            </p>
+            <Button size="sm" variant="secondary" icon="unlock" onClick={() => setUnlocking(true)} disabled={!ctx.canEdit}>
+              Unlock…
+            </Button>
+          </div>
+        ) : null}
       </Panel>
 
       <Panel title="Delete permanently">
@@ -163,6 +184,7 @@ export function ArchivedQuestion({ record }: { record: ArchivedRecord }) {
           onConfirm={remove}
         />
       ) : null}
+      {unlocking && protectedModuleKey ? <UnlockDialog instrument={protectedModuleKey} onClose={() => setUnlocking(false)} /> : null}
     </div>
   );
 }

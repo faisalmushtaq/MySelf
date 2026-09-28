@@ -15,7 +15,8 @@ export function SurveyFacts({ tip }: { tip?: ReactNode }) {
   const { draft } = ctx;
   const c = draft.composition;
   const questions = useMemo(() => new Set(liveQuestions(draft).map((q) => q.itemKey)), [draft]);
-  const newQuestions = [...questions].filter((k) => !ctx.publishedItemKeys.has(k)).length;
+  // Not counted until what has been published is known: every question would count as new.
+  const newQuestions = ctx.publishedStatus === "ready" ? [...questions].filter((k) => !ctx.publishedItemKeys.has(k)).length : 0;
   const { errors, warnings } = summariseIssues(ctx.issues);
   const active = ctx.published?.active ?? null;
   const unlocked = Object.keys(draft.unlocked);
@@ -112,7 +113,12 @@ export function ArchivedFacts({ record }: { record: ArchivedQuestion }) {
             { label: "Archived", value: `${formatDateTime(Number.isNaN(at.getTime()) ? null : at)} by ${record.archivedBy}` },
             {
               label: "Published",
-              value: ctx.publishedItemKeys.has(record.itemKey) ? "Yes — its ID and label stay reserved for good" : "No — it can be deleted",
+              value: ctx.publishedItemKeys.has(record.itemKey)
+                ? "Yes — its ID and label stay reserved for good"
+                : // REVIEW FIX: not "No" while what has been published is still unknown.
+                  ctx.publishedStatus !== "ready"
+                  ? "Checking…"
+                  : "No — it can be deleted",
             },
           ]}
         />

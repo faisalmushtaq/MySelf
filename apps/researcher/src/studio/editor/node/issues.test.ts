@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { findQuestion, scaleUsage, updateOption, updateQuestion, updateScreen, validateDraft, type Issue } from "@myself/studio";
 import { liveDraft } from "./fixture.js";
-import { blockIssues, focusSelectors, GENERAL, issuesAt, leadIssue, questionField, questionIssues, screenIssues, sectionIssues } from "./issues.js";
+import { blockIssues, focusSelectors, GENERAL, issuesAt, leadIssue, questionField, questionIssues, rescueSelectors, screenIssues, sectionIssues } from "./issues.js";
 
 describe("issues sorted to fields", () => {
   it("puts a question's missing text on its stem field", () => {
@@ -96,5 +96,25 @@ describe("focus selectors for a jump", () => {
     const s = focusSelectors("participantCode.pattern");
     expect(s[0]).toBe('[data-field="participantCode.pattern"]');
     expect(s[s.length - 1]).toBe('[data-field="participantCode"]');
+  });
+});
+
+// REVIEW FIX: focus that an action would drop to the top of the page goes back
+// to the nearest field still on screen, else the centre editor's heading.
+describe("where lost focus goes back to", () => {
+  it("tries the fields around the lost control, innermost first, then the heading", () => {
+    expect(rescueSelectors({ panel: ".ste-centre", fields: ["moreInfo.label", "moreInfo"] })).toEqual([
+      '.ste-centre [data-field="moreInfo.label"]',
+      '.ste-centre [data-field="moreInfo"]',
+      ".ste-centre [data-editor-heading]",
+    ]);
+  });
+
+  it("goes to the centre's heading from a settings-panel button that belongs to no field (Archive)", () => {
+    expect(rescueSelectors({ panel: ".ste-right", fields: [] })).toEqual([".ste-centre [data-editor-heading]"]);
+  });
+
+  it("quotes field names inside the selector", () => {
+    expect(rescueSelectors({ panel: ".ste-centre", fields: ['a"b'] })[0]).toBe(String.raw`.ste-centre [data-field="a\"b"]`);
   });
 });

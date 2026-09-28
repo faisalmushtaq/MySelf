@@ -2,6 +2,7 @@ import { memo, useCallback, useId, useMemo, useRef, useState, type DragEvent, ty
 import {
   addOption,
   addOtherOption,
+  findQuestion,
   forkScale,
   moveOption,
   removeOption,
@@ -9,6 +10,7 @@ import {
   updateOption,
   type Issue,
   type ScaleInput,
+  type StudioDraft,
 } from "@myself/studio";
 import { ConfirmDialog } from "../../ui/dialog.js";
 import { Icon } from "../../ui/icons.js";
@@ -17,6 +19,7 @@ import { useEditor } from "../context.js";
 import { Disclosure, IssueMessages, useSyncedText } from "./controls.js";
 import { focusSoon } from "./focus.js";
 import type { FieldIssues } from "./issues.js";
+import { unlessUnchanged } from "./unchanged.js";
 import {
   dropIndex,
   kindLabel,
@@ -49,6 +52,12 @@ import {
 
 type ScaleOption = ScaleInput["options"][number];
 
+/** The option list a question uses in a draft, for comparing before and after an edit. */
+function scaleOfQuestion(draft: StudioDraft, itemKey: string): ScaleInput | null {
+  const item = findQuestion(draft, itemKey)?.item;
+  return item && "scale" in item ? (draft.scales[item.scale] ?? null) : null;
+}
+
 export function OptionsEditor({
   itemKey,
   scaleKey,
@@ -67,7 +76,11 @@ export function OptionsEditor({
   const shared = useMemo(() => sharedWith(draft, itemKey), [draft, itemKey]);
   const editable = ctx.canEdit && access.editable;
   const publishedCodes = ctx.published?.publishedScaleCodes.get(scaleKey);
-  const isPublished = listPublished(draft, itemKey, ctx.publishedItemKeys);
+  // REVIEW FIX: until what has been published is known, a removed value is
+  // treated as published — asked about, and retired rather than freed — since
+  // a freed value can be handed to a new option and old answers misread.
+  const publishedKnown = ctx.publishedStatus === "ready";
+  const isPublished = !publishedKnown || listPublished(draft, itemKey, ctx.publishedItemKeys);
   const helpId = useId();
   const [removing, setRemoving] = useState<ScaleOption | null>(null);
   const [marker, setMarker] = useState<{ index: number; after: boolean } | null>(null);
@@ -76,17 +89,24 @@ export function OptionsEditor({
 
   // The row callbacks read the latest draft through a ref, so they keep one
   // identity and a memoised row re-renders only when its own option changes.
-  const latest = useRef({ ctx, scale, itemKey, publishedCodes, isPublished });
-  latest.current = { ctx, scale, itemKey, publishedCodes, isPublished };
+  const latest = useRef({ ctx, scale, itemKey, publishedCodes, isPublished, publishedKnown });
+  latest.current = { ctx, scale, itemKey, publishedCodes, isPublished, publishedKnown };
 
+  // REVIEW FIX: labels and descriptions are stored trimmed, so a space typed at
+  // the end changes nothing; `unlessUnchanged` keeps that from recording an
+  // empty undo step and an autosave.
   const onLabel = useCallback((code: number, label: string) => {
     const { ctx, itemKey } = latest.current;
-    ctx.run(`Edit option ${code} of ${itemKey}`, (d) => updateOption(d, itemKey, code, { label }).draft);
+    ctx.run(`Edit option ${code} of ${itemKey}`, (d) => unlessUnchanged(d, updateOption(d, itemKey, code, { label }).draft, (x) => scaleOfQuestion(x, itemKey)));
   }, []);
   const onDescription = useCallback((code: number, description: string) => {
     const { ctx, itemKey } = latest.current;
     ctx.run(`Edit the description of option ${code} of ${itemKey}`, (d) =>
-      updateOption(d, itemKey, code, { description: description.trim() ? description : null }).draft,
+      unlessUnchanged(
+        d,
+        updateOption(d, itemKey, code, { description: description.trim() ? description : null }).draft,
+        (x) => scaleOfQuestion(x, itemKey),
+      ),
     );
   }, []);
   const onKind = useCallback((code: number, kind: NonNullable<OptionKind>) => {
@@ -115,10 +135,10 @@ export function OptionsEditor({
   }, []);
 
   function remove(option: ScaleOption) {
-    const { ctx, itemKey, scale } = latest.current;
+    const { ctx, itemKey, scale, publishedKnown } = latest.current;
     const index = scale?.options.findIndex((o) => o.code === option.code) ?? -1;
     const ok = ctx.run(`Remove option ${option.code} of ${itemKey}`, (d) =>
-      removeOption(d, itemKey, option.code, { published: ctx.publishedItemKeys, at: new Date().toISOString() }).draft,
+      removeOption(d, itemKey, option.code, { published: publishedKnown ? ctx.publishedItemKeys : true, at: new Date().toISOString() }).draft,
     );
     if (ok) {
       ctx.announce(`Removed “${option.label}”. Undo brings it back.`);
@@ -210,6 +230,8 @@ export function OptionsEditor({
     if (ok && out.followUp) {
       setAdded({ followUp: out.followUp, forked: out.forked ?? false });
       ctx.announce("Added an “Other” option and a follow-up question shown only when “Other” is chosen.");
+      // REVIEW FIX: the "Add ‘Other’" button is gone now; the next step is the follow-up.
+      focusSoon("[data-followup-action]");
     }
   };
 
@@ -289,7 +311,7 @@ export function OptionsEditor({
             tone="accent"
             title="Added “Other” and a follow-up question"
             action={
-              <Button size="sm" onClick={() => ctx.select({ kind: "question", itemKey: added.followUp }, { field: "stem" })}>
+              <Button size="sm" data-followup-action onClick={() => ctx.select({ kind: "question", itemKey: added.followUp }, { field: "stem" })}>
                 Edit the follow-up
               </Button>
             }
@@ -304,7 +326,7 @@ export function OptionsEditor({
           title={`Remove “${shortText(removing.label, 40)}”?`}
           body={
             <>
-              <p className="stn-flush">{removalConsequence(removing, true, publishedCodes?.get(removing.code))}</p>
+              <p className="stn-flush">{removalConsequence(removing, true, publishedCodes)}</p>
               {shared.live.length > 0 ? <p>It is removed from all {usersCount} questions that share this list.</p> : null}
             </>
           }
@@ -536,7 +558,16 @@ const OptionRow = memo(function OptionRow(props: RowProps) {
             ))}
           </select>
           {!showDescription ? (
-            <button type="button" className="stn-linkbtn" data-part="add-description" onClick={() => setShowDescription(true)}>
+            <button
+              type="button"
+              className="stn-linkbtn"
+              data-part="add-description"
+              onClick={() => {
+                setShowDescription(true);
+                // REVIEW FIX: this button disappears; carry on in the box it opened.
+                focusSoon(`[data-row-code="${code}"] [data-part="description"]`);
+              }}
+            >
               Add a description
             </button>
           ) : null}
