@@ -1,0 +1,150 @@
+/*
+ * The checks drawer: over the settings panel on a wide screen, a bottom sheet
+ * on a narrow one. Not modal — the editor stays live beside it — so it has a
+ * clear edge and shadow rather than a backdrop.
+ */
+
+.sto-vp {
+  position: fixed;
+  top: var(--sto-vp-top, 0px);
+  right: 0;
+  bottom: 0;
+  z-index: 40;
+  width: min(420px, 100vw);
+  display: flex;
+  flex-direction: column;
+  background: var(--paper);
+  border-left: 1px solid var(--hairline-strong);
+  box-shadow: var(--st-shadow-lg);
+}
+.sto-vp-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.6rem 0.75rem 0.4rem 1.1rem;
+  border-bottom: 1px solid var(--hairline);
+}
+.sto-vp-head h2 {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+.studio .sto-vp-head h2:focus,
+.studio .sto-vp-head h2:focus-visible {
+  box-shadow: none;
+}
+.sto-vp-body {
+  flex: 1;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0.85rem 1.1rem 2rem;
+}
+.sto-vp-summary {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin: 0 0 0.6rem;
+  font-size: 1rem;
+}
+.sto-vp-summary > .st-icon {
+  color: var(--accent);
+}
+.sto-vp-summary.has-errors > .st-icon,
+.sto-vp-summary.has-warnings > .st-icon {
+  color: var(--warn);
+}
+.sto-vp-summary.has-errors {
+  color: var(--warn);
+}
+.sto-vp-lede {
+  margin: 0 0 0.5rem;
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+.sto-vp-quiet {
+  color: var(--muted);
+  margin-bottom: 1rem;
+}
+
+.sto-vp-sev {
+  margin-top: 1rem;
+}
+.sto-vp-sev > h3 {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0 0 0.5rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.sto-vp-sev > h3 > .st-icon {
+  color: var(--warn);
+}
+.sto-vp-count {
+  display: inline-flex;
+  min-width: 1.4rem;
+  justify-content: center;
+  padding: 0 0.35rem;
+  border-radius: 999px;
+  background: var(--off-white);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
+}
+.sto-vp-error > h3 .sto-vp-count {
+  background: var(--warn);
+  color: #fff;
+}
+
+.sto-vp-group {
+  border-top: 1px solid var(--hairline);
+  padding: 0.6rem 0 0.4rem;
+}
+.sto-vp-group h4 {
+  margin: 0 0 0.35rem;
+  font-size: 0.86rem;
+  font-weight: 600;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+.sto-vp-context {
+  font-weight: 400;
+  color: var(--muted);
+}
+.sto-vp-group ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.5rem;
+}
+.sto-vp-group li {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.6rem;
+  align-items: start;
+  font-size: 0.86rem;
+  line-height: 1.45;
+}
+.sto-vp-error .sto-vp-group li {
+  padding-left: 0.6rem;
+  border-left: 3px solid var(--warn);
+}
+.sto-vp-warning .sto-vp-group li {
+  padding-left: 0.6rem;
+  border-left: 3px dashed rgba(163, 59, 0, 0.5);
+}
+
+@media (max-width: 760px) {
+  .sto-vp {
+    top: auto;
+    left: 0;
+    width: auto;
+    max-height: 75vh;
+    border-left: 0;
+    border-top: 1px solid var(--hairline-strong);
+    border-radius: var(--st-radius-lg) var(--st-radius-lg) 0 0;
+  }
+}

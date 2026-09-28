@@ -1,0 +1,268 @@
+/*
+ * The editor toolbar. Quiet, like the rest of the chrome: one line of
+ * identity on the left, the controls on the right, and state carried by words
+ * and icons with colour only as a second signal (docs/11 §1, §5).
+ */
+
+.sto-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1.25rem;
+  padding: 0.55rem 1rem;
+  background: var(--paper);
+  border-bottom: 1px solid var(--hairline);
+}
+
+.sto-tb-id {
+  flex: 1 1 280px;
+  min-width: 0;
+}
+.sto-title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+  line-height: 1.3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sto-tb-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.15rem 0.9rem;
+  margin-top: 0.1rem;
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+.sto-tb-meta > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+.sto-live strong {
+  color: var(--text);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.sto-live > .st-icon,
+.sto-draft-same > .st-icon {
+  color: var(--accent);
+}
+.sto-draft-changed {
+  color: var(--text);
+}
+
+.sto-tb-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+}
+.sto-tb-sep {
+  width: 1px;
+  height: 22px;
+  background: var(--hairline);
+  margin: 0 0.2rem;
+}
+
+/* Save status: text first, the icon only confirms it. */
+.sto-save {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-height: 32px;
+  padding: 0 0.4rem;
+  font-size: 0.84rem;
+  white-space: nowrap;
+}
+.sto-save-text {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+.sto-save-ok .st-icon {
+  color: var(--accent);
+}
+.sto-save-warn {
+  color: var(--warn);
+  font-weight: 500;
+}
+.sto-save-pending,
+.sto-save-busy {
+  color: var(--muted);
+}
+.sto-save-warn .sto-save-text {
+  white-space: normal;
+  max-width: 26ch;
+  line-height: 1.25;
+}
+.sto-retry {
+  min-height: 28px;
+  padding: 0 0.6rem;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  color: var(--warn);
+}
+
+.sto-undo {
+  display: inline-flex;
+  gap: 0.1rem;
+}
+
+/* The checks badge: a pill whose words say the count; icon shape says the worst. */
+.sto-checks {
+  border-color: var(--hairline-strong);
+  background: var(--paper);
+  color: var(--text);
+  min-width: 8.5rem;
+}
+.sto-checks:hover:not(:disabled) {
+  border-color: #000;
+}
+.sto-checks-ok .st-icon {
+  color: var(--accent);
+}
+.sto-checks-warn .st-icon,
+.sto-checks-error .st-icon {
+  color: var(--warn);
+}
+.sto-checks-error {
+  border-color: var(--warn);
+  font-weight: 600;
+}
+.sto-checks[aria-expanded="true"] {
+  background: var(--off-white);
+  border-color: #000;
+}
+
+.sto-preview {
+  text-decoration: none;
+}
+
+/* A disabled action that still explains itself on hover and focus. */
+.sto-tipwrap {
+  position: relative;
+  display: inline-flex;
+}
+.sto-tip {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 60;
+  width: max-content;
+  max-width: 260px;
+  padding: 0.35rem 0.6rem;
+  border-radius: 4px;
+  background: #111;
+  color: #fff;
+  font-size: 0.8rem;
+  font-weight: 500;
+  line-height: 1.35;
+  white-space: normal;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.sto-tipwrap:hover .sto-tip,
+.sto-tipwrap:focus-within .sto-tip {
+  opacity: 1;
+}
+
+.sto-help {
+  font: inherit;
+  font-weight: 700;
+  font-size: 1rem;
+  border: 1.5px solid var(--hairline-strong);
+  border-radius: 50%;
+  width: 30px;
+  height: 30px;
+}
+
+/* Who else is here. */
+.sto-presence {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0 0.5rem 0 0.25rem;
+  min-height: 32px;
+  font-size: 0.82rem;
+  border-radius: 999px;
+}
+.sto-presence-clash {
+  background: var(--warn-wash);
+  color: var(--warn);
+  font-weight: 500;
+}
+.sto-presence-text {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  max-width: 24ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sto-avatars {
+  display: inline-flex;
+}
+.sto-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 600;
+  border: 2px solid var(--paper);
+}
+.sto-avatar + .sto-avatar {
+  margin-left: -7px;
+}
+.sto-avatar-more {
+  background: var(--off-white);
+  color: var(--text);
+}
+
+/* The shortcuts dialog. */
+.sto-keys {
+  display: grid;
+  gap: 0;
+  margin: 1rem 0 0;
+  border-top: 1px solid var(--hairline);
+}
+.sto-keys > div {
+  display: grid;
+  grid-template-columns: 13.5rem 1fr;
+  gap: 1rem;
+  align-items: baseline;
+  padding: 0.45rem 0;
+  border-bottom: 1px solid var(--hairline);
+}
+.sto-keys dt {
+  white-space: nowrap;
+}
+.sto-keys dd {
+  margin: 0;
+}
+
+@media (max-width: 760px) {
+  .sto-toolbar {
+    position: static;
+    padding: 0.55rem 1rem;
+  }
+  .sto-tb-sep {
+    display: none;
+  }
+  .sto-checks {
+    min-width: 0;
+  }
+}
