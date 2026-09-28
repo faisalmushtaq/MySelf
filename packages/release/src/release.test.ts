@@ -18,20 +18,20 @@ const registries: Registries = {
 /**
  * The current release.
  *
- * r7.0.1 is a PATCH on r7.0.0 and the version rule is the repo's own: docs/06
- * §44-49 names a licence-status update as PATCH, because it is a correction
- * invisible to both participants and analysts. The same document is emphatic
- * that participant-visible wording is never PATCH — a one-character typo fix is
- * MAJOR on the form it touches. Nothing a participant reads or selects differs
- * between r7.0.0 and r7.0.1, and `node publish.mjs` output confirms it: the only
- * fields that moved are the licence records and the release header.
+ * r7.1.0 is a MINOR on r7.0.1. It removes the site branding a participant sees —
+ * the "Notre Dame · 2026" cover label (composition.studyLabel, now unset) and the
+ * "— Notre Dame" suffix on the consent sheet's subtitle — for a fielding not at
+ * that site. Per docs/06 §44-49 this is not PATCH (participant-visible wording
+ * never is) and not MAJOR either: no question, response option or code changes, so
+ * sittings under r7.0.1 and r7.1.0 are the same instrument and pool without a
+ * comparability argument. A site label is presentation, not measurement — MINOR.
  */
 const meta = {
-  version: "7.0.1",
-  publishedAt: "2026-09-26T21:00:00.000Z",
+  version: "7.1.0",
+  publishedAt: "2026-09-28T11:30:00.000Z",
   publishedBy: "faisalmushtaq",
   engineVersion: "0.1.0",
-  decisionRefs: ["D-10"],
+  decisionRefs: ["D-24"],
 };
 
 describe("canonical JSON", () => {
@@ -44,12 +44,12 @@ describe("canonical JSON", () => {
   });
 });
 
-describe("YBM release r7.0.1", () => {
+describe("YBM release r7.1.0", () => {
   it("passes the publish gate and produces a verifiable manifest", () => {
     const manifest = buildRelease(ybmComposition, registries, meta);
     expect(manifest.hash).toMatch(/^sha256:[0-9a-f]{64}$/);
     expect(verifyManifestHash(manifest)).toBe(true);
-    expect(manifest.release.key).toBe("ybm_nd2026_standard_r7_0_1");
+    expect(manifest.release.key).toBe("ybm_nd2026_standard_r7_1_0");
   });
 
   it("is deterministic: identical inputs give an identical hash", () => {
@@ -76,7 +76,7 @@ describe("YBM release r7.0.1", () => {
     // The frozen file is what devices actually run. If someone edits an item,
     // a scale or the composition without republishing, this fails: the release
     // on disk would no longer be the release the sources describe.
-    const path = fileURLToPath(new URL("../../../releases/ybm_nd2026_standard_r7.0.1.manifest.json", import.meta.url));
+    const path = fileURLToPath(new URL("../../../releases/ybm_nd2026_standard_r7.1.0.manifest.json", import.meta.url));
     const committed = JSON.parse(readFileSync(path, "utf8")) as {
       hash: string;
       release: { version: string; publishedAt: string; publishedBy: string; engineVersion: string; decisionRefs: string[] };
