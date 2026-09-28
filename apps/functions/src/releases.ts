@@ -90,10 +90,20 @@ export async function readStoredRelease(
   if (!raw || typeof raw !== "object" || (raw as { hash?: unknown }).hash !== hash) {
     return { refused: "the manifest carries a different hash from the one it is filed under" };
   }
-  if (!(await verifyRawManifestHash(raw))) {
-    return { refused: "the manifest's content does not hash to the hash it carries" };
+  // Hashing and parsing both walk the document recursively, so JSON nested
+  // deeply enough (a few hundred kB of `[[[[…`, well inside a document's size
+  // limit) overflows the stack — a RangeError, not a false. Uncaught, that
+  // would abort the whole nightly export over one bad document, which is
+  // exactly what "never throws" above promises cannot happen.
+  let parsed: ReturnType<typeof releaseManifest.safeParse>;
+  try {
+    if (!(await verifyRawManifestHash(raw))) {
+      return { refused: "the manifest's content does not hash to the hash it carries" };
+    }
+    parsed = releaseManifest.safeParse(raw);
+  } catch (error) {
+    return { refused: `the manifest could not be checked (${error instanceof Error ? error.name : "error"})` };
   }
-  const parsed = releaseManifest.safeParse(raw);
   if (!parsed.success) {
     const first = parsed.error.issues[0];
     return { refused: `the manifest is not a release this build can read (${first?.path.join(".") ?? "?"}: ${first?.message ?? "?"})` };
@@ -111,7 +121,14 @@ export async function readStoredRelease(
  * by the next sitting that names it, not hidden behind a remembered miss.
  */
 export function releaseResolver(bundled: ReadonlyMap<string, ReleaseManifest> = releasesByHash) {
+  // Keyed by study AND hash. The lookup reads `studies/{study}/publicReleases`,
+  // so what is remembered must be what that study's store held: keyed by hash
+  // alone, a release verified from one study's store would answer for another
+  // study whose store never held it — and only on a warm instance, so the
+  // same export could list a sitting as unreadable one night and read it the
+  // next, depending on which trigger had run first.
   const verified = new Map<string, ReleaseManifest>();
+  const cacheKey = (study: string, hash: string) => `${study}\u0000${hash}`;
 
   /**
    * The manifest a sitting's hash names: the bundled copy, else the study's
@@ -126,7 +143,7 @@ export function releaseResolver(bundled: ReadonlyMap<string, ReleaseManifest> = 
   return async function resolveRelease(db: Firestore, study: string, hash: string): Promise<ResolvedRelease | null> {
     const inBundle = bundled.get(hash);
     if (inBundle) return { manifest: inBundle, source: "bundled" };
-    const known = verified.get(hash);
+    const known = verified.get(cacheKey(study, hash));
     if (known) return { manifest: known, source: "store" };
 
     // Anything else cannot be a document ID; a malformed hash on a sitting is
@@ -146,7 +163,7 @@ export function releaseResolver(bundled: ReadonlyMap<string, ReleaseManifest> = 
       });
       return null;
     }
-    verified.set(hash, read.manifest);
+    verified.set(cacheKey(study, hash), read.manifest);
     return { manifest: read.manifest, source: "store" };
   };
 }

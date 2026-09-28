@@ -106,6 +106,12 @@ describe("the export's releases", () => {
     expect(JSON.parse(listed!.content).sittings).toEqual([
       { sessionId: "ses_unknown_release", releaseHash: UNKNOWN },
     ]);
+    // Review fix: a top-level file BIDS does not define fails validation
+    // unless the dataset's .bidsignore names it; the existing line stays.
+    const ignore = files.find((f) => f.path === ".bidsignore")!.content.split("\n");
+    expect(ignore).toContain("unreadable.json");
+    expect(ignore[0]).toMatch(/^# Survey-only dataset/);
+    expect(files.map((f) => f.path)).toEqual([...files.map((f) => f.path)].sort((a, b) => a.localeCompare(b)));
   });
 
   it("reads a sitting under a release only the store holds through that release", async () => {
@@ -149,6 +155,7 @@ describe("the export's releases", () => {
     const files = exportFiles(built, STUDY, []);
     expect(built.unreadable).toEqual([]);
     expect(files.some((f) => f.path === "unreadable.json")).toBe(false);
+    expect(files.find((f) => f.path === ".bidsignore")!.content).not.toMatch(/unreadable/);
     const description = JSON.parse(files.find((f) => f.path === "dataset_description.json")!.content);
     expect(description.SourceDatasets[0].ReleaseHash).toBe(live.hash);
   });

@@ -243,6 +243,14 @@ export function exportFiles(
         2,
       )}\n`,
     });
+    // A top-level file BIDS does not define is an error to a validator, and
+    // the archived export should validate whether or not something was left
+    // out; `.bidsignore` is how this dataset already names what BIDS will not
+    // recognise (review fix). Kept in path order, as `buildBidsExport` leaves it.
+    const ignore = files.find((f) => f.path === ".bidsignore");
+    if (ignore) ignore.content = `${ignore.content.replace(/\n?$/, "\n")}unreadable.json\n`;
+    else files.push({ path: ".bidsignore", content: "unreadable.json\n" });
+    files.sort((a, b) => a.path.localeCompare(b.path));
   }
   return files;
 }
