@@ -48,6 +48,12 @@ export interface EditorContextValue {
   /** What has been published, once loaded; null while loading or on error. */
   published: PublishedContext | null;
   publishedStatus: Loadable<PublishedContext>["status"];
+  /**
+   * The version the draft is checked against — the live one, else the release
+   * a never-published survey was copied from — once loaded; null otherwise.
+   * It names what the draft no longer has (a question removed outright).
+   */
+  baseline: StudioDraft | null;
   /** Question IDs that have ever been published: archive, don't delete; ID and variable locked. */
   publishedItemKeys: ReadonlySet<string>;
   reserved: ReservedIds | undefined;
@@ -210,6 +216,7 @@ export function EditorProvider({
       draft,
       published,
       publishedStatus: context.status,
+      baseline: published?.baseline ?? origin,
       publishedItemKeys: published?.publishedItemKeys ?? EMPTY,
       reserved: published?.reserved,
       role,
@@ -239,6 +246,7 @@ export function EditorProvider({
       draft,
       published,
       context.status,
+      origin,
       role,
       user,
       playground,

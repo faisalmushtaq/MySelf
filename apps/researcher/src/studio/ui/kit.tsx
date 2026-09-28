@@ -345,12 +345,32 @@ export const AutoTextarea = forwardRef<HTMLTextAreaElement, TextareaHTMLAttribut
       },
       [ref],
     );
-    useEffect(() => {
+    const fit = useCallback(() => {
       const el = inner.current;
       if (!el) return;
       el.style.height = "auto";
       el.style.height = `${el.scrollHeight + 2}px`;
-    }, [value]);
+    }, []);
+    useEffect(fit, [value, fit]);
+    // A narrower box needs more lines (a window made smaller, a phone turned
+    // upright), or the end of a long question is cut off.
+    useEffect(() => {
+      const el = inner.current;
+      if (!el || typeof ResizeObserver === "undefined") return;
+      let width = el.clientWidth;
+      let frame = 0;
+      const observer = new ResizeObserver(() => {
+        if (el.clientWidth === width) return;
+        width = el.clientWidth;
+        cancelAnimationFrame(frame);
+        frame = requestAnimationFrame(fit);
+      });
+      observer.observe(el);
+      return () => {
+        observer.disconnect();
+        cancelAnimationFrame(frame);
+      };
+    }, [fit]);
     return <textarea ref={setRefs} rows={1} className={`st-autotext${className ? ` ${className}` : ""}`} value={value} {...rest} />;
   },
 );

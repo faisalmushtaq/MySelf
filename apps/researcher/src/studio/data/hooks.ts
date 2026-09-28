@@ -15,7 +15,7 @@ import {
 import { httpsCallable } from "firebase/functions";
 import { paths } from "@myself/firebase";
 import { compareVersions } from "@myself/release/gate";
-import { CALLABLES, atLeast, extractDraft, type ResponseStatsRequest } from "@myself/studio";
+import { CALLABLES, atLeast, extractDraft, type ResponseStatsRequest, type StudioDraft } from "@myself/studio";
 import { STUDY, studioFirebase } from "../firebase.js";
 import { toMillis } from "../format.js";
 import { usePlaygroundMode } from "../mode.js";
@@ -250,6 +250,23 @@ export function usePresence(surveyId: string, focus: string | null): PresenceDoc
 
 // ── What has been published ───────────────────────────────────────────────
 
+/**
+ * One draft per live release, however often the survey document changes. Each
+ * save's bookkeeping (the list of who has edited since the last publish)
+ * rebuilds the published context, and a new baseline object every time
+ * restarted everything compared with it: the toolbar said "Comparing…" for a
+ * second after each save, and the draft was validated again for nothing.
+ */
+const baselines = new WeakMap<LoadedRelease, StudioDraft>();
+function baselineOf(release: LoadedRelease): StudioDraft {
+  let draft = baselines.get(release);
+  if (!draft) {
+    draft = extractDraft(release.raw);
+    baselines.set(release, draft);
+  }
+  return draft;
+}
+
 /** Pure: the published context from the survey, its versions and their releases. */
 export function buildPublishedContext(
   survey: SurveyDoc | null,
@@ -263,7 +280,7 @@ export function buildPublishedContext(
   const manifests = versions.map((v) => releases.get(v.hash)?.manifest).filter((m): m is ReleaseManifest => !!m);
   if (activeRelease && !manifests.includes(activeRelease.manifest)) manifests.push(activeRelease.manifest);
   return {
-    baseline: activeRelease ? extractDraft(activeRelease.raw) : null,
+    baseline: activeRelease ? baselineOf(activeRelease) : null,
     active,
     latestVersion: survey?.latestVersion ?? null,
     // A copy: the real reservedFrom (packages/studio history.ts) takes a

@@ -366,14 +366,12 @@ function compareDefinitions(
     for (const item of thenItems) {
       const key = String(item["key"]);
       if (!nowByKey.has(key)) {
-        out.push(
-          difference(
-            { instrument, refKey, itemKey: `${instrument}.${key}`, change: "question_removed" },
-            `${questionLabel(`${instrument}.${key}`, item)} has been removed from ${name}.`,
-            `Removed from ${kind}`,
-            `${why}. ${options.tier === "locked" ? "Put the question back, or remove the whole instrument instead." : fix}`,
-          ),
-        );
+        const itemKey = `${instrument}.${key}`;
+        const lead = `${questionLabel(itemKey, item)} has been removed from ${name}.`;
+        // The question is gone from the draft, so the editor may have no text
+        // to head it with (only its ID): the explanation says which it was.
+        const detail = `${lead} ${why}. ${options.tier === "locked" ? "Put the question back, or remove the whole instrument instead." : fix}`;
+        out.push({ instrument, refKey, itemKey, change: "question_removed", message: detail, summary: `Removed from ${kind}`, detail });
       }
     }
     for (const item of nowItems) {

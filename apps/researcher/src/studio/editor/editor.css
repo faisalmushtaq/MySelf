@@ -47,11 +47,11 @@
 .ste-left {
   background: var(--st-bg-subtle);
   border-right: 1px solid var(--st-border);
-  /* A tooltip near the edge must never make the outline scroll sideways. */
+  /* A tooltip near the edge must never make the outline scroll sideways.
+     No scroll-padding to clear the sticky search header: the header is inside
+     this scroller, so focusing its own controls would scroll the list. The
+     outline keeps rows clear of it by hand (Outline.tsx `revealRow`). */
   overflow-x: hidden;
-  /* A row scrolled into view lands clear of the sticky search header (about
-     90px) and off the bottom edge, never under or flush against either. */
-  scroll-padding: 104px 0 40px;
 }
 .ste-right {
   background: var(--st-bg-subtle);

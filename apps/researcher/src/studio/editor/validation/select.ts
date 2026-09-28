@@ -61,8 +61,13 @@ interface Place {
   order: number;
 }
 
-/** Issues by severity, then by place in survey order: start, each section and its questions, completion, survey. */
-export function groupIssues(issues: readonly Issue[], outline: Outline): GroupedIssues {
+/**
+ * Issues by severity, then by place in survey order: start, each section and
+ * its questions, completion, survey. `before` is the version the draft is
+ * checked against: a question removed from the draft outright (not archived)
+ * is headed by its text from there, rather than by its ID alone.
+ */
+export function groupIssues(issues: readonly Issue[], outline: Outline, before?: Outline | null): GroupedIssues {
   const questionPlace = new Map<string, { text: string; section: string; order: number }>();
   const sectionPlace = new Map<string, { title: string; order: number }>();
   const blockPlace = new Map<string, { name: string; section: string; order: number }>();
@@ -80,6 +85,12 @@ export function groupIssues(issues: readonly Issue[], outline: Outline): Grouped
   });
   const end = (outline.sections.length + 1) * STEP;
   const archived = new Map(outline.archived.map((a) => [a.itemKey, a.text]));
+  let removed: Map<string, string> | null = null;
+  const removedText = (itemKey: string): string | undefined => {
+    if (!before) return undefined;
+    removed ??= new Map(before.sections.flatMap((s) => s.blocks.flatMap((b) => b.questions.map((q) => [q.itemKey, q.text] as const))));
+    return removed.get(itemKey);
+  };
 
   const placeOf = (issue: Issue): Place => {
     const at = issue.location;
@@ -90,9 +101,15 @@ export function groupIssues(issues: readonly Issue[], outline: Outline): Grouped
         return { id: `q:${at.itemKey}`, label: `${said} (${at.itemKey})`, context: q.section, order: q.order };
       }
       const text = archived.get(at.itemKey);
+      const gone = text === undefined ? removedText(at.itemKey) : undefined;
       return {
         id: `q:${at.itemKey}`,
-        label: text !== undefined ? `“${shortText(text, 70)}” (${at.itemKey}, archived)` : `Question ${at.itemKey}`,
+        label:
+          text !== undefined
+            ? `“${shortText(text, 70)}” (${at.itemKey}, archived)`
+            : gone?.trim()
+              ? `“${shortText(gone, 70)}” (${at.itemKey})`
+              : `Question ${at.itemKey}`,
         context: null,
         order: end - 1,
       };

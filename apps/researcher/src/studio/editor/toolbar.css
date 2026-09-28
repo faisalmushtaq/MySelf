@@ -292,9 +292,15 @@
 }
 
 /* ── Narrow windows: two rows, nothing hidden ──────────────────────────── */
+/* A phone scrolls the whole page. The toolbar — saved or not, checks, Publish
+   — is the bar worth keeping in sight there, so it stays at the top of the
+   window and the page header scrolls away rather than stacking both on a
+   small screen (Toolbar.tsx keeps what takes focus clear of the toolbar). */
 @media (max-width: 760px) {
+  .stp-app:has(.sto-toolbar) > .stp-header {
+    position: relative;
+  }
   .sto-toolbar {
-    position: static;
     flex-wrap: wrap;
     padding: 8px 12px;
   }

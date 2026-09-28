@@ -4,7 +4,7 @@ import { useDraftSession, type DraftSession } from "../data/draft-editor.js";
 import { usePublishedContext, useStudioSession, useSurvey, type DraftEditor } from "../data/index.js";
 import { diffDrafts } from "../data/model-adapter.js";
 import { EditorPage } from "../editor/EditorPage.js";
-import { SHOW_SHORTCUTS_EVENT } from "../editor/Toolbar.js";
+import { SHORTCUTS_MENU_ITEM } from "../editor/Toolbar.js";
 import { formatTime, ROLE_NAMES } from "../format.js";
 import { PreviewPage } from "../preview/PreviewPage.js";
 import { navigate, useNavigationGuard, type SurveyTab } from "../router.js";
@@ -52,14 +52,12 @@ export function SurveyLayout({ surveyId, tab, q }: { surveyId: string; tab: Surv
     current: t === tab,
   }));
 
-  // The editor's shortcuts, from the account menu (the "?" key opens them too).
-  const menuItems = useMemo<MenuItem[] | undefined>(
-    () =>
-      tab === "edit"
-        ? [{ label: "Keyboard shortcuts", icon: "keyboard", shortcut: "?", onSelect: () => window.dispatchEvent(new Event(SHOW_SHORTCUTS_EVENT)) }]
-        : undefined,
-    [tab],
-  );
+  // The editor's shortcuts, from the account menu (the "?" key opens them
+  // too) — only while the editor is on screen: its toolbar is what shows them,
+  // so while the survey or its draft is still loading the item would do nothing.
+  const editorShown =
+    tab === "edit" && survey.status === "ready" && survey.data !== null && draft.editor.status !== "loading" && draft.editor.draft !== null;
+  const menuItems = useMemo<MenuItem[] | undefined>(() => (editorShown ? [SHORTCUTS_MENU_ITEM] : undefined), [editorShown]);
 
   const title = survey.status === "ready" && survey.data ? survey.data.title : surveyId;
   const role: StudioRole = session.role ?? "viewer";

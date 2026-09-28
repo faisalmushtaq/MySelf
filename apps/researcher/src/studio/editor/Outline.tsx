@@ -66,6 +66,7 @@ import { RowMenu } from "./outline/RowMenu.js";
 import { RowStore } from "./outline/store.js";
 import { TypePicker } from "./outline/TypePicker.js";
 import { encodeSelection } from "./selection.js";
+import { SHORTCUTS_MENU_ITEM } from "./Toolbar.js";
 import "./outline.css";
 
 /**
@@ -99,19 +100,38 @@ interface MenuState {
 
 const quote = (text: string, max = 60) => `“${shortText(text || "(no text yet)", max)}”`;
 
+/** How far a row brought into view stays from the sticky search header, and from the column's bottom edge. */
+const REVEAL_GAP_TOP = 8;
+const REVEAL_GAP_BOTTOM = 40;
+
 /**
  * Scroll a row into view within the outline's own column, clear of its sticky
- * search header (the column's scroll-padding, editor.css). Where the outline
- * doesn't scroll on its own — a phone, where the columns stack — the page is
- * left where it is: scrolling the window down to the row would push the editor
- * for what was just opened off the screen.
+ * search header and off the bottom edge. Done by hand: the browser's own
+ * scrolling knows nothing of the header, and giving the column a
+ * scroll-padding to tell it made focusing the header's own controls (the
+ * search, "+", the "…" menu) scroll the list away from the selection. Where
+ * the outline doesn't scroll on its own — a phone, where the columns stack —
+ * the page is left where it is: scrolling the window down to the row would
+ * push the editor for what was just opened off the screen.
  */
 function revealRow(id: string): void {
   const row = document.getElementById(rowDomId(id))?.querySelector<HTMLElement>(":scope > .sto-row");
   if (!row) return;
   const column = row.closest<HTMLElement>(".ste-left");
-  if (column && getComputedStyle(column).overflowY === "visible") return;
-  row.scrollIntoView({ block: "nearest" });
+  if (!column) {
+    row.scrollIntoView({ block: "nearest" });
+    return;
+  }
+  if (getComputedStyle(column).overflowY === "visible") return;
+  const box = column.getBoundingClientRect();
+  const inner = box.top + column.clientTop;
+  const head = column.querySelector<HTMLElement>(".sto-head")?.offsetHeight ?? 0;
+  const top = inner + head + REVEAL_GAP_TOP;
+  const bottom = inner + column.clientHeight - REVEAL_GAP_BOTTOM;
+  const r = row.getBoundingClientRect();
+  if (r.top < top) column.scrollTop -= top - r.top;
+  // Never so far that the row's top goes under the header, in a very short column.
+  else if (r.bottom > bottom) column.scrollTop += Math.min(r.bottom - bottom, r.top - top);
 }
 
 /**
@@ -224,20 +244,22 @@ export function Outline() {
     if (focus && tree.shown.has(focus)) {
       focusAfter.current = null;
       store.set({ active: focus });
-      const el = document.getElementById(rowDomId(focus));
-      el?.focus();
+      document.getElementById(rowDomId(focus))?.focus({ preventScroll: true });
       revealRow(focus);
     } else if (focus && !tree.byId.has(focus)) {
       focusAfter.current = null;
     }
   }, [tree, store, selectedId]);
 
+  // Arrow keys, Home and End, typeahead, and focus coming back from a menu:
+  // the row is brought into view clear of the sticky header, which the
+  // browser's own scroll-on-focus would leave it under.
   const focusRow = useCallback(
     (id: string | undefined) => {
       if (!id) return;
       store.set({ active: id });
-      const el = document.getElementById(rowDomId(id));
-      el?.focus();
+      document.getElementById(rowDomId(id))?.focus({ preventScroll: true });
+      revealRow(id);
     },
     [store],
   );
@@ -817,6 +839,7 @@ export function Outline() {
     return [
       { label: "Expand all", icon: "chevron-down", onSelect: () => setAllRef.current(true), disabled: filtering, ...(hint ? { hint } : {}) },
       { label: "Collapse all", icon: "chevron-right", onSelect: () => setAllRef.current(false), disabled: filtering, ...(hint ? { hint } : {}) },
+      SHORTCUTS_MENU_ITEM,
     ];
   }, [filtering]);
   const problemCount = ctx.issues.length;
@@ -952,7 +975,11 @@ export function Outline() {
             onKeyDown={onTreeKeyDown}
             onFocus={(e) => {
               const id = (e.target as HTMLElement).dataset["rowId"];
-              if (id) store.set({ active: id });
+              if (!id) return;
+              store.set({ active: id });
+              // Tabbing in is scrolled by the browser, after this event and
+              // blind to the sticky header: settle the row once it has.
+              requestAnimationFrame(() => revealRow(id));
             }}
           >
             {tree.roots.map((node) => (

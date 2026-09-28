@@ -105,6 +105,15 @@ describe("lockedDifferences", () => {
     expect(lockedDifferences(draft, baseline).map((d) => d.change).sort()).toEqual(["order", "question_added", "question_removed"]);
   });
 
+  it("says which question was removed in the explanation, since no heading can show a question that is gone", () => {
+    const draft = edit((d) => void sdqItems(d).splice(0, 1));
+    const removed = lockedDifferences(draft, baseline).find((d) => d.change === "question_removed")!;
+    expect(removed).toMatchObject({ itemKey: "sdq25_s.q1", summary: "Removed from a licensed instrument" });
+    expect(removed.detail).toMatch(/^“I try to be nice to other people\. I care about…” \(sdq25_s\.q1\) has been removed from “SDQ”/);
+    expect(removed.detail).toMatch(/Put the question back/);
+    expect(removed.message).toBe(removed.detail);
+  });
+
   it("reports changed answer options, which live outside the instrument", () => {
     const draft = edit((d) => (d.scales["scale.sdq_3pt"]!.options[2]!.label = "Clearly True"));
     expect(lockedDifferences(draft, baseline)).toMatchObject([{ change: "scale", itemKey: "sdq25_s.q1" }]);

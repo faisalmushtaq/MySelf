@@ -1,4 +1,4 @@
-import { useEffect, useId, useReducer, useRef, useState, type ReactNode, type RefObject } from "react";
+import { useEffect, useId, useMemo, useReducer, useRef, useState, type ReactNode, type RefObject } from "react";
 import { diffDrafts, outline, validateDraft, type Issue, type ValidationContext } from "@myself/studio";
 import { StudioCallError, studio, type PublishedContext } from "../data/index.js";
 import { versionLabel } from "../format.js";
@@ -244,7 +244,10 @@ function Heading({ children, headingRef }: { children: ReactNode; headingRef: Re
 
 function IssuesToFix({ issues, goTo, severity }: { issues: Issue[]; goTo: (i: Issue) => void; severity: "error" | "warning" }) {
   const ctx = useEditor();
-  const groups = groupIssues(issues, outline(ctx.draft));
+  const groups = useMemo(
+    () => groupIssues(issues, outline(ctx.draft), ctx.baseline ? outline(ctx.baseline) : null),
+    [issues, ctx.draft, ctx.baseline],
+  );
   const list = severity === "error" ? groups.errors : groups.warnings;
   return (
     <ul className={`sto-pub-issues sto-pub-issues-${severity}`}>

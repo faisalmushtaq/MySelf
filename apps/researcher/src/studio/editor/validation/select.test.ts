@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-import { extractDraft, outline, validateDraft, type Issue, type IssueLocation } from "@myself/studio";
+import { extractDraft, outline, shortText, validateDraft, type Issue, type IssueLocation } from "@myself/studio";
 import { groupIssues, selectionFor } from "./select.js";
 
 const r710 = JSON.parse(readFileSync(resolve(__dirname, "../../../../../../releases/ybm_nd2026_standard_r7.1.0.manifest.json"), "utf8"));
@@ -69,6 +69,17 @@ describe("grouping issues for the panel", () => {
     expect(grouped.errors).toHaveLength(1);
     expect(grouped.errors[0]!.label).toBe(`“${sdq.name}”`);
     expect(grouped.errors[0]!.context).toBe(o.sections.find((s) => s.key === "wellbeing")!.title);
+  });
+
+  it("heads a licensed question removed outright by its text in the version the draft is checked against", () => {
+    const sdq = o.sections.find((s) => s.key === "wellbeing")!.blocks[1]!;
+    const first = sdq.questions[0]!;
+    const edited = structuredClone(draft);
+    (edited.instruments[sdq.refKey] as unknown as { forms: { items: unknown[] }[] }).forms[0]!.items.splice(0, 1);
+    const removed = validateDraft(edited, { baseline: draft }).find((i) => i.code === "locked.question_removed")!;
+    expect(removed.location.itemKey).toBe(first.itemKey);
+    expect(groupIssues([removed], outline(edited)).errors[0]!.label).toBe(`Question ${first.itemKey}`);
+    expect(groupIssues([removed], outline(edited), o).errors[0]!.label).toBe(`“${shortText(first.text, 70)}” (${first.itemKey})`);
   });
 
   it("groups the live survey's own warnings under their questions", () => {

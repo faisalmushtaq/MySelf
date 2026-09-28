@@ -431,7 +431,9 @@ function LivePreview({
           </select>
         </div>
         {/* News about the run, then the promise and the size: the toolbar's
-            right end, instead of a line of their own above the device. */}
+            right end, instead of a line of their own above the device. The
+            promise, divider and size wrap as one, so a divider never ends a
+            line or starts one. */}
         <p className="st-pv-announce" role="status">
           {announcement ? (
             <>
@@ -439,14 +441,16 @@ function LivePreview({
             </>
           ) : null}
         </p>
-        <span className="st-pv-promise">
-          <Icon name="lock" size={12} />
-          Never saved or sent
-          <InfoTip text={PROMISE} label="the preview" />
-        </span>
-        <span className="st-pv-divider" aria-hidden="true" />
-        <span className="st-pv-scale">
-          {spec.width} × {spec.height} · {percent}%
+        <span className="st-pv-end">
+          <span className="st-pv-promise">
+            <Icon name="lock" size={12} />
+            Never saved or sent
+            <InfoTip text={PROMISE} label="the preview" />
+          </span>
+          <span className="st-pv-divider" aria-hidden="true" />
+          <span className="st-pv-scale">
+            {spec.width} × {spec.height} · {percent}%
+          </span>
         </span>
       </div>
 

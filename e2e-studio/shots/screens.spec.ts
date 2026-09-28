@@ -120,6 +120,8 @@ test("photograph every Studio screen", async ({ page, browser }) => {
   await expect(page.getByRole("button", { name: /1 error/ })).toBeVisible({ timeout: 15_000 });
   await shot(page, "13-editor-with-error");
   await page.getByRole("button", { name: /1 error/ }).click();
+  // The toolbar settles on whether the draft differs from live, not "Comparing…".
+  await expect(page.getByText(/In sync with live|Draft differs from live/).first()).toBeVisible({ timeout: 15_000 });
   await shot(page, "14-checks-panel");
   await page.keyboard.press("Escape");
   await stem.fill("Do you have a smartphone of your very own?");
@@ -152,6 +154,7 @@ test("photograph every Studio screen", async ({ page, browser }) => {
   await shot(page, "20-publish-confirm");
   await publish.getByRole("button", { name: /^Publish r?8/ }).click();
   await expect(page.getByText(/8\.0\.0 is live/)).toBeVisible({ timeout: 60_000 });
+  await expect(page.getByText(/In sync with live|Draft differs from live/).first()).toBeVisible({ timeout: 15_000 });
   await shot(page, "21-published", { keepToasts: true });
   await page.keyboard.press("Escape");
 

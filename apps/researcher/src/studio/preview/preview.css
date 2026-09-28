@@ -77,9 +77,10 @@
   background-position: right 6px center;
 }
 
-/* The run's news (empty, it takes no room), the promise and the size, at the right. */
+/* The run's news (empty, it takes no room), then the promise and the size,
+   together at the right: when the toolbar wraps they go down as one. */
 .st-pv-toolbar > .st-pv-announce {
-  margin: 0 0 0 auto;
+  margin: 0;
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -87,6 +88,13 @@
   line-height: 16px;
   font-weight: 500;
   color: var(--st-text);
+}
+.st-pv-end {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  margin-left: auto;
+  white-space: nowrap;
 }
 .st-pv-promise {
   display: inline-flex;

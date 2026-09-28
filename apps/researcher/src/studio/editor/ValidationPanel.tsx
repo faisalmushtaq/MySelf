@@ -63,7 +63,8 @@ function fieldWord(field: string | undefined): string | null {
 function Panel() {
   const ctx = useEditor();
   const o = useMemo(() => outline(ctx.draft), [ctx.draft]);
-  const grouped = useMemo(() => groupIssues(ctx.issues, o), [ctx.issues, o]);
+  const before = useMemo(() => (ctx.baseline ? outline(ctx.baseline) : null), [ctx.baseline]);
+  const grouped = useMemo(() => groupIssues(ctx.issues, o, before), [ctx.issues, o, before]);
   const counts = summariseIssues(ctx.issues);
   const panel = useRef<HTMLElement | null>(null);
   const heading = useRef<HTMLHeadingElement | null>(null);

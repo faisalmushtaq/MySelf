@@ -1195,9 +1195,22 @@
   .stp-page {
     padding: 24px 16px 48px;
   }
-  .stp-srow-title,
-  .stp-srow-meta {
+  .stp-srow-title {
     white-space: normal;
+  }
+  /* The ID and the count wrap as whole pieces, with no "·" left to start or end a line. */
+  .stp-srow-meta {
+    display: flex;
+    flex-wrap: wrap;
+    column-gap: 8px;
+    white-space: normal;
+  }
+  .stp-srow-meta > .stp-id {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+  .stp-srow-sep {
+    display: none;
   }
   .stp-surveys .stp-col-live {
     width: 96px;

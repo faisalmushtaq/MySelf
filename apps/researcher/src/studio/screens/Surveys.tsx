@@ -94,8 +94,12 @@ function SurveyRow({ survey }: { survey: SurveyDoc }) {
           {survey.title}
         </Link>
         <span className="stp-srow-meta">
-          {/* The separator stays with the count, so a wrapped line never ends in "·". */}
-          <span className="stp-id">{survey.surveyId}</span> <span className="stp-nowrap">· {plural(survey.versionCount, "version")}</span>
+          {/* On a phone the two go on lines of their own when they must, and the "·" goes. */}
+          <span className="stp-id">{survey.surveyId}</span>{" "}
+          <span className="stp-srow-sep" aria-hidden="true">
+            ·
+          </span>{" "}
+          <span className="stp-nowrap">{plural(survey.versionCount, "version")}</span>
         </span>
       </th>
       <td>

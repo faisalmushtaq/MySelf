@@ -11,9 +11,9 @@
   right: 0;
   bottom: 0;
   z-index: 40;
-  /* Over the settings panel and the editor's side padding: none of the
-     survey itself is hidden (its column is at most 720px, centred). */
-  width: calc(var(--st-right, 320px) + 40px);
+  /* Exactly over the settings panel, so none of the survey itself is hidden
+     at any width where the panel is a column of its own. */
+  width: var(--st-right, 320px);
   display: flex;
   flex-direction: column;
   background: var(--st-bg);
