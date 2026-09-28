@@ -9,5 +9,9 @@
       ]
     }
   ],
-  "fieldOverrides": []
+  "fieldOverrides": [
+    { "collectionGroup": "draft", "fieldPath": "content", "indexes": [] },
+    { "collectionGroup": "publicReleases", "fieldPath": "manifest", "indexes": [] },
+    { "collectionGroup": "studioAudit", "fieldPath": "detail", "indexes": [] }
+  ]
 }
