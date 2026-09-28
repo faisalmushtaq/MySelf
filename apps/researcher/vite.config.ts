@@ -17,6 +17,10 @@ export default defineConfig({
     // One study per project keeps IAM simple, so this matches MYSELF_STUDY on
     // the functions rather than being chosen in the browser.
     __STUDY__: JSON.stringify(process.env["MYSELF_STUDY"] ?? "ybm"),
+    // MySelf Studio. Emulators only for local runs and the end-to-end tests:
+    // left empty, the build contains no emulator or test sign-in code at all.
+    __STUDIO_EMULATORS__: JSON.stringify(process.env["MYSELF_STUDIO_EMULATORS"] ?? ""),
+    __SURVEY_ID__: JSON.stringify(process.env["MYSELF_SURVEY_ID"] ?? "ybm_nd2026_standard"),
   },
   plugins: [react()],
   server: { fs: { allow: [".."] } },
