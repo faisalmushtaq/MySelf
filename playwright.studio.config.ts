@@ -29,6 +29,8 @@ const emulators = {
 
 export default defineConfig({
   testDir: "./e2e-studio",
+  // The screenshot run lives beside the suite but is not part of it.
+  testIgnore: ["**/shots/**"],
   fullyParallel: false,
   workers: 1,
   retries: 0,
