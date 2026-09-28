@@ -54,7 +54,11 @@ jobs:
         run: |
           if [ "${{ inputs.functions }}" = "true" ]; then
             echo "functions=true" >> "$GITHUB_OUTPUT"
-          elif git diff --name-only HEAD^ HEAD | grep -qE '^(apps/functions/|packages/(llm|narrative|firebase|schema|store)/|releases/|infra/firebase/(firebase\.json|firestore\.rules|storage\.rules))'; then
+          # Every workspace package the functions bundle compiles in. engine and
+          # scoring were missing (store depends on both), and the Studio adds
+          # release, library and studio: a change to how a release is validated
+          # or frozen is a change to what `studioPublish` does.
+          elif git diff --name-only HEAD^ HEAD | grep -qE '^(apps/functions/|packages/(llm|narrative|firebase|schema|store|engine|scoring|release|library|studio)/|releases/|infra/firebase/(firebase\.json|firestore\.rules|storage\.rules))'; then
             echo "functions=true" >> "$GITHUB_OUTPUT"
           else
             echo "functions=false" >> "$GITHUB_OUTPUT"
@@ -125,6 +129,21 @@ jobs:
       - name: Deploy hosting
         working-directory: infra/firebase
         run: firebase deploy --only hosting --project myself-research --non-interactive
+
+      # The rules are the access control (D-39), so they are tested against
+      # the real emulator before they are deployed, not only in CI on the way
+      # to main: a rules file that fails its own suite never reaches the
+      # project. docs/13 always said "run this before every rules deploy"; now
+      # the deploy does.
+      - uses: actions/setup-java@v4
+        if: steps.changed.outputs.rules == 'true'
+        with:
+          distribution: temurin
+          java-version: "17"
+      - name: Test the rules against the emulator
+        if: steps.changed.outputs.rules == 'true'
+        working-directory: infra/firebase/test
+        run: npm install && npm test
 
       # Before the functions, deliberately: if a new function reads or writes
       # something the rules must permit, the permission should already be in

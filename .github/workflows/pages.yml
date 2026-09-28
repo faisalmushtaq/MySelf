@@ -37,12 +37,11 @@ jobs:
       # than in a secret because it ships inside the built JavaScript either
       # way, and pretending otherwise would be theatre.
       #
-      # THE PARTICIPANT APP GETS IT TOO, so one build serves both the public
-      # preview and a fielded iPad. Which one it is depends on enrolment, not on
-      # the build: an unenrolled device stores everything locally and sends
-      # nothing anywhere, and only an owner can mint the token that enrols one.
-      # A visitor to the public URL therefore gets the survey and no route into
-      # the study, which is what the preview has always been.
+      # THE PARTICIPANT APP GETS IT TOO, and uses only the project ID from it:
+      # to derive where it files sittings (saveSitting, with a credential the
+      # device issues itself) and where it reads the published survey from (the
+      # public, get-only `published` pointer and `publicReleases` store — docs/16
+      # §5.3). It carries no Firebase SDK and signs in to nothing.
       - run: pnpm -r build
         env:
           MYSELF_FIREBASE_CONFIG: >-
@@ -60,6 +59,12 @@ jobs:
       # MyStory, static: it runs the narrative protocols in the page against
       # the deterministic mock, so it needs no server and no key.
       - run: cp -R apps/mystory-lab/dist apps/participant/dist/mystory
+      # GitHub Pages serves the site's 404.html for any path it has no file
+      # for. This one sends Studio paths typed without their hash
+      # (/MySelf/researcher/surveys) to the hash route that serves them, and
+      # everything else to an honest "not found". Copied after the participant
+      # build on purpose, so the survey's service worker never precaches it.
+      - run: cp infra/pages/404.html apps/participant/dist/404.html
       - uses: actions/upload-pages-artifact@v3
         with:
           path: apps/participant/dist
