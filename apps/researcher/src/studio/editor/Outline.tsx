@@ -31,7 +31,7 @@ import {
 import type { LogicExpr } from "@myself/schema";
 import { ConfirmDialog } from "../ui/dialog.js";
 import { Icon } from "../ui/icons.js";
-import { Button, IconButton, Kbd, VisuallyHidden } from "../ui/kit.js";
+import { Button, IconButton, Kbd, MenuButton, Tooltip, VisuallyHidden, type MenuItem } from "../ui/kit.js";
 import { useEditor } from "./context.js";
 import { actionsFor, archivedTierOf, type ActionId, type ActionSpec } from "./outline/actions.js";
 import {
@@ -782,8 +782,18 @@ export function Outline() {
     next.set("archive", open);
     setExpanded(next);
   };
+  const setAllRef = useRef(setAll);
+  setAllRef.current = setAll;
 
   const filtering = tree.filtering;
+  // Stable while nothing it shows changes, so an open menu keeps its place.
+  const viewItems = useMemo<MenuItem[]>(() => {
+    const hint = filtering ? "Clear the search and filters first" : undefined;
+    return [
+      { label: "Expand all", icon: "chevron-down", onSelect: () => setAllRef.current(true), disabled: filtering, ...(hint ? { hint } : {}) },
+      { label: "Collapse all", icon: "chevron-right", onSelect: () => setAllRef.current(false), disabled: filtering, ...(hint ? { hint } : {}) },
+    ];
+  }, [filtering]);
   const problemCount = ctx.issues.length;
   const status = filtering
     ? tree.matches === 0
@@ -801,7 +811,7 @@ export function Outline() {
     >
       <div className="sto-head">
         <div className="sto-search">
-          <Icon name="search" size={16} />
+          <Icon name="search" size={14} />
           <input
             ref={searchRef}
             type="search"
@@ -840,36 +850,35 @@ export function Outline() {
             </span>
           )}
         </div>
-        <div className="sto-chips" role="group" aria-label="Show only">
-          <button type="button" className="sto-chip" aria-pressed={withProblems} onClick={() => setWithProblems((v) => !v)}>
-            <Icon name={withProblems ? "check" : "warning"} size={14} />
-            With problems
-            {problemCount > 0 ? <span className="sto-chip-count">{problemCount}</span> : null}
-          </button>
-          <button type="button" className="sto-chip" aria-pressed={withConditions} onClick={() => setWithConditions((v) => !v)}>
-            <Icon name={withConditions ? "check" : "branch"} size={14} />
-            With conditions
-          </button>
-        </div>
-        <div className="sto-actions">
-          {canEdit ? (
-            <Button
-              size="sm"
-              variant="primary"
-              icon="plus"
-              onClick={() => {
-                const target = addTarget();
-                if (target) setPending({ kind: "picker", ...target });
-              }}
-            >
-              Add question
-            </Button>
-          ) : (
-            <span />
-          )}
+        <div className="sto-tools">
+          <div className="sto-chips" role="group" aria-label="Show only">
+            <Tooltip text="Show only questions with issues">
+              <button type="button" className="sto-chip" aria-pressed={withProblems} onClick={() => setWithProblems((v) => !v)}>
+                <Icon name={withProblems ? "check" : "warning"} size={12} />
+                Issues
+                {problemCount > 0 ? <span className="sto-chip-count">{problemCount}</span> : null}
+              </button>
+            </Tooltip>
+            <Tooltip text="Show only questions with conditions">
+              <button type="button" className="sto-chip" aria-pressed={withConditions} onClick={() => setWithConditions((v) => !v)}>
+                <Icon name={withConditions ? "check" : "branch"} size={12} />
+                Conditions
+              </button>
+            </Tooltip>
+          </div>
           <span className="sto-tools-end">
-            <IconButton icon="chevron-down" size="sm" label="Expand all" onClick={() => setAll(true)} disabled={filtering} />
-            <IconButton icon="chevron-right" size="sm" label="Collapse all" onClick={() => setAll(false)} disabled={filtering} />
+            {canEdit ? (
+              <IconButton
+                icon="plus"
+                label="Add question"
+                className="sto-add"
+                onClick={() => {
+                  const target = addTarget();
+                  if (target) setPending({ kind: "picker", ...target });
+                }}
+              />
+            ) : null}
+            <MenuButton label="Outline options" items={viewItems} />
           </span>
         </div>
         {dragNote ? (
@@ -885,8 +894,13 @@ export function Outline() {
       {tree.visible.length === 0 ? (
         <div className="sto-empty">
           <p>
-            {deferredQuery.trim() ? <>No questions match &ldquo;{deferredQuery.trim()}&rdquo;</> : "Nothing matches these filters"}
-            {withProblems && !deferredQuery.trim() ? " — no question has a problem." : "."}
+            {deferredQuery.trim() ? (
+              <>No questions match &ldquo;{deferredQuery.trim()}&rdquo;.</>
+            ) : withProblems ? (
+              "No question has an issue."
+            ) : (
+              "Nothing matches these filters."
+            )}
           </p>
           <Button
             size="sm"
@@ -899,7 +913,7 @@ export function Outline() {
               searchRef.current?.focus();
             }}
           >
-            Show everything
+            Clear filters
           </Button>
         </div>
       ) : (

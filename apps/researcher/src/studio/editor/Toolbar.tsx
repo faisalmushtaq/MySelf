@@ -5,20 +5,21 @@ import { formatTime, toDate, versionLabel } from "../format.js";
 import { Link, useRoute, type Route } from "../router.js";
 import { Dialog } from "../ui/dialog.js";
 import { Icon } from "../ui/icons.js";
-import { IconButton, Kbd, Spinner, Tooltip, VisuallyHidden } from "../ui/kit.js";
+import { IconButton, Kbd, Spinner, StatusDot, Tooltip, VisuallyHidden } from "../ui/kit.js";
 import { useToast } from "../ui/toast.js";
 import { useEditor } from "./context.js";
 import { isTextEntry, modKey } from "./outline/keys.js";
 import "./toolbar.css";
 
 /**
- * The editor's toolbar: which survey this is and what is live, whether the
- * work is saved, undo and redo, whether anything is wrong, who else is here,
- * and the two ways out — Preview and Publish.
+ * The editor's toolbar (DESIGN.md §4): on the left, whether the work is saved
+ * and what is live; on the right, undo and redo, whether anything is wrong,
+ * who else is here, and the two ways out — Preview and Publish.
  *
- * Every state is said in words (and usually an icon), never by colour alone,
- * and the save status sits in a polite live region so a screen-reader user
- * hears "Saved" or "Save failed" without having to go looking.
+ * Every state is said in words (a dot or icon only confirms it), in two or
+ * three of them, with the rest of the sentence on hover and for screen
+ * readers. The save status sits in a polite live region so a screen-reader
+ * user hears "Saved" or "Save failed" without having to go looking.
  */
 
 export const VALIDATION_TOGGLE_ID = "sto-validation-toggle";
@@ -32,21 +33,19 @@ export function Toolbar() {
 
   return (
     <div className="sto-toolbar" role="region" aria-label="Survey toolbar">
-      <div className="sto-tb-id">
-        <h1 className="sto-title" title={title}>
-          {title}
-        </h1>
-        <div className="sto-tb-meta">
-          <LiveVersion />
-          <DraftStatus />
-        </div>
+      {/* The header's crumb shows the title; the page keeps it as its heading. */}
+      <h1 className="st-sr">{title}</h1>
+      <div className="sto-tb-status">
+        <SaveStatus />
+        <span className="sto-tb-sep" aria-hidden="true" />
+        <LiveVersion />
+        <DraftStatus />
       </div>
       <div className="sto-tb-actions">
-        <SaveStatus />
+        {ctx.playground ? null : <Presence />}
         <UndoRedo />
         <span className="sto-tb-sep" aria-hidden="true" />
         <ValidationBadge />
-        {ctx.playground ? null : <Presence />}
         <PreviewLink />
         <PublishButton />
         <Tooltip text="Keyboard shortcuts (?)">
@@ -58,7 +57,7 @@ export function Toolbar() {
             aria-keyshortcuts="?"
             onClick={() => setShortcuts(true)}
           >
-            ?
+            <span aria-hidden="true">?</span>
           </button>
         </Tooltip>
       </div>
@@ -82,18 +81,20 @@ function LiveVersion() {
   const ctx = useEditor();
   const active = ctx.survey?.active ?? ctx.published?.active ?? null;
   if (!active) {
-    return ctx.publishedStatus === "loading" ? <span>Checking what&rsquo;s live…</span> : <span>Not published yet</span>;
+    return (
+      <span className="sto-live sto-live-none">
+        {ctx.publishedStatus === "loading" ? <>Checking what&rsquo;s live…</> : "Not published yet"}
+      </span>
+    );
   }
   const on = publishedOn(toDate(active.publishedAt));
-  return (
+  const label = (
     <span className="sto-live">
-      <Icon name="flag" size={14} />
-      <span>
-        Live: <strong>{versionLabel(active.version)}</strong>
-        {on ? ` · published ${on}` : ""}
-      </span>
+      <span className="sto-live-word">Live</span> <span className="sto-live-version">{versionLabel(active.version)}</span>
+      {on ? <VisuallyHidden>, published {on}</VisuallyHidden> : null}
     </span>
   );
+  return on ? <Tooltip text={`Published ${on}`}>{label}</Tooltip> : label;
 }
 
 const DIFF_DELAY_MS = 900;
@@ -129,71 +130,100 @@ function DraftStatus() {
   const baseline = ctx.published?.baseline ?? null;
   const same = useMatchesLive(ctx.draft, baseline, ctx.publishedStatus === "ready");
   if (ctx.publishedStatus !== "ready" || !baseline) return null;
-  if (same === null) return <span>Comparing with the live version…</span>;
+  // Said in words, not colour: a quiet "in sync", or a tag when there is something to publish.
+  if (same === null) return <span className="sto-draft sto-draft-busy">Comparing…</span>;
   return same ? (
-    <span className="sto-draft-same">
-      <Icon name="check" size={14} /> Draft matches the live version
-    </span>
+    <span className="sto-draft sto-draft-same">In sync with live</span>
   ) : (
-    <span className="sto-draft-changed">
-      <Icon name="info" size={14} /> Draft has changes not yet published
-    </span>
+    <span className="sto-draft sto-draft-changed">Draft differs from live</span>
   );
 }
 
 // ── Saving ───────────────────────────────────────────────────────────────
 
-function saveText(save: SaveState): { icon: "check" | "warning" | "error" | "offline" | "info" | null; text: string; busy?: boolean; tone: string } {
+type SaveTone = "ok" | "busy" | "pending" | "warn" | "error";
+
+/**
+ * The save state in two words. `detail` finishes the sentence for screen
+ * readers (inside the live region, as before); `tip` says it on hover.
+ */
+function saveText(save: SaveState): { text: string; detail: string | null; tip: string; tone: SaveTone } {
   switch (save.kind) {
     case "saved":
-      return { icon: "check", text: save.at ? `Saved at ${formatTime(save.at)}` : "Saved", tone: "ok" };
+      return save.at
+        ? { text: "Saved", detail: ` at ${formatTime(save.at)}`, tip: `Saved at ${formatTime(save.at)}`, tone: "ok" }
+        : { text: "Saved", detail: null, tip: "All changes saved", tone: "ok" };
     case "saving":
-      return { icon: null, text: "Saving…", busy: true, tone: "busy" };
+      return { text: "Saving…", detail: null, tip: "Saving your changes", tone: "busy" };
     case "unsaved":
-      return { icon: "info", text: "Unsaved changes", tone: "pending" };
+      return { text: "Unsaved", detail: " changes", tip: "Unsaved changes — saved in a moment", tone: "pending" };
     case "offline":
-      return { icon: "offline", text: "Offline — kept in this tab", tone: "warn" };
+      return { text: "Offline", detail: " — kept in this tab", tip: "Offline — changes are kept in this tab until you’re back online", tone: "warn" };
     case "error":
-      return { icon: "error", text: "Save failed", tone: "warn" };
+      return { text: "Save failed", detail: null, tip: save.message ? `Save failed: ${save.message}` : "Save failed", tone: "error" };
     case "conflict":
-      return { icon: "warning", text: "Not saved: someone else saved first — see the message above", tone: "warn" };
+      return {
+        text: "Not saved",
+        detail: ": someone else saved first — see the message above",
+        tip: "Someone else saved first — see the message above",
+        tone: "error",
+      };
   }
 }
+
+const DOT: Record<SaveTone, "neutral" | "accent" | "warn" | "danger"> = {
+  ok: "accent",
+  busy: "neutral",
+  pending: "neutral",
+  warn: "warn",
+  error: "danger",
+};
 
 function SaveStatus() {
   const ctx = useEditor();
   const box = useRef<HTMLSpanElement | null>(null);
   if (ctx.playground) {
     return (
-      <span className="sto-save sto-save-pending" role="status">
-        <Icon name="info" size={16} /> Nothing is saved in the playground
-      </span>
+      <Tooltip text="Nothing is saved in the playground">
+        <span className="sto-save sto-save-pending">
+          <span role="status" className="sto-save-text">
+            <StatusDot />
+            <span>Playground</span>
+            <VisuallyHidden>: nothing is saved</VisuallyHidden>
+          </span>
+        </span>
+      </Tooltip>
     );
   }
   const save = ctx.editor.save;
   const s = saveText(save);
+  // Always inside the tooltip, so the live region below is never remounted
+  // (a region replaced along with its text is often not announced).
   return (
-    <span className={`sto-save sto-save-${s.tone}`} ref={box} tabIndex={-1}>
-      <span role="status" className="sto-save-text">
-        {s.busy ? <Spinner /> : s.icon ? <Icon name={s.icon} size={16} /> : null}
-        <span>{s.text}</span>
+    <Tooltip text={s.tip}>
+      <span className={`sto-save sto-save-${s.tone}`} ref={box} tabIndex={-1}>
+        <span role="status" className="sto-save-text">
+          <StatusDot tone={DOT[s.tone]} />
+          <span>{s.text}</span>
+          {s.detail ? <VisuallyHidden>{s.detail}</VisuallyHidden> : null}
+        </span>
+        {save.kind === "error" ? (
+          <button
+            type="button"
+            className="st-btn st-btn-ghost st-btn-sm sto-retry"
+            onClick={() => {
+              // REVIEW FIX: Retry disappears as soon as the save starts, which
+              // dropped focus to the page; it moves to the status it reports to.
+              box.current?.focus();
+              void ctx.editor.saveNow();
+            }}
+            title={save.message}
+          >
+            Retry
+          </button>
+        ) : null}
       </span>
-      {save.kind === "error" ? (
-        <button
-          type="button"
-          className="st-btn st-btn-ghost st-btn-sm sto-retry"
-          onClick={() => {
-            // REVIEW FIX: Retry disappears as soon as the save starts, which
-            // dropped focus to the page; it moves to the status it reports to.
-            box.current?.focus();
-            void ctx.editor.saveNow();
-          }}
-          title={save.message}
-        >
-          Retry
-        </button>
-      ) : null}
-    </span>
+    </Tooltip>
   );
 }
 
@@ -276,6 +306,12 @@ function useEditorShortcuts(openShortcuts: () => void) {
 
 // ── Validation ───────────────────────────────────────────────────────────
 
+const countOf = (n: number, word: string) => `${n} ${n === 1 ? word : `${word}s`}`;
+
+/**
+ * The checks chip. It shows the worst news in words ("2 errors", else "6
+ * warnings"); its accessible name always carries every count.
+ */
 function ValidationBadge() {
   const ctx = useEditor();
   const { errors, warnings } = summariseIssues(ctx.issues);
@@ -291,15 +327,22 @@ function ValidationBadge() {
   } else if (errors + warnings === 0) {
     content = (
       <>
-        <Icon name="check" size={16} /> <span>No problems</span>
+        <Icon name="check" size={16} /> <span>No issues</span>
+      </>
+    );
+  } else if (errors > 0) {
+    tone = "error";
+    content = (
+      <>
+        <Icon name="error" size={16} /> <span>{countOf(errors, "error")}</span>
+        {warnings > 0 ? <VisuallyHidden>, {countOf(warnings, "warning")}</VisuallyHidden> : null}
       </>
     );
   } else {
-    tone = errors > 0 ? "error" : "warn";
-    const parts = [errors > 0 ? `${errors} ${errors === 1 ? "error" : "errors"}` : null, warnings > 0 ? `${warnings} ${warnings === 1 ? "warning" : "warnings"}` : null].filter(Boolean);
+    tone = "warn";
     content = (
       <>
-        <Icon name={errors > 0 ? "error" : "warning"} size={16} /> <span>{parts.join(" · ")}</span>
+        <Icon name="warning" size={16} /> <span>{countOf(warnings, "warning")}</span>
       </>
     );
   }
@@ -328,6 +371,8 @@ function Presence() {
   const sameQuestion = focus ? others.filter((p) => p.focus === focus) : [];
   const described = others.map((p) => `${p.email}${p.focus ? ` (on ${p.focus})` : ""}`).join(", ");
   const shown = others.slice(0, 3);
+  // Faces only, with the names on hover and for screen readers; words appear
+  // only when someone is on the same question, which is worth interrupting for.
   return (
     <span className={`sto-presence${sameQuestion.length > 0 ? " sto-presence-clash" : ""}`} title={`Also editing: ${described}`}>
       <span className="sto-avatars" aria-hidden="true">
@@ -338,20 +383,14 @@ function Presence() {
         ))}
         {others.length > shown.length ? <span className="sto-avatar sto-avatar-more">+{others.length - shown.length}</span> : null}
       </span>
-      <span className="sto-presence-text">
-        {sameQuestion.length > 0 ? (
-          <>
-            <Icon name="warning" size={14} /> {sameQuestion[0]!.email} is on this question too
-          </>
-        ) : others.length === 1 ? (
-          <>Also editing: {described}</>
-        ) : (
-          <>
-            Also editing: {others.length} people
-            <VisuallyHidden> — {described}</VisuallyHidden>
-          </>
-        )}
-      </span>
+      {sameQuestion.length > 0 ? (
+        <span className="sto-presence-text">
+          <Icon name="warning" size={14} /> <span>Also on this question</span>
+          <VisuallyHidden>: {sameQuestion[0]!.email}. Also editing: {described}</VisuallyHidden>
+        </span>
+      ) : (
+        <VisuallyHidden>Also editing: {described}</VisuallyHidden>
+      )}
     </span>
   );
 }
@@ -366,10 +405,12 @@ function PreviewLink() {
   if (route.name === "playground") to = { name: "playground", tab: "preview", q };
   else to = { name: "survey", surveyId: ctx.surveyId, tab: "preview", q };
   return (
-    <Link to={to} className="st-btn st-btn-secondary st-btn-sm sto-preview" title={q ? "Preview from the selected question" : "Preview from the start"}>
-      <Icon name="eye" size={16} />
-      <span>Preview</span>
-    </Link>
+    <Tooltip text={q ? "Preview from the selected question" : "Preview from the start"}>
+      <Link to={to} className="st-btn st-btn-secondary st-btn-sm sto-preview">
+        <Icon name="eye" size={16} />
+        <span>Preview</span>
+      </Link>
+    </Tooltip>
   );
 }
 
@@ -418,20 +459,21 @@ function ShortcutsDialog({ onClose, playground }: { onClose: () => void; playgro
     ...(playground ? [] : [[<><Kbd>{mod}</Kbd> <Kbd>S</Kbd></>, "Save now"] as [ReactNode, string]]),
     [<Kbd>/</Kbd>, "Search the outline"],
     [<Kbd>?</Kbd>, "Show these shortcuts"],
+    [<Kbd>Esc</Kbd>, "Close a menu, panel or dialog"],
     [<><Kbd>↑</Kbd> <Kbd>↓</Kbd></>, "Outline: move between rows"],
-    [<><Kbd>→</Kbd> <Kbd>←</Kbd></>, "Outline: open or close a section or block, or go to its parent"],
+    [<><Kbd>→</Kbd> <Kbd>←</Kbd></>, "Outline: open or close, or go to the parent"],
     [<><Kbd>Home</Kbd> <Kbd>End</Kbd></>, "Outline: first or last row"],
     [<><Kbd>Enter</Kbd> or <Kbd>Space</Kbd></>, "Outline: open the row in the editor"],
-    [<><Kbd>Alt</Kbd> <Kbd>↑</Kbd> / <Kbd>↓</Kbd></>, "Outline: move the question, block or section up or down"],
-    [<><Kbd>Shift</Kbd> <Kbd>F10</Kbd></>, "Outline: the row’s actions (copy, move, archive…)"],
-    [<Kbd>Esc</Kbd>, "Close a menu, panel or dialog"],
+    [<><Kbd>Alt</Kbd> <Kbd>↑</Kbd> / <Kbd>↓</Kbd></>, "Outline: move the row up or down"],
+    [<><Kbd>Shift</Kbd> <Kbd>F10</Kbd></>, "Outline: the row’s actions"],
   ];
   return (
-    <Dialog title="Keyboard shortcuts" onClose={onClose} width={560}>
-      <p className="stp-flush">
-        While you&rsquo;re typing in a box, {mod}+Z undoes your typing there, as it does anywhere else. Outside a box it
-        undoes the last change to the survey.
-      </p>
+    <Dialog
+      title="Keyboard shortcuts"
+      description={<>In a text box, {mod}+Z undoes typing. Elsewhere it undoes the last change to the survey.</>}
+      onClose={onClose}
+      width={560}
+    >
       <dl className="sto-keys">
         {rows.map(([keys, what], i) => (
           <div key={i}>

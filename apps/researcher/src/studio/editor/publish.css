@@ -1,209 +1,425 @@
 /*
- * The publish dialog. The stepper says where you are in words and numbers;
- * the current step is bold and underlined, done steps carry a tick.
+ * The publish dialog (640px): a small step indicator, a concise heading per
+ * step, and each step's content as tidy rows on hairlines rather than boxes.
+ * The step marks say where you are in numbers and words; done steps carry a
+ * tick, the current one is filled.
  */
 
+/* ── Steps ─────────────────────────────────────────────────────────────── */
 .sto-steps {
   display: flex;
-  flex-wrap: wrap;
-  gap: 0.25rem 1rem;
+  align-items: center;
+  gap: 8px;
   list-style: none;
-  margin: 0 0 1rem;
-  padding: 0 0 0.75rem;
-  border-bottom: 1px solid var(--hairline);
-  font-size: 0.84rem;
+  margin: 0 0 20px;
+  padding: 0;
+  font-size: 12px;
+  line-height: 16px;
 }
 .sto-steps li {
   display: inline-flex;
   align-items: center;
-  gap: 0.4rem;
-  color: var(--muted);
+  gap: 6px;
+  color: var(--st-text-tertiary);
+  white-space: nowrap;
+}
+/* Hairlines between the steps. */
+.sto-steps li + li::before {
+  content: "";
+  width: 16px;
+  height: 1px;
+  margin-right: 2px;
+  background: var(--st-border-strong);
 }
 .sto-steps li.current {
-  color: var(--text);
-  font-weight: 600;
-  text-decoration: underline;
-  text-decoration-color: var(--accent);
-  text-decoration-thickness: 2px;
-  text-underline-offset: 5px;
+  color: var(--st-text);
+  font-weight: 500;
 }
 .sto-steps li.done {
-  color: var(--text);
+  color: var(--st-text-secondary);
 }
 .sto-step-mark {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 20px;
-  height: 20px;
+  width: 18px;
+  height: 18px;
   border-radius: 50%;
-  border: 1px solid var(--hairline-strong);
-  font-size: 0.72rem;
+  border: 1px solid var(--st-border-strong);
+  font-size: 11px;
+  font-weight: 500;
   font-variant-numeric: tabular-nums;
-  text-decoration: none;
 }
 .sto-steps li.current .sto-step-mark {
-  background: #111;
-  border-color: #111;
-  color: #fff;
+  background: var(--st-text);
+  border-color: var(--st-text);
+  color: #ffffff;
 }
 .sto-steps li.done .sto-step-mark {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: #fff;
+  background: var(--st-bg-muted);
+  border-color: var(--st-bg-muted);
+  color: var(--st-accent);
+}
+.sto-steps li.done .sto-step-mark .st-icon {
+  stroke-width: 2.4;
 }
 
+/* ── A step: heading, one line under it, then its content ─────────────── */
 .sto-pub-heading {
   display: flex;
   align-items: center;
-  gap: 0.4rem;
-  margin: 0 0 0.6rem;
-  font-size: 1.02rem;
+  gap: 8px;
+  margin: 0;
+  font-size: 15px;
   font-weight: 600;
+  line-height: 22px;
+  letter-spacing: -0.005em;
 }
 .studio .sto-pub-heading:focus,
 .studio .sto-pub-heading:focus-visible {
   box-shadow: none;
 }
-.sto-pub-heading > .st-icon {
-  color: var(--accent);
-}
-.sto-pub-busy p {
+.sto-pub-sub {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 0.5rem;
+  gap: 4px 8px;
+  margin: 4px 0 0;
+  color: var(--st-text-secondary);
+}
+.sto-pub-step .st-notice {
+  margin-top: 12px;
+}
+.sto-pub-after {
+  margin-top: 12px;
+}
+.sto-pub-muted {
+  color: var(--st-text-tertiary);
+}
+.sto-pub-busy .sto-pub-sub {
+  margin-top: 8px;
+}
+.sto-pub-busy .st-spinner {
+  color: var(--st-text-tertiary);
 }
 
-.sto-pub-ok {
-  display: flex;
-  align-items: center;
-  gap: 0.35rem;
-  margin: 0 0 0.6rem;
+.sto-pub-headline {
+  justify-content: space-between;
+}
+.sto-pub-headline > span:first-child {
+  color: var(--st-text);
   font-weight: 500;
 }
-.sto-pub-ok > .st-icon {
-  color: var(--accent);
+.sto-pub-ok {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--st-text-secondary);
 }
-.sto-pub-changes {
-  margin-top: 0.9rem;
+.sto-pub-ok > .st-icon {
+  color: var(--st-accent);
 }
 
+/* The change list (shared with Versions), tightened for the dialog. */
+.sto-pub-changes {
+  margin-top: 16px;
+}
+.sto-pub-changes .stp-changes {
+  gap: 16px;
+}
+.sto-pub-changes .stp-changes-note {
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--st-text-secondary);
+}
+.sto-pub-changes .stp-change-group h4 {
+  gap: 6px;
+  margin: 0 0 4px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 16px;
+  color: var(--st-text-secondary);
+}
+.sto-pub-changes .stp-change-group h4 .stp-count {
+  min-width: 0;
+  height: auto;
+  padding: 0;
+  background: none;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--st-text-tertiary);
+}
+.sto-pub-changes .stp-change-group ul {
+  border-top: 1px solid var(--st-border);
+}
+.sto-pub-changes .stp-change-group li {
+  min-height: 36px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--st-border);
+  font-size: 13px;
+  line-height: 20px;
+}
+
+/* ── Issues to fix or review ───────────────────────────────────────────── */
 .sto-pub-issues {
   list-style: none;
-  margin: 0.75rem 0;
+  margin: 16px 0 0;
   padding: 0;
-  display: grid;
-  gap: 0.5rem;
+  border-top: 1px solid var(--st-border);
 }
 .sto-pub-issues li {
   display: grid;
-  grid-template-columns: auto 1fr auto;
-  gap: 0.55rem;
+  grid-template-columns: 16px minmax(0, 1fr) auto;
+  gap: 10px;
   align-items: start;
-  padding: 0.55rem 0.65rem;
-  border: 1px solid var(--hairline);
-  border-radius: var(--st-radius);
-  font-size: 0.88rem;
-  line-height: 1.45;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--st-border);
+  font-size: 13px;
+  line-height: 20px;
 }
 .sto-pub-issues li > .st-icon {
-  margin-top: 0.15rem;
-  color: var(--warn);
+  margin-top: 2px;
+}
+.sto-pub-issues-warning li > .st-icon {
+  color: var(--st-warn);
+}
+.sto-pub-issues-error li > .st-icon {
+  color: var(--st-danger);
+}
+.sto-pub-issue-text {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.sto-pub-issue-place {
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 16px;
+  color: var(--st-text-secondary);
+}
+.sto-pub-issue-context {
+  font-weight: 400;
+  color: var(--st-text-tertiary);
+}
+.sto-pub-issues li .st-btn {
+  margin-top: -2px;
 }
 
 .sto-pub-check {
   display: flex;
-  gap: 0.6rem;
+  gap: 10px;
   align-items: center;
-  margin-top: 0.9rem;
-  padding: 0.7rem 0.85rem;
-  border: 1px solid var(--hairline-strong);
-  border-radius: var(--st-radius);
+  margin-top: 16px;
+  min-height: 32px;
   font-weight: 500;
   cursor: pointer;
 }
 .sto-pub-check input {
-  width: 18px;
-  height: 18px;
-  accent-color: var(--accent);
-}
-.sto-pub-check:has(input:checked) {
-  border-color: var(--accent);
-  background: var(--accent-wash);
+  flex: none;
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--st-accent);
 }
 .sto-pub-check.has-error {
-  border-color: var(--warn);
+  color: var(--st-danger);
 }
 .sto-pub-problem {
   display: flex;
   align-items: center;
-  gap: 0.35rem;
-  margin: 0.5rem 0 0;
-  font-size: 0.86rem;
+  gap: 4px;
+  margin: 8px 0 0;
+  font-size: 12px;
   font-weight: 500;
-  color: var(--warn);
+  line-height: 16px;
+  color: var(--st-danger);
 }
 
-.sto-pub-versions .stp-radio strong {
+/* ── Version: a compact radio list ─────────────────────────────────────── */
+.sto-pub-versions {
+  margin: 16px 0 0;
+  padding: 0;
+  border: 0;
+  border-top: 1px solid var(--st-border);
+}
+.sto-pub-version {
+  display: grid;
+  grid-template-columns: 16px 64px minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+  padding: 12px 8px;
+  margin: 0 -8px;
+  border-bottom: 1px solid var(--st-border);
+  border-radius: 0;
+  cursor: pointer;
+}
+.sto-pub-version:hover:not(.is-disabled) {
+  background: var(--st-bg-subtle);
+}
+.sto-pub-version input {
+  width: 16px;
+  height: 16px;
+  margin: 2px 0 0;
+  accent-color: var(--st-accent);
+}
+.sto-pub-version-num {
+  font-family: var(--st-mono);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 20px;
   font-variant-numeric: tabular-nums;
+  color: var(--st-text);
+}
+.sto-pub-version-text {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.sto-pub-version-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font-weight: 500;
+  line-height: 20px;
+}
+.sto-pub-version-text small {
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--st-text-secondary);
 }
 .sto-pub-rec {
-  font-style: normal;
-  font-weight: 400;
-  color: var(--accent);
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: var(--st-radius-sm);
+  background: var(--st-bg-muted);
+  color: var(--st-text-secondary);
+  font-size: 12px;
+  font-weight: 500;
 }
-.sto-pub-why {
+.sto-pub-version.is-disabled {
+  cursor: not-allowed;
+}
+.sto-pub-version.is-disabled .sto-pub-version-num,
+.sto-pub-version.is-disabled .sto-pub-version-title {
+  color: var(--st-text-tertiary);
+}
+.sto-pub-version.is-disabled input {
+  opacity: 0.5;
+}
+.studio .sto-pub-why {
   display: flex;
-  gap: 0.3rem;
+  gap: 4px;
   align-items: flex-start;
-  color: var(--text) !important;
+  color: var(--st-text-tertiary);
 }
 .sto-pub-why > .st-icon {
-  margin-top: 0.15rem;
+  flex: none;
+  margin-top: 2px;
 }
 
+/* ── Release note ──────────────────────────────────────────────────────── */
+.sto-pub-notefield {
+  margin: 16px 0 0;
+}
 .sto-pub-note {
-  min-height: 7.5rem;
+  min-height: 120px;
   resize: vertical;
-  line-height: 1.45;
+  line-height: 20px;
+  padding-top: 6px;
+  padding-bottom: 6px;
+}
+.sto-pub-notehint {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
 }
 .sto-pub-count {
-  float: right;
+  flex: none;
   font-variant-numeric: tabular-nums;
 }
 
+/* ── Confirm: a short definition list ──────────────────────────────────── */
 .sto-pub-summary {
   display: grid;
-  gap: 0.6rem;
-  margin: 0 0 1rem;
-  padding: 0.85rem 1rem;
-  border: 1px solid var(--hairline);
-  border-radius: var(--st-radius);
-  background: var(--off-white);
+  margin: 16px 0 0;
+  border-top: 1px solid var(--st-border);
+}
+.sto-pub-summary > div {
+  display: grid;
+  grid-template-columns: 112px minmax(0, 1fr);
+  gap: 16px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--st-border);
 }
 .sto-pub-summary dt {
-  font-size: 0.72rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 20px;
+  color: var(--st-text-secondary);
 }
 .sto-pub-summary dd {
-  margin: 0.1rem 0 0;
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.sto-pub-mono {
+  font-family: var(--st-mono);
+  font-weight: 500;
 }
 .sto-pub-quote {
   white-space: pre-line;
-  border-left: 3px solid var(--hairline-strong);
-  padding-left: 0.6rem;
 }
 
+/* ── Done: calm ────────────────────────────────────────────────────────── */
+.sto-pub-done {
+  display: grid;
+  justify-items: start;
+  padding: 4px 0 0;
+}
+.sto-pub-done-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  margin-bottom: 12px;
+  border-radius: 50%;
+  background: var(--st-accent-subtle);
+  color: var(--st-accent);
+}
+.sto-pub-done-mark .st-icon {
+  stroke-width: 2;
+}
 .sto-pub-links {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.5rem;
-  margin-top: 1rem;
+  gap: 8px;
+  margin: 16px 0 0;
 }
+
 .sto-pub-gate {
-  margin: 0.25rem 0 0;
-  padding-left: 1.2rem;
-  font-size: 0.88rem;
+  margin: 4px 0 0;
+  padding-left: 20px;
+  color: var(--st-text-secondary);
+}
+
+@media (max-width: 560px) {
+  /* Only the current step is named on screen; the others keep their names for screen readers. */
+  .sto-steps li:not(.current) .sto-step-name {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+  }
+  .sto-pub-summary > div {
+    grid-template-columns: 1fr;
+    gap: 2px;
+  }
 }

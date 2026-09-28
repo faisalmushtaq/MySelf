@@ -198,12 +198,12 @@ function PublishFlow() {
       title={title}
       onClose={close}
       dismissable={!inFlight(s)}
-      width={680}
+      width={640}
       initialFocus=".sto-pub-heading"
       footer={<Footer s={s} dispatch={dispatch} close={close} />}
     >
       {isFormStep(s.step) ? <Stepper current={s.step} hasChecks={warningsOf(s).length > 0} /> : null}
-      {body}
+      <div className={`sto-pub-step sto-pub-step-${s.step}`}>{body}</div>
     </Dialog>
   );
 }
@@ -212,6 +212,7 @@ function isFormStep(step: PublishState["step"]): step is FormStep {
   return (STEPS as readonly string[]).includes(step);
 }
 
+/** Where you are: a row of small numbered marks joined by hairlines, the current one named in full. */
 function Stepper({ current, hasChecks }: { current: FormStep; hasChecks: boolean }) {
   const steps = STEPS.filter((step) => step !== "checks" || hasChecks);
   const at = steps.indexOf(current);
@@ -220,9 +221,10 @@ function Stepper({ current, hasChecks }: { current: FormStep; hasChecks: boolean
       {steps.map((step, i) => (
         <li key={step} className={i < at ? "done" : i === at ? "current" : ""} aria-current={i === at ? "step" : undefined}>
           <span className="sto-step-mark" aria-hidden="true">
-            {i < at ? <Icon name="check" size={12} /> : i + 1}
+            {i < at ? <Icon name="check" size={10} /> : i + 1}
           </span>
-          {STEP_TITLES[step]}
+          <span className="sto-step-name">{STEP_TITLES[step]}</span>
+          {i < at ? <span className="st-sr"> (done)</span> : null}
         </li>
       ))}
     </ol>
@@ -244,18 +246,19 @@ function IssuesToFix({ issues, goTo, severity }: { issues: Issue[]; goTo: (i: Is
   const groups = groupIssues(issues, outline(ctx.draft));
   const list = severity === "error" ? groups.errors : groups.warnings;
   return (
-    <ul className="sto-pub-issues">
+    <ul className={`sto-pub-issues sto-pub-issues-${severity}`}>
       {list.flatMap((g) =>
         g.issues.map((issue, i) => (
           <li key={`${g.id}:${i}`}>
             <Icon name={severity === "error" ? "error" : "warning"} size={16} />
-            <span>
-              <strong>{g.label}</strong>
-              {g.context ? <span className="stp-muted"> in {g.context}</span> : null}
-              <br />
-              {issue.message}
+            <span className="sto-pub-issue-text">
+              <span className="sto-pub-issue-place">
+                {g.label}
+                {g.context ? <span className="sto-pub-issue-context"> in {g.context}</span> : null}
+              </span>
+              <span>{issue.message}</span>
             </span>
-            <Button size="sm" variant="secondary" onClick={() => goTo(issue)} aria-label={`Go to ${g.label}`}>
+            <Button size="sm" variant="ghost" onClick={() => goTo(issue)} aria-label={`Go to ${g.label}`}>
               Go to
             </Button>
           </li>
@@ -289,7 +292,7 @@ function StepBody({
       return (
         <div className="sto-pub-busy">
           <Heading headingRef={headingRef}>Saving your latest changes…</Heading>
-          <p className="stp-flush">
+          <p className="sto-pub-sub">
             <Spinner /> Then the draft is checked one last time.
           </p>
         </div>
@@ -302,7 +305,7 @@ function StepBody({
           <>
             <Heading headingRef={headingRef}>Your latest changes aren&rsquo;t saved</Heading>
             <Notice tone={stop.reason === "context" ? "warn" : "error"}>{stop.message}</Notice>
-            <p>Nothing has been published.</p>
+            <p className="sto-pub-sub sto-pub-after">Nothing has been published.</p>
           </>
         );
       }
@@ -310,11 +313,11 @@ function StepBody({
         return (
           <>
             <Heading headingRef={headingRef}>
-              {stop.errors.length === 1 ? "1 error must be fixed first" : `${stop.errors.length} errors must be fixed first`}
+              {stop.errors.length === 1 ? "Fix 1 error first" : `Fix ${stop.errors.length} errors first`}
             </Heading>
-            <p className="stp-flush">
-              Errors stop a version being published, because participants would meet a survey that doesn&rsquo;t work. Go to
-              each one and fix it, then publish again.
+            <p className="sto-pub-sub">
+              Errors stop a version being published: participants would meet a survey that doesn&rsquo;t work. Fix each one, then
+              publish again.
             </p>
             <IssuesToFix issues={stop.errors} goTo={goTo} severity="error" />
           </>
@@ -322,10 +325,11 @@ function StepBody({
       }
       return (
         <>
-          <Heading headingRef={headingRef}>The draft matches the live version</Heading>
-          <p className="stp-flush">
-            Nothing has changed{stop.liveVersion ? ` since ${versionLabel(stop.liveVersion)}` : ""} — there&rsquo;s nothing to publish.
-            The draft is exactly what participants see now.
+          <Heading headingRef={headingRef}>Nothing to publish</Heading>
+          <p className="sto-pub-sub">
+            The draft matches the live version
+            {stop.liveVersion ? <> — nothing has changed since {versionLabel(stop.liveVersion)}</> : null}. It is exactly what
+            participants see now.
           </p>
         </>
       );
@@ -335,11 +339,8 @@ function StepBody({
       const warnings = warningsOf(s);
       return (
         <>
-          <Heading headingRef={headingRef}>Nothing stops this being published</Heading>
-          <p className="stp-flush">
-            {warnings.length === 1 ? "One warning is" : `${warnings.length} warnings are`} worth a look first. They don&rsquo;t block
-            publishing.
-          </p>
+          <Heading headingRef={headingRef}>{warnings.length === 1 ? "Review 1 warning" : `Review ${warnings.length} warnings`}</Heading>
+          <p className="sto-pub-sub">Nothing stops this being published. Warnings are worth a look, but don&rsquo;t block it.</p>
           <IssuesToFix issues={warnings} goTo={goTo} severity="warning" />
           <label className={`sto-pub-check${problem ? " has-error" : ""}`}>
             <input type="checkbox" checked={s.reviewed} onChange={(e) => dispatch({ type: "review", reviewed: e.target.checked })} aria-describedby={problem ? `${noteId}-review` : undefined} />
@@ -359,19 +360,19 @@ function StepBody({
       const breaking = summary.entries.filter((e) => e.breaking).length;
       return (
         <>
-          <Heading headingRef={headingRef}>What changes{since}</Heading>
-          {warningsOf(s).length === 0 ? (
-            <p className="sto-pub-ok">
-              <Icon name="check" size={16} /> All checks passed.
-            </p>
-          ) : null}
-          <p className="stp-flush">
-            <strong>{changeHeadline(summary)}</strong>
+          <Heading headingRef={headingRef}>Changes{since}</Heading>
+          <p className="sto-pub-sub sto-pub-headline">
+            <span>{changeHeadline(summary)}</span>
+            {warningsOf(s).length === 0 ? (
+              <span className="sto-pub-ok">
+                <Icon name="check" size={14} /> All checks passed
+              </span>
+            ) : null}
           </p>
           {breaking > 0 ? (
             <Notice tone="warn" title={breaking === 1 ? "1 change is breaking" : `${breaking} changes are breaking`}>
-              A breaking change changes how answers are coded — consider a new question instead, so answers collected before and
-              after it don&rsquo;t share a column but mean different things.
+              It changes how answers are coded. Consider a new question instead, so answers collected before and after it
+              don&rsquo;t share a column but mean different things.
             </Notice>
           ) : null}
           <div className="sto-pub-changes">
@@ -385,15 +386,14 @@ function StepBody({
       const options = versionOptions(s.latest, s.required);
       return (
         <>
-          <Heading headingRef={headingRef}>Choose the version number</Heading>
-          <p className="stp-flush">
-            {s.latest ? `The latest version is ${versionLabel(s.latest)}. ` : ""}The changes decide the smallest step allowed; you can
-            choose a bigger one, never a smaller one.
+          <Heading headingRef={headingRef}>Version number</Heading>
+          <p className="sto-pub-sub">
+            {s.latest ? `Latest is ${versionLabel(s.latest)}. ` : ""}The changes set the smallest step allowed; a bigger one is fine.
           </p>
-          <fieldset className="stp-fieldset sto-pub-versions">
+          <fieldset className="sto-pub-versions">
             <legend className="st-sr">Version number</legend>
             {options.map((o) => (
-              <label key={o.bump} className={`stp-radio${o.allowed ? "" : " disabled"}`}>
+              <label key={o.bump} className={`sto-pub-version${o.allowed ? "" : " is-disabled"}`}>
                 <input
                   type="radio"
                   name="sto-version"
@@ -404,11 +404,12 @@ function StepBody({
                   // REVIEW FIX: what each number means (and why a smaller one isn't allowed) is read with it, not only seen.
                   aria-describedby={`${noteId}-${o.bump}-m${o.reason ? ` ${noteId}-${o.bump}-r` : ""}`}
                 />
-                <span>
-                  <strong>
-                    {o.title} — {versionLabel(o.version)}
-                    {o.required && s.latest ? <em className="sto-pub-rec"> · what these changes need</em> : null}
-                  </strong>
+                <span className="sto-pub-version-num">{versionLabel(o.version)}</span>
+                <span className="sto-pub-version-text">
+                  <span className="sto-pub-version-title">
+                    {o.title}
+                    {o.required && s.latest ? <span className="sto-pub-rec">Needed for these changes</span> : null}
+                  </span>
                   <small id={`${noteId}-${o.bump}-m`}>{o.meaning}</small>
                   {o.reason ? (
                     <small className="sto-pub-why" id={`${noteId}-${o.bump}-r`}>
@@ -432,8 +433,8 @@ function StepBody({
       const length = s.note.trim().length;
       return (
         <>
-          <Heading headingRef={headingRef}>Write the release note</Heading>
-          <div className={`st-field${problem ? " st-field-error" : ""}`}>
+          <Heading headingRef={headingRef}>Describe this version</Heading>
+          <div className={`st-field sto-pub-notefield${problem ? " st-field-error" : ""}`}>
             <label htmlFor={noteId} className="st-field-label">
               Release note for {v}
             </label>
@@ -447,9 +448,11 @@ function StepBody({
               aria-describedby={`${noteId}-hint${problem ? ` ${noteId}-err` : ""}`}
               aria-invalid={problem ? true : undefined}
             />
-            <div id={`${noteId}-hint`} className="st-field-hint">
-              What changed and why, for the version history — anyone reading the data later looks here to understand it. At least{" "}
-              {NOTE_MIN} characters. <span className="sto-pub-count">{length.toLocaleString("en-GB")} / {NOTE_MAX.toLocaleString("en-GB")}</span>
+            <div id={`${noteId}-hint`} className="st-field-hint sto-pub-notehint">
+              <span>What changed and why — anyone reading the data later looks here. At least {NOTE_MIN} characters.</span>
+              <span className="sto-pub-count">
+                {length.toLocaleString("en-GB")} / {NOTE_MAX.toLocaleString("en-GB")}
+              </span>
             </div>
             {problem ? (
               <div id={`${noteId}-err`} className="st-field-msg st-field-msg-error">
@@ -468,13 +471,13 @@ function StepBody({
           <dl className="sto-pub-summary">
             <div>
               <dt>Version</dt>
-              <dd>{v}</dd>
+              <dd className="sto-pub-mono">{v}</dd>
             </div>
             <div>
               <dt>Changes</dt>
               <dd>
                 {changeHeadline(s.inputs!.summary)}
-                {s.inputs?.liveVersion ? <span className="stp-muted"> Compared with {versionLabel(s.inputs.liveVersion)}.</span> : null}
+                {s.inputs?.liveVersion ? <span className="sto-pub-muted"> Compared with {versionLabel(s.inputs.liveVersion)}.</span> : null}
               </dd>
             </div>
             <div>
@@ -482,9 +485,9 @@ function StepBody({
               <dd className="sto-pub-quote">{s.note.trim()}</dd>
             </div>
           </dl>
-          <p>
-            Publishing {v} makes it the live version at the public survey link. Participants who start after this see it; anyone
-            mid-way through carries on with the version they started. Earlier versions and all responses are kept.
+          <p className="sto-pub-sub sto-pub-after">
+            {v} becomes the live version at the public survey link. Participants who start after this see it; anyone mid-way
+            through carries on with the version they started. Earlier versions and all responses are kept.
           </p>
         </>
       );
@@ -493,7 +496,7 @@ function StepBody({
       return (
         <div className="sto-pub-busy">
           <Heading headingRef={headingRef}>Publishing {v}…</Heading>
-          <p className="stp-flush">
+          <p className="sto-pub-sub">
             <Spinner /> This takes a few seconds. Keep this window open.
           </p>
         </div>
@@ -503,7 +506,7 @@ function StepBody({
       return (
         <div className="sto-pub-busy">
           <Heading headingRef={headingRef}>Checking the live link…</Heading>
-          <p className="stp-flush">
+          <p className="sto-pub-sub">
             <Spinner /> {v} has been published. Waiting to see participants&rsquo; link point at it.
           </p>
         </div>
@@ -512,15 +515,18 @@ function StepBody({
     case "live": {
       const p = s.published!;
       return (
-        <>
-          <Heading headingRef={headingRef}>
-            <Icon name="check" size={20} /> {versionLabel(p.version)} is live
-          </Heading>
-          <p className="stp-flush">
+        <div className="sto-pub-done">
+          <span className="sto-pub-done-mark" aria-hidden="true">
+            <Icon name="check" size={20} />
+          </span>
+          <Heading headingRef={headingRef}>{versionLabel(p.version)} is live</Heading>
+          <p className="sto-pub-sub">
             Participants who start from now see {versionLabel(p.version)}. Anyone mid-way through carries on with the version they
             started.
           </p>
-          {p.alreadyPublished ? <p>This version had already been published from this draft, so nothing new was written.</p> : null}
+          {p.alreadyPublished ? (
+            <p className="sto-pub-sub">This version had already been published from this draft, so nothing new was written.</p>
+          ) : null}
           <p className="sto-pub-links">
             <Link to={{ name: "survey", surveyId, tab: "versions", q: null }} className="st-btn st-btn-secondary st-btn-sm">
               <Icon name="history" size={16} />
@@ -532,7 +538,7 @@ function StepBody({
               <span className="st-sr"> (opens in a new tab)</span>
             </a>
           </p>
-        </>
+        </div>
       );
     }
 
@@ -566,7 +572,7 @@ function StepBody({
           {f.kind === "invalid" && f.issues.length > 0 ? <IssuesToFix issues={f.issues.filter((i) => i.severity === "error")} goTo={goTo} severity="error" /> : null}
           {f.kind === "invalid" && f.gate.length > 0 ? (
             <>
-              <p>The publish check also said:</p>
+              <p className="sto-pub-sub sto-pub-after">The publish check also said:</p>
               <ul className="sto-pub-gate">
                 {f.gate.map((g, i) => (
                   <li key={i}>{g}</li>

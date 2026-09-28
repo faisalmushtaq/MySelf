@@ -36,8 +36,8 @@ export interface VersionOption {
 }
 
 const MEANING: Record<Bump, string> = {
-  major: "Changes to questions: wording, options, codes, types, required status, conditions or variables.",
-  minor: "Wording participants see outside the questions: the start and completion screens, section titles.",
+  major: "Question changes: wording, options, codes, types, required, conditions or variables.",
+  minor: "Wording outside the questions: start and completion screens, section titles.",
   patch: "Details participants never see.",
 };
 
@@ -46,9 +46,9 @@ const TITLE: Record<Bump, string> = { major: "Major", minor: "Minor", patch: "Pa
 /** Why a smaller bump than `required` is not allowed. */
 export function tooSmallReason(required: Bump): string {
   if (required === "major") {
-    return "These changes alter the questions themselves, so they need a major version: answers collected before and after them must not be read as the same survey.";
+    return "These changes alter the questions, so they need a major version: answers before and after must not be read as the same survey.";
   }
-  return "These changes include wording participants see, which is never a patch (docs/06).";
+  return "These changes include wording participants see, which is never a patch.";
 }
 
 /**
