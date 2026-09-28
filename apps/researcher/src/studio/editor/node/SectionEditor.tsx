@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useState } from "react";
 import { editTier, outline, removeSection, updateSection, type StudioDraft } from "@myself/studio";
-import { Button } from "../../ui/kit.js";
+import { Icon } from "../../ui/icons.js";
+import { Button, InfoTip } from "../../ui/kit.js";
 import { useEditor } from "../context.js";
 import { AddQuestionDialog } from "./AddQuestion.js";
 import { ConditionBuilder } from "./ConditionBuilder.js";
@@ -45,25 +46,29 @@ export function SectionEditor({ sectionKey }: { sectionKey: string }) {
 
   return (
     <div className="stn-node">
-      <header className="stn-node-head">
-        <p className="stn-crumbs">
-          Section {index + 1} of {draft.composition.sections.length}
-        </p>
-        <h2 className="stn-title" tabIndex={-1} data-editor-heading>
-          {section.title || "Untitled section"}
+      <header className="stn-head">
+        <h2 className="stn-meta" tabIndex={-1} data-editor-heading>
+          <span className="st-num">
+            Section {index + 1} of {draft.composition.sections.length}
+          </span>
+          <span className="st-sr">: {section.title || "Untitled section"}</span>
+          <span className="stn-meta-id">{sectionKey}</span>
         </h2>
       </header>
       <IssueMessages issues={issues.general} />
-      <article className="stn-card stn-card-plain">
+      <div className="stn-canvas">
         <TextField
           label="Section title"
+          hideLabel
+          className="stn-field-stem"
           field="title"
           value={section.title}
           inputClassName="stn-sectiontitle"
+          placeholder="Section title"
           readOnly={!ctx.canEdit}
           lockedReason={ctx.readOnlyReason}
           validate={validateTitle}
-          hint="Participants see it in the progress bar as they move through the survey."
+          hint="Shown to participants in the progress bar."
           issues={issues.byField.get("title")}
           onCommit={(title) =>
             ctx.run(`Rename the section ${sectionKey}`, (d) =>
@@ -72,30 +77,14 @@ export function SectionEditor({ sectionKey }: { sectionKey: string }) {
             )
           }
         />
-      </article>
-
-      <Panel title="When it's shown" field="displayIf">
-        <ConditionBuilder
-          subject={{ kind: "section", sectionKey }}
-          noun="section"
-          expr={section.displayIf}
-          readOnly={!ctx.canEdit || guarded !== null}
-          lockedReason={
-            guarded
-              ? "This section holds a protected module (the consent or the participant identifiers), which every participant must see. A condition here would hide it too."
-              : ctx.readOnlyReason
-          }
-          issues={issues.byField.get("displayIf")}
-          onWrite={(next) => ctx.run(`Change when the section ${sectionKey} is shown`, (d) => updateSection(d, sectionKey, { displayIf: next }).draft)}
-        />
-      </Panel>
+      </div>
 
       <Panel
-        title={`In this section · ${questionCount} question${questionCount === 1 ? "" : "s"}`}
+        title={`Questions · ${questionCount}`}
         field="components"
         actions={
-          <Button size="sm" icon="plus" onClick={() => setAdding(true)} disabled={!ctx.canEdit}>
-            Add a question
+          <Button size="sm" variant="ghost" icon="plus" onClick={() => setAdding(true)} disabled={!ctx.canEdit}>
+            Add question
           </Button>
         }
       >
@@ -103,21 +92,44 @@ export function SectionEditor({ sectionKey }: { sectionKey: string }) {
         <NodeList blocks={blocks} sectionKey={sectionKey} withBlocks select={ctx.select} />
       </Panel>
 
+      <Panel
+        title="Condition"
+        field="displayIf"
+        info="Conditions can only use answers given earlier. To skip ahead, hide the questions in between — the survey always moves forward."
+      >
+        <ConditionBuilder
+          subject={{ kind: "section", sectionKey }}
+          noun="section"
+          expr={section.displayIf}
+          readOnly={!ctx.canEdit || guarded !== null}
+          lockedReason={
+            guarded
+              ? "It holds a protected module (the consent or the participant identifiers) that every participant must see."
+              : ctx.readOnlyReason
+          }
+          issues={issues.byField.get("displayIf")}
+          onWrite={(next) => ctx.run(`Change when the section ${sectionKey} is shown`, (d) => updateSection(d, sectionKey, { displayIf: next }).draft)}
+        />
+      </Panel>
+
       <Panel title="Delete section">
         {empty && draft.composition.sections.length > 1 ? (
-          <>
-            <p className="stn-flush">This section is empty, so deleting it loses nothing. You can undo it.</p>
-            <div className="stn-row-actions">
-              <Button variant="danger" icon="trash" onClick={remove} disabled={!ctx.canEdit}>
-                Delete section
-              </Button>
-            </div>
-          </>
+          <div className="stn-actionrow">
+            <p className="stn-flush stn-muted">It's empty, so nothing is lost. You can undo it.</p>
+            <Button variant="secondary" className="stn-danger-btn" icon="trash" onClick={remove} disabled={!ctx.canEdit}>
+              Delete section
+            </Button>
+          </div>
         ) : (
-          <p className="stn-hint">
-            {empty
-              ? "A survey needs at least one section."
-              : "Only an empty section can be deleted, so nothing goes with it by accident. Move its questions to another section, or archive them, first."}
+          <p className="stn-inline-note">
+            <Icon name="lock" size={14} />
+            {empty ? "A survey needs at least one section." : "Only an empty section can be deleted."}
+            {empty ? null : (
+              <InfoTip
+                text="So nothing goes with it by accident. Move its questions to another section, or archive them, first."
+                label="deleting a section"
+              />
+            )}
           </p>
         )}
       </Panel>

@@ -46,22 +46,30 @@ export function AddQuestionDialog({ sectionKey, onClose }: { sectionKey?: string
       intro={
         sectionKey ? (
           <p className="stn-flush">
-            It goes at the end of “{sections.find((s) => s.key === sectionKey)?.title ?? sectionKey}”, or straight after any questions you have
-            already added there. You can move it afterwards.
+            Added at the end of “{sections.find((s) => s.key === sectionKey)?.title ?? sectionKey}”, after any questions already added there. You
+            can move it afterwards.
           </p>
         ) : (
-          <div className="stn-field stn-flush">
+          <div className="stn-field stn-field-inline stn-flush">
             <label className="stn-label" htmlFor={selectId}>
-              Section
+              Add to section
             </label>
-            <select id={selectId} className="st-select" value={target} onChange={(e) => setTarget(e.target.value)}>
+            <select
+              id={selectId}
+              className="st-select"
+              value={target}
+              onChange={(e) => setTarget(e.target.value)}
+              aria-describedby={`${selectId}-hint`}
+            >
               {sections.map((s) => (
                 <option key={s.key} value={s.key}>
                   {s.title}
                 </option>
               ))}
             </select>
-            <div className="stn-hint">It goes at the end of the section, or straight after any questions you have already added there. You can move it afterwards.</div>
+            <div id={`${selectId}-hint`} className="stn-hint">
+              Added at the end of the section, after any questions already added there. You can move it afterwards.
+            </div>
           </div>
         )
       }

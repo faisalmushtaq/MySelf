@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useState, type ReactNode } from "react";
 import type { ItemDefinition } from "@myself/schema";
 import {
   changeQuestionType,
@@ -14,11 +14,12 @@ import {
   type StudioDraft,
 } from "@myself/studio";
 import { Icon } from "../../ui/icons.js";
-import { Badge, Button } from "../../ui/kit.js";
+import { Button, Tooltip } from "../../ui/kit.js";
 import { useToast } from "../../ui/toast.js";
 import { useEditor } from "../context.js";
 import { ConditionBuilder } from "./ConditionBuilder.js";
-import { Disclosure, IssueMessages, LockBanner, Panel, TextField } from "./controls.js";
+import { Disclosure, IssueMessages, LockBanner, LockTip, Panel, TextField } from "./controls.js";
+import { focusSoon } from "./focus.js";
 import { fieldsShownFor, questionIssues, unplacedIssues, type FieldIssues } from "./issues.js";
 import { FieldsEditor, GroupsEditor, StatementsEditor } from "./ListEditors.js";
 import { identityText, lockedBanner, protectedBanner, publishedPending, questionLock, tierAllows, typeLock, type QuestionLock } from "./locks.js";
@@ -27,13 +28,13 @@ import { pipeUses } from "./pipes.js";
 import { TypePickerDialog } from "./TypePicker.js";
 import { TYPE_ICONS, typeLabel } from "./types.js";
 import { unlessUnchanged } from "./unchanged.js";
-import { relock, UnlockDialog, UnlockedNote } from "./UnlockDialog.js";
+import { relock, UnlockDialog, unlockedText } from "./UnlockDialog.js";
 
 /**
- * A question, edited as the participant sees it: a white card with the
- * question in large type, then its description, help and answer, then when it
- * is shown. Settings that change how it is answered but not what it says live
- * in the settings panel on the right.
+ * A question, edited as the participant sees it: the question in large type,
+ * editable in place, then its description, anything extra it offers and its
+ * answer, then when it is shown. Settings that change how it is answered but
+ * not what it says live in the settings panel on the right.
  */
 
 export type WriteQuestion = (label: string, make: (item: ItemDefinition) => QuestionPatch) => boolean;
@@ -73,6 +74,15 @@ export function QuestionEditor({ itemKey }: { itemKey: string }) {
   const can = (field: string) => ctx.canEdit && tierAllows(lock, field);
   const [unlocking, setUnlocking] = useState(false);
   const [picking, setPicking] = useState(false);
+  // "More information" and help text are "+ Add …" buttons until they are
+  // used. Once opened they stay open, even emptied, so the box being typed in
+  // never disappears from under the caret.
+  const [moreOpen, setMoreOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
+  const moreShown = !!item.moreInfo || moreOpen;
+  const helpShown = !!item.hint || helpOpen;
+  const addMore = !moreShown && can("moreInfo");
+  const addHelp = !helpShown && can("hint");
   // REVIEW FIX: whether it was published decides between changing the type and
   // replacing the question, so neither is offered until that is known.
   const typeReason = typeLock(lock) ?? publishedPending(ctx.publishedStatus);
@@ -102,14 +112,14 @@ export function QuestionEditor({ itemKey }: { itemKey: string }) {
 
   return (
     <div className="stn-node stn-question">
-      <header className="stn-node-head">
+      <header className="stn-head">
         <nav className="stn-crumbs" aria-label="Where this question is">
           {place ? (
             <>
               <button type="button" className="stn-crumb" onClick={() => ctx.select({ kind: "section", sectionKey: place.sectionKey })}>
                 {place.sectionTitle}
               </button>
-              <Icon name="chevron-right" size={14} />
+              <Icon name="chevron-right" size={12} className="st-icon stn-crumb-sep" />
               <button
                 type="button"
                 className="stn-crumb"
@@ -122,42 +132,26 @@ export function QuestionEditor({ itemKey }: { itemKey: string }) {
             <span>Not placed in any section</span>
           )}
         </nav>
-        <h2 className="stn-title" tabIndex={-1} data-editor-heading>
-          {place ? `Question ${place.number} of ${place.total}` : "Question"}
-          <span className="stn-title-id">{itemKey}</span>
+        <h2 className="stn-meta" tabIndex={-1} data-editor-heading>
+          <span className="st-num">{place ? `Question ${place.number} of ${place.total}` : "Question"}</span>
+          <span className="stn-meta-id">{itemKey}</span>
         </h2>
       </header>
 
-      <QuestionBanners lock={lock} onUnlock={() => setUnlocking(true)} variable={item.variable} />
+      <QuestionNotices lock={lock} onUnlock={() => setUnlocking(true)} variable={item.variable} />
 
-      <article className="stn-card" aria-label="The question as participants see it">
-        <div className="stn-card-top">
-          <span className="stn-typechip">
-            <Icon name={TYPE_ICONS[studioType]} size={16} />
-            {typeLabel(studioType)}
-          </span>
-          {item.responseType !== "info" ? (
-            item.required === "hard" ? (
-              <Badge icon="check">Required</Badge>
-            ) : (
-              <Badge tone="muted">Not required</Badge>
-            )
-          ) : null}
-          {item.displayIf ? (
-            <Badge tone="accent" icon="branch">
-              Shown only to some
-            </Badge>
-          ) : null}
-          {lock.published ? <Badge tone="muted">Published</Badge> : null}
-        </div>
+      <article className="stn-canvas" aria-label="The question as participants see it">
         <IssueMessages issues={unplacedIssues(issues, fieldsShownFor(item.responseType))} />
 
         <TextField
-          label="Question text — what participants read"
+          label="Question"
+          hideLabel
+          className="stn-field-stem"
           field="stem"
           value={item.stem.text}
           multiline
           inputClassName="stn-stem"
+          placeholder="Type the question"
           readOnly={!can("stem")}
           issues={issues.byField.get("stem")}
           onCommit={(text) => write(`Edit wording of ${itemKey}`, (it) => ({ stem: { ...it.stem, text } }))}
@@ -166,34 +160,66 @@ export function QuestionEditor({ itemKey }: { itemKey: string }) {
         />
 
         <LedeField itemKey={itemKey} item={item} editable={can("lede")} issues={issues} write={write} />
-        <MoreInfoField itemKey={itemKey} item={item} editable={can("moreInfo")} issues={issues} write={write} />
 
-        <TextField
-          label="Help text"
-          field="hint"
-          optional
-          value={item.hint ?? ""}
-          multiline
-          readOnly={!can("hint")}
-          hint="Offered on request (“Remind me what this is about”) or after a long pause on this question. Never shown by default."
-          issues={issues.byField.get("hint")}
-          onCommit={(text) => write(`Edit help text of ${itemKey}`, () => ({ hint: text.trim() ? text : null }))}
-          emptyText="No help text"
-        />
+        {moreShown ? (
+          <MoreInfoField itemKey={itemKey} item={item} editable={can("moreInfo")} issues={issues} write={write} opened={moreOpen} onOpen={() => setMoreOpen(true)} />
+        ) : null}
+        {helpShown ? (
+          <TextField
+            label="Help text"
+            className="stn-field-extra"
+            field="hint"
+            value={item.hint ?? ""}
+            multiline
+            readOnly={!can("hint")}
+            info="Offered when a participant asks (“Remind me what this is about”) or pauses on the question for a long time. Never shown by default."
+            issues={issues.byField.get("hint")}
+            onCommit={(text) => write(`Edit help text of ${itemKey}`, () => ({ hint: text.trim() ? text : null }))}
+            emptyText="No help text"
+          />
+        ) : null}
+        {addMore || addHelp ? (
+          <div className="stn-extras">
+            {addMore ? (
+              <span data-field="moreInfo">
+                <Tooltip text="A collapsed panel under the question, for detail a participant may want but shouldn't have to read.">
+                  <Button size="sm" variant="ghost" icon="plus" onClick={() => setMoreOpen(true)}>
+                    More information
+                  </Button>
+                </Tooltip>
+              </span>
+            ) : null}
+            {addHelp ? (
+              <span data-field="hint">
+                <Tooltip text="Offered on request or after a long pause. Never shown by default.">
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    icon="plus"
+                    onClick={() => {
+                      setHelpOpen(true);
+                      focusSoon('[data-field="hint"]');
+                    }}
+                  >
+                    Help text
+                  </Button>
+                </Tooltip>
+              </span>
+            ) : null}
+          </div>
+        ) : null}
 
         <section className="stn-answer" aria-labelledby={`${itemKey}-answer`} data-field="responseType" tabIndex={-1}>
           <div className="stn-answer-head">
-            <h3 id={`${itemKey}-answer`} className="stn-eyebrow">
+            <h3 id={`${itemKey}-answer`} className="stn-h">
               Answer
             </h3>
-            <span className="stn-typechip strong">
-              <Icon name={TYPE_ICONS[studioType]} size={16} />
+            <span className="stn-typetag">
+              <Icon name={TYPE_ICONS[studioType]} size={14} />
               {typeLabel(studioType)}
             </span>
             {typeReason ? (
-              <span className="stn-hint stn-lockreason">
-                <Icon name="lock" size={13} /> {typeReason}
-              </span>
+              <LockTip reason={typeReason} label="Why the answer type can't change" />
             ) : (
               <Button size="sm" variant="ghost" onClick={() => setPicking(true)} disabled={!ctx.canEdit}>
                 Change type
@@ -205,7 +231,11 @@ export function QuestionEditor({ itemKey }: { itemKey: string }) {
         </section>
       </article>
 
-      <Panel title="When it's shown" field="displayIf">
+      <Panel
+        title="Condition"
+        field="displayIf"
+        info="Conditions can only use answers given earlier. To skip ahead, hide the questions in between — the survey always moves forward."
+      >
         <ConditionBuilder
           subject={{ kind: "question", itemKey }}
           noun="question"
@@ -214,17 +244,16 @@ export function QuestionEditor({ itemKey }: { itemKey: string }) {
           lockedReason={
             lock.tier === "locked" ? (
               <>
-                The questions of a licensed questionnaire are asked together.{" "}
+                Asked with its whole questionnaire.{" "}
                 {place ? (
                   <button
                     type="button"
                     className="stp-textlink"
                     onClick={() => ctx.select({ kind: "block", sectionKey: place.sectionKey, componentIndex: place.componentIndex }, { field: "displayIf" })}
                   >
-                    Show or hide the whole questionnaire from its block
+                    Set a condition on the block
                   </button>
                 ) : null}
-                .
               </>
             ) : lock.tier === "protected" ? (
               "Part of a protected module. Unlock it to change when this question is shown."
@@ -263,57 +292,57 @@ export function QuestionEditor({ itemKey }: { itemKey: string }) {
   );
 }
 
-function QuestionBanners({ lock, onUnlock, variable }: { lock: QuestionLock; onUnlock: () => void; variable: string }) {
+/** What is special about the question, one slim line each, the why behind an ⓘ. */
+function QuestionNotices({ lock, onUnlock, variable }: { lock: QuestionLock; onUnlock: () => void; variable: string }) {
   const ctx = useEditor();
-  const banners = [];
+  const notices = [];
   if (lock.tier === "locked") {
     const text = lockedBanner(lock);
-    banners.push(
-      <LockBanner key="locked" title={text.title}>
-        {text.body}
-      </LockBanner>,
-    );
+    notices.push(<LockBanner key="locked" title="Licensed questionnaire · wording locked" info={`${text.title}. ${text.body}`} infoLabel="the licence" />);
   } else if (lock.tier === "protected" && lock.protection) {
     const text = protectedBanner(lock.protection);
-    banners.push(
+    notices.push(
       <LockBanner
         key="protected"
-        tone="warn"
-        title={text.title}
+        title={lock.protection.reason === "ethics" ? "Ethics-approved consent · locked" : "Participant identifiers · locked"}
+        info={`${text.title}. ${text.body}`}
+        infoLabel="this lock"
         actions={
           <Button size="sm" variant="secondary" icon="unlock" onClick={onUnlock} disabled={!ctx.canEdit}>
             Unlock…
           </Button>
         }
-      >
-        {text.body}
-      </LockBanner>,
+      />,
     );
   } else if (lock.protection && lock.unlocked) {
-    banners.push(
+    notices.push(
       <LockBanner
         key="unlocked"
         icon="unlock"
         tone="accent"
-        title={`Unlocked: ${lock.protection.reason === "ethics" ? "ethics-approved consent" : "participant identifiers"}`}
+        title={`Unlocked · ${lock.protection.reason === "ethics" ? "ethics-approved consent" : "participant identifiers"}`}
+        info={unlockedText(ctx.draft, lock.instrument)}
+        infoLabel="the unlock"
         actions={
           <Button size="sm" variant="secondary" icon="lock" onClick={() => relock(ctx, lock.instrument)} disabled={!ctx.canEdit}>
             Lock again
           </Button>
         }
-      >
-        <UnlockedNote instrument={lock.instrument} />
-      </LockBanner>,
+      />,
     );
   }
   if (lock.identityRole) {
-    banners.push(
-      <LockBanner key="identity" icon="user" title={lock.identityRole === "linkage" ? "Part of the participant code" : "Identifies the participant"}>
-        {identityText(lock.identityRole, variable)}
-      </LockBanner>,
+    notices.push(
+      <LockBanner
+        key="identity"
+        icon="user"
+        title={lock.identityRole === "linkage" ? "Part of the participant code" : "Identifies the participant"}
+        info={identityText(lock.identityRole, variable)}
+        infoLabel="what stays fixed"
+      />,
     );
   }
-  return banners.length > 0 ? <div className="stn-banners">{banners}</div> : null;
+  return notices.length > 0 ? <div className="stn-notices">{notices}</div> : null;
 }
 
 /** Inserted answers in a piece of text, said in words. */
@@ -356,15 +385,18 @@ function LedeField({
   if (!editable && !item.lede) return null;
   return (
     <TextField
-      label="Description or guidance"
-      field="lede"
+      label="Description"
+      hideLabel
+      className="stn-field-lede"
       optional
+      field="lede"
       value={item.lede?.text ?? ""}
       multiline
       inputClassName="stn-lede"
+      placeholder="Add a description (optional)"
       readOnly={!editable}
       validate={validate}
-      hint="Shown under the question in body text — for an example, a definition or a reassurance, so the question itself stays short."
+      describe="Shown under the question in body text — for an example, a definition or a reassurance, so the question itself stays short."
       issues={issues.byField.get("lede")}
       onCommit={(text) => write(`Edit the description of ${itemKey}`, (it) => ({ lede: text.trim() ? { ...(it.lede ?? {}), text } : null }))}
       after={<PipeList display={item.lede} />}
@@ -379,17 +411,19 @@ function MoreInfoField({
   editable,
   issues,
   write,
+  opened,
+  onOpen,
 }: {
   itemKey: string;
   item: ItemDefinition;
   editable: boolean;
   issues: FieldIssues;
   write: WriteQuestion;
+  /** Opened with "+ More information" (or kept open after its text was emptied). */
+  opened: boolean;
+  onOpen: () => void;
 }) {
   const info = item.moreInfo;
-  // Open once someone starts one, and kept open if its text is emptied, so the
-  // box being typed in never disappears from under the caret.
-  const [open, setOpen] = useState(false);
   const [pendingLabel, setPendingLabel] = useState("More information");
   const label = info?.label ?? pendingLabel;
   const fieldIssues = issues.byField.get("moreInfo");
@@ -400,44 +434,34 @@ function MoreInfoField({
     [hasPipes],
   );
 
-  if (!info && !open) {
-    if (!editable) return null;
-    return (
-      <div className="stn-field" data-field="moreInfo" tabIndex={-1}>
-        <Button size="sm" variant="ghost" icon="plus" onClick={() => setOpen(true)}>
-          Add “More information”
-        </Button>
-        <p className="stn-hint">A collapsed panel under the question, for detail a participant may want but shouldn't have to read.</p>
-      </div>
-    );
-  }
+  if (!info && !opened) return null;
   return (
-    <Disclosure summary={`More information${info ? `: “${info.label}”` : ""}`} defaultOpen={open || (fieldIssues?.length ?? 0) > 0} className="stn-moreinfo">
+    <Disclosure summary={info ? `More information · “${info.label}”` : "More information"} defaultOpen={opened || (fieldIssues?.length ?? 0) > 0} className="stn-moreinfo">
       <div data-field="moreInfo">
         <TextField
-          label="Its label"
+          label="Link text"
           field="moreInfo.label"
           value={label}
           readOnly={!editable}
           validate={labelValidate}
-          hint="The link participants tap to open it."
+          info="The link participants tap to open it."
           onCommit={(text) => {
             if (info) write(`Edit “More information” of ${itemKey}`, (it) => ({ moreInfo: { ...(it.moreInfo ?? { body: { text: "" } }), label: text } }));
             else setPendingLabel(text);
           }}
         />
         <TextField
-          label="What it says"
+          label="Text"
           field="moreInfo.body"
           value={info?.body.text ?? ""}
           multiline
           readOnly={!editable}
           validate={bodyValidate}
-          hint={info ? "Empty it to remove “More information” altogether." : "Saved once it has some text."}
+          hint={info ? "Empty it to remove “More information”." : "Saved once it has some text."}
           issues={fieldIssues}
           onCommit={(text) => {
             if (!text.trim()) {
-              setOpen(true);
+              onOpen();
               if (info) setPendingLabel(info.label);
             }
             write(`Edit “More information” of ${itemKey}`, (it) =>
@@ -452,7 +476,12 @@ function MoreInfoField({
   );
 }
 
-/** What is specific to the question's type, in the card's answer area. */
+/** One short line saying how the answer works, above what can be edited of it. */
+function AnswerNote({ children }: { children: ReactNode }) {
+  return <p className="stn-answer-note">{children}</p>;
+}
+
+/** What is specific to the question's type, in the answer area. */
 function AnswerEditor({
   itemKey,
   item,
@@ -473,49 +502,51 @@ function AnswerEditor({
       return (
         <>
           {item.responseType === "multi_choice" ? (
-            <p className="stn-answer-note">
-              Participants tick every option that applies{item.maxSelections ? `, up to ${item.maxSelections}` : ""}.
-            </p>
+            <AnswerNote>{item.maxSelections ? `Participants tick up to ${item.maxSelections}.` : "Participants tick all that apply."}</AnswerNote>
           ) : null}
-          <OptionsEditor itemKey={itemKey} scaleKey={item.scale} issues={issues} />
+          <OptionsEditor itemKey={itemKey} scaleKey={item.scale} issues={issues} glyph={item.responseType === "multi_choice" ? "check" : "radio"} />
         </>
       );
     case "rank_group":
       return (
         <>
-          <p className="stn-answer-note">Participants drag each item into a group. These are the items:</p>
-          <OptionsEditor itemKey={itemKey} scaleKey={item.scale} issues={issues} statementNoun={choiceNoun} />
-          <h4 className="stn-eyebrow stn-gap-top">Groups</h4>
+          <AnswerNote>Participants drag each item into a group.</AnswerNote>
+          <OptionsEditor itemKey={itemKey} scaleKey={item.scale} issues={issues} statementNoun={choiceNoun} glyph="none" />
+          <h4 className="stn-subhead">Groups</h4>
           <GroupsEditor itemKey={itemKey} groups={item.groups} editable={can("groups")} issues={issues.byField.get("groups")} />
         </>
       );
     case "checkbox_set":
       return (
         <>
-          <p className="stn-answer-note">Participants tick each statement to show they understand and agree.</p>
+          <AnswerNote>Participants tick each statement to agree.</AnswerNote>
           <StatementsEditor itemKey={itemKey} statements={item.statements} editable={can("statements")} issues={issues.byField.get("statements")} />
         </>
       );
     case "form_fields":
       return (
         <>
-          <p className="stn-answer-note">Participants fill in several labelled boxes on one screen.</p>
+          <AnswerNote>Several labelled boxes on one screen.</AnswerNote>
           <FieldsEditor itemKey={itemKey} fields={item.fields} editable={can("fields")} issues={issues.byField.get("fields")} />
         </>
       );
     case "slider":
       return (
         <div className="stn-scaleends">
-          <p className="stn-answer-note">
-            Participants drag along a range from {item.min} to {item.max}
-            {item.step && item.step !== 1 ? ` in steps of ${item.step}` : ""}. Set the numbers in the settings panel.
-          </p>
           <div className="stn-track" aria-hidden="true">
             <span />
           </div>
+          <div className="stn-track-ends st-num" aria-hidden="true">
+            <span>{item.min}</span>
+            <span>{item.max}</span>
+          </div>
+          <p className="st-sr">
+            A slider from {item.min} to {item.max}
+            {item.step && item.step !== 1 ? `, in steps of ${item.step}` : ""}.
+          </p>
           <div className="stn-ends">
             <TextField
-              label={`Label at ${item.min}`}
+              label={`At ${item.min}`}
               field="minLabel"
               value={item.minLabel ?? ""}
               readOnly={!can("minLabel")}
@@ -525,7 +556,7 @@ function AnswerEditor({
               emptyText="No label"
             />
             <TextField
-              label={`Label at ${item.max}`}
+              label={`At ${item.max}`}
               field="maxLabel"
               value={item.maxLabel ?? ""}
               readOnly={!can("maxLabel")}
@@ -540,74 +571,83 @@ function AnswerEditor({
     case "ladder":
       return (
         <div className="stn-scaleends">
-          <p className="stn-answer-note">
-            A drawn ladder of {item.rungs} rungs; participants tap the rung where they would put themselves. Rungs are stored as{" "}
-            {item.lowestValue ?? 1} (bottom) to {(item.lowestValue ?? 1) + item.rungs - 1} (top).
-          </p>
-          <TextField
-            label="Label at the top"
-            field="topLabel"
-            value={item.topLabel ?? ""}
-            readOnly={!can("topLabel")}
-            issues={issues.byField.get("topLabel")}
-            onCommit={(text) => write(`Edit the ladder labels of ${itemKey}`, () => ({ topLabel: text.trim() ? text : null }))}
-            emptyText="No label"
-          />
-          <TextField
-            label="Label at the bottom"
-            field="bottomLabel"
-            value={item.bottomLabel ?? ""}
-            readOnly={!can("bottomLabel")}
-            issues={issues.byField.get("bottomLabel")}
-            onCommit={(text) => write(`Edit the ladder labels of ${itemKey}`, () => ({ bottomLabel: text.trim() ? text : null }))}
-            emptyText="No label"
-          />
+          <AnswerNote>
+            A ladder of {item.rungs} rungs, stored as {item.lowestValue ?? 1} (bottom) to {(item.lowestValue ?? 1) + item.rungs - 1} (top).
+          </AnswerNote>
+          <div className="stn-ends">
+            <TextField
+              label="Top label"
+              field="topLabel"
+              value={item.topLabel ?? ""}
+              readOnly={!can("topLabel")}
+              issues={issues.byField.get("topLabel")}
+              onCommit={(text) => write(`Edit the ladder labels of ${itemKey}`, () => ({ topLabel: text.trim() ? text : null }))}
+              emptyText="No label"
+            />
+            <TextField
+              label="Bottom label"
+              field="bottomLabel"
+              value={item.bottomLabel ?? ""}
+              readOnly={!can("bottomLabel")}
+              issues={issues.byField.get("bottomLabel")}
+              onCommit={(text) => write(`Edit the ladder labels of ${itemKey}`, () => ({ bottomLabel: text.trim() ? text : null }))}
+              emptyText="No label"
+            />
+          </div>
         </div>
       );
     case "numeric": {
       const range =
         item.min !== undefined && item.max !== undefined
-          ? ` from ${item.min} to ${item.max}`
+          ? `, ${item.min} to ${item.max}`
           : item.min !== undefined
-            ? ` of at least ${item.min}`
+            ? `, at least ${item.min}`
             : item.max !== undefined
-              ? ` of at most ${item.max}`
+              ? `, at most ${item.max}`
               : "";
       return (
-        <div className="stn-preview-box" aria-hidden="false">
-          <span className="stn-preview-input">{item.integerOnly === false ? "12.5" : "12"}</span>
+        <div className="stn-preview-box">
+          <span className="stn-preview-input" aria-hidden="true">
+            {item.integerOnly === false ? "12.5" : "12"}
+          </span>
           {item.unitLabel ? <span className="stn-preview-unit">{item.unitLabel}</span> : null}
-          <p className="stn-answer-note">
-            Participants type a {item.integerOnly === false ? "number" : "whole number"}
-            {range}. Limits and the unit are in the settings panel.
-          </p>
+          <AnswerNote>
+            {item.integerOnly === false ? "A number" : "A whole number"}
+            {range}.
+          </AnswerNote>
         </div>
       );
     }
     case "date":
       return (
-        <p className="stn-answer-note">
-          Participants pick a date
-          {item.minAgeYears !== undefined || item.maxAgeYears !== undefined
-            ? `; a date of birth making them younger than ${item.minAgeYears ?? 0} or older than ${item.maxAgeYears ?? 120} is questioned`
-            : ""}
-          . Age limits are in the settings panel.
-        </p>
-      );
-    case "text_short":
-    case "text_long":
-      return (
         <div className="stn-preview-box">
-          <span className={`stn-preview-input${item.responseType === "text_long" ? " long" : ""}`} />
-          <p className="stn-answer-note">
-            Participants type {item.responseType === "text_long" ? "as much as they like" : "a short answer"}, up to {item.maxChars ?? (item.responseType === "text_long" ? 5000 : 200)}{" "}
-            characters
-            {item.responseType === "text_short" && item.pattern ? ", in the format set in the settings panel" : ""}.
-          </p>
+          <span className="stn-preview-input" aria-hidden="true">
+            DD / MM / YYYY
+          </span>
+          <AnswerNote>
+            A date
+            {item.minAgeYears !== undefined || item.maxAgeYears !== undefined
+              ? `; an age under ${item.minAgeYears ?? 0} or over ${item.maxAgeYears ?? 120} is questioned`
+              : ""}
+            .
+          </AnswerNote>
         </div>
       );
+    case "text_short":
+    case "text_long": {
+      const max = item.maxChars ?? (item.responseType === "text_long" ? 5000 : 200);
+      return (
+        <div className="stn-preview-box">
+          <span className={`stn-preview-input${item.responseType === "text_long" ? " long" : ""}`} aria-hidden="true" />
+          <AnswerNote>
+            {item.responseType === "text_long" ? "Free text" : "A short answer"}, up to {max} character{max === 1 ? "" : "s"}
+            {item.responseType === "text_short" && item.pattern ? ", in a set format" : ""}.
+          </AnswerNote>
+        </div>
+      );
+    }
     case "info":
-      return <p className="stn-answer-note">Nothing to answer: participants read this and carry on.</p>;
+      return <AnswerNote>Nothing to answer: participants read this and carry on.</AnswerNote>;
   }
 }
 

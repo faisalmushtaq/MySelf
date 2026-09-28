@@ -1,169 +1,217 @@
 /*
- * The settings panel (`sti-`): dense, quiet, one column. Groups are separated
- * by hairlines rather than boxes so a long list of settings reads down the
- * panel; each setting says in a sentence what it does. Form controls come
- * from the kit and from the centre editor's field styles (node.css), so a box
- * looks the same wherever it is.
+ * The settings panel (`sti-`), per DESIGN.md §5 "Inspector": groups (Answer ·
+ * Validation · Logic · Reporting · Status) with a 13px/600 heading and a
+ * hairline between them; rows of label left, control right at 36px; what a
+ * setting does behind an ⓘ. Boxes, switches and messages come from the
+ * centre editor's field styles (node.css), so they look the same everywhere.
  */
 
 .sti {
-  padding: 0.9rem 1rem 3rem;
-  display: grid;
-  gap: 0;
-}
-.sti-head {
-  padding-bottom: 0.6rem;
-  border-bottom: 1px solid var(--hairline);
-}
-.sti-eyebrow {
-  margin: 0;
-  font-size: 0.74rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-}
-.sti-id {
-  margin: 0.25rem 0 0;
-  overflow-wrap: anywhere;
-}
-.sti-tip {
-  margin-top: 0.75rem;
-  padding: 0.6rem 0.75rem;
-  border-radius: var(--st-radius);
-  background: var(--canvas);
-  border: 1px solid var(--hairline);
-  font-size: 0.9rem;
+  /* Positioned, so screen-reader-only text stays inside the scrolling panel. */
+  position: relative;
+  min-height: 100%;
+  padding: 0 16px 48px;
+  background: var(--st-bg-subtle);
 }
 .sti-group {
-  padding: 1rem 0 0.6rem;
-  border-bottom: 1px solid var(--hairline);
+  padding: 16px 0;
+  border-bottom: 1px solid var(--st-border);
 }
 .sti-group:last-child {
   border-bottom: 0;
 }
+.sti-titlerow {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-height: 20px;
+  margin-bottom: 6px;
+}
 .sti-title {
-  margin: 0 0 0.75rem;
-  font-size: 0.95rem;
+  margin: 0;
+  font-size: 13px;
+  line-height: 20px;
   font-weight: 600;
+  color: var(--st-text);
 }
-.sti-note {
-  margin: 0 0 0.75rem;
-  font-size: 0.85rem;
-  color: var(--muted);
-  display: flex;
-  gap: 0.35rem;
-  align-items: flex-start;
-  flex-wrap: wrap;
-}
-.sti-note .st-icon {
-  margin-top: 0.15rem;
-}
-.sti-status {
-  margin: 0 0 0.75rem;
-  font-size: 0.9rem;
-  line-height: 1.6;
+.sti-titlerow .st-infotip {
+  margin-left: 2px;
 }
 
-/* Radio choices as full-width rows, the chosen one marked by a filled dot,
-   a border and a wash — never the colour alone. */
-.sti-radios {
-  border: 0;
-  margin: 0 0 0.75rem;
-  padding: 0;
-  display: grid;
-  gap: 0.4rem;
+/* Rows */
+.sti-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+}
+.sti-row-label {
+  flex: 1;
   min-width: 0;
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--st-text);
 }
-.sti-legend {
-  padding: 0;
-  margin-bottom: 0.4rem;
-  font-size: 0.74rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
+.sti-row-value {
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--st-text-secondary);
 }
-.sti-radio {
-  display: flex;
-  gap: 0.55rem;
-  align-items: flex-start;
-  padding: 0.55rem 0.65rem;
-  border: 1px solid var(--hairline);
-  border-radius: var(--st-radius);
-  background: var(--paper);
-  cursor: pointer;
-  font-size: 0.9rem;
-  line-height: 1.4;
-  transition: border-color 0.15s;
+.sti-row .st-btn-ghost {
+  margin-right: -8px;
 }
-.sti-radio:hover {
-  border-color: var(--hairline-strong);
+.studio .st-select.sti-select {
+  width: 148px;
 }
-.sti-radio.on {
-  border-color: var(--accent);
-  background: var(--accent-wash);
+.sti .stn-field {
+  margin-bottom: 12px;
 }
-.sti-radio input {
-  flex: none;
-  width: 18px;
-  height: 18px;
-  margin: 0.05rem 0 0;
-  accent-color: var(--accent);
+.sti .stn-field.stn-field-inline {
+  margin-bottom: 0;
 }
-.sti-radio:focus-within {
-  box-shadow: var(--st-focus);
+.sti .stn-field-inline + .stn-field:not(.stn-field-inline),
+.sti .stn-switchrow + .stn-field:not(.stn-field-inline) {
+  margin-top: 8px;
+}
+.sti .stn-field:last-child {
+  margin-bottom: 0;
+}
+.studio .sti .stn-field-inline > .stn-inputrow > .st-input {
+  width: 88px;
 }
 
-.sti-pair {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(7.5rem, 1fr));
-  gap: 0 0.75rem;
-}
-.studio .sti-pair .st-input.stn-number {
-  max-width: none;
-}
-
-.sti-idrow {
+/* Notes and facts */
+.sti-note {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0.3rem 0.5rem;
+  gap: 4px 6px;
+  margin: 4px 0 0;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--st-text-tertiary);
 }
-.sti-fullid {
-  overflow-wrap: anywhere;
+.sti-note .st-icon {
+  flex: none;
 }
-.sti-sensitivity {
-  margin-bottom: 1rem;
+.sti-note .stn-locktip {
+  margin: 0;
 }
+.sti-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 28px;
+  margin: 0;
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--st-text);
+}
+.sti-status .st-infotip {
+  margin-left: -4px;
+}
+.sti-flag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.sti-flag .st-icon {
+  color: var(--st-text-tertiary);
+}
+.sti-checks {
+  list-style: none;
+  margin: 0 0 12px;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+  font-size: 13px;
+  line-height: 20px;
+}
+.sti-checks li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.sti-check-ok .st-icon {
+  color: var(--st-accent);
+}
+.sti-check-error {
+  color: var(--st-danger);
+  font-weight: 500;
+}
+.sti-check-warn .st-icon {
+  color: var(--st-warn);
+}
+
 .sti-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.5rem;
   align-items: center;
-  margin: 0.25rem 0 0.75rem;
+  gap: 8px;
+  margin-top: 8px;
 }
+.sti-actions .sti-note {
+  margin: 0;
+}
+.sti-actions + .stn-field,
+.sti-actions + .sti-note + .stn-field {
+  margin-top: 16px;
+}
+.studio .st-btn.sti-delete {
+  color: var(--st-danger);
+}
+.studio .st-btn.sti-delete:hover:not(:disabled) {
+  background: var(--st-danger-subtle);
+  color: var(--st-danger);
+}
+
 .sti-links {
   margin: 0;
-  padding-left: 1.1rem;
+  padding: 2px 0 4px 16px;
   display: grid;
-  gap: 0.35rem;
-  font-size: 0.9rem;
+  gap: 4px;
+  font-size: 13px;
+  line-height: 20px;
+}
+.sti-idrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.sti-idtools {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
 }
 .sti .stn-details {
-  margin-bottom: 0.75rem;
+  margin-top: 4px;
+}
+.sti .stn-details-body {
+  padding-left: 0;
 }
 .sti-unavailable ul {
   margin: 0;
-  padding-left: 1.1rem;
+  padding-left: 16px;
   display: grid;
-  gap: 0.45rem;
-  font-size: 0.86rem;
+  gap: 6px;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--st-text-secondary);
+}
+.sti-unavailable strong {
+  font-weight: 600;
+  color: var(--st-text);
 }
 .sti .stn-facts > div {
-  grid-template-columns: minmax(6.5rem, 8.5rem) minmax(0, 1fr);
-  gap: 0.6rem;
+  grid-template-columns: 104px minmax(0, 1fr);
+  gap: 8px;
+  padding: 4px 0;
 }
-.sti .st-switch {
-  margin-bottom: 0.6rem;
+.sti .stn-facts dt {
+  font-size: 12px;
+}
+.sti .stn-tester {
+  margin-top: -4px;
 }
 
 @media (max-width: 560px) {

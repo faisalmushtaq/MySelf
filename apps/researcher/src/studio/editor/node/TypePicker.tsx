@@ -68,7 +68,7 @@ export function TypePickerDialog({
           if (types.length === 0) return null;
           return (
             <section key={group.id} className="stn-types-group" aria-label={group.title}>
-              <h3 className="stn-eyebrow">{group.title}</h3>
+              <h3 className="stn-subhead">{group.title}</h3>
               <ul className="stn-types-list">
                 {types.map((t) => {
                   const isCurrent = t.id === current;
@@ -82,7 +82,7 @@ export function TypePickerDialog({
                         aria-describedby={`stn-type-desc-${t.id}`}
                       >
                         <span className="stn-type-icon">
-                          <Icon name={TYPE_ICONS[t.id]} size={20} />
+                          <Icon name={TYPE_ICONS[t.id]} size={16} />
                         </span>
                         <span className="stn-type-text">
                           <span className="stn-type-label">

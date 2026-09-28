@@ -310,7 +310,8 @@
   vertical-align: -3px;
   margin-left: 4px;
 }
-.st-infotip > button {
+.st-infotip > button,
+.st-infotip > .st-tip-anchor > button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -323,7 +324,8 @@
   color: var(--st-text-tertiary);
   cursor: help;
 }
-.st-infotip > button:hover {
+.st-infotip > button:hover,
+.st-infotip > .st-tip-anchor > button:hover {
   color: var(--st-text);
 }
 .st-infotip .st-icon {

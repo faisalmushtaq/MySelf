@@ -61,14 +61,17 @@ export function SectionInspector({ sectionKey }: { sectionKey: string }) {
 
   return (
     <div className="sti">
-      <header className="sti-head">
-        <p className="sti-eyebrow">Section settings</p>
-      </header>
-      <section className="sti-group" aria-label="About this section">
+      <section className="sti-group" aria-labelledby="sti-section-facts">
+        <div className="sti-titlerow">
+          <h3 className="sti-title" id="sti-section-facts">
+            Section
+          </h3>
+        </div>
         <Facts
           rows={[
             {
-              label: "Section ID",
+              label: "ID",
+              info: "Fixed: the data and the preview refer to the section by it.",
               value: (
                 <span className="sti-idrow">
                   <code>{sectionKey}</code>
@@ -79,20 +82,21 @@ export function SectionInspector({ sectionKey }: { sectionKey: string }) {
             { label: "Position", value: `${index + 1} of ${sections.length}` },
             { label: "Blocks", value: String(o.blocks.length) },
             { label: "Questions", value: String(questions) },
-            { label: "Shown only to some", value: `${conditional} question${conditional === 1 ? "" : "s"}${o.hasCondition ? ", and the whole section" : ""}` },
+            { label: "Conditional", value: `${conditional} question${conditional === 1 ? "" : "s"}${o.hasCondition ? ", and the section" : ""}` },
           ]}
         />
-        <p className="sti-note">The section ID is fixed: the data and the preview refer to the section by it.</p>
       </section>
       <section className="sti-group" aria-labelledby="sti-section-move">
-        <h3 className="sti-title" id="sti-section-move">
-          Order
-        </h3>
+        <div className="sti-titlerow">
+          <h3 className="sti-title" id="sti-section-move">
+            Order
+          </h3>
+        </div>
         <div className="sti-actions">
-          <Button size="sm" icon="arrow-up" data-move="up" onClick={() => move(index - 1, "up")} disabled={!ctx.canEdit || moves.up !== null}>
+          <Button size="sm" variant="secondary" icon="arrow-up" data-move="up" onClick={() => move(index - 1, "up")} disabled={!ctx.canEdit || moves.up !== null}>
             Move up
           </Button>
-          <Button size="sm" icon="arrow-down" data-move="down" onClick={() => move(index + 1, "down")} disabled={!ctx.canEdit || moves.down !== null}>
+          <Button size="sm" variant="secondary" icon="arrow-down" data-move="down" onClick={() => move(index + 1, "down")} disabled={!ctx.canEdit || moves.down !== null}>
             Move down
           </Button>
         </div>

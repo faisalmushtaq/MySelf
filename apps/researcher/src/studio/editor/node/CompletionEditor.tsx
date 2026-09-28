@@ -1,6 +1,6 @@
 import { useCallback, useMemo } from "react";
 import { updateScreen } from "@myself/studio";
-import { Button } from "../../ui/kit.js";
+import { Button, InfoTip } from "../../ui/kit.js";
 import { useEditor } from "../context.js";
 import { IssueMessages, Panel, TextField } from "./controls.js";
 import { issuesAt, screenIssues } from "./issues.js";
@@ -87,30 +87,38 @@ export function CompletionEditor() {
   const readOnly = !ctx.canEdit;
   return (
     <div className="stn-node">
-      <header className="stn-node-head">
-        <p className="stn-crumbs">Completion</p>
+      <header className="stn-pagehead">
         <h2 className="stn-title" tabIndex={-1} data-editor-heading>
           Completion screens
         </h2>
-        <p className="stn-lead">What participants see when they have answered everything.</p>
+        <p className="stn-lead">
+          What participants see when they have answered everything.
+          <InfoTip
+            text="Text in braces, like {first_name}, is replaced by an earlier answer. Existing insertions are kept as they are; a new one typed here isn't set up to insert anything, and the checks will say so."
+            label="text in braces"
+          />
+        </p>
       </header>
       <IssueMessages issues={issues.general} />
 
-      <Panel title="Finish screen" field="screens.finish" description="Shown to every participant at the end. Their answers are saved by then.">
+      <Panel title="Finish screen" field="screens.finish" info="Shown to every participant at the end. Their answers are saved by then.">
         {screens["finish"] ? (
-          <article className="stn-card stn-card-screen">
-            <ScreenFields which="finish" />
-          </article>
+          <ScreenFields which="finish" />
         ) : (
           <>
             <IssueMessages issues={issuesAt(issues, "screens.finish")} />
-            <Button
-              icon="plus"
-              disabled={readOnly}
-              onClick={() => ctx.run("Add a finish screen", (d) => updateScreen(d, "finish", { title: "Thank you", body: "That's everything — thank you for taking part." }).draft)}
-            >
-              Add a finish screen
-            </Button>
+            <div className="stn-actionrow">
+              <p className="stn-flush stn-muted">No finish screen.</p>
+              <Button
+                size="sm"
+                variant="secondary"
+                icon="plus"
+                disabled={readOnly}
+                onClick={() => ctx.run("Add a finish screen", (d) => updateScreen(d, "finish", { title: "Thank you", body: "That's everything — thank you for taking part." }).draft)}
+              >
+                Add a finish screen
+              </Button>
+            </div>
           </>
         )}
       </Panel>
@@ -118,32 +126,25 @@ export function CompletionEditor() {
       <Panel
         title="Review screen"
         field="screens.review"
-        description={
-          <>
-            Offered from the finish screen as “Need to change anything? Go back to my answers”. It lists every answer so a participant who
-            knows they got something wrong can tap it, change it and come back to the end — the change is recorded as a correction, not a
-            first answer. Without a review screen, the offer isn't shown.
-          </>
-        }
+        info="Offered from the finish screen as “Need to change anything? Go back to my answers”. It lists every answer, so a participant can tap one, change it and come back to the end — recorded as a correction, not a first answer. Without a review screen, the offer isn't shown."
       >
         {screens["review"] ? (
-          <article className="stn-card stn-card-screen">
-            <ScreenFields which="review" />
-          </article>
+          <ScreenFields which="review" />
         ) : (
-          <Button
-            icon="plus"
-            disabled={readOnly}
-            onClick={() => ctx.run("Add a review screen", (d) => updateScreen(d, "review", REVIEW_DEFAULT).draft)}
-          >
-            Add a review screen
-          </Button>
+          <div className="stn-actionrow">
+            <p className="stn-flush stn-muted">Not offered.</p>
+            <Button
+              size="sm"
+              variant="secondary"
+              icon="plus"
+              disabled={readOnly}
+              onClick={() => ctx.run("Add a review screen", (d) => updateScreen(d, "review", REVIEW_DEFAULT).draft)}
+            >
+              Add a review screen
+            </Button>
+          </div>
         )}
       </Panel>
-      <p className="stn-hint">
-        Text in braces, like <code>{"{first_name}"}</code>, is replaced by an earlier answer. The Studio keeps existing insertions as they are;
-        a new one typed here isn't set up to insert anything, and validation will say so.
-      </p>
     </div>
   );
 }
