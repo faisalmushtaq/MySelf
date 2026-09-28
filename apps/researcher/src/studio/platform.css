@@ -91,29 +91,6 @@
   white-space: nowrap;
 }
 
-/* The kit's ⓘ wraps its button in a tooltip anchor, so studio.css's
-   `.st-infotip > button` never reaches it and the browser's default button
-   box shows. The same look, reached through the anchor. */
-.st-infotip .st-tip-anchor > button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 16px;
-  height: 16px;
-  padding: 0;
-  border: 0;
-  border-radius: 50%;
-  background: transparent;
-  color: var(--st-text-tertiary);
-  cursor: help;
-}
-.st-infotip .st-tip-anchor > button:hover {
-  color: var(--st-text);
-}
-.st-infotip .st-tip-anchor > button:focus-visible {
-  border-radius: 50%;
-}
-
 /* ── Shell ────────────────────────────────────────────────────────────── */
 .stp-app {
   min-height: 100vh;
