@@ -41,6 +41,10 @@ export function UnlockDialog({ instrument, onClose }: { instrument: string; onCl
       title={`Unlock “${name}”`}
       onClose={onClose}
       width={560}
+      // REVIEW FIX: start in the reason box. Left to the shared dialog, focus
+      // landed on its Close button, so someone who opened this from the
+      // keyboard and began typing their reason closed it with the first space.
+      initialFocus={`#${CSS.escape(reasonId)}`}
       description={<p className="stn-flush">{protection.explanation}</p>}
       footer={
         <>

@@ -1,9 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
+  addOption,
   addOtherOption,
   addQuestion,
+  findQuestion,
   forkScale,
   liveQuestions,
+  removeOption,
   unlockModule,
   updateOption,
   type StudioDraft,
@@ -118,8 +121,26 @@ describe("sharing and publishing", () => {
   });
 
   it("explains that a removed published value is retired and never reused", () => {
-    expect(removalConsequence({ code: 3, label: "Rarely" }, true, "Hardly ever")).toMatch(/recorded as 3 meant “Hardly ever”.*retired/);
+    const published = new Map([[3, "Hardly ever"]]);
+    expect(removalConsequence({ code: 3, label: "Rarely" }, true, published)).toMatch(/recorded as 3 meant “Hardly ever”.*retired/);
     expect(removalConsequence({ code: 3, label: "Rarely" }, false, undefined)).toMatch(/Nobody has answered/);
+    // Whether anything was published under this list isn't known (a list of its own, or still loading).
+    expect(removalConsequence({ code: 3, label: "Rarely" }, true, undefined)).toMatch(/^Any answers already recorded as 3 keep their meaning, “Rarely”\..*retired/);
+  });
+
+  // REVIEW FIX: an option added since the list was last published was said to
+  // have recorded answers ("Answers already recorded as 5 meant …").
+  it("doesn't claim answers were recorded under a value added since the last publish, but says it is still retired", () => {
+    const text = removalConsequence({ code: 5, label: "Other" }, true, new Map([[1, "Yes"], [2, "No"]]));
+    expect(text).not.toMatch(/meant/);
+    expect(text).toMatch(/added after this list was last published, so no answers are recorded as 5 yet/);
+    expect(text).toMatch(/5 is retired anyway/);
+    // …which is what the model does: a published list's removed value is retired, however new.
+    const published = new Set(["ybm_demographics.gender"]);
+    const added = addOption(liveDraft(), "ybm_demographics.gender", { label: "Other" });
+    const scaleKey = (findQuestion(added.draft, "ybm_demographics.gender")!.item as { scale: string }).scale;
+    const removed = removeOption(added.draft, "ybm_demographics.gender", added.code, { published, at: "2026-09-28T00:00:00Z" }).draft;
+    expect(removed.retiredCodes[scaleKey]?.map((r) => r.code)).toContain(added.code);
   });
 });
 

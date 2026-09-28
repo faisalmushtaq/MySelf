@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { addQuestion, findQuestion, PROTECTED_MODULES, unlockModule } from "@myself/studio";
 import { liveDraft } from "./fixture.js";
-import { allowedWords, identifierLock, identityText, lockedBanner, protectedBanner, questionLock, typeLock } from "./locks.js";
+import { allowedWords, identifierLock, identityText, lockedBanner, protectedBanner, publishedPending, questionLock, typeLock } from "./locks.js";
 import { pipeUses } from "./pipes.js";
 
 const lockOf = (d: ReturnType<typeof liveDraft>, itemKey: string, published: ReadonlySet<string> = new Set()) =>
@@ -40,6 +40,19 @@ describe("lock banners", () => {
     const lock = lockOf(added.draft, added.itemKey, published);
     expect(identifierLock(lock, "ID")).toBeNull();
     expect(typeLock(lock)).toBeNull();
+  });
+
+  // REVIEW FIX: with the published versions not yet loaded (or failed), every
+  // question looks never-published — so type, ID, label and delete must wait.
+  it("holds back what depends on publishing until it is known", () => {
+    expect(publishedPending("ready")).toBeNull();
+    expect(publishedPending("loading")).toMatch(/^Checking what has been published/);
+    expect(publishedPending("error")).toMatch(/couldn't be loaded.*Reload/);
+    // What the model would do without it: an empty "published" set lets a
+    // published question's type change in place.
+    const lock = lockOf(d, "ybm_smartphone.own", new Set());
+    expect(lock.published).toBe(false);
+    expect(typeLock(lock) ?? publishedPending("loading")).not.toBeNull();
   });
 });
 

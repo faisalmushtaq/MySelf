@@ -164,15 +164,33 @@ export function relabelWarning(publishedCodes: ReadonlyMap<number, string> | und
   return `Answers already recorded as ${option.code} meant “${was}”. If the meaning has changed, add a new option instead, so old and new answers aren't mixed.`;
 }
 
-/** What removing an option does to answers already recorded with it. */
-export function removalConsequence(option: Pick<ScaleOption, "code" | "label">, published: boolean, publishedLabel: string | undefined): string {
+/**
+ * What removing an option does to answers already recorded with it.
+ *
+ * `publishedCodes` is what every published version of this list offered (value
+ * → label), when known. REVIEW FIX: an option added since the list was last
+ * published was described as "Answers already recorded as 6 meant …", which is
+ * false — nobody could have chosen it. It is still retired (the model retires
+ * any value of a published list), and now says so truthfully.
+ */
+export function removalConsequence(
+  option: Pick<ScaleOption, "code" | "label">,
+  published: boolean,
+  publishedCodes: ReadonlyMap<number, string> | undefined,
+): string {
   if (!published) {
     return `Nobody has answered with this list yet, so “${option.label}” is simply removed. Its value, ${option.code}, stays free.`;
   }
-  return (
-    `Answers already recorded as ${option.code} meant “${publishedLabel ?? option.label}” and keep that meaning. ` +
-    `The value ${option.code} is retired: no option added later can take it, so old answers can never be misread.`
-  );
+  const retired = `The value ${option.code} is retired: no option added later can take it, so old answers can never be misread.`;
+  const was = publishedCodes?.get(option.code);
+  if (was !== undefined) return `Answers already recorded as ${option.code} meant “${was}” and keep that meaning. ${retired}`;
+  if (publishedCodes) {
+    return (
+      `“${option.label}” was added after this list was last published, so no answers are recorded as ${option.code} yet. ` +
+      `The list itself has been published, so ${option.code} is retired anyway: no option added later can take it.`
+    );
+  }
+  return `Any answers already recorded as ${option.code} keep their meaning, “${option.label}”. ${retired}`;
 }
 
 /** Why an option can't be removed, or null when it can. */
@@ -187,6 +205,14 @@ export function newOptionLabel(scale: Pick<ScaleInput, "options">): string {
     const label = `Option ${n}`;
     if (!taken.has(label.toLowerCase())) return label;
   }
+}
+
+/**
+ * The row that takes focus when the row at `index` of a list (statements, form
+ * boxes, groups) is removed: the next one, else the one before.
+ */
+export function neighbourOf<T extends { key: string }>(list: readonly T[], index: number): string | null {
+  return (list[index + 1] ?? list[index - 1])?.key ?? null;
 }
 
 /** Where a keyboard move lands, or null at either end of the list. */

@@ -194,10 +194,17 @@ export function TextField(props: TextFieldProps) {
   const className = `st-input${mono ? " st-input-mono" : ""}${inputClassName ? ` ${inputClassName}` : ""}`;
 
   const box = readOnly ? (
+    // REVIEW FIX: a <label for> names only form controls, so this value had no
+    // name when a jump focused it ("I get a lot of headaches…" with no "Question
+    // text"). It is exposed as the read-only text box it stands in for.
     <div
       id={id}
       data-field={field}
       tabIndex={-1}
+      role="textbox"
+      aria-readonly="true"
+      aria-multiline={multiline || undefined}
+      aria-labelledby={`${id}-label`}
       aria-describedby={describedBy}
       className={`stn-readonly${multiline ? " stn-readonly-multi" : ""}${mono ? " stn-mono" : ""}${inputClassName ? ` ${inputClassName}-ro` : ""}`}
     >
@@ -232,7 +239,7 @@ export function TextField(props: TextFieldProps) {
 
   return (
     <div className={`stn-field${invalid ? " stn-field-invalid" : ""}`}>
-      <label htmlFor={id} className="stn-label">
+      <label htmlFor={id} id={`${id}-label`} className="stn-label">
         {label}
         {optional ? <span className="stn-optional"> (optional)</span> : null}
         {readOnly ? (
@@ -341,6 +348,8 @@ export function ReadOnlyValue({
         className={`stn-readonly${mono ? " stn-mono" : ""}`}
         data-field={field}
         tabIndex={field ? -1 : undefined}
+        // REVIEW FIX: aria-labelledby is ignored on a plain <div>; as a group it names the value.
+        role="group"
         aria-labelledby={`${id}-label`}
         aria-describedby={reason ? `${id}-why` : undefined}
       >

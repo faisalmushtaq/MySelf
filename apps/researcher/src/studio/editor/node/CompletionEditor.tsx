@@ -5,6 +5,7 @@ import { useEditor } from "../context.js";
 import { IssueMessages, Panel, TextField } from "./controls.js";
 import { issuesAt, screenIssues } from "./issues.js";
 import { PipeList } from "./QuestionEditor.js";
+import { unlessUnchanged } from "./unchanged.js";
 
 /**
  * The end of the survey: the finish screen every participant sees, and the
@@ -49,7 +50,8 @@ function ScreenFields({ which }: { which: Which }) {
         validate={validateTitle}
         issues={issuesAt(issues, `screens.${which}.title`)}
         onCommit={(text) =>
-          ctx.run(`Edit the ${noun}`, (d) => updateScreen(d, which, { title: text.trim() ? text : null }).draft)
+          // No undo step for spaces typed into an empty heading (unchanged.ts).
+          ctx.run(`Edit the ${noun}`, (d) => unlessUnchanged(d, updateScreen(d, which, { title: text.trim() ? text : null }).draft, (x) => x.composition.screens[which]))
         }
         after={
           <>

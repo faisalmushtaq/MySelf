@@ -4,6 +4,7 @@ import { Icon } from "../../ui/icons.js";
 import { Button, IconButton } from "../../ui/kit.js";
 import { useEditor } from "../context.js";
 import { Facts } from "../node/controls.js";
+import { focusSoon } from "../node/focus.js";
 import { refusal } from "./settings.js";
 
 /**
@@ -49,9 +50,12 @@ export function SectionInspector({ sectionKey }: { sectionKey: string }) {
   const questions = o.blocks.reduce((n, b) => n + b.questions.length, 0);
   const conditional = o.blocks.reduce((n, b) => n + b.questions.filter((q) => q.hasCondition).length, 0);
 
-  const move = (to: number) => {
+  const move = (to: number, dir: "up" | "down") => {
     if (ctx.run(`Move the section “${o.title}”`, (d) => moveSection(d, sectionKey, to).draft)) {
       ctx.announce(`Moved “${o.title}” to position ${to + 1} of ${sections.length}.`);
+      // REVIEW FIX: at the first or last place the button pressed becomes
+      // disabled, which drops focus; keep it on the move buttons.
+      focusSoon([`.sti [data-move="${dir}"]`, `.sti [data-move="${dir === "up" ? "down" : "up"}"]`]);
     }
   };
 
@@ -85,10 +89,10 @@ export function SectionInspector({ sectionKey }: { sectionKey: string }) {
           Order
         </h3>
         <div className="sti-actions">
-          <Button size="sm" icon="arrow-up" onClick={() => move(index - 1)} disabled={!ctx.canEdit || moves.up !== null}>
+          <Button size="sm" icon="arrow-up" data-move="up" onClick={() => move(index - 1, "up")} disabled={!ctx.canEdit || moves.up !== null}>
             Move up
           </Button>
-          <Button size="sm" icon="arrow-down" onClick={() => move(index + 1)} disabled={!ctx.canEdit || moves.down !== null}>
+          <Button size="sm" icon="arrow-down" data-move="down" onClick={() => move(index + 1, "down")} disabled={!ctx.canEdit || moves.down !== null}>
             Move down
           </Button>
         </div>

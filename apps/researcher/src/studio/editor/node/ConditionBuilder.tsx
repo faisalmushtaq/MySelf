@@ -1,6 +1,6 @@
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 import type { LogicExpr } from "@myself/schema";
-import { describeCondition, TEST_LABELS, type ConditionJoin, type ConditionTest, type Issue } from "@myself/studio";
+import { describeCondition, type ConditionJoin, type ConditionTest, type Issue } from "@myself/studio";
 import { ConfirmDialog } from "../../ui/dialog.js";
 import { Button, IconButton, Segmented } from "../../ui/kit.js";
 import { useEditor } from "../context.js";
@@ -14,6 +14,7 @@ import {
   ruleFor,
   ruleProblem,
   sameLogic,
+  testLabel,
   valueInput,
   withTest,
   type BuilderState,
@@ -264,7 +265,10 @@ function RuleEditor({
   const name = `Rule ${index + 1}${count > 1 ? ` of ${count}` : ""}`;
 
   return (
-    <li className="stn-rule" role="group" aria-label={name} aria-describedby={problem ? problemId : undefined}>
+    // REVIEW FIX: the group is inside the list item, not on it — `<li role="group">`
+    // stopped the rules being read as a list ("Rule 2 of 3" with no list around it).
+    <li className="stn-rule">
+      <div role="group" aria-label={name} aria-describedby={problem ? problemId : undefined}>
       <div className="stn-rule-fields">
         <select
           className="st-select stn-rule-question"
@@ -301,7 +305,7 @@ function RuleEditor({
           </option>
           {tests.map((t) => (
             <option key={t} value={t}>
-              {TEST_LABELS[t]}
+              {testLabel(t, target?.responseType)}
             </option>
           ))}
         </select>
@@ -340,6 +344,7 @@ function RuleEditor({
           Not saved yet: {problem}
         </p>
       ) : null}
+      </div>
     </li>
   );
 }

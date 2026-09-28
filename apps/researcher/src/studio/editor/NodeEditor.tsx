@@ -5,7 +5,7 @@ import { useEditor } from "./context.js";
 import { ArchivedQuestion } from "./node/ArchivedQuestion.js";
 import { BlockEditor, findBlock } from "./node/BlockEditor.js";
 import { CompletionEditor } from "./node/CompletionEditor.js";
-import { usePendingFocus } from "./node/focus.js";
+import { useFocusRescue, usePendingFocus } from "./node/focus.js";
 import { renameCandidates, useQuestionIdentity } from "./node/identity.js";
 import { Overview } from "./node/Overview.js";
 import { QuestionEditor } from "./node/QuestionEditor.js";
@@ -25,6 +25,8 @@ import "./node.css";
 export function NodeEditor() {
   const ctx = useEditor();
   usePendingFocus();
+  // REVIEW FIX: put focus back when an action removes the control holding it (focus.ts).
+  useFocusRescue();
   const { selection, draft } = ctx;
 
   switch (selection?.kind) {

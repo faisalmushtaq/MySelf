@@ -4,6 +4,7 @@ import { Switch } from "../../ui/kit.js";
 import { useEditor } from "../context.js";
 import { Facts, IssueMessages, Panel, TextField } from "./controls.js";
 import { issuesAt, screenIssues } from "./issues.js";
+import { unlessUnchanged } from "./unchanged.js";
 
 /** Plain names for the composition's reading levels and age bands. */
 export const READING_LEVELS: Record<string, string> = {
@@ -47,7 +48,10 @@ export function SettingsEditor() {
           validate={validateTitle}
           hint="What researchers know it by, in the survey list, versions and exports. Participants don't see it — they see the study label on the start screen."
           issues={issuesAt(issues, "title")}
-          onCommit={(title) => ctx.run("Rename the survey", (d) => updateSettings(d, { title }).draft)}
+          onCommit={(title) =>
+            // Stored trimmed: no undo step for a space at the end (unchanged.ts).
+            ctx.run("Rename the survey", (d) => unlessUnchanged(d, updateSettings(d, { title }).draft, (x) => x.composition.title))
+          }
         />
       </Panel>
       <Panel title="Moving through the survey">

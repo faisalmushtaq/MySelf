@@ -21,11 +21,12 @@ import { ConditionBuilder } from "./ConditionBuilder.js";
 import { Disclosure, IssueMessages, LockBanner, Panel, TextField } from "./controls.js";
 import { fieldsShownFor, questionIssues, unplacedIssues, type FieldIssues } from "./issues.js";
 import { FieldsEditor, GroupsEditor, StatementsEditor } from "./ListEditors.js";
-import { identityText, lockedBanner, protectedBanner, questionLock, tierAllows, typeLock, type QuestionLock } from "./locks.js";
+import { identityText, lockedBanner, protectedBanner, publishedPending, questionLock, tierAllows, typeLock, type QuestionLock } from "./locks.js";
 import { OptionsEditor } from "./OptionsEditor.js";
 import { pipeUses } from "./pipes.js";
 import { TypePickerDialog } from "./TypePicker.js";
 import { TYPE_ICONS, typeLabel } from "./types.js";
+import { unlessUnchanged } from "./unchanged.js";
 import { relock, UnlockDialog, UnlockedNote } from "./UnlockDialog.js";
 
 /**
@@ -45,10 +46,12 @@ export function useQuestionWriter(itemKey: string): WriteQuestion {
       ctx.run(label, (d) => {
         const q = findQuestion(d, itemKey);
         if (!q) throw new StudioOpError("That question is no longer in the draft.", "not_found");
-        return updateQuestion(d, itemKey, make(q.item), {
+        const next = updateQuestion(d, itemKey, make(q.item), {
           published: ctx.publishedItemKeys,
           ...(ctx.reserved ? { reserved: ctx.reserved } : {}),
         }).draft;
+        // REVIEW FIX: no undo step or save for an edit that changed nothing (unchanged.ts).
+        return unlessUnchanged(d, next, (x) => findQuestion(x, itemKey)?.item);
       }),
     [ctx, itemKey],
   );
@@ -70,7 +73,9 @@ export function QuestionEditor({ itemKey }: { itemKey: string }) {
   const can = (field: string) => ctx.canEdit && tierAllows(lock, field);
   const [unlocking, setUnlocking] = useState(false);
   const [picking, setPicking] = useState(false);
-  const typeReason = typeLock(lock);
+  // REVIEW FIX: whether it was published decides between changing the type and
+  // replacing the question, so neither is offered until that is known.
+  const typeReason = typeLock(lock) ?? publishedPending(ctx.publishedStatus);
 
   const pickType = (typeId: QuestionTypeId) => {
     setPicking(false);

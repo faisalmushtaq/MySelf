@@ -7,6 +7,7 @@ import { ConditionBuilder } from "./ConditionBuilder.js";
 import { IssueMessages, Panel, TextField } from "./controls.js";
 import { sectionIssues } from "./issues.js";
 import { NodeList } from "./NodeList.js";
+import { unlessUnchanged } from "./unchanged.js";
 
 /**
  * A section: its title (participants see it in the progress bar), when it is
@@ -64,7 +65,12 @@ export function SectionEditor({ sectionKey }: { sectionKey: string }) {
           validate={validateTitle}
           hint="Participants see it in the progress bar as they move through the survey."
           issues={issues.byField.get("title")}
-          onCommit={(title) => ctx.run(`Rename the section ${sectionKey}`, (d) => updateSection(d, sectionKey, { title }).draft)}
+          onCommit={(title) =>
+            ctx.run(`Rename the section ${sectionKey}`, (d) =>
+              // Stored trimmed: no undo step for a space at the end (unchanged.ts).
+              unlessUnchanged(d, updateSection(d, sectionKey, { title }).draft, (x) => x.composition.sections.find((s) => s.key === sectionKey)?.title),
+            )
+          }
         />
       </article>
 

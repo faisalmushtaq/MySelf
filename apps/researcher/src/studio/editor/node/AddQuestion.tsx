@@ -1,5 +1,5 @@
 import { useId, useState } from "react";
-import { addQuestion, type QuestionTypeId } from "@myself/studio";
+import { addQuestion, liveQuestions, type QuestionTypeId, type StudioDraft } from "@myself/studio";
 import { useEditor } from "../context.js";
 import { focusSoon } from "./focus.js";
 import { TypePickerDialog } from "./TypePicker.js";
@@ -17,16 +17,25 @@ export function AddQuestionDialog({ sectionKey, onClose }: { sectionKey?: string
   const selectId = useId();
 
   const add = (typeId: QuestionTypeId) => {
-    const out: { itemKey?: string } = {};
+    const out: { itemKey?: string; draft?: StudioDraft } = {};
     const ok = ctx.run(`Add a ${typeLabel(typeId).toLowerCase()} question`, (d) => {
       const result = addQuestion(d, { sectionKey: target, typeId, ...(ctx.reserved ? { reserved: ctx.reserved } : {}) });
       out.itemKey = result.itemKey;
+      out.draft = result.draft;
       return result.draft;
     });
     onClose();
-    if (ok && out.itemKey) {
+    if (ok && out.itemKey && out.draft) {
       ctx.select({ kind: "question", itemKey: out.itemKey });
-      ctx.announce(`Added a ${typeLabel(typeId).toLowerCase()} question at the end of the section.`);
+      // REVIEW FIX: said "at the end of the section", which isn't always where
+      // the model puts it (it joins the questions already added there); say
+      // where it actually is.
+      const live = liveQuestions(out.draft);
+      const at = live.find((q) => q.itemKey === out.itemKey);
+      const section = out.draft.composition.sections.find((s) => s.key === target)?.title ?? target;
+      ctx.announce(
+        `Added a ${typeLabel(typeId).toLowerCase()} question${at ? `: question ${at.position + 1} of ${live.length}` : ""}, in “${section}”.`,
+      );
       focusSoon('[data-field="stem"]', { select: true });
     }
   };
@@ -36,7 +45,10 @@ export function AddQuestionDialog({ sectionKey, onClose }: { sectionKey?: string
       title="Add a question"
       intro={
         sectionKey ? (
-          <p className="stn-flush">It goes at the end of “{sections.find((s) => s.key === sectionKey)?.title ?? sectionKey}”. You can move it afterwards.</p>
+          <p className="stn-flush">
+            It goes at the end of “{sections.find((s) => s.key === sectionKey)?.title ?? sectionKey}”, or straight after any questions you have
+            already added there. You can move it afterwards.
+          </p>
         ) : (
           <div className="stn-field stn-flush">
             <label className="stn-label" htmlFor={selectId}>
@@ -49,12 +61,14 @@ export function AddQuestionDialog({ sectionKey, onClose }: { sectionKey?: string
                 </option>
               ))}
             </select>
-            <div className="stn-hint">It goes at the end of the section. You can move it afterwards.</div>
+            <div className="stn-hint">It goes at the end of the section, or straight after any questions you have already added there. You can move it afterwards.</div>
           </div>
         )
       }
       onPick={add}
       onClose={onClose}
+      // The section menu comes first when there is one, as it is read first.
+      {...(sectionKey ? {} : { initialFocus: `#${CSS.escape(selectId)}` })}
     />
   );
 }

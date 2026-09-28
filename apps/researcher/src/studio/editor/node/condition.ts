@@ -8,6 +8,7 @@ import {
   fromLogic,
   liveQuestions,
   shortText,
+  TEST_LABELS,
   testsFor,
   toLogic,
   type ConditionJoin,
@@ -275,6 +276,24 @@ export function buildLogic(state: BuilderState): LogicExpr | null {
 export function sameLogic(a: LogicExpr | null | undefined, b: LogicExpr | null | undefined): boolean {
   if (!a || !b) return !a && !b;
   return canonicalJson(a) === canonicalJson(b);
+}
+
+/**
+ * How a test reads in the rule's menu, for the question it is about.
+ *
+ * REVIEW FIX: on a multiple-choice question "selected" means the answer
+ * INCLUDES the option, whatever else was ticked — the sentence underneath says
+ * so, but the menu said "is", which reads as "is exactly". And "not selected"
+ * only holds for someone who answered (the engine treats a skipped question as
+ * neither), so it says that too.
+ */
+export function testLabel(test: ConditionTest, responseType: ItemDefinition["responseType"] | undefined): string {
+  if (responseType === "multi_choice") {
+    if (test === "selected") return "includes";
+    if (test === "not_selected") return "is answered without";
+  }
+  if (responseType === "single_choice" && test === "not_selected") return "is answered, but not";
+  return TEST_LABELS[test];
 }
 
 /**

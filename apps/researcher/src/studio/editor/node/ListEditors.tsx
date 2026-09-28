@@ -5,6 +5,7 @@ import { Button, IconButton } from "../../ui/kit.js";
 import { useEditor } from "../context.js";
 import { IssueMessages, useSyncedText } from "./controls.js";
 import { focusSoon } from "./focus.js";
+import { neighbourOf } from "./options.js";
 
 /**
  * The lists some question types carry besides options: consent statements,
@@ -34,7 +35,20 @@ function useListWriter<K extends "statements" | "fields" | "groups", T>(itemKey:
   );
 }
 
+/**
+ * A row's move and remove buttons.
+ *
+ * REVIEW FIX: focus follows the row. Moving a row down re-inserts it in the
+ * page, and removing one deletes the button pressed; either way the browser
+ * dropped focus to the top of the page. Now the same move button keeps focus
+ * (the other one once the row reaches an end), and a removal lands on the
+ * neighbouring row's text.
+ */
 function RowControls({
+  field,
+  rowKey,
+  neighbourKey,
+  part,
   index,
   count,
   noun,
@@ -42,17 +56,42 @@ function RowControls({
   onMove,
   onRemove,
 }: {
+  /** The list's `data-field`, e.g. "statements". */
+  field: string;
+  rowKey: string;
+  /** The row that takes focus if this one is removed. */
+  neighbourKey: string | null;
+  /** The row's text box, as `data-part`. */
+  part: string;
   index: number;
   count: number;
   noun: string;
   min: number;
-  onMove: (to: number) => void;
-  onRemove: () => void;
+  onMove: (to: number) => boolean;
+  onRemove: () => boolean;
 }) {
+  const row = (key: string) => `[data-field="${field}"] [data-row-key="${key}"]`;
+  const move = (to: number, dir: "up" | "down") => {
+    if (onMove(to)) focusSoon([`${row(rowKey)} [data-move="${dir}"]`, `${row(rowKey)} [data-move="${dir === "up" ? "down" : "up"}"]`]);
+  };
   return (
     <div className="stn-list-controls">
-      <IconButton icon="arrow-up" size="sm" label={`Move ${noun} ${index + 1} up`} disabled={index === 0} onClick={() => onMove(index - 1)} />
-      <IconButton icon="arrow-down" size="sm" label={`Move ${noun} ${index + 1} down`} disabled={index === count - 1} onClick={() => onMove(index + 1)} />
+      <IconButton
+        icon="arrow-up"
+        size="sm"
+        data-move="up"
+        label={`Move ${noun} ${index + 1} up`}
+        disabled={index === 0}
+        onClick={() => move(index - 1, "up")}
+      />
+      <IconButton
+        icon="arrow-down"
+        size="sm"
+        data-move="down"
+        label={`Move ${noun} ${index + 1} down`}
+        disabled={index === count - 1}
+        onClick={() => move(index + 1, "down")}
+      />
       <IconButton
         icon="trash"
         size="sm"
@@ -60,7 +99,7 @@ function RowControls({
         label={count <= min ? `Can't remove ${noun} ${index + 1}: at least ${min} needed` : `Remove ${noun} ${index + 1}`}
         aria-disabled={count <= min ? true : undefined}
         onClick={() => {
-          if (count > min) onRemove();
+          if (count > min && onRemove() && neighbourKey) focusSoon(`${row(neighbourKey)} [data-part="${part}"]`);
         }}
       />
     </div>
@@ -94,14 +133,35 @@ function RowText({
 }) {
   const validate = useCallback((t: string) => (required && !t.trim() ? required : null), [required]);
   const synced = useSyncedText(value, onCommit, validate);
+  // REVIEW FIX: the message is tied to its box, as every other field's is, so
+  // a screen reader says why the text isn't being kept.
+  const errorId = useId();
+  const described = [describedBy, synced.localError ? errorId : null].filter(Boolean).join(" ") || undefined;
+  const invalid = synced.localError ? true : undefined;
   return (
     <>
       {multiline ? (
-        <textarea className="st-input stn-list-text" rows={2} data-part={part} aria-label={label} aria-describedby={describedBy} {...synced.bind} />
+        <textarea
+          className="st-input stn-list-text"
+          rows={2}
+          data-part={part}
+          aria-label={label}
+          aria-describedby={described}
+          aria-invalid={invalid}
+          {...synced.bind}
+        />
       ) : (
-        <input className="st-input" data-part={part} aria-label={label} aria-describedby={describedBy} autoComplete="off" {...synced.bind} />
+        <input
+          className="st-input"
+          data-part={part}
+          aria-label={label}
+          aria-describedby={described}
+          aria-invalid={invalid}
+          autoComplete="off"
+          {...synced.bind}
+        />
       )}
-      {synced.localError ? <IssueMessages local={synced.localError} /> : null}
+      {synced.localError ? <IssueMessages id={errorId} local={synced.localError} /> : null}
     </>
   );
 }
@@ -190,13 +250,15 @@ export function StatementsEditor({ itemKey, statements, editable, issues }: { it
             </div>
           </div>
           <RowControls
+            field="statements"
+            rowKey={s.key}
+            neighbourKey={neighbourOf(statements, i)}
+            part="text"
             index={i}
             count={statements.length}
             noun="statement"
             min={1}
-            onMove={(to) => {
-              if (write((list) => move(list, i, to))) focusSoon(`[data-row-key="${s.key}"] [data-part="text"]`);
-            }}
+            onMove={(to) => write((list) => move(list, i, to))}
             onRemove={() => write((list) => list.filter((x) => x.key !== s.key))}
           />
         </li>
@@ -280,6 +342,10 @@ export function FieldsEditor({ itemKey, fields, editable, issues }: { itemKey: s
             </div>
           </div>
           <RowControls
+            field="fields"
+            rowKey={f.key}
+            neighbourKey={neighbourOf(fields, i)}
+            part="label"
             index={i}
             count={fields.length}
             noun="box"
@@ -358,6 +424,10 @@ export function GroupsEditor({ itemKey, groups, editable, issues }: { itemKey: s
             </div>
           </div>
           <RowControls
+            field="groups"
+            rowKey={g.key}
+            neighbourKey={neighbourOf(groups, i)}
+            part="label"
             index={i}
             count={groups.length}
             noun="group"

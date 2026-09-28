@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { LogicExpr } from "@myself/schema";
-import { findQuestion, liveQuestions, setBlockCondition, updateQuestion, updateSection, validateDraft } from "@myself/studio";
+import { describeCondition, findQuestion, liveQuestions, setBlockCondition, updateQuestion, updateSection, validateDraft } from "@myself/studio";
 import {
   buildLogic,
   earlierQuestions,
@@ -10,6 +10,7 @@ import {
   ruleFor,
   ruleProblem,
   sameLogic,
+  testLabel,
   testNeeds,
   valueInput,
   withTest,
@@ -144,5 +145,28 @@ describe("rules to and from the stored condition", () => {
     next = setBlockCondition(next, "right_now", 1, gaming).draft;
     const logicIssues = validateDraft(next).filter((i) => i.code.startsWith("logic."));
     expect(logicIssues).toEqual([]);
+  });
+});
+
+// REVIEW FIX: the menu said "is" for a multiple-choice test that means "includes".
+describe("how a test reads in the rule's menu", () => {
+  it("says “includes” for a multiple-choice question, as the sentence underneath does", () => {
+    expect(testLabel("selected", "multi_choice")).toBe("includes");
+    expect(testLabel("not_selected", "multi_choice")).toBe("is answered without");
+    const d = liveDraft();
+    const multi = liveQuestions(d).find((q) => q.item.responseType === "multi_choice")!;
+    const code = d.scales[(multi.item as { scale: string }).scale]!.options[0]!.code;
+    const sentence = describeCondition({ op: "selected", target: target(multi.instrument, multi.item.key), code }, d);
+    expect(sentence).toMatch(/ includes “/);
+  });
+
+  it("says a “not” test holds only for someone who answered", () => {
+    expect(testLabel("not_selected", "single_choice")).toBe("is answered, but not");
+  });
+
+  it("keeps the model's words everywhere else", () => {
+    expect(testLabel("selected", "single_choice")).toBe("is");
+    expect(testLabel("at_least", "numeric")).toBe("is at least");
+    expect(testLabel("answered", undefined)).toBe("is answered");
   });
 });

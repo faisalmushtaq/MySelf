@@ -5,6 +5,7 @@ import { Badge, Button } from "../../ui/kit.js";
 import { useEditor } from "../context.js";
 import { findBlock, type BlockRef } from "../node/BlockEditor.js";
 import { Facts } from "../node/controls.js";
+import { focusSoon } from "../node/focus.js";
 import { orderSignature } from "./SectionInspector.js";
 import { refusal } from "./settings.js";
 
@@ -43,10 +44,13 @@ export function BlockInspector({ sectionKey, componentIndex }: BlockRef) {
   const tier = editTier(draft, p.instrument);
   const name = p.def?.name ?? p.instrument;
 
-  const moveWithin = (to: number) => {
+  const moveWithin = (to: number, dir: "up" | "down") => {
     if (ctx.run(`Move the block “${name}”`, (d) => moveBlock(d, { sectionKey, componentIndex }, { sectionKey, index: to }).draft)) {
       ctx.select({ kind: "block", sectionKey, componentIndex: to });
       ctx.announce(`Moved “${name}” to position ${to + 1} of ${count} in its section.`);
+      // REVIEW FIX: the selection moves with the block, which redraws this panel
+      // and dropped focus; put it back on the move buttons.
+      focusSoon([`.sti [data-move="${dir}"]`, `.sti [data-move="${dir === "up" ? "down" : "up"}"]`]);
     }
   };
   const moveTo = () => {
@@ -56,6 +60,7 @@ export function BlockInspector({ sectionKey, componentIndex }: BlockRef) {
       ctx.select({ kind: "block", sectionKey: destination.key, componentIndex: index });
       ctx.announce(`Moved “${name}” to the end of “${destination.title}”.`);
       setTarget("");
+      focusSoon(['.sti [data-move="up"]', '.sti [data-move="down"]']);
     }
   };
   const reasons = [moves.up, moves.down].filter((m): m is string => m !== null && m !== "first" && m !== "last");
@@ -92,10 +97,16 @@ export function BlockInspector({ sectionKey, componentIndex }: BlockRef) {
           Move
         </h3>
         <div className="sti-actions">
-          <Button size="sm" icon="arrow-up" onClick={() => moveWithin(componentIndex - 1)} disabled={!ctx.canEdit || moves.up !== null}>
+          <Button size="sm" icon="arrow-up" data-move="up" onClick={() => moveWithin(componentIndex - 1, "up")} disabled={!ctx.canEdit || moves.up !== null}>
             Move up
           </Button>
-          <Button size="sm" icon="arrow-down" onClick={() => moveWithin(componentIndex + 1)} disabled={!ctx.canEdit || moves.down !== null}>
+          <Button
+            size="sm"
+            icon="arrow-down"
+            data-move="down"
+            onClick={() => moveWithin(componentIndex + 1, "down")}
+            disabled={!ctx.canEdit || moves.down !== null}
+          >
             Move down
           </Button>
         </div>

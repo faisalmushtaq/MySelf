@@ -31,6 +31,7 @@ export function TypePickerDialog({
   onPick,
   onClose,
   footerNote,
+  initialFocus,
 }: {
   title: string;
   intro?: ReactNode;
@@ -41,6 +42,8 @@ export function TypePickerDialog({
   onPick: (id: QuestionTypeId) => void;
   onClose: () => void;
   footerNote?: ReactNode;
+  /** What takes focus when the dialog opens; the first type that can be chosen, unless given. */
+  initialFocus?: string;
 }) {
   const creatable = QUESTION_TYPES.filter((t) => t.canCreate);
   const editOnly = QUESTION_TYPES.filter((t) => !t.canCreate);
@@ -50,6 +53,9 @@ export function TypePickerDialog({
       onClose={onClose}
       width={720}
       description={intro}
+      // REVIEW FIX: named explicitly. Left to the shared dialog, focus lands on
+      // its Close button (its body selector only scopes the first alternative).
+      initialFocus={initialFocus ?? ".stn-type:not([disabled])"}
       footer={
         <Button variant="secondary" onClick={onClose}>
           Cancel
