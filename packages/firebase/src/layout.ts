@@ -78,6 +78,39 @@ export const paths = {
   voiceNote: (study: string, sessionId: string, clipId: string, extension: string) =>
     `studies/${study}/voice/${sessionId}/${clipId}.${extension}`,
 
+  /**
+   * MySelf Studio — docs/16 §5.2.
+   *
+   * Surveys, their working draft and their published versions, beside the
+   * sittings rather than inside them. Nothing here is a response: a sitting
+   * keeps pointing at the release it was collected under by hash, and these
+   * documents are how that hash is found again.
+   *
+   * TWO OF THEM ARE PUBLIC, and only by `get`: the pointer that says which
+   * release is live, and the immutable manifests it points at. Those are what a
+   * participant's device downloads — the same content it used to receive
+   * compiled into the app. Everything else is readable only by people on the
+   * Studio list, and every write except a draft edit goes through a function.
+   */
+  studioSurveys: (study: string) => `studies/${study}/surveys`,
+  studioSurvey: (study: string, surveyId: string) => `studies/${study}/surveys/${surveyId}`,
+  studioDraft: (study: string, surveyId: string) => `studies/${study}/surveys/${surveyId}/draft/current`,
+  studioVersions: (study: string, surveyId: string) => `studies/${study}/surveys/${surveyId}/versions`,
+  studioVersion: (study: string, surveyId: string, version: string) =>
+    `studies/${study}/surveys/${surveyId}/versions/${version}`,
+  studioPresence: (study: string, surveyId: string) => `studies/${study}/surveys/${surveyId}/presence`,
+  studioPresenceOf: (study: string, surveyId: string, uid: string) =>
+    `studies/${study}/surveys/${surveyId}/presence/${uid}`,
+  publishedPointer: (study: string, surveyId: string) => `studies/${study}/published/${surveyId}`,
+  publicReleases: (study: string) => `studies/${study}/publicReleases`,
+  /** Keyed by the hex part of the hash — see `hashHex` in @myself/schema. */
+  publicRelease: (study: string, hashHex: string) => `studies/${study}/publicReleases/${hashHex}`,
+  studioMembers: (study: string) => `studies/${study}/studioMembers`,
+  /** Keyed by the lower-cased email address, which is what the rules look up. */
+  studioMember: (study: string, email: string) => `studies/${study}/studioMembers/${email.trim().toLowerCase()}`,
+  studioAccessConfig: (study: string) => `studies/${study}/studioAccess/config`,
+  studioAudit: (study: string) => `studies/${study}/studioAudit`,
+
   /** identity project — a different Firebase project entirely */
   participants: (study: string) => `studies/${study}/participants`,
   participant: (study: string, code: string) => `studies/${study}/participants/${code}`,

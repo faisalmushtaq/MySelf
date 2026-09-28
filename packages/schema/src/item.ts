@@ -122,6 +122,13 @@ const baseItem = {
   crossChecks: z.array(crossCheck).optional(),
   a11yNote: z.string().optional(),
   researcherNote: z.string().optional(),
+  /**
+   * A reporting grouping for analysts ("Screen use", "Sleep"), set in the
+   * Studio. Participants never see it and it changes nothing about how the
+   * answer is stored; it travels in the release so a report built years later
+   * groups the columns the way the researcher who wrote the question meant.
+   */
+  reportingCategory: z.string().min(1).max(64).optional(),
 };
 
 export const itemDefinition = z.discriminatedUnion("responseType", [
