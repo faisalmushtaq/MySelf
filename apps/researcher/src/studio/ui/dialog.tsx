@@ -18,6 +18,11 @@ let openDialogs = 0;
 const FOCUSABLE =
   'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
+/** The same, but only inside the dialog's body. */
+const IN_BODY = FOCUSABLE.split(",")
+  .map((selector) => `.st-dialog-body ${selector.trim()}`)
+  .join(", ");
+
 export function Dialog({
   title,
   description,
@@ -56,7 +61,10 @@ export function Dialog({
     const node = panel.current;
     const target =
       (initialFocus ? node?.querySelector<HTMLElement>(initialFocus) : null) ??
-      node?.querySelector<HTMLElement>(`.st-dialog-body ${FOCUSABLE}`) ??
+      // Scoped per selector: FOCUSABLE is a comma-separated list, and prefixing
+      // the whole list would scope only its first entry — which is how dialogs
+      // opened with focus on the header's Close button.
+      node?.querySelector<HTMLElement>(IN_BODY) ??
       node?.querySelector<HTMLElement>(FOCUSABLE);
     target?.focus();
     return () => {
