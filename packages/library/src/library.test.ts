@@ -191,14 +191,21 @@ describe("nothing describes an interaction or a layout that is not there", () =>
   });
 
   it("no two questions ask exactly the same thing", () => {
-    const seen = new Map<string, string>();
+    // Forms of one questionnaire for age ranges that do not overlap — the SDQ
+    // for 11–17 and for 18+ (D-51) — share wording by design: nobody is given both.
+    const ages = new Map(everything.map((i) => [i.instrument, i.ageRange]));
+    const disjoint = (a: string, b: string) => {
+      const [x, y] = [ages.get(a), ages.get(b)];
+      return !!x && !!y && (x.max < y.min || y.max < x.min);
+    };
+    const seen = new Map<string, { inst: string; at: string }>();
     const dupes: string[] = [];
     for (const { inst, item } of canonicalItems) {
       if (item.responseType === "info") continue;
       const at = `${inst}/${item.key}`;
       const prev = seen.get(item.stem.text);
-      if (prev) dupes.push(`${at} duplicates ${prev}`);
-      else seen.set(item.stem.text, at);
+      if (prev && !disjoint(prev.inst, inst)) dupes.push(`${at} duplicates ${prev.at}`);
+      else if (!prev) seen.set(item.stem.text, { inst, at });
     }
     expect(dupes).toEqual([]);
   });
@@ -252,8 +259,8 @@ describe("date of birth bounds", () => {
 });
 
 describe("instruments and modules", () => {
-  it("9 instruments and 10 modules parse", () => {
-    expect(parsedInstruments).toHaveLength(9);
+  it("10 instruments and 10 modules parse", () => {
+    expect(parsedInstruments).toHaveLength(10);
     expect(parsedModules).toHaveLength(10);
   });
 
@@ -317,13 +324,51 @@ describe("instruments and modules", () => {
 
   it("D-05: SDQ and RCADS items are soft-required with decline enabled", () => {
     const sdq = parsedInstruments.find((i) => i.instrument === "sdq25_s")!;
+    const sdq18 = parsedInstruments.find((i) => i.instrument === "sdq25_s18")!;
     const rcads = parsedInstruments.find((i) => i.instrument === "rcads25")!;
-    for (const form of [...sdq.forms, ...rcads.forms]) {
+    for (const form of [...sdq.forms, ...sdq18.forms, ...rcads.forms]) {
       for (const item of form.items) {
         expect(item.required).toBe("soft");
         expect(item.allowDecline).toBe(true);
       }
     }
+  });
+
+  it("D-51: the SDQ is the 11–17 self-report word for word, and the 18+ its own instrument", () => {
+    const sdq = parsedInstruments.find((i) => i.instrument === "sdq25_s")!;
+    const [canonical, administered] = [sdq.forms.find((f) => !f.variant)!, sdq.forms.find((f) => f.variant)!];
+    const at = (form: typeof canonical, n: number) => form.items.find((i) => i.key === `q${n}`)!;
+    expect(sdq.version).toBe("2.0");
+    expect(at(canonical, 19).stem.text).toBe("Other children or young people pick on me or bully me");
+    expect(at(canonical, 20).stem.text).toBe("I often volunteer to help others (parents, teachers, children)");
+    expect(at(canonical, 22).stem.text).toBe("I take things that are not mine from home, school or elsewhere");
+    // a changed wording is a new revision, under the same variable; the rest are untouched
+    for (const n of [19, 20, 22]) {
+      expect(at(canonical, n)).toMatchObject({ revision: 2, variable: `sdq25_q${n}` });
+      expect(at(administered, n).revision).toBe(1);
+      expect(at(administered, n).stem.text).not.toBe(at(canonical, n).stem.text);
+    }
+    expect(canonical.items.filter((i) => i.revision !== 1).map((i) => i.key)).toEqual(["q19", "q20", "q22"]);
+    // what was fielded before MySelf is kept as it was
+    expect(at(administered, 20).stem.text).toBe("I often offer to help others (family members, friends, colleagues)");
+
+    const adult = parsedInstruments.find((i) => i.instrument === "sdq25_s18")!;
+    expect(adult.ageRange).toEqual({ min: 18, max: 120 });
+    expect(sdq.ageRange).toEqual({ min: 11, max: 17 });
+    const items = adult.forms[0]!.items;
+    expect(items.map((i) => i.variable)).toEqual(Array.from({ length: 25 }, (_, i) => `sdq25_s18_q${i + 1}`));
+    expect(items.every((i) => i.legacyVariable === undefined)).toBe(true); // never fielded in Qualtrics
+    expect(items.find((i) => i.key === "q23")!.stem.text).toBe(
+      "I get along better with older people than with people of my own age",
+    );
+    // item 22 is the study's adaptation of the S18+ wording (D-52), and says so
+    const q22 = items.find((i) => i.key === "q22")!;
+    expect(q22.stem.text).toBe("I take things that are not mine from home, school or college, university, work or elsewhere");
+    expect(q22.researcherNote).toContain("home, work or elsewhere");
+    // scored the same way: same subscales and reverse-scored items
+    expect(adult.subscales).toEqual(sdq.subscales);
+    expect(adult.reverseScoredItems).toEqual(sdq.reverseScoredItems);
+    expect(adult.scoringKey).toBe("score.sdq25_s18");
   });
 
   it("D-02: the Twitch time item conditions on the Twitch platform code", () => {

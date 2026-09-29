@@ -1092,6 +1092,40 @@ input[type="range"] {
   min-height: 46px;
 }
 
+.field-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+/* The area a postcode lies in, said back as it is typed (D-52). */
+.field-note {
+  margin: 0;
+  min-height: 1.3em;
+  font-family: var(--font-body);
+  font-size: 0.95rem;
+  color: var(--text);
+}
+
+.confirm-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.confirm-postcode {
+  align-self: flex-start;
+  min-height: 44px;
+  padding: 0.5rem 1rem;
+  font: inherit;
+  font-size: 0.95rem;
+  color: var(--text);
+  background: transparent;
+  border: 1.5px solid currentColor;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
 /* ── Chips + ranking ───────────────────────────────────────────────────── */
 .rank-group {
   display: flex;

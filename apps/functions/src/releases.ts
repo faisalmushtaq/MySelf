@@ -6,6 +6,7 @@ import r701 from "../../../releases/ybm_nd2026_standard_r7.0.1.manifest.json" wi
 import r710 from "../../../releases/ybm_nd2026_standard_r7.1.0.manifest.json" with { type: "json" };
 import r720 from "../../../releases/ybm_nd2026_standard_r7.2.0.manifest.json" with { type: "json" };
 import r730 from "../../../releases/ybm_nd2026_standard_r7.3.0.manifest.json" with { type: "json" };
+import r800 from "../../../releases/ybm_nd2026_standard_r8.0.0.manifest.json" with { type: "json" };
 
 /**
  * Every published release, by content hash.
@@ -21,7 +22,7 @@ import r730 from "../../../releases/ybm_nd2026_standard_r7.3.0.manifest.json" wi
 
 // Older releases stay. A sitting is always read back through the release it was
 // collected under, so dropping one would make its sittings unreadable.
-const published: unknown[] = [r5, r6, r7, r701, r710, r720, r730];
+const published: unknown[] = [r5, r6, r7, r701, r710, r720, r730, r800];
 
 export const releasesByHash = new Map<string, ReleaseManifest>(
   published

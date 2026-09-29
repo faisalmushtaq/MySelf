@@ -13,24 +13,42 @@ export type ScoringInput = z.input<typeof scoringDefinition>;
 
 const q = (ns: number[]): string[] => ns.map((n) => `q${n}`);
 
-/** SDQ self-report: canonical 0-2 codes; 5 reverse items; subscale sums with
- * standard >=3-of-5 proration; total difficulties = sum of 4 problem subscales. */
+/** The SDQ's scoring, the same for the 11–17 and the 18+ self-report: canonical
+ * 0-2 codes; 5 reverse items; subscale sums with standard >=3-of-5 proration;
+ * total difficulties = sum of the 4 problem subscales. */
+const sdqSteps: ScoringInput["steps"] = [
+  { op: "reverse", items: q([7, 11, 14, 21, 25]), maxPlusMin: 2 },
+  { op: "sum", items: q([3, 8, 13, 16, 24]), output: "emotional", minValid: 3, prorate: true },
+  { op: "sum", items: q([5, 7, 12, 18, 22]), output: "conduct", minValid: 3, prorate: true },
+  { op: "sum", items: q([2, 10, 15, 21, 25]), output: "hyperactivity", minValid: 3, prorate: true },
+  { op: "sum", items: q([6, 11, 14, 19, 23]), output: "peer", minValid: 3, prorate: true },
+  { op: "sum", items: q([1, 4, 9, 17, 20]), output: "prosocial", minValid: 3, prorate: true },
+  { op: "sum", items: ["emotional", "conduct", "hyperactivity", "peer"], output: "total_difficulties", minValid: 4 },
+];
+
+/** SDQ self-report 11–17. 1.0.1 (D-51): names instrument version 2.0; the
+ * scoring itself is unchanged. */
 export const scoreSdq25S: ScoringInput = {
   key: "score.sdq25_s",
-  version: "1.0.0",
+  version: "1.0.1",
   instrument: "sdq25_s",
-  instrumentVersion: "1.0",
-  steps: [
-    { op: "reverse", items: q([7, 11, 14, 21, 25]), maxPlusMin: 2 },
-    { op: "sum", items: q([3, 8, 13, 16, 24]), output: "emotional", minValid: 3, prorate: true },
-    { op: "sum", items: q([5, 7, 12, 18, 22]), output: "conduct", minValid: 3, prorate: true },
-    { op: "sum", items: q([2, 10, 15, 21, 25]), output: "hyperactivity", minValid: 3, prorate: true },
-    { op: "sum", items: q([6, 11, 14, 19, 23]), output: "peer", minValid: 3, prorate: true },
-    { op: "sum", items: q([1, 4, 9, 17, 20]), output: "prosocial", minValid: 3, prorate: true },
-    { op: "sum", items: ["emotional", "conduct", "hyperactivity", "peer"], output: "total_difficulties", minValid: 4 },
-  ],
+  instrumentVersion: "2.0",
+  steps: sdqSteps,
   provenance:
     "Standard youthinmind SDQ scoring (0-2 coding, reverse items 7/11/14/21/25, subscale proration >=3 items, total difficulties excludes prosocial). Verify against the youthinmind scoring sheet before approval.",
+  verified: false,
+};
+
+/** SDQ self-report 18+ (D-51): scored as the 11–17. No bands — youthinmind has
+ * not validated the 4–17 cut-points for it. */
+export const scoreSdq25S18: ScoringInput = {
+  key: "score.sdq25_s18",
+  version: "1.0.0",
+  instrument: "sdq25_s18",
+  instrumentVersion: "1.0",
+  steps: sdqSteps,
+  provenance:
+    "youthinmind, 'Scoring the Strengths & Difficulties Questionnaire for age 4-17 or 18+' (20 June 2016): the scoring instructions are 'identical for the similarly-worded 18+ SDQ'; the 4–17 cut-points 'have not been validated for use with the 18+ SDQ', so none are applied.",
   verified: false,
 };
 
@@ -158,6 +176,7 @@ export const scoreEhiSf: ScoringInput = {
 
 export const allScoring: ScoringInput[] = [
   scoreSdq25S,
+  scoreSdq25S18,
   scoreRcads25,
   scoreSwemwbs,
   scoreStai5,

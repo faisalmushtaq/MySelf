@@ -1,3 +1,4 @@
 export * from "./canonical.js";
+export * from "./assets.js";
 export * from "./builder.js";
 export * from "./compose-ybm.js";

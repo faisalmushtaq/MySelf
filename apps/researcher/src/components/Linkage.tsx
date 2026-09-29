@@ -169,7 +169,7 @@ export function Linkage({ onCorrectionsChanged }: { onCorrectionsChanged: () => 
             <input
               className="search"
               value={code}
-              placeholder="JA101CD"
+              placeholder="JA101CD, or P7K2M9Q4XA1 from r8.0.0"
               onChange={(e) => setCode(e.target.value.toUpperCase())}
             />
             <button

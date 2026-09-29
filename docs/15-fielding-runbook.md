@@ -223,6 +223,11 @@ in the code — see docs/14 §2.1. The consent form promises removal within 24
 hours of submission, so whoever fields the study has to be able to honour that
 by hand and record that they did.
 
+From survey version 8.0.0 there is no secret code to quote (D-52): someone asking
+to withdraw gives their name and date of birth. The **Linkage** tab finds their
+sittings by name; the participant ID is also recomputable from name and date of
+birth (docs/06, D-52), and their address confirms it is the right person.
+
 ---
 
 ## 8. Stopping one device

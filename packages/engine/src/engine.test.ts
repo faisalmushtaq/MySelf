@@ -158,3 +158,65 @@ describe("walker", () => {
     expect(progress.activeIndex).toBe(1);
   });
 });
+
+describe("age conditions (D-51)", () => {
+  const dob = ref("ybm_identity", "dob");
+  const adult: LogicExpr = { op: "age_gte", target: { item: dob }, years: 18 };
+  const underAdult: LogicExpr = { op: "not", arg: adult };
+  const born = (iso: string) => {
+    const store = new AnswerStore();
+    store.set(dob, { status: "answered", value: { kind: "date", iso } });
+    return store;
+  };
+  const started = new Date("2026-09-29T10:15:00Z");
+
+  it("counts whole years to the day the sitting started, turning 18 on the birthday itself", () => {
+    expect(evaluate(adult, born("2008-09-29"), started)).toBe(true); // 18 today
+    expect(evaluate(adult, born("2008-09-30"), started)).toBe(false); // 18 tomorrow
+    expect(evaluate(adult, born("2008-10-01"), started)).toBe(false);
+    expect(evaluate(adult, born("1990-01-01"), started)).toBe(true);
+    expect(evaluate(adult, born("2013-02-11"), started)).toBe(false);
+  });
+
+  it("judges the age on the sitting's start, not on the day it is evaluated again", () => {
+    // A sitting started the day before an 18th birthday stays an under-18 sitting
+    // when it is resumed, or re-read by a researcher, after the birthday.
+    const store = born("2008-09-30");
+    expect(evaluate(adult, store, started)).toBe(false);
+    expect(evaluate(adult, store, new Date("2026-10-05T09:00:00Z"))).toBe(true);
+  });
+
+  it("uses the UTC calendar date of the start, so every machine agrees", () => {
+    // 23:30 UTC on the 28th is 00:30 on the 29th in London (BST); the rule reads the 28th.
+    expect(evaluate(adult, born("2008-09-29"), new Date("2026-09-28T23:30:00Z"))).toBe(false);
+    expect(evaluate(adult, born("2008-09-29"), new Date("2026-09-29T00:00:00Z"))).toBe(true);
+  });
+
+  it("is false without a usable date of birth or a sitting date, so the under-18 branch is taken", () => {
+    const none = new AnswerStore();
+    expect(evaluate(adult, none, started)).toBe(false);
+    expect(evaluate(underAdult, none, started)).toBe(true);
+    expect(evaluate(adult, born("not-a-date"), started)).toBe(false);
+    expect(evaluate(adult, born("2008-13-01"), started)).toBe(false);
+    expect(evaluate(adult, born("1990-01-01"))).toBe(false); // no sitting date supplied
+    const skipped = new AnswerStore();
+    skipped.set(dob, { status: "skipped" });
+    expect(evaluate(underAdult, skipped, started)).toBe(true);
+  });
+
+  it("routes exactly one of two age-conditioned units through the walker", () => {
+    const sdqUnits: PresentableUnit[] = [
+      { instrument: "ybm_identity", sectionKey: "about_you", item: stubItem("dob", "dob") },
+      { instrument: "sdq25_s", sectionKey: "wellbeing", item: stubItem("q1", "sdq25_q1"), displayIf: underAdult },
+      { instrument: "sdq25_s18", sectionKey: "wellbeing", item: stubItem("q1", "sdq25_s18_q1"), displayIf: adult },
+    ];
+    const shown = (iso: string) =>
+      new Walker(sdqUnits, born(iso), true, started).visibleUnits().map((i) => sdqUnits[i]!.instrument);
+    expect(shown("2011-05-04")).toEqual(["ybm_identity", "sdq25_s"]);
+    expect(shown("2008-09-29")).toEqual(["ybm_identity", "sdq25_s18"]);
+    expect(new Walker(sdqUnits, born("2008-09-29"), true).visibleUnits().map((i) => sdqUnits[i]!.instrument)).toEqual([
+      "ybm_identity",
+      "sdq25_s",
+    ]);
+  });
+});

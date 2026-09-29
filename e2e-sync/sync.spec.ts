@@ -92,7 +92,8 @@ async function answer(page: Page): Promise<void> {
   }
   const text = page.locator(".survey-body textarea:visible, .survey-body input.text-input:visible").first();
   if ((await text.count()) > 0) {
-    for (const candidate of ["1", "A", "Something I would say about this."]) {
+    // A postcode for the address screen (D-52), which rejects the others.
+    for (const candidate of ["1", "A", "LS2 9JT", "Something I would say about this."]) {
       await text.fill(candidate);
       if (await accepted(page)) return;
     }

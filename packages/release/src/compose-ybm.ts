@@ -28,6 +28,13 @@ const yesTo = (item: string) => ({
   code: 1,
 });
 
+/** Aged 18 or over on the day the sitting started, from the date of birth asked in "About you". */
+const adult = {
+  op: "age_gte",
+  target: { item: { instrument: "ybm_identity", item: "dob", revision: 1 } },
+  years: 18,
+} as const;
+
 const usesSocialMedia = {
   op: "any" as const,
   args: [yesTo("sm_use"), yesTo("sm_use_confirm")],
@@ -153,7 +160,10 @@ export const ybmComposition: AssessmentDraftInput = {
       transition: "These questions ask how things have been for you lately.",
       components: [
         { kind: "instrument", ref: { instrument: "swemwbs", version: "1.0", ...en } },
-        { kind: "instrument", ref: { instrument: "sdq25_s", version: "1.0", ...en } },
+        // The SDQ form published for the participant's age on the day the
+        // sitting started (D-51): the 11–17 self-report under 18, the 18+ from 18.
+        { kind: "instrument", ref: { instrument: "sdq25_s", version: "2.0", ...en }, displayIf: { op: "not", arg: adult } },
+        { kind: "instrument", ref: { instrument: "sdq25_s18", version: "1.0", ...en }, displayIf: adult },
         { kind: "instrument", ref: { instrument: "rcads25", version: "1.0", ...en } },
       ],
     },

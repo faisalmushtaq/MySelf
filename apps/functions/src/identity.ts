@@ -56,6 +56,20 @@ async function logAccess(actor: string, action: string, subject: string, justifi
  * Runs on write rather than create, because a sitting is finished by a second
  * write when a participant resumes, and the name may only be present then.
  */
+/** The address answer as ingest renders it (JSON of the fields given), or null. */
+function parseAddress(raw: string | undefined): Record<string, string> | null {
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null;
+    const out: Record<string, string> = {};
+    for (const [k, v] of Object.entries(parsed)) if (typeof v === "string" && v.trim() !== "") out[k] = v.trim();
+    return Object.keys(out).length ? out : null;
+  } catch {
+    return null;
+  }
+}
+
 export const captureIdentity = onDocumentWritten("studies/{study}/sessions/{sessionId}", async (event) => {
   const after = event.data?.after?.data() as SessionDoc | undefined;
   if (!after) return;
@@ -88,6 +102,7 @@ export const captureIdentity = onDocumentWritten("studies/{study}/sessions/{sess
   const values: Record<string, string> = {};
   for (const row of rows) values[row.variable] = row.value;
   const code = rows[0]!.participantId;
+  const homeAddress = parseAddress(values["home_address"]);
   const db = identity();
 
   // The claim is what was typed at this sitting, kept whatever else happens:
@@ -99,6 +114,8 @@ export const captureIdentity = onDocumentWritten("studies/{study}/sessions/{sess
     givenName: values["first_name"] ?? null,
     familyName: values["last_name"] ?? null,
     dateOfBirth: values["dob"] ?? null,
+    // r8.0.0 on (D-52): the home address as given, {postcode, house, street}.
+    homeAddress,
     recordedAt: after.startedAt,
   });
 
@@ -115,6 +132,9 @@ export const captureIdentity = onDocumentWritten("studies/{study}/sessions/{sess
       givenName: before["givenName"] ?? values["first_name"] ?? null,
       familyName: before["familyName"] ?? values["last_name"] ?? null,
       dateOfBirth: before["dateOfBirth"] ?? values["dob"] ?? null,
+      // Unlike a name, an address is expected to change: the registry keeps the
+      // latest, and every sitting's claim keeps the one given then.
+      homeAddress: homeAddress ?? before["homeAddress"] ?? null,
       upn: before["upn"] ?? null,
       nhsNumber: before["nhsNumber"] ?? null,
       updatedAt: FieldValue.serverTimestamp(),

@@ -73,6 +73,14 @@ describe("logic AST", () => {
     expect(logicExpr.parse(expr)).toBeTruthy();
   });
 
+  it("accepts an age condition on the date of birth, in whole years (D-51)", () => {
+    const dob = { instrument: "ybm_identity", item: "dob", revision: 1 };
+    expect(logicExpr.parse({ op: "not", arg: { op: "age_gte", target: { item: dob }, years: 18 } })).toBeTruthy();
+    expect(() => logicExpr.parse({ op: "age_gte", target: { item: dob }, years: 17.5 })).toThrow();
+    expect(() => logicExpr.parse({ op: "age_gte", target: { item: dob }, years: -1 })).toThrow();
+    expect(() => logicExpr.parse({ op: "age_gte", target: { item: dob } })).toThrow();
+  });
+
   it("rejects an unknown operator", () => {
     expect(() => logicExpr.parse({ op: "regex", target: { item: smOwn }, value: ".*" })).toThrow();
   });

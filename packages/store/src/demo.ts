@@ -1,4 +1,5 @@
-import type { ReleaseManifest, ResponseScale } from "@myself/schema";
+import { AnswerStore, evaluate } from "@myself/engine";
+import type { LogicExpr, ReleaseManifest, ResponseScale } from "@myself/schema";
 import type { DeviceSession, DeviceEvent } from "./ingest.js";
 
 /**
@@ -66,6 +67,23 @@ export function buildDemoSessions(options: DemoOptions): DeviceSession[] {
     return { instrument: inst.instrument, items: inst.forms.flatMap((f) => f.items) };
   });
 
+  // The generator answers every question rather than walking display conditions,
+  // except component conditions, judged against the made-up date of birth. The
+  // only ones are the SDQ's age rule (D-51), so nobody answers both SDQ forms; a
+  // component condition on any other answer would drop that component here.
+  const componentIf = new Map<string, LogicExpr>();
+  for (const section of manifest.composition.sections) {
+    for (const component of section.components) {
+      if ((component.kind === "instrument" || component.kind === "module") && component.displayIf) {
+        componentIf.set(component.ref.instrument, component.displayIf);
+      }
+    }
+  }
+  const dateItems = Object.values(manifest.instruments).flatMap((raw) => {
+    const inst = raw as { instrument: string; forms: { items: FrozenItem[] }[] };
+    return inst.forms.flatMap((f) => f.items.filter((i) => i.responseType === "date").map((i) => ({ instrument: inst.instrument, item: i.key, revision: 1 })));
+  });
+
   const pick = <T,>(list: T[]): T => list[Math.floor(random() * list.length)]!;
   const letters = () =>
     String.fromCharCode(65 + Math.floor(random() * 26)) + String.fromCharCode(65 + Math.floor(random() * 26));
@@ -81,6 +99,14 @@ export function buildDemoSessions(options: DemoOptions): DeviceSession[] {
       houseDigit: String(Math.floor(random() * 10)),
       birthMonthCode: 1 + Math.floor(random() * 12),
       postcodeLetters: letters(),
+    };
+    // An address that cannot be real: no postcode area is XX (D-52). Drawn from
+    // its own stream, so adding it changed nothing else a seed produces.
+    const own = rng((options.seed ?? 20260101) + 7919 * (p + 1));
+    const address = {
+      postcode: `XX${1 + Math.floor(own() * 9)} ${1 + Math.floor(own() * 9)}XX`,
+      house: String(1 + Math.floor(own() * 99)),
+      street: ["Demo Street", "Example Road", "Sample Lane"][Math.floor(own() * 3)]!,
     };
     const firstName = pick(FIRST_NAMES);
     const lastName = pick(LAST_NAMES);
@@ -109,8 +135,13 @@ export function buildDemoSessions(options: DemoOptions): DeviceSession[] {
         tMono: elapsed,
       });
 
+      const known = new AnswerStore();
+      for (const ref of dateItems) known.set(ref, { status: "answered", value: { kind: "date", iso: dob } });
+
       let answeredAny = 0;
       for (const inst of instruments) {
+        const condition = componentIf.get(inst.instrument);
+        if (condition && !evaluate(condition, known, started)) continue;
         for (const item of inst.items) {
           if (item.responseType === "info") continue;
           const key = `${inst.instrument}.${item.key}`;
@@ -130,6 +161,7 @@ export function buildDemoSessions(options: DemoOptions): DeviceSession[] {
               lastName,
               dob,
               parts,
+              address,
               handednessLean,
             });
             if (value === null) continue;
@@ -196,6 +228,7 @@ interface AnswerContext {
   lastName: string;
   dob: string;
   parts: { motherInitials: string; houseDigit: string; birthMonthCode: number; postcodeLetters: string };
+  address: { postcode: string; house: string; street: string };
   handednessLean: number;
 }
 
@@ -216,6 +249,8 @@ function answerFor(item: FrozenItem, ctx: AnswerContext): unknown {
       return { kind: "text", value: ctx.parts.postcodeLetters };
     case "ps_birth_month":
       return { kind: "choice", code: ctx.parts.birthMonthCode };
+    case "home_address":
+      return { kind: "fields", values: { ...ctx.address } };
   }
 
   switch (item.responseType) {

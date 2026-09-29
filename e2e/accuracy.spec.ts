@@ -26,6 +26,8 @@ import { expect, test, type Locator, type Page } from "@playwright/test";
  */
 
 const CODE = "NDC0042";
+/** The date of birth the walk gives: 14 in 2026, so the 11–17 SDQ (D-51). */
+let dateOfBirth = "2012-05-14";
 const PASSPHRASE = "six brown otters reading";
 /**
  * Resolved from the working directory rather than from `import.meta`.
@@ -33,7 +35,7 @@ const PASSPHRASE = "six brown otters reading";
  * Playwright compiles these specs as CommonJS, where `import.meta` is a syntax
  * error, and the suite always runs from the repository root.
  */
-const MANIFEST = resolve("releases/ybm_nd2026_standard_r7.3.0.manifest.json");
+const MANIFEST = resolve("releases/ybm_nd2026_standard_r8.0.0.manifest.json");
 
 /**
  * `@myself/store` is ESM-only, so it is imported dynamically — a static import of a
@@ -137,7 +139,7 @@ async function answerAndRecord(page: Page, ledger: Tapped[]): Promise<void> {
       /**
        * Recorded whether or not the app accepts it, and that is the point.
        *
-       * Some items are checked against an earlier answer — "the month you were born"
+       * Some items are checked against an earlier answer — "the month you were born" (to r7.3.0)
        * has to agree with the date of birth — so the walker tries options until one
        * is accepted. Every tap along the way IS an answer the participant gave, and
        * the event log records all of them in order, because it is append-only.
@@ -204,13 +206,14 @@ async function answerAndRecord(page: Page, ledger: Tapped[]): Promise<void> {
 
   const date = page.locator('.survey-body input[type="date"]:visible').first();
   if ((await date.count()) > 0) {
-    await date.fill("2012-05-14");
+    await date.fill(dateOfBirth);
     return;
   }
 
   const text = page.locator(".survey-body textarea:visible, .survey-body input.text-input:visible").first();
   if ((await text.count()) > 0) {
-    for (const candidate of ["1", "A", "Something I would say about this."]) {
+    // A postcode for the address screen (D-52), which rejects the others.
+    for (const candidate of ["1", "A", "LS2 9JT", "Something I would say about this."]) {
       await text.fill(candidate);
       if (await accepted(page)) return;
     }
@@ -268,17 +271,14 @@ async function advance(page: Page): Promise<void> {
   throw new Error(`nothing to click on ${await position(page)}`);
 }
 
-test("the dataset says what the participant actually answered", async ({ page }) => {
-  test.slow();
-  const { stemOf, labelOf } = await definitions();
-  const ledger: Tapped[] = [];
-
+/** Answer screen after screen until the survey finishes, or `enough` says to stop. */
+async function walk(page: Page, ledger: Tapped[], enough: () => boolean | Promise<boolean> = () => false): Promise<void> {
   await page.goto("./");
   await page.locator("input.code").fill(CODE);
   await page.locator("button.next.big").click();
 
   for (let screens = 0; screens < 400; screens += 1) {
-    if ((await position(page)) === "finished") break;
+    if ((await position(page)) === "finished" || (await enough())) break;
     const before = await position(page);
     await answerAndRecord(page, ledger);
     let moved = false;
@@ -294,6 +294,72 @@ test("the dataset says what the participant actually answered", async ({ page })
       await expect.poll(() => position(page), { timeout: 10_000 }).not.toBe(before);
     }
   }
+}
+
+test("someone 18 or over on the day is given the 18+ SDQ, word for word (D-51)", async ({ page }) => {
+  test.slow();
+  dateOfBirth = "2000-01-15";
+  const ledger: Tapped[] = [];
+  const asked = (stem: string) => ledger.some((t) => t.stem.includes(stem));
+  // Both forms end with the same item, so the walk can stop once it is answered.
+  await walk(page, ledger, () => asked("I finish the work I'm doing"));
+
+  expect(asked("I am restless, I find it hard to sit down for long")).toBe(true);
+  expect(asked("I get along better with older people than with people of my own age")).toBe(true);
+  expect(asked("I often offer to help others (family members, friends, colleagues)")).toBe(true);
+  // and nothing from the 11–17 form
+  expect(asked("I am restless, I cannot stay still for long")).toBe(false);
+  expect(asked("Other children or young people pick on me or bully me")).toBe(false);
+});
+
+test("the address screen names a postcode's area, and keeps one outside it only after two confirmations (D-52)", async ({ page }) => {
+  test.slow();
+  dateOfBirth = "2012-05-14";
+  const postcode = page.getByRole("textbox", { name: "Postcode" });
+  await walk(page, [], async () => (await postcode.count()) > 0);
+
+  const next = page.locator("button.next:not(.big)").first();
+  const note = page.locator(".field-note");
+  await postcode.fill("ls2 9jt");
+  await expect(note).toHaveText("✓ Little London & Woodhouse, Leeds");
+  await expect(next).toBeEnabled();
+
+  // Harrogate: a real postcode, outside West Yorkshire. Questioned twice, never
+  // refused: is it typed correctly, and is the home really outside the area?
+  await postcode.fill("HG1 2AA");
+  await expect(note).toHaveText("We can't find HG1 2AA in West Yorkshire. Check it's typed correctly.");
+  await expect(next).toBeDisabled();
+  await page.getByRole("button", { name: "It's typed correctly" }).click();
+  await expect(note).toHaveText("Is your home outside West Yorkshire?");
+  await expect(next).toBeDisabled();
+  // Saying no goes back to checking the postcode, with the box ready to edit.
+  await page.getByRole("button", { name: "No — I'll check my postcode" }).click();
+  await expect(note).toContainText("Check it's typed correctly");
+  await expect(postcode).toBeFocused();
+  await page.getByRole("button", { name: "It's typed correctly" }).click();
+  await page.getByRole("button", { name: "Yes, my home is outside West Yorkshire" }).click();
+  await expect(note).toHaveText("✓ Kept as you gave it — outside West Yorkshire");
+  await expect(next).toBeEnabled();
+  // A different postcode starts the questions again.
+  await postcode.fill("YO1 7HH");
+  await expect(next).toBeDisabled();
+  await page.getByRole("button", { name: "It's typed correctly" }).click();
+  await page.getByRole("button", { name: "Yes, my home is outside West Yorkshire" }).click();
+  await expect(next).toBeEnabled();
+
+  // The rest is optional; what they know is what is kept.
+  await page.getByRole("textbox", { name: "House number or name" }).fill("12");
+  await next.click();
+  await expect(postcode).toHaveCount(0);
+});
+
+test("the dataset says what the participant actually answered", async ({ page }) => {
+  test.slow();
+  dateOfBirth = "2012-05-14";
+  const { stemOf, labelOf } = await definitions();
+  const ledger: Tapped[] = [];
+
+  await walk(page, ledger);
 
   await expect(page.locator(".screen.finish")).toBeVisible();
   expect(ledger.length).toBeGreaterThan(20);
