@@ -456,4 +456,82 @@ describe("linkage", () => {
     );
     expect(claims.rows[0]!.given_name).toBe("Amarah");
   });
+
+  describe("the home address (r8.0.0 on, D-52)", () => {
+    const code = "P0000000001";
+    const sittingAt = (sessionId: string, recordedAt: string, address: Record<string, string> | string) => [
+      { participantId: code, sessionId, variable: "first_name", value: "Test", recordedAt },
+      { participantId: code, sessionId, variable: "last_name", value: "Person", recordedAt },
+      { participantId: code, sessionId, variable: "dob", value: "2011-07-04", recordedAt },
+      {
+        participantId: code,
+        sessionId,
+        variable: "home_address",
+        value: typeof address === "string" ? address : JSON.stringify(address),
+        recordedAt,
+      },
+    ];
+    const registry = async () =>
+      (
+        await db.query<{ home_address: unknown; home_address_recorded_at: Date | null }>(
+          "SELECT home_address, home_address_recorded_at FROM identity.participants WHERE participant_code = $1",
+          [code],
+        )
+      ).rows[0]!;
+
+    it("keeps each sitting's address on its claim, and the current one on the registry", async () => {
+      await storeIdentity(db, "ybm", sittingAt("a1", "2026-09-29T10:00:00.000Z", { postcode: "XX1 1XX", house: "1", street: "Example Street" }));
+      await storeIdentity(db, "ybm", sittingAt("a2", "2027-03-01T10:00:00.000Z", { postcode: "XX2 2XX" }));
+
+      const claims = await db.query<{ session_id: string; home_address: unknown }>(
+        "SELECT session_id, home_address FROM identity.code_claims WHERE claimed_code = $1 ORDER BY session_id",
+        [code],
+      );
+      expect(claims.rows).toEqual([
+        { session_id: "a1", home_address: { postcode: "XX1 1XX", house: "1", street: "Example Street" } },
+        { session_id: "a2", home_address: { postcode: "XX2 2XX" } },
+      ]);
+      // Replaced whole, not merged: the old house and street do not survive.
+      const current = await registry();
+      expect(current.home_address).toEqual({ postcode: "XX2 2XX" });
+      expect(new Date(current.home_address_recorded_at!).toISOString()).toBe("2027-03-01T10:00:00.000Z");
+
+      const res = await server().inject({
+        method: "POST",
+        url: "/identity/lookup",
+        headers: owner,
+        payload: { participantCode: code, ...why },
+      });
+      expect(res.json()).toMatchObject({ givenName: "Test", homeAddress: { postcode: "XX2 2XX" } });
+    });
+
+    it("does not let an older sitting that arrives late replace a newer address", async () => {
+      await storeIdentity(db, "ybm", sittingAt("b2", "2027-03-01T10:00:00.000Z", { postcode: "XX2 2XX" }));
+      await storeIdentity(db, "ybm", sittingAt("b1", "2026-09-29T10:00:00.000Z", { postcode: "XX1 1XX" }));
+      const current = await registry();
+      expect(current.home_address).toEqual({ postcode: "XX2 2XX" });
+      expect(new Date(current.home_address_recorded_at!).toISOString()).toBe("2027-03-01T10:00:00.000Z");
+    });
+
+    it("keeps the address on file through a sitting that gives none, and drops one it cannot read", async () => {
+      await storeIdentity(db, "ybm", sittingAt("c1", "2026-09-29T10:00:00.000Z", { postcode: "XX1 1XX" }));
+      await storeIdentity(db, "ybm", sittingAt("c2", "2027-03-01T10:00:00.000Z", "not json"));
+      expect((await registry()).home_address).toEqual({ postcode: "XX1 1XX" });
+      const claim = await db.query<{ home_address: unknown }>(
+        "SELECT home_address FROM identity.code_claims WHERE session_id = 'c2'",
+      );
+      expect(claim.rows[0]!.home_address).toBeNull();
+    });
+
+    it("leaves a sitting from before r8.0.0 exactly as it was", async () => {
+      // JA101CD was filed in beforeEach with a name and no address.
+      const res = await server().inject({
+        method: "POST",
+        url: "/identity/lookup",
+        headers: owner,
+        payload: { participantCode: "JA101CD", ...why },
+      });
+      expect(res.json()).toMatchObject({ givenName: "Amara", homeAddress: null });
+    });
+  });
 });
