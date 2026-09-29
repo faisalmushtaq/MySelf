@@ -58,8 +58,9 @@ jobs:
         run: |
           rm -rf preview-public && cp -R ../../apps/participant/dist preview-public
           firebase hosting:channel:deploy survey-preview --config firebase.preview.json \
-            --expires 30d --project myself-research --non-interactive --json > channel.json
-          url=$(node -e 'const r=require("./channel.json").result; const s=Object.values(r)[0]; console.log(s.url + "  (expires " + s.expireTime + ")")')
+            --expires 30d --project myself-research --non-interactive | tee channel.log
+          url=$(grep -oE 'https://[a-z0-9-]+--survey-preview-[a-z0-9]+\.web\.app' channel.log | head -1)
+          if [ -z "$url" ]; then echo "::error::Deployed, but no channel URL found in the output above."; exit 1; fi
           echo "Survey preview: $url"
           echo "### Survey preview: $url" >> "$GITHUB_STEP_SUMMARY"
 

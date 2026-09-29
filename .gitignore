@@ -17,4 +17,4 @@ firebase-debug.log
 firestore-debug.log
 ui-debug.log
 infra/firebase/preview-public/
-infra/firebase/channel.json
+infra/firebase/channel.log

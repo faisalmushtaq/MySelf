@@ -105,6 +105,31 @@ function distance(a: string, b: string, limit: number): number {
   return prev[b.length]!;
 }
 
+/** Letter counts of a normalised name (a-z, 0-9, space), for a cheap bound on distance. */
+const SLOTS = 37;
+const slotOf = (code: number): number => (code === 32 ? 36 : code >= 97 ? code - 97 : code - 22);
+function countsOf(text: string, length = text.length): Int16Array {
+  const counts = new Int16Array(SLOTS);
+  for (let i = 0; i < length && i < text.length; i += 1) counts[slotOf(text.charCodeAt(i))]! += 1;
+  return counts;
+}
+
+const scratch = new Int16Array(SLOTS);
+/**
+ * A lower bound on the edit distance between the query (by its counts) and the
+ * first `length` characters of `text`: every edit changes the letter counts by
+ * at most two, so half the total difference, rounded up, is a floor. Costs a
+ * pass over the name, where the full distance costs a pass per letter — most
+ * of 40,000 names are ruled out here.
+ */
+function countBound(query: Int16Array, text: string, length: number): number {
+  scratch.set(query);
+  for (let i = 0; i < length && i < text.length; i += 1) scratch[slotOf(text.charCodeAt(i))]! -= 1;
+  let total = 0;
+  for (let i = 0; i < SLOTS; i += 1) total += Math.abs(scratch[i]!);
+  return Math.ceil(total / 2);
+}
+
 interface Entry extends StreetMatch {
   /** The name as compared. */
   key: string;
@@ -113,15 +138,19 @@ interface Entry extends StreetMatch {
 }
 
 /** How close a typed street is to one entry, from 0 (nothing alike) to 1 (the same). */
-function closeness(q: string, e: Entry): number {
+function closeness(q: string, qCounts: Int16Array, e: Entry): number {
   if (e.key === q) return 1;
   if (e.key.startsWith(q)) return 0.9 + 0.08 * (q.length / e.key.length);
   if (e.full.startsWith(q)) return 0.88;
   if (e.key.includes(` ${q}`)) return 0.8;
-  // Typing mistakes: the whole name, or — while still typing — its start.
+  // Typing mistakes: the whole name, or — while still typing — its start. The
+  // count bound skips the full comparison for names that cannot be close.
   const limit = Math.max(1, Math.floor(q.length / 4));
-  const whole = distance(q, e.key, limit);
-  const start = distance(q, e.key.slice(0, q.length), limit);
+  const whole =
+    Math.abs(q.length - e.key.length) <= limit && countBound(qCounts, e.key, e.key.length) <= limit
+      ? distance(q, e.key, limit)
+      : limit + 1;
+  const start = countBound(qCounts, e.key, q.length) <= limit ? distance(q, e.key.slice(0, q.length), limit) : limit + 1;
   const best = Math.max(
     whole <= limit ? 1 - whole / Math.max(q.length, e.key.length) : 0,
     start <= limit ? 0.85 * (1 - start / q.length) : 0,
@@ -160,9 +189,10 @@ export function parseStreetList(text: string): StreetList {
     search(query: string, limit = 5) {
       const q = normaliseStreet(query);
       if (q.replace(/[^a-z]/g, "").length < 3) return [];
+      const qCounts = countsOf(q);
       const scored: { e: Entry; s: number }[] = [];
       for (const e of entries) {
-        const s = closeness(q, e);
+        const s = closeness(q, qCounts, e);
         if (s >= 0.5) scored.push({ e, s });
       }
       scored.sort((a, b) => b.s - a.s || a.e.street.localeCompare(b.e.street) || a.e.area.localeCompare(b.e.area));
