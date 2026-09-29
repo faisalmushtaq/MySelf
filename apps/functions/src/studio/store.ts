@@ -181,13 +181,14 @@ export function licenceEscapes(draft: StudioDraft, published: Iterable<StudioDra
 }
 
 /**
- * A file a draft says the release should pin (D-52: the postcode list) that no
- * published release pins with exactly that path, hash and size. The Studio does
- * not edit assets, so a pin it has never seen came from somewhere else — and a
- * wrong hash would only be caught later, on every device, as a release the app
- * refuses.
+ * A file a release is about to pin (D-52: the postcode list) that no known
+ * release pins with exactly that path, hash and size. The Studio does not edit
+ * assets, so a pin it has never seen came from somewhere else — and a wrong
+ * hash would only be caught later, on every device, as a release the app
+ * refuses. Checked on what the release actually ships: a draft keeps the pins
+ * it came with whether or not a question still uses them.
  */
-export function assetEscapes(draft: StudioDraft, published: Iterable<Record<string, unknown>>): Issue[] {
+export function assetEscapes(pins: Record<string, unknown> | undefined, published: Iterable<Record<string, unknown>>): Issue[] {
   const known = new Map<string, Set<string>>();
   for (const source of published) {
     const assets = (source as { assets?: unknown }).assets;
@@ -199,12 +200,12 @@ export function assetEscapes(draft: StudioDraft, published: Iterable<Record<stri
     }
   }
   const issues: Issue[] = [];
-  for (const [key, pin] of Object.entries(draft.assets ?? {})) {
+  for (const [key, pin] of Object.entries(pins ?? {})) {
     if (known.get(key)?.has(canonicalJson(pin))) continue;
     issues.push(
       problem(
         "asset.unknown",
-        `The draft pins a file ('${key}') that no published version pins in exactly that form. Files like the postcode list can't be changed in the Studio. Restore the draft from a published version.`,
+        `The release would pin a file ('${key}') that no published version pins in exactly that form. Files like the postcode list can't be changed in the Studio. Restore the draft from a published version.`,
       ),
     );
   }

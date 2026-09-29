@@ -61,6 +61,12 @@ describe("restoring a version into the draft", () => {
     expect(codes.filter((c) => c.startsWith("gate.scoring") || c === "locked.scoring")).toEqual([]);
   });
 
+  it("keeps the postcode list an archived address question needs, so it can be brought back (D-52)", () => {
+    const merged = mergeRestore(draftOf("7.3.0"), draftOf("8.0.0"), { at: AT, by: "u_pub", publishedCodes: new Map() });
+    expect(merged.archived).toContain("ybm_identity.home_address");
+    expect(merged.draft.assets).toEqual(draftOf("8.0.0").assets);
+  });
+
   it("drops unlocks: going back to a published version needs a fresh acknowledgement to change protected content", () => {
     const merged = mergeRestore(draftOf("7.0.1"), current(), { at: AT, by: "u_pub", publishedCodes: new Map() });
     expect(merged.draft.unlocked).toEqual({});
@@ -174,15 +180,15 @@ describe("what the server refuses beyond Studio validation", () => {
     expect(licenceEscapes(live, [live])).toEqual([]);
   });
 
-  it("a file pin no published version has, such as a different postcode list", () => {
+  it("a file pin no known release has, such as a different postcode list", () => {
     const live = draftOf("8.0.0");
     const published = [bundledManifests.find((b) => b.manifest.release.version === "8.0.0")!.raw as Record<string, unknown>];
-    expect(assetEscapes(live, published)).toEqual([]);
-    const tampered = structuredClone(live);
-    tampered.assets!["postcodes_west_yorkshire"]!.sha256 = `sha256:${"0".repeat(64)}`;
+    expect(assetEscapes(live.assets, published)).toEqual([]);
+    const tampered = structuredClone(live.assets!);
+    tampered["postcodes_west_yorkshire"]!.sha256 = `sha256:${"0".repeat(64)}`;
     expect(assetEscapes(tampered, published).map((i) => i.code)).toEqual(["asset.unknown"]);
-    // A survey that pins nothing has nothing to check.
-    expect(assetEscapes(draftOf("7.3.0"), published)).toEqual([]);
+    // A release that pins nothing has nothing to check.
+    expect(assetEscapes({}, [])).toEqual([]);
   });
 
   it("a draft that claims to be another survey, or another study's", () => {

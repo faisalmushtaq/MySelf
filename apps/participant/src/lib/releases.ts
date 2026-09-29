@@ -89,19 +89,6 @@ export type Verification =
   | { ok: true; manifest: ReleaseManifest; raw: Record<string, unknown> }
   | { ok: false; reason: string };
 
-/**
- * Whether a downloaded manifest may be rendered. Never throws.
- *
- * `expectedHash` is the hash the study's pointer named. The raw JSON must carry
- * it and must hash to it: a manifest served from the wrong document, altered in
- * transit or altered in storage is refused before it is even parsed. The hash is
- * checked over the RAW object (`verifyRawManifestHash`), because zod drops keys
- * it does not know and a check over a parsed copy would pass a manifest whose
- * unknown fields had been changed.
- *
- * Nothing is mutated: zod returns new objects, and the raw JSON is what App
- * flattens, exactly as it always flattened the built-in manifest.
- */
 const assetHashes = new Map<string, Promise<string>>();
 
 /** `sha256:<hex>` of a bundled file, over its UTF-8 bytes as the release pins it; computed once. */
@@ -117,6 +104,19 @@ function bundledAssetHash(key: string, text: string): Promise<string> {
   return hash;
 }
 
+/**
+ * Whether a downloaded manifest may be rendered. Never throws.
+ *
+ * `expectedHash` is the hash the study's pointer named. The raw JSON must carry
+ * it and must hash to it: a manifest served from the wrong document, altered in
+ * transit or altered in storage is refused before it is even parsed. The hash is
+ * checked over the RAW object (`verifyRawManifestHash`), because zod drops keys
+ * it does not know and a check over a parsed copy would pass a manifest whose
+ * unknown fields had been changed.
+ *
+ * Nothing is mutated: zod returns new objects, and the raw JSON is what App
+ * flattens, exactly as it always flattened the built-in manifest.
+ */
 export async function verifyRelease(
   json: string,
   expectedHash: string,

@@ -20,6 +20,7 @@ import {
   type StudioDraft,
   type VersionDoc,
 } from "@myself/studio";
+import { bundledManifests } from "../releases.js";
 import { auditRow, newAuditRef, type AuditActor } from "./audit.js";
 import { problem, refuse } from "./errors.js";
 import {
@@ -204,7 +205,6 @@ export async function publish(db: Firestore, args: PublishArgs): Promise<Publish
     const issues: Issue[] = [
       ...identityIssues(draft, surveyId, study),
       ...licenceEscapes(draft, origin ? [...published, origin.raw] : published),
-      ...assetEscapes(draft, origin ? [...published, origin.raw] : published),
       ...validateDraft(draft, {
         reserved: reservedFrom(versions),
         baseline: baseline ?? lockBaseline(origin ? draftOf(origin) : null, draft),
@@ -256,6 +256,19 @@ export async function publish(db: Firestore, args: PublishArgs): Promise<Publish
         problem("schema.invalid", `Part of the survey is not in a form the survey app can use: ${describeError(error)}`),
       ]);
     }
+
+    // The files the release pins must be ones a release already pinned (D-52):
+    // this survey's history, the version it was copied from, or a release in
+    // the repository.
+    const basedOn = state.draft.basedOn
+      ? (origin ?? (await readReleases(tx, refs, [state.draft.basedOn.hash])).get(state.draft.basedOn.hash) ?? null)
+      : null;
+    const pinIssues = assetEscapes(manifest.assets, [
+      ...published,
+      ...(basedOn ? [basedOn.raw] : []),
+      ...bundledManifests.map((b) => b.raw as Record<string, unknown>),
+    ]);
+    if (pinIssues.length > 0) throw refuse.invalid(describeRefusedDraft(pinIssues, draft), pinIssues);
 
     const hash = manifest.hash;
     const json = JSON.stringify(manifest);

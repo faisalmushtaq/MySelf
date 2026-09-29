@@ -4,6 +4,7 @@ import { releaseManifest, responseScale, type ItemDefinition, type LogicExpr, ty
 import { flattenManifest } from "@participant/lib/flatten.js";
 import { describeAnswer } from "@participant/components/ReviewScreen.js";
 import rawR730 from "../../../../../releases/ybm_nd2026_standard_r7.3.0.manifest.json";
+import rawR800 from "../../../../../releases/ybm_nd2026_standard_r8.0.0.manifest.json";
 import { describeCondition, type DescribeContext } from "./model-adapter.js";
 import {
   answerSummaries,
@@ -85,6 +86,21 @@ describe("preview visibility", () => {
       "q.b": "hidden",
       "q.c": "not_reached",
     });
+  });
+
+  it("judges age on the sitting's date, so an adult is shown the 18+ SDQ (D-51)", () => {
+    const flat = flattenManifest(releaseManifest.parse(rawR800));
+    const store = new AnswerStore();
+    store.set({ instrument: "ybm_identity", item: "dob", revision: 1 }, { status: "answered", value: { kind: "date", iso: "2000-01-15" } });
+    const started = new Date("2026-09-29T09:00:00Z");
+    const visibility = computeVisibility(flat.units, store, new Set(), started);
+    const shownSdq = (instrument: string) =>
+      flat.units.filter((u) => u.instrument === instrument && u.item.responseType !== "info").some((u) => visibility[unitKeyOf(u)] !== "hidden");
+    expect(shownSdq("sdq25_s18")).toBe(true);
+    expect(shownSdq("sdq25_s")).toBe(false);
+    // The engine's own walk agrees.
+    const shown = new Walker(flat.units, store, true, started).visibleUnits().map((i) => unitKeyOf(flat.units[i]!));
+    expect(flat.units.map(unitKeyOf).filter((k) => visibility[k] !== "hidden")).toEqual(shown);
   });
 
   it("agrees with the participant engine's own walk on r7.3.0", () => {

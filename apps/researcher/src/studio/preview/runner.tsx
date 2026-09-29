@@ -181,7 +181,7 @@ export function PreviewRunner({ release, startAt, jump, accessibility, onAccessi
       setPhase({ kind: "finished" });
       return;
     }
-    const index = new Walker(units, storeRef.current, allowBack).first() ?? 0;
+    const index = new Walker(units, storeRef.current, allowBack, sessionStart.current).first() ?? 0;
     enterItem(index);
     setPhase({ kind: "running", index });
   };
@@ -227,7 +227,7 @@ export function PreviewRunner({ release, startAt, jump, accessibility, onAccessi
         return;
       }
 
-      const next = new Walker(units, storeRef.current, allowBack).next(from);
+      const next = new Walker(units, storeRef.current, allowBack, sessionStart.current).next(from);
 
       if (next !== null && skipRun.current.count >= effort.skipRunCheckIn && skipRun.current.firstIndex !== null) {
         const firstSkipped = skipRun.current.firstIndex;
@@ -264,7 +264,7 @@ export function PreviewRunner({ release, startAt, jump, accessibility, onAccessi
         setPhase({ kind: "review" });
         return;
       }
-      const prev = new Walker(units, storeRef.current, allowBack).back(from);
+      const prev = new Walker(units, storeRef.current, allowBack, sessionStart.current).back(from);
       if (prev !== null) {
         leaveItem(from, false);
         enterItem(prev);
@@ -304,7 +304,7 @@ export function PreviewRunner({ release, startAt, jump, accessibility, onAccessi
       index,
       itemKey: index === null ? null : keyAt(index) || null,
       answers: answerSummaries(units, storeRef.current, scales, describeAnswer),
-      visibility: computeVisibility(units, storeRef.current, visited.current),
+      visibility: computeVisibility(units, storeRef.current, visited.current, sessionStart.current),
     });
   }, [phase, answersVersion]);
 

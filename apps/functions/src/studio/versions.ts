@@ -122,10 +122,15 @@ export function mergeRestore(
     }
     d.archived = [...structuredClone(kept), ...added];
 
-    // What the archive needs to be restorable: its option lists and scoring.
+    // What the archive needs to be restorable: its option lists, scoring and
+    // the file a postcode check reads (D-52).
     for (const a of d.archived) {
       const scale = (a.item as { scale?: unknown }).scale;
       if (typeof scale === "string" && !d.scales[scale] && current.scales[scale]) d.scales[scale] = structuredClone(current.scales[scale]!);
+      const asset = (a.item as { postcodeCheck?: { asset?: unknown } }).postcodeCheck?.asset;
+      if (typeof asset === "string" && !d.assets?.[asset] && current.assets?.[asset]) {
+        d.assets = { ...d.assets, [asset]: structuredClone(current.assets[asset]) };
+      }
       const scoringKey = (a.instrumentShell as { scoringKey?: unknown } | undefined)?.scoringKey;
       if (typeof scoringKey === "string" && !d.scoring[scoringKey] && current.scoring[scoringKey]) {
         d.scoring[scoringKey] = structuredClone(current.scoring[scoringKey]!);

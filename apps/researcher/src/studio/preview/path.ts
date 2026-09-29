@@ -30,8 +30,10 @@ export function computeVisibility(
   units: PresentableUnit[],
   store: AnswerStore,
   visited: ReadonlySet<string>,
+  /** When the sitting started: what age conditions are judged against (D-51). */
+  sessionStart?: Date,
 ): Record<string, Visibility> {
-  const walker = new Walker(units, store, true);
+  const walker = new Walker(units, store, true, sessionStart);
   const out: Record<string, Visibility> = {};
   units.forEach((unit, i) => {
     const key = unitKeyOf(unit);
