@@ -1,9 +1,10 @@
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { allInstruments, allModules, allScales } from "@myself/library";
 import { microNarrativeFull, type NarrativeProtocol } from "@myself/narrative";
-import { allScoring } from "@myself/scoring";
+import { allScoring, scoringReferenceProblems } from "@myself/scoring";
+import { scoringDefinition } from "@myself/schema";
 import { buildRelease, PublishGateError, verifyManifestHash, type Registries } from "./builder.js";
 import { canonicalJson, contentHash } from "./canonical.js";
 import { ybmComposition } from "./compose-ybm.js";
@@ -18,20 +19,21 @@ const registries: Registries = {
 /**
  * The current release.
  *
- * r7.1.0 is a MINOR on r7.0.1. It removes the site branding a participant sees —
- * the "Notre Dame · 2026" cover label (composition.studyLabel, now unset) and the
- * "— Notre Dame" suffix on the consent sheet's subtitle — for a fielding not at
- * that site. Per docs/06 §44-49 this is not PATCH (participant-visible wording
- * never is) and not MAJOR either: no question, response option or code changes, so
- * sittings under r7.0.1 and r7.1.0 are the same instrument and pool without a
- * comparability argument. A site label is presentation, not measurement — MINOR.
+ * r7.2.0 is a MINOR on r7.1.0 (D-49). Its SWEMWBS and STAI-5 scoring definitions
+ * (1.0.1) name their items by their real keys; the 1.0.0 definitions frozen into
+ * r1.0.0–r7.1.0 named `q1`…, which those instruments have never had, so the
+ * totals were always blank. Nothing a participant reads or selects changes and no
+ * code changes: sittings under r7.1.0 and r7.2.0 are the same instrument and pool
+ * without a comparability argument, and the scores are the same published rule
+ * applied to the same items. Per docs/06 §44-49 that is not MAJOR; it is not PATCH
+ * either, because analysts see scores where there were blanks — MINOR.
  */
 const meta = {
-  version: "7.1.0",
-  publishedAt: "2026-09-28T11:30:00.000Z",
+  version: "7.2.0",
+  publishedAt: "2026-09-29T08:32:00.000Z",
   publishedBy: "faisalmushtaq",
   engineVersion: "0.1.0",
-  decisionRefs: ["D-24"],
+  decisionRefs: ["D-49"],
 };
 
 describe("canonical JSON", () => {
@@ -44,12 +46,12 @@ describe("canonical JSON", () => {
   });
 });
 
-describe("YBM release r7.1.0", () => {
+describe("YBM release r7.2.0", () => {
   it("passes the publish gate and produces a verifiable manifest", () => {
     const manifest = buildRelease(ybmComposition, registries, meta);
     expect(manifest.hash).toMatch(/^sha256:[0-9a-f]{64}$/);
     expect(verifyManifestHash(manifest)).toBe(true);
-    expect(manifest.release.key).toBe("ybm_nd2026_standard_r7_1_0");
+    expect(manifest.release.key).toBe("ybm_nd2026_standard_r7_2_0");
   });
 
   it("is deterministic: identical inputs give an identical hash", () => {
@@ -76,7 +78,7 @@ describe("YBM release r7.1.0", () => {
     // The frozen file is what devices actually run. If someone edits an item,
     // a scale or the composition without republishing, this fails: the release
     // on disk would no longer be the release the sources describe.
-    const path = fileURLToPath(new URL("../../../releases/ybm_nd2026_standard_r7.1.0.manifest.json", import.meta.url));
+    const path = fileURLToPath(new URL("../../../releases/ybm_nd2026_standard_r7.2.0.manifest.json", import.meta.url));
     const committed = JSON.parse(readFileSync(path, "utf8")) as {
       hash: string;
       release: { version: string; publishedAt: string; publishedBy: string; engineVersion: string; decisionRefs: string[] };
@@ -99,6 +101,50 @@ describe("YBM release r7.1.0", () => {
     const tampered = structuredClone(manifest);
     (tampered.composition.sections[0]!.title as string) = "Tampered";
     expect(verifyManifestHash(tampered)).toBe(false);
+  });
+});
+
+describe("scoring definitions against the items they score (D-49)", () => {
+  it("every definition in the library names only questions its instrument has", () => {
+    for (const def of allScoring) {
+      const instrument = allInstruments.find((i) => i.instrument === def.instrument && i.version === def.instrumentVersion);
+      expect(instrument, def.key).toBeDefined();
+      for (const form of instrument!.forms) {
+        expect(scoringReferenceProblems(scoringDefinition.parse(def), form.items), `${def.key} / ${form.language}`).toEqual([]);
+      }
+    }
+  });
+
+  it("the publish gate refuses a definition that names a question the form does not have", () => {
+    const bad = structuredClone(registries);
+    const swemwbs = bad.scoring.find((d) => d.key === "score.swemwbs")!;
+    swemwbs.steps = [{ op: "sum", items: ["q1", "q2", "q3", "q4", "q5", "q6", "q7"], output: "raw_total", minValid: 7 }];
+    expect(() => buildRelease(ybmComposition, bad, meta)).toThrow(PublishGateError);
+    expect(() => buildRelease(ybmComposition, bad, meta)).toThrow(/scoring definition 'score\.swemwbs': step 1 reads 'q1', which is neither a question of 'swemwbs'/);
+  });
+
+  it("every committed release from r7.2.0 scores every definition it freezes; the earlier ones fail only SWEMWBS and STAI-5", () => {
+    const dir = fileURLToPath(new URL("../../../releases/", import.meta.url));
+    const files = readdirSync(dir).filter((f) => /^ybm_nd2026_standard_r[\d.]+\.manifest\.json$/.test(f));
+    expect(files.length).toBeGreaterThanOrEqual(11);
+    for (const f of files) {
+      const m = JSON.parse(readFileSync(`${dir}${f}`, "utf8")) as {
+        release: { version: string };
+        scoring: Record<string, unknown>;
+        instruments: Record<string, { instrument: string; forms: { items: { key: string; responseType?: string }[] }[] }>;
+      };
+      const broken = Object.values(m.scoring)
+        .map((raw) => scoringDefinition.parse(raw))
+        .filter((sd) => {
+          const inst = Object.values(m.instruments).find((i) => i.instrument === sd.instrument);
+          return inst ? scoringReferenceProblems(sd, inst.forms[0]!.items).length > 0 : true;
+        })
+        .map((sd) => sd.key)
+        .sort();
+      const [major, minor] = m.release.version.split(".").map(Number) as [number, number];
+      const fixed = major > 7 || (major === 7 && minor >= 2);
+      expect(broken, `${m.release.version}`).toEqual(fixed ? [] : ["score.stai5", "score.swemwbs"]);
+    }
   });
 });
 
