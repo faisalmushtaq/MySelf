@@ -19,21 +19,23 @@ const registries: Registries = {
 /**
  * The current release.
  *
- * r7.2.0 is a MINOR on r7.1.0 (D-49). Its SWEMWBS and STAI-5 scoring definitions
- * (1.0.1) name their items by their real keys; the 1.0.0 definitions frozen into
- * r1.0.0–r7.1.0 named `q1`…, which those instruments have never had, so the
- * totals were always blank. Nothing a participant reads or selects changes and no
- * code changes: sittings under r7.1.0 and r7.2.0 are the same instrument and pool
- * without a comparability argument, and the scores are the same published rule
- * applied to the same items. Per docs/06 §44-49 that is not MAJOR; it is not PATCH
- * either, because analysts see scores where there were blanks — MINOR.
+ * r7.3.0 is a MINOR on r7.2.0 (D-50). Its RCADS-25 scoring definition (2.0.0)
+ * uses the published key: depression is items 1, 4, 8, 10, 13, 15, 16, 19, 21
+ * and 24. The 1.0.0 definition frozen into r1.0.0–r7.2.0 swapped items 18 and 24
+ * between depression and anxiety. Nothing a participant reads or selects changes
+ * and no code changes, so r7.2.0 and r7.3.0 sittings are the same instrument; the
+ * survey's own RCADS subscales change meaning across the two (the definition is
+ * MAJOR), but they are derived, the answers are unchanged, and the research
+ * dashboard scores every version with the published key — MINOR, as for D-49.
+ *
+ * r7.2.0 (D-49) named the SWEMWBS and STAI-5 items by their real keys.
  */
 const meta = {
-  version: "7.2.0",
-  publishedAt: "2026-09-29T08:32:00.000Z",
+  version: "7.3.0",
+  publishedAt: "2026-09-29T15:33:00.000Z",
   publishedBy: "faisalmushtaq",
   engineVersion: "0.1.0",
-  decisionRefs: ["D-49"],
+  decisionRefs: ["D-50"],
 };
 
 describe("canonical JSON", () => {
@@ -46,12 +48,12 @@ describe("canonical JSON", () => {
   });
 });
 
-describe("YBM release r7.2.0", () => {
+describe("YBM release r7.3.0", () => {
   it("passes the publish gate and produces a verifiable manifest", () => {
     const manifest = buildRelease(ybmComposition, registries, meta);
     expect(manifest.hash).toMatch(/^sha256:[0-9a-f]{64}$/);
     expect(verifyManifestHash(manifest)).toBe(true);
-    expect(manifest.release.key).toBe("ybm_nd2026_standard_r7_2_0");
+    expect(manifest.release.key).toBe("ybm_nd2026_standard_r7_3_0");
   });
 
   it("is deterministic: identical inputs give an identical hash", () => {
@@ -78,7 +80,7 @@ describe("YBM release r7.2.0", () => {
     // The frozen file is what devices actually run. If someone edits an item,
     // a scale or the composition without republishing, this fails: the release
     // on disk would no longer be the release the sources describe.
-    const path = fileURLToPath(new URL("../../../releases/ybm_nd2026_standard_r7.2.0.manifest.json", import.meta.url));
+    const path = fileURLToPath(new URL("../../../releases/ybm_nd2026_standard_r7.3.0.manifest.json", import.meta.url));
     const committed = JSON.parse(readFileSync(path, "utf8")) as {
       hash: string;
       release: { version: string; publishedAt: string; publishedBy: string; engineVersion: string; decisionRefs: string[] };
@@ -144,6 +146,35 @@ describe("scoring definitions against the items they score (D-49)", () => {
       const [major, minor] = m.release.version.split(".").map(Number) as [number, number];
       const fixed = major > 7 || (major === 7 && minor >= 2);
       expect(broken, `${m.release.version}`).toEqual(fixed ? [] : ["score.stai5", "score.swemwbs"]);
+    }
+  });
+});
+
+describe("the RCADS-25 key (D-50)", () => {
+  const DEPRESSION = ["q1", "q4", "q8", "q10", "q13", "q15", "q16", "q19", "q21", "q24"];
+  const itemsOf = (def: { steps: unknown[] }, output: string) =>
+    ((def.steps as { output?: string; items?: string[] }[]).find((s) => s.output === output)?.items ?? []).slice().sort();
+
+  it("the library's definition uses the published depression and anxiety items", () => {
+    const rcads = scoringDefinition.parse(allScoring.find((d) => d.key === "score.rcads25"));
+    expect(itemsOf(rcads, "depression")).toEqual([...DEPRESSION].sort());
+    const anxiety = itemsOf(rcads, "anxiety");
+    expect(anxiety).toHaveLength(15);
+    expect(anxiety).toContain("q18");
+    expect(anxiety.some((i) => DEPRESSION.includes(i))).toBe(false);
+  });
+
+  it("committed releases from r7.3.0 freeze it; the earlier ones keep the swap of items 18 and 24", () => {
+    const dir = fileURLToPath(new URL("../../../releases/", import.meta.url));
+    for (const f of readdirSync(dir).filter((x) => /^ybm_nd2026_standard_r[\d.]+\.manifest\.json$/.test(x))) {
+      const m = JSON.parse(readFileSync(`${dir}${f}`, "utf8")) as { release: { version: string }; scoring: Record<string, { steps: unknown[] }> };
+      const rcads = m.scoring["score.rcads25"];
+      if (!rcads) continue;
+      const [major, minor] = m.release.version.split(".").map(Number) as [number, number];
+      const fixed = major > 7 || (major === 7 && minor >= 3);
+      const depression = itemsOf(rcads, "depression");
+      expect(depression.includes("q24"), m.release.version).toBe(fixed);
+      expect(depression.includes("q18"), m.release.version).toBe(!fixed);
     }
   });
 });

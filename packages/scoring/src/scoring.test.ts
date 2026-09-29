@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { scoringDefinition } from "@myself/schema";
 import { executeScoring, type ItemValues } from "./executor.js";
 import { allScoring, scoreEhiSf, scoreSdq25S, scoreStai5, scoreSwemwbs } from "./definitions.js";
-import { scoringReferenceProblems } from "./references.js";
+import { scoringItemKeys, scoringReferenceProblems } from "./references.js";
 
 const sdq = scoringDefinition.parse(scoreSdq25S);
 const ehi = scoringDefinition.parse(scoreEhiSf);
@@ -146,5 +146,21 @@ describe("scoring references", () => {
   it("check a lookup or classify input too", () => {
     const def = { instrument: "x", steps: [{ op: "classify" as const, input: "missing", bands: [{ label: "l", min: 0, max: 1 }], output: "band" }] };
     expect(scoringReferenceProblems(def, items)).toHaveLength(1);
+  });
+});
+
+describe("the items a definition reads (S7)", () => {
+  it("are its questions, never the outputs of its earlier steps", () => {
+    expect(scoringItemKeys(sdq).sort()).toEqual(Array.from({ length: 25 }, (_, i) => `q${i + 1}`).sort());
+    expect(scoringItemKeys(scoringDefinition.parse(allScoring.find((d) => d.key === "score.rcads25")))).not.toContain("depression");
+    expect(scoringItemKeys(ehi)).toEqual(["writing", "throwing", "toothbrush", "spoon"]);
+  });
+
+  it("filled from the answers alone, let a total add up its subscales", () => {
+    const answers = Object.fromEntries(scoringItemKeys(sdq).map((k) => [k, 1]));
+    const out = executeScoring(sdq, answers).outputs;
+    expect(out["total_difficulties"]).toBe((out["emotional"] as number) + (out["conduct"] as number) + (out["hyperactivity"] as number) + (out["peer"] as number));
+    // Handing in a blank under a subscale's name is what hid it (the old reading).
+    expect(executeScoring(sdq, { ...answers, emotional: null }).outputs["total_difficulties"]).toBeNull();
   });
 });

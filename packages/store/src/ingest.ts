@@ -1,5 +1,5 @@
 import type { ReleaseManifest, ResponseScale, ScoringDefinition } from "@myself/schema";
-import { executeScoring } from "@myself/scoring";
+import { executeScoring, scoringItemKeys } from "@myself/scoring";
 import type { Dataset, IdentityRow, ResponseRow, ScoreRow, SessionRow } from "./dataset.js";
 import { deriveParticipantCode } from "./identity.js";
 
@@ -522,22 +522,20 @@ function scoreSession(
   void itemIndex;
   const rows: ScoreRow[] = [];
   for (const [key, def] of scoring) {
+    // Only the definition's items: a blank handed in under a subscale's name
+    // would hide the subscale from the step that adds it up (S7).
     const values: Record<string, number | null> = {};
-    for (const step of def.steps) {
-      const stepItems = "items" in step ? step.items : [];
-      for (const item of stepItems) {
-        if (item in values) continue;
-        const st = items.get(`${def.instrument}.${item}`);
-        const v = st?.value as { kind?: string; code?: number; value?: number } | null;
-        values[item] =
-          st?.status === "answered" && v
-            ? v.kind === "choice"
-              ? (v.code ?? null)
-              : v.kind === "number"
-                ? (v.value ?? null)
-                : null
-            : null;
-      }
+    for (const item of scoringItemKeys(def)) {
+      const st = items.get(`${def.instrument}.${item}`);
+      const v = st?.value as { kind?: string; code?: number; value?: number } | null;
+      values[item] =
+        st?.status === "answered" && v
+          ? v.kind === "choice"
+            ? (v.code ?? null)
+            : v.kind === "number"
+              ? (v.value ?? null)
+              : null
+          : null;
     }
     const result = executeScoring(def, values);
     for (const [output, value] of Object.entries(result.outputs)) {
