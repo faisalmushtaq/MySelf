@@ -1,5 +1,6 @@
 import type { z } from "zod";
 import type { itemDefinition, moduleDefinition } from "@myself/schema";
+import { ANOTHER_LANGUAGE_CODE, LANGUAGES } from "./scales.js";
 
 /**
  * Bespoke YBM modules encoded from the QSF with decisions applied:
@@ -345,11 +346,90 @@ export const ybmIdentity: ModuleInput = {
 
 // ---------------------------------------------------------------------------
 
+/**
+ * Languages (D-53): English as a first language, any other languages, and how
+ * well each is understood. One "how well" question per language ticked, each
+ * shown only if that language was — so a child who speaks three languages is
+ * asked about all three, and the data has one column per language.
+ */
+const demographicsRef = (item: string) => ({ instrument: "ybm_demographics", item, revision: 1 });
+const languageItems: ItemInput[] = [
+  single(
+    "first_language_english",
+    "first_language_english",
+    "",
+    "Was English the first language you learned to speak?",
+    "scale.first_language_english",
+    { required: "hard" },
+  ),
+  single(
+    "speaks_other_language",
+    "speaks_other_language",
+    "",
+    "Do you speak or understand any language other than English?",
+    "scale.yes_no",
+    {
+      required: "hard",
+      lede: { text: "Count any language you use at home, with family or friends, or have learned at school." },
+    },
+  ),
+  {
+    responseType: "multi_choice",
+    key: "other_languages",
+    revision: 1,
+    variable: "other_languages",
+    displayIf: { op: "selected", target: { item: demographicsRef("speaks_other_language") }, code: 1 },
+    stem: { text: "Which other languages do you speak or understand?" },
+    lede: { text: "Choose all that apply." },
+    scale: "scale.other_languages",
+    scaleVersion: "1.0.0",
+    minSelections: 1,
+    researcherNote:
+      "Options in West Yorkshire 2021 Census main-language order (TS024), most common first; 15 = another language, named in other_language_named.",
+  },
+  {
+    responseType: "text_short",
+    key: "other_language_named",
+    revision: 1,
+    variable: "other_language_named",
+    displayIf: { op: "selected", target: { item: demographicsRef("other_languages") }, code: ANOTHER_LANGUAGE_CODE },
+    stem: { text: "Which other language?" },
+    lede: { text: "If there is more than one, name the one you use most." },
+    maxChars: 60,
+  },
+  ...LANGUAGES.map(
+    (l): ItemInput =>
+      single(`understand_${l.key}`, `understand_${l.key}`, "", `How well do you understand ${l.label}?`, "scale.language_understanding_4", {
+        displayIf: { op: "selected", target: { item: demographicsRef("other_languages") }, code: l.code },
+      }),
+  ),
+  single(
+    "understand_other_language",
+    "understand_other_language",
+    "",
+    "How well do you understand {language}?",
+    "scale.language_understanding_4",
+    {
+      displayIf: { op: "selected", target: { item: demographicsRef("other_languages") }, code: ANOTHER_LANGUAGE_CODE },
+      stem: {
+        text: "How well do you understand {language}?",
+        pipes: {
+          language: {
+            kind: "item_text_entry",
+            item: demographicsRef("other_language_named"),
+            fallback: "the other language you speak",
+          },
+        },
+      },
+    },
+  ),
+];
+
 export const ybmDemographics: ModuleInput = {
   ...moduleBase,
   instrument: "ybm_demographics",
   name: "YBM demographics",
-  construct: "Ethnicity, gender, mental-health medication",
+  construct: "Ethnicity, languages, gender, mental-health medication",
   forms: [
     {
       language: "en-GB",
@@ -372,6 +452,7 @@ export const ybmDemographics: ModuleInput = {
               "'Ethic origin' typo fixed per D-07. Presented as a full tappable list rather than a menu (D-23): the census categories are long enough to need reading, and a menu hides them behind an extra tap. From r9.0.0 the options are in West Yorkshire 2021 Census order, most common first (D-53); codes unchanged.",
           },
         ),
+        ...languageItems,
         single("gender", "gender", "Gender", "Gender", "scale.gender_4", { required: "hard" }),
         single(
           "medication",
@@ -393,7 +474,8 @@ export const ybmDemographics: ModuleInput = {
   timeEstimates: est(90, 70),
   changelog:
     "1.0: encoded from QSF; full 20-option ethnicity list recovered (docs/10 §3). " +
-    "D-53: ethnicity options shown most common in West Yorkshire first (scale 2.0.0, codes unchanged).",
+    "D-53: ethnicity options shown most common in West Yorkshire first (scale 2.0.0, codes unchanged); " +
+    "questions on English as a first language, other languages spoken, and how well each is understood.",
 };
 
 // ---------------------------------------------------------------------------

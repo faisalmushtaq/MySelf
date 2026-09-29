@@ -17,8 +17,8 @@ const everything = [...parsedInstruments, ...parsedModules];
 const scaleKeys = new Set(parsedScales.map((s) => s.key));
 
 describe("scales", () => {
-  it("all 38 scales parse", () => {
-    expect(parsedScales).toHaveLength(38);
+  it("all 41 scales parse", () => {
+    expect(parsedScales).toHaveLength(41);
   });
 
   it("scale keys are unique", () => {
@@ -501,6 +501,34 @@ describe("D-53: shorter consent, sleep quality and sanity checks", () => {
     const scale = parsedScales.find((s) => s.key === "scale.sm_family_control_how")!;
     const something = scale.options.find((o) => o.kind === "other_specify")!;
     expect(other.displayIf).toMatchObject({ op: "selected", code: something.code });
+  });
+
+  it("asks about English as a first language, other languages, and how well each is understood", () => {
+    const items = moduleItems("ybm_demographics");
+    const keys = items.map((i) => i.key);
+    expect(keys.slice(keys.indexOf("ethnicity") + 1, keys.indexOf("ethnicity") + 5)).toEqual([
+      "first_language_english",
+      "speaks_other_language",
+      "other_languages",
+      "other_language_named",
+    ]);
+    const languages = parsedScales.find((s) => s.key === "scale.other_languages")!;
+    expect(languages.options.slice(0, 3).map((o) => o.label)).toEqual(["Urdu", "Punjabi", "Polish"]);
+    expect(languages.options.at(-1)).toMatchObject({ label: "Another language", kind: "other_specify" });
+    // One "how well" question per language, shown only when that language is ticked.
+    for (const o of languages.options) {
+      const asked = items.filter(
+        (i) =>
+          i.displayIf?.op === "selected" &&
+          i.displayIf.target.item.item === "other_languages" &&
+          i.displayIf.code === o.code &&
+          i.responseType === "single_choice",
+      );
+      expect(asked, o.label).toHaveLength(1);
+      if (o.kind !== "other_specify") expect(asked[0]!.stem.text).toBe(`How well do you understand ${o.label}?`);
+    }
+    const other = items.find((i) => i.key === "understand_other_language")!;
+    expect(other.stem.pipes?.["language"]).toMatchObject({ kind: "item_text_entry", fallback: "the other language you speak" });
   });
 
   it("the address question can find a street for someone who doesn't know their postcode", () => {

@@ -39,7 +39,7 @@ const registries: Registries = {
  */
 const meta = {
   version: "9.0.0",
-  publishedAt: "2026-09-29T21:57:00.000Z",
+  publishedAt: "2026-09-29T23:02:00.000Z",
   publishedBy: "faisalmushtaq",
   engineVersion: "0.3.0",
   decisionRefs: ["D-53"],

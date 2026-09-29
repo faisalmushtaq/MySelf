@@ -420,6 +420,25 @@ background" (3.7%), down to "Gypsy or Irish Traveller" (0.1%). "Prefer not to
 say" stays last. Only the order on screen changes: every code is as before, so
 the data are comparable with earlier releases. The scale becomes 2.0.0.
 
+**Languages.** After ethnic origin, three new questions:
+- "Was English the first language you learned to speak?" (Yes / No / "I learned
+  English and another language at the same time");
+- "Do you speak or understand any language other than English?", counting home,
+  family, friends and school;
+- if yes, "Which other languages…?" (choose all).
+
+The language list is the languages the 2021 Census names individually, most
+common first as main languages in West Yorkshire (TS024): Urdu, Punjabi, Polish,
+Arabic, Chinese, Gujarati, Bengali, Portuguese, Spanish, Russian, French, Tamil,
+British Sign Language, Turkish. "Another language" opens a box to name it. Then
+one question per language ticked, "How well do you understand Urdu?" (Very well /
+Well / Not very well / Only a few words, after the Census question on English).
+Each is shown only when its language is ticked, so a child with three languages
+answers about all three, and the data has one column per language
+(`understand_urdu` … `understand_other_language`). The main-language ranking
+undercounts languages learned at school or spoken alongside English; it decides
+only the order on screen.
+
 **Sleep quality.** The Sleep Quality Scale (SQS; Snyder et al., 2018, *J Clin
 Sleep Med* 14(11)) is asked before the Karolinska Sleepiness Scale: "During the
 past 7 days, how would you rate your sleep quality overall?", from 0 to 10.

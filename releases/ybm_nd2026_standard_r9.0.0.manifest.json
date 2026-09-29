@@ -5,7 +5,7 @@
     "version": "9.0.0",
     "assessment": "ybm_nd2026_standard",
     "study": "ybm",
-    "publishedAt": "2026-09-29T21:57:00.000Z",
+    "publishedAt": "2026-09-29T23:02:00.000Z",
     "publishedBy": "faisalmushtaq",
     "engineVersion": "0.3.0",
     "decisionRefs": [
@@ -718,7 +718,7 @@
       "instrument": "ybm_demographics",
       "version": "1.0",
       "name": "YBM demographics",
-      "construct": "Ethnicity, gender, mental-health medication",
+      "construct": "Ethnicity, languages, gender, mental-health medication",
       "citationVerified": false,
       "licence": {
         "status": "open",
@@ -750,6 +750,532 @@
               "responseType": "single_choice",
               "scale": "scale.ethnicity_uk20",
               "scaleVersion": "2.0.0",
+              "presentation": "cards",
+              "spectrumReverse": false,
+              "autoAdvance": true
+            },
+            {
+              "key": "first_language_english",
+              "revision": 1,
+              "variable": "first_language_english",
+              "stem": {
+                "text": "Was English the first language you learned to speak?"
+              },
+              "required": "hard",
+              "allowDecline": false,
+              "identifying": false,
+              "responseType": "single_choice",
+              "scale": "scale.first_language_english",
+              "scaleVersion": "1.0.0",
+              "presentation": "cards",
+              "spectrumReverse": false,
+              "autoAdvance": true
+            },
+            {
+              "key": "speaks_other_language",
+              "revision": 1,
+              "variable": "speaks_other_language",
+              "stem": {
+                "text": "Do you speak or understand any language other than English?"
+              },
+              "lede": {
+                "text": "Count any language you use at home, with family or friends, or have learned at school."
+              },
+              "required": "hard",
+              "allowDecline": false,
+              "identifying": false,
+              "responseType": "single_choice",
+              "scale": "scale.yes_no",
+              "scaleVersion": "1.0.0",
+              "presentation": "cards",
+              "spectrumReverse": false,
+              "autoAdvance": true
+            },
+            {
+              "key": "other_languages",
+              "revision": 1,
+              "variable": "other_languages",
+              "stem": {
+                "text": "Which other languages do you speak or understand?"
+              },
+              "lede": {
+                "text": "Choose all that apply."
+              },
+              "required": "soft",
+              "allowDecline": false,
+              "identifying": false,
+              "displayIf": {
+                "op": "selected",
+                "target": {
+                  "item": {
+                    "instrument": "ybm_demographics",
+                    "item": "speaks_other_language",
+                    "revision": 1
+                  }
+                },
+                "code": 1
+              },
+              "researcherNote": "Options in West Yorkshire 2021 Census main-language order (TS024), most common first; 15 = another language, named in other_language_named.",
+              "responseType": "multi_choice",
+              "scale": "scale.other_languages",
+              "scaleVersion": "1.0.0",
+              "minSelections": 1
+            },
+            {
+              "key": "other_language_named",
+              "revision": 1,
+              "variable": "other_language_named",
+              "stem": {
+                "text": "Which other language?"
+              },
+              "lede": {
+                "text": "If there is more than one, name the one you use most."
+              },
+              "required": "soft",
+              "allowDecline": false,
+              "identifying": false,
+              "displayIf": {
+                "op": "selected",
+                "target": {
+                  "item": {
+                    "instrument": "ybm_demographics",
+                    "item": "other_languages",
+                    "revision": 1
+                  }
+                },
+                "code": 15
+              },
+              "responseType": "text_short",
+              "minChars": 0,
+              "maxChars": 60
+            },
+            {
+              "key": "understand_urdu",
+              "revision": 1,
+              "variable": "understand_urdu",
+              "stem": {
+                "text": "How well do you understand Urdu?"
+              },
+              "required": "soft",
+              "allowDecline": false,
+              "identifying": false,
+              "displayIf": {
+                "op": "selected",
+                "target": {
+                  "item": {
+                    "instrument": "ybm_demographics",
+                    "item": "other_languages",
+                    "revision": 1
+                  }
+                },
+                "code": 1
+              },
+              "responseType": "single_choice",
+              "scale": "scale.language_understanding_4",
+              "scaleVersion": "1.0.0",
+              "presentation": "cards",
+              "spectrumReverse": false,
+              "autoAdvance": true
+            },
+            {
+              "key": "understand_punjabi",
+              "revision": 1,
+              "variable": "understand_punjabi",
+              "stem": {
+                "text": "How well do you understand Punjabi?"
+              },
+              "required": "soft",
+              "allowDecline": false,
+              "identifying": false,
+              "displayIf": {
+                "op": "selected",
+                "target": {
+                  "item": {
+                    "instrument": "ybm_demographics",
+                    "item": "other_languages",
+                    "revision": 1
+                  }
+                },
+                "code": 2
+              },
+              "responseType": "single_choice",
+              "scale": "scale.language_understanding_4",
+              "scaleVersion": "1.0.0",
+              "presentation": "cards",
+              "spectrumReverse": false,
+              "autoAdvance": true
+            },
+            {
+              "key": "understand_polish",
+              "revision": 1,
+              "variable": "understand_polish",
+              "stem": {
+                "text": "How well do you understand Polish?"
+              },
+              "required": "soft",
+              "allowDecline": false,
+              "identifying": false,
+              "displayIf": {
+                "op": "selected",
+                "target": {
+                  "item": {
+                    "instrument": "ybm_demographics",
+                    "item": "other_languages",
+                    "revision": 1
+                  }
+                },
+                "code": 3
+              },
+              "responseType": "single_choice",
+              "scale": "scale.language_understanding_4",
+              "scaleVersion": "1.0.0",
+              "presentation": "cards",
+              "spectrumReverse": false,
+              "autoAdvance": true
+            },
+            {
+              "key": "understand_arabic",
+              "revision": 1,
+              "variable": "understand_arabic",
+              "stem": {
+                "text": "How well do you understand Arabic?"
+              },
+              "required": "soft",
+              "allowDecline": false,
+              "identifying": false,
+              "displayIf": {
+                "op": "selected",
+                "target": {
+                  "item": {
+                    "instrument": "ybm_demographics",
+                    "item": "other_languages",
+                    "revision": 1
+                  }
+                },
+                "code": 4
+              },
+              "responseType": "single_choice",
+              "scale": "scale.language_understanding_4",
+              "scaleVersion": "1.0.0",
+              "presentation": "cards",
+              "spectrumReverse": false,
+              "autoAdvance": true
+            },
+            {
+              "key": "understand_chinese",
+              "revision": 1,
+              "variable": "understand_chinese",
+              "stem": {
+                "text": "How well do you understand Chinese (Mandarin or Cantonese)?"
+              },
+              "required": "soft",
+              "allowDecline": false,
+              "identifying": false,
+              "displayIf": {
+                "op": "selected",
+                "target": {
+                  "item": {
+                    "instrument": "ybm_demographics",
+                    "item": "other_languages",
+                    "revision": 1
+                  }
+                },
+                "code": 5
+              },
+              "responseType": "single_choice",
+              "scale": "scale.language_understanding_4",
+              "scaleVersion": "1.0.0",
+              "presentation": "cards",
+              "spectrumReverse": false,
+              "autoAdvance": true
+            },
+            {
+              "key": "understand_gujarati",
+              "revision": 1,
+              "variable": "understand_gujarati",
+              "stem": {
+                "text": "How well do you understand Gujarati?"
+              },
+              "required": "soft",
+              "allowDecline": false,
+              "identifying": false,
+              "displayIf": {
+                "op": "selected",
+                "target": {
+                  "item": {
+                    "instrument": "ybm_demographics",
+                    "item": "other_languages",
+                    "revision": 1
+                  }
+                },
+                "code": 6
+              },
+              "responseType": "single_choice",
+              "scale": "scale.language_understanding_4",
+              "scaleVersion": "1.0.0",
+              "presentation": "cards",
+              "spectrumReverse": false,
+              "autoAdvance": true
+            },
+            {
+              "key": "understand_bengali",
+              "revision": 1,
+              "variable": "understand_bengali",
+              "stem": {
+                "text": "How well do you understand Bengali (including Sylheti)?"
+              },
+              "required": "soft",
+              "allowDecline": false,
+              "identifying": false,
+              "displayIf": {
+                "op": "selected",
+                "target": {
+                  "item": {
+                    "instrument": "ybm_demographics",
+                    "item": "other_languages",
+                    "revision": 1
+                  }
+                },
+                "code": 7
+              },
+              "responseType": "single_choice",
+              "scale": "scale.language_understanding_4",
+              "scaleVersion": "1.0.0",
+              "presentation": "cards",
+              "spectrumReverse": false,
+              "autoAdvance": true
+            },
+            {
+              "key": "understand_portuguese",
+              "revision": 1,
+              "variable": "understand_portuguese",
+              "stem": {
+                "text": "How well do you understand Portuguese?"
+              },
+              "required": "soft",
+              "allowDecline": false,
+              "identifying": false,
+              "displayIf": {
+                "op": "selected",
+                "target": {
+                  "item": {
+                    "instrument": "ybm_demographics",
+                    "item": "other_languages",
+                    "revision": 1
+                  }
+                },
+                "code": 8
+              },
+              "responseType": "single_choice",
+              "scale": "scale.language_understanding_4",
+              "scaleVersion": "1.0.0",
+              "presentation": "cards",
+              "spectrumReverse": false,
+              "autoAdvance": true
+            },
+            {
+              "key": "understand_spanish",
+              "revision": 1,
+              "variable": "understand_spanish",
+              "stem": {
+                "text": "How well do you understand Spanish?"
+              },
+              "required": "soft",
+              "allowDecline": false,
+              "identifying": false,
+              "displayIf": {
+                "op": "selected",
+                "target": {
+                  "item": {
+                    "instrument": "ybm_demographics",
+                    "item": "other_languages",
+                    "revision": 1
+                  }
+                },
+                "code": 9
+              },
+              "responseType": "single_choice",
+              "scale": "scale.language_understanding_4",
+              "scaleVersion": "1.0.0",
+              "presentation": "cards",
+              "spectrumReverse": false,
+              "autoAdvance": true
+            },
+            {
+              "key": "understand_russian",
+              "revision": 1,
+              "variable": "understand_russian",
+              "stem": {
+                "text": "How well do you understand Russian?"
+              },
+              "required": "soft",
+              "allowDecline": false,
+              "identifying": false,
+              "displayIf": {
+                "op": "selected",
+                "target": {
+                  "item": {
+                    "instrument": "ybm_demographics",
+                    "item": "other_languages",
+                    "revision": 1
+                  }
+                },
+                "code": 10
+              },
+              "responseType": "single_choice",
+              "scale": "scale.language_understanding_4",
+              "scaleVersion": "1.0.0",
+              "presentation": "cards",
+              "spectrumReverse": false,
+              "autoAdvance": true
+            },
+            {
+              "key": "understand_french",
+              "revision": 1,
+              "variable": "understand_french",
+              "stem": {
+                "text": "How well do you understand French?"
+              },
+              "required": "soft",
+              "allowDecline": false,
+              "identifying": false,
+              "displayIf": {
+                "op": "selected",
+                "target": {
+                  "item": {
+                    "instrument": "ybm_demographics",
+                    "item": "other_languages",
+                    "revision": 1
+                  }
+                },
+                "code": 11
+              },
+              "responseType": "single_choice",
+              "scale": "scale.language_understanding_4",
+              "scaleVersion": "1.0.0",
+              "presentation": "cards",
+              "spectrumReverse": false,
+              "autoAdvance": true
+            },
+            {
+              "key": "understand_tamil",
+              "revision": 1,
+              "variable": "understand_tamil",
+              "stem": {
+                "text": "How well do you understand Tamil?"
+              },
+              "required": "soft",
+              "allowDecline": false,
+              "identifying": false,
+              "displayIf": {
+                "op": "selected",
+                "target": {
+                  "item": {
+                    "instrument": "ybm_demographics",
+                    "item": "other_languages",
+                    "revision": 1
+                  }
+                },
+                "code": 12
+              },
+              "responseType": "single_choice",
+              "scale": "scale.language_understanding_4",
+              "scaleVersion": "1.0.0",
+              "presentation": "cards",
+              "spectrumReverse": false,
+              "autoAdvance": true
+            },
+            {
+              "key": "understand_bsl",
+              "revision": 1,
+              "variable": "understand_bsl",
+              "stem": {
+                "text": "How well do you understand British Sign Language?"
+              },
+              "required": "soft",
+              "allowDecline": false,
+              "identifying": false,
+              "displayIf": {
+                "op": "selected",
+                "target": {
+                  "item": {
+                    "instrument": "ybm_demographics",
+                    "item": "other_languages",
+                    "revision": 1
+                  }
+                },
+                "code": 13
+              },
+              "responseType": "single_choice",
+              "scale": "scale.language_understanding_4",
+              "scaleVersion": "1.0.0",
+              "presentation": "cards",
+              "spectrumReverse": false,
+              "autoAdvance": true
+            },
+            {
+              "key": "understand_turkish",
+              "revision": 1,
+              "variable": "understand_turkish",
+              "stem": {
+                "text": "How well do you understand Turkish?"
+              },
+              "required": "soft",
+              "allowDecline": false,
+              "identifying": false,
+              "displayIf": {
+                "op": "selected",
+                "target": {
+                  "item": {
+                    "instrument": "ybm_demographics",
+                    "item": "other_languages",
+                    "revision": 1
+                  }
+                },
+                "code": 14
+              },
+              "responseType": "single_choice",
+              "scale": "scale.language_understanding_4",
+              "scaleVersion": "1.0.0",
+              "presentation": "cards",
+              "spectrumReverse": false,
+              "autoAdvance": true
+            },
+            {
+              "key": "understand_other_language",
+              "revision": 1,
+              "variable": "understand_other_language",
+              "stem": {
+                "text": "How well do you understand {language}?",
+                "pipes": {
+                  "language": {
+                    "kind": "item_text_entry",
+                    "item": {
+                      "instrument": "ybm_demographics",
+                      "item": "other_language_named",
+                      "revision": 1
+                    },
+                    "fallback": "the other language you speak"
+                  }
+                }
+              },
+              "required": "soft",
+              "allowDecline": false,
+              "identifying": false,
+              "displayIf": {
+                "op": "selected",
+                "target": {
+                  "item": {
+                    "instrument": "ybm_demographics",
+                    "item": "other_languages",
+                    "revision": 1
+                  }
+                },
+                "code": 15
+              },
+              "responseType": "single_choice",
+              "scale": "scale.language_understanding_4",
+              "scaleVersion": "1.0.0",
               "presentation": "cards",
               "spectrumReverse": false,
               "autoAdvance": true
@@ -810,7 +1336,7 @@
           "provenance": "estimated-heuristic"
         }
       ],
-      "changelog": "1.0: encoded from QSF; full 20-option ethnicity list recovered (docs/10 §3). D-53: ethnicity options shown most common in West Yorkshire first (scale 2.0.0, codes unchanged).",
+      "changelog": "1.0: encoded from QSF; full 20-option ethnicity list recovered (docs/10 §3). D-53: ethnicity options shown most common in West Yorkshire first (scale 2.0.0, codes unchanged); questions on English as a first language, other languages spoken, and how well each is understood.",
       "approvalStatus": "draft",
       "owner": "ybm",
       "kind": "module",
@@ -5279,6 +5805,185 @@
       ],
       "direction": "unordered"
     },
+    "scale.first_language_english": {
+      "key": "scale.first_language_english",
+      "version": "1.0.0",
+      "name": "English as first language (yes / no / alongside another)",
+      "options": [
+        {
+          "code": 1,
+          "label": "Yes",
+          "kind": "substantive",
+          "textEntry": false
+        },
+        {
+          "code": 2,
+          "label": "No",
+          "kind": "substantive",
+          "textEntry": false
+        },
+        {
+          "code": 3,
+          "label": "I learned English and another language at the same time",
+          "kind": "substantive",
+          "textEntry": false
+        }
+      ],
+      "direction": "unordered"
+    },
+    "scale.yes_no": {
+      "key": "scale.yes_no",
+      "version": "1.0.0",
+      "name": "Yes / No",
+      "options": [
+        {
+          "code": 1,
+          "label": "Yes",
+          "legacyCode": 1,
+          "kind": "substantive",
+          "textEntry": false
+        },
+        {
+          "code": 2,
+          "label": "No",
+          "legacyCode": 2,
+          "kind": "substantive",
+          "textEntry": false
+        }
+      ],
+      "direction": "unordered"
+    },
+    "scale.other_languages": {
+      "key": "scale.other_languages",
+      "version": "1.0.0",
+      "name": "Languages other than English (most common in West Yorkshire first; select all)",
+      "options": [
+        {
+          "code": 1,
+          "label": "Urdu",
+          "kind": "substantive",
+          "textEntry": false
+        },
+        {
+          "code": 2,
+          "label": "Punjabi",
+          "kind": "substantive",
+          "textEntry": false
+        },
+        {
+          "code": 3,
+          "label": "Polish",
+          "kind": "substantive",
+          "textEntry": false
+        },
+        {
+          "code": 4,
+          "label": "Arabic",
+          "kind": "substantive",
+          "textEntry": false
+        },
+        {
+          "code": 5,
+          "label": "Chinese (Mandarin or Cantonese)",
+          "kind": "substantive",
+          "textEntry": false
+        },
+        {
+          "code": 6,
+          "label": "Gujarati",
+          "kind": "substantive",
+          "textEntry": false
+        },
+        {
+          "code": 7,
+          "label": "Bengali (including Sylheti)",
+          "kind": "substantive",
+          "textEntry": false
+        },
+        {
+          "code": 8,
+          "label": "Portuguese",
+          "kind": "substantive",
+          "textEntry": false
+        },
+        {
+          "code": 9,
+          "label": "Spanish",
+          "kind": "substantive",
+          "textEntry": false
+        },
+        {
+          "code": 10,
+          "label": "Russian",
+          "kind": "substantive",
+          "textEntry": false
+        },
+        {
+          "code": 11,
+          "label": "French",
+          "kind": "substantive",
+          "textEntry": false
+        },
+        {
+          "code": 12,
+          "label": "Tamil",
+          "kind": "substantive",
+          "textEntry": false
+        },
+        {
+          "code": 13,
+          "label": "British Sign Language",
+          "kind": "substantive",
+          "textEntry": false
+        },
+        {
+          "code": 14,
+          "label": "Turkish",
+          "kind": "substantive",
+          "textEntry": false
+        },
+        {
+          "code": 15,
+          "label": "Another language",
+          "kind": "other_specify",
+          "textEntry": false
+        }
+      ],
+      "direction": "unordered"
+    },
+    "scale.language_understanding_4": {
+      "key": "scale.language_understanding_4",
+      "version": "1.0.0",
+      "name": "How well a language is understood (very well to only a few words)",
+      "options": [
+        {
+          "code": 1,
+          "label": "Very well",
+          "kind": "substantive",
+          "textEntry": false
+        },
+        {
+          "code": 2,
+          "label": "Well",
+          "kind": "substantive",
+          "textEntry": false
+        },
+        {
+          "code": 3,
+          "label": "Not very well",
+          "kind": "substantive",
+          "textEntry": false
+        },
+        {
+          "code": 4,
+          "label": "Only a few words",
+          "kind": "substantive",
+          "textEntry": false
+        }
+      ],
+      "direction": "descending",
+      "scoringNote": "1 = very well … 4 = only a few words. Descending understanding."
+    },
     "scale.gender_4": {
       "key": "scale.gender_4",
       "version": "1.0.0",
@@ -5310,28 +6015,6 @@
           "label": "Prefer not to say",
           "legacyCode": 4,
           "kind": "decline",
-          "textEntry": false
-        }
-      ],
-      "direction": "unordered"
-    },
-    "scale.yes_no": {
-      "key": "scale.yes_no",
-      "version": "1.0.0",
-      "name": "Yes / No",
-      "options": [
-        {
-          "code": 1,
-          "label": "Yes",
-          "legacyCode": 1,
-          "kind": "substantive",
-          "textEntry": false
-        },
-        {
-          "code": 2,
-          "label": "No",
-          "legacyCode": 2,
-          "kind": "substantive",
           "textEntry": false
         }
       ],
@@ -7538,5 +8221,5 @@
       "bytes": 589147
     }
   },
-  "hash": "sha256:aa2e7fb47fe37a713ee4cb6eead0c7c243eef903f217f251269b272f54132f6c"
+  "hash": "sha256:a48bff591ca5de73256a4b3322d07b1a954cc052d009c87f0541b2c8cd6b1c9f"
 }

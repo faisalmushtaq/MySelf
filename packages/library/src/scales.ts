@@ -110,6 +110,70 @@ export const ethnicityUk20: ResponseScale = {
   ],
 };
 
+/** Whether English was the first language spoken (D-53). */
+export const firstLanguageEnglish: ResponseScale = {
+  key: "scale.first_language_english",
+  version: "1.0.0",
+  name: "English as first language (yes / no / alongside another)",
+  direction: "unordered",
+  options: [
+    opt(1, "Yes"),
+    opt(2, "No"),
+    opt(3, "I learned English and another language at the same time"),
+  ],
+};
+
+/**
+ * Languages other than English (D-53), most common first in West Yorkshire:
+ * the languages the 2021 Census names individually (table TS024, main
+ * language, usual residents of Bradford, Calderdale, Kirklees, Leeds and
+ * Wakefield, ONS, Open Government Licence), in order of how many people there
+ * gave each as their main language. Anything else is "Another language",
+ * named in a box.
+ */
+export const LANGUAGES: { code: number; label: string; key: string }[] = [
+  { code: 1, label: "Urdu", key: "urdu" }, // 29,077
+  { code: 2, label: "Punjabi", key: "punjabi" }, // 27,309
+  { code: 3, label: "Polish", key: "polish" }, // 26,929
+  { code: 4, label: "Arabic", key: "arabic" }, // 9,443
+  { code: 5, label: "Chinese (Mandarin or Cantonese)", key: "chinese" }, // 6,633
+  { code: 6, label: "Gujarati", key: "gujarati" }, // 5,998
+  { code: 7, label: "Bengali (including Sylheti)", key: "bengali" }, // 5,488
+  { code: 8, label: "Portuguese", key: "portuguese" }, // 4,610
+  { code: 9, label: "Spanish", key: "spanish" }, // 3,799
+  { code: 10, label: "Russian", key: "russian" }, // 2,865
+  { code: 11, label: "French", key: "french" }, // 2,273
+  { code: 12, label: "Tamil", key: "tamil" }, // 1,254
+  { code: 13, label: "British Sign Language", key: "bsl" }, // 1,106
+  { code: 14, label: "Turkish", key: "turkish" }, // 739
+];
+export const ANOTHER_LANGUAGE_CODE = 15;
+
+export const otherLanguages: ResponseScale = {
+  key: "scale.other_languages",
+  version: "1.0.0",
+  name: "Languages other than English (most common in West Yorkshire first; select all)",
+  direction: "unordered",
+  options: [
+    ...LANGUAGES.map((l) => opt(l.code, l.label)),
+    opt(ANOTHER_LANGUAGE_CODE, "Another language", undefined, "other_specify"),
+  ],
+};
+
+/**
+ * How well a language is understood (D-53). Worded after the Census question
+ * on English ("very well / well / not well / not at all"), ending at "only a
+ * few words" because anyone asked has said they understand some of it.
+ */
+export const languageUnderstanding4: ResponseScale = {
+  key: "scale.language_understanding_4",
+  version: "1.0.0",
+  name: "How well a language is understood (very well to only a few words)",
+  direction: "descending",
+  options: [opt(1, "Very well"), opt(2, "Well"), opt(3, "Not very well"), opt(4, "Only a few words")],
+  scoringNote: "1 = very well … 4 = only a few words. Descending understanding.",
+};
+
 /**
  * Consent to linkage through Connected Yorkshire (D-53). Worded as an
  * agreement, so either answer is a complete one.
@@ -722,6 +786,9 @@ export const allScales: ResponseScale[] = [
   yesNoSometimes,
   gender4,
   ethnicityUk20,
+  firstLanguageEnglish,
+  otherLanguages,
+  languageUnderstanding4,
   linkageConsent,
   sqs11,
   smFamilyControlHow,
