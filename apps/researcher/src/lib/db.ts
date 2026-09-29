@@ -1,5 +1,6 @@
 import Dexie, { type EntityTable } from "dexie";
 import {
+  defuseFormula,
   formatHomeAddress,
   isEncryptedEnvelope,
   openExport,
@@ -739,7 +740,7 @@ export async function identifierFile(justification: string): Promise<string> {
     if (raw === null || raw === "") return "";
     // Anything a participant typed is opened in a spreadsheet here: a leading
     // =, +, - or @ would run as a formula, so it is made plain text.
-    const value = /^[=+\-@\t\r]/.test(raw) ? `'${raw}` : raw;
+    const value = defuseFormula(raw);
     return /[",\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
   };
   const header = "participant_id,given_name,family_name,date_of_birth,home_address,upn,nhs_number,n_sittings";
