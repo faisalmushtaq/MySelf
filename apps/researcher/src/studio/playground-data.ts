@@ -14,7 +14,7 @@ import type { PublishedContext } from "./data/types.js";
  */
 
 /** The version participants are answering now, which the playground starts from. */
-export const PLAYGROUND_VERSION = "7.3.0";
+export const PLAYGROUND_VERSION = "8.0.0";
 
 const bundled = import.meta.glob("../../../../releases/ybm_nd2026_standard_r*.manifest.json", { import: "default" }) as Record<
   string,

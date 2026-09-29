@@ -23,7 +23,7 @@ import type { ReservedIds } from "./history.js";
 import {
   instrumentLabel,
   isUnlocked,
-  LINKAGE_ITEM_KEYS,
+  linkageItemKeys,
   lockedDifferences,
   lockedTest,
   protectedDifferences,
@@ -98,7 +98,6 @@ const FREE_TEXT_TYPES = new Set(["text_short", "text_long", "form_fields"]);
 
 /** The questions ingest routes to the identity store by variable (packages/store/src/ingest.ts). */
 const IDENTITY_VARIABLES = new Set(["first_name", "last_name", "dob"]);
-const LINKAGE = new Set(LINKAGE_ITEM_KEYS);
 
 const SLUG = /^[a-z][a-z0-9_]*$/;
 const PLACEHOLDER = /\{([a-z][a-z0-9_]*)\}/g;
@@ -120,7 +119,8 @@ const OPS_BY_TYPE: Record<string, ReadonlySet<string>> = {
   slider: new Set(["answered", "not_empty", "eq", "ne", "gt", "gte", "lt", "lte"]),
   numeric: new Set(["answered", "not_empty", "eq", "ne", "gt", "gte", "lt", "lte"]),
   ladder: new Set(["answered", "not_empty", "eq", "ne", "gt", "gte", "lt", "lte"]),
-  date: new Set(["answered", "not_empty", "eq", "ne"]),
+  // age_gte: the participant's age on the day of the sitting, from a date of birth (D-51).
+  date: new Set(["answered", "not_empty", "eq", "ne", "age_gte"]),
   text_short: new Set(["answered", "not_empty", "eq", "ne"]),
   text_long: new Set(["answered", "not_empty", "eq", "ne"]),
   form_fields: new Set(["answered", "not_empty"]),
@@ -131,6 +131,7 @@ const STRING_VALUED = new Set(["date", "text_short", "text_long"]);
 const LOGIC_OPS = new Set(["all", "any", "not", ...Object.values(OPS_BY_TYPE).flatMap((s) => [...s]), "in_group"]);
 
 const OP_PHRASES: Record<string, string> = {
+  age_gte: "gives an age of at least some number of years",
   answered: "was answered",
   not_empty: "has an answer",
   selected: "has a particular option chosen",
@@ -296,6 +297,13 @@ interface Model {
   sectionTitle(key: string): string;
   /** Whether a draft definition is a locked (licensed) instrument — see `lockedTest`. */
   isLocked: ReturnType<typeof lockedTest>;
+  /**
+   * The questions sittings are linked on — the published version's, since that
+   * is what earlier sittings were linked by (`linkageItemKeys`).
+   */
+  linkage: ReadonlySet<string>;
+  /** Whether that linkage is the four-part secret code (to r7.3.0) rather than name and date of birth. */
+  linksByCode: boolean;
 }
 
 function firstOccurrences(live: LiveQuestion[]): Map<string, LiveQuestion> {
@@ -380,6 +388,8 @@ function buildModel(draft: StudioDraft, ctx: ValidationContext, c: Collector): M
       return title ? `“${truncateText(title, 40)}”` : `“${key}”`;
     },
     isLocked: lockedTest(ctx.baseline, ctx.reference),
+    linkage: new Set(linkageItemKeys(ctx.baseline ?? draft)),
+    linksByCode: linkageItemKeys(ctx.baseline ?? draft).includes("ybm_identity.ps_mother_initials"),
   };
 }
 
@@ -567,7 +577,7 @@ function checkQuestion(m: Model, c: Collector, q: LiveQuestion): void {
   }
   // Not for the linkage items: a participant code is derived only from all four
   // (identity.ts), so for them "must answer" is the design, not an oversight.
-  if (!isInfo && item["identifying"] === true && item["required"] === "hard" && !LINKAGE.has(q.itemKey)) {
+  if (!isInfo && item["identifying"] === true && item["required"] === "hard" && !m.linkage.has(q.itemKey)) {
     c.warn(
       "question.identifying_required",
       "Collects identifying information and is required",
@@ -931,7 +941,7 @@ function checkDuplicatesAndReservations(m: Model, c: Collector): void {
     const archived = m.archived.get(key);
     const publishedVars = reserved?.variablesByItem?.get(key);
     // Linkage items have their own, stricter check below.
-    const linkage = LINKAGE.has(key) && !!base;
+    const linkage = m.linkage.has(key) && !!base;
 
     const publishedAs = base
       ? (base.item as { variable?: unknown }).variable
@@ -1438,7 +1448,7 @@ function checkCompletion(m: Model, c: Collector): void {
 function checkIdentity(m: Model, c: Collector): void {
   for (const q of m.firstList) {
     const item = q.item as unknown as Loose;
-    if ((IDENTITY_VARIABLES.has(String(item["variable"])) || LINKAGE.has(q.itemKey)) && item["identifying"] !== true) {
+    if ((IDENTITY_VARIABLES.has(String(item["variable"])) || m.linkage.has(q.itemKey)) && item["identifying"] !== true) {
       c.error(
         "identity.not_identifying",
         "Asks for identifying details but isn't marked identifying",
@@ -1506,15 +1516,18 @@ function checkAgainstBaseline(m: Model, c: Collector): void {
 
   // Participant linkage: no unlock permits breaking it.
   const unlocked = isUnlocked(m.draft.unlocked, "ybm_identity");
-  for (const key of LINKAGE_ITEM_KEYS) {
+  const part = m.linksByCode ? "Part of the participant code" : "Used to link sittings";
+  for (const key of m.linkage) {
     const before = m.baseFirst.get(key);
     if (!before) continue;
     const now = m.first.get(key);
-    const why = "It is one of the four answers the participant code is made from.";
+    const why = m.linksByCode
+      ? "It is one of the four answers the participant code is made from."
+      : "Sittings are linked to the same participant by first name, last name and date of birth.";
     if (!now) {
       c.error(
         "linkage.removed",
-        `Part of the participant code, and it has been ${m.archived.has(key) ? "archived" : "removed"}`,
+        `${part}, and it has been ${m.archived.has(key) ? "archived" : "removed"}`,
         at("question", { itemKey: key, refKey: before.refKey }),
         `${why} Without it, later sittings can't be linked to earlier ones. Put it back.`,
       );
@@ -1525,7 +1538,7 @@ function checkAgainstBaseline(m: Model, c: Collector): void {
     if (was["responseType"] !== is["responseType"]) {
       c.error(
         "linkage.type_changed",
-        "Part of the participant code, so its type can't change",
+        `${part}, so its type can't change`,
         questionAt(now, "responseType"),
         `${why} A different kind of answer would produce a different code. Change it back.`,
       );
@@ -1547,9 +1560,9 @@ function checkAgainstBaseline(m: Model, c: Collector): void {
       if (canonicalJson(strip(was)) !== canonicalJson(strip(is)) || optionMap(baseline, was) !== optionMap(m.draft, is)) {
         c.warn(
           "linkage.changed",
-          "Part of the participant code, and it has changed",
+          `${part}, and it has changed`,
           questionAt(now),
-          `${why} If participants now answer it differently, their codes will no longer match earlier sittings. Check the change with whoever manages participant linkage.`,
+          `${why} If participants now answer it differently, their sittings will no longer link to earlier ones. Check the change with whoever manages participant linkage.`,
         );
       }
     }
@@ -1577,6 +1590,8 @@ const GATE_RULES: { re: RegExp; code: string; plain: string }[] = [
   { re: /^scoring definition '[^']+' is for /, code: "gate.scoring_instrument", plain: "Scoring rules belong to a different questionnaire" },
   { re: /^scoring definition '[^']+': /, code: "gate.scoring_reference", plain: "Scoring rules name a question this questionnaire doesn't have" },
   { re: /^scoring definition /, code: "gate.scoring_missing", plain: "An instrument's scoring rules are missing" },
+  { re: /: postcode list '[^']+' is not among the release's assets$/, code: "gate.asset_missing", plain: "An address question checks postcodes against a list the survey doesn't carry" },
+  { re: /: postcode check names field '[^']+'/, code: "gate.postcode_field", plain: "An address question checks a postcode field it doesn't have" },
   { re: /^duplicate section keys/, code: "gate.section_keys_duplicate", plain: "Two sections have the same ID" },
   { re: /which is not in this release$/, code: "gate.dependency_missing", plain: "A condition or check refers to a question that is not in the survey" },
   { re: /which is asked later/, code: "gate.dependency_later", plain: "A condition or check depends on a question asked later" },

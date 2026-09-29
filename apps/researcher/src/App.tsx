@@ -273,8 +273,9 @@ function ResearcherView() {
             {issues.collisions.length} code{issues.collisions.length === 1 ? " is" : "s are"} being shared by more
             than one person — almost certainly twins.
           </strong>{" "}
-          The secret code is built from the mother&apos;s initials, a house digit, a birth month and postcode
-          letters, and siblings born on the same day share every one of them. Until this is resolved, their answers
+          Up to survey version 7.3.0 the secret code is built from the mother&apos;s initials, a house digit, a
+          birth month and postcode letters, and siblings born on the same day share every one of them. (From 8.0.0
+          the ID comes from name and date of birth, so twins no longer share one.) Until this is resolved, their answers
           are counted as one person and <strong>any analysis of this dataset is wrong</strong>.
           <ul>
             {issues.collisions.map((c) => (

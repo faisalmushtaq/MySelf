@@ -85,5 +85,7 @@ function describeTest(expr: Exclude<LogicExpr, { op: "all" | "any" | "not" }>, c
       return `${q} is less than ${expr.value}`;
     case "lte":
       return `${q} is ${expr.value} or less`;
+    case "age_gte":
+      return `the participant is ${expr.years} or older on the day of the sitting, going by ${q}`;
   }
 }

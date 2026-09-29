@@ -38,7 +38,9 @@ const isFile = (path: string) => existsSync(path) && statSync(path).isFile();
 type Resolved = { kind: "file"; path: string } | { kind: "package"; name: string };
 
 /** Resolve an import as vite.config.ts does: the @participant alias, workspace packages from source. */
-function resolveImport(spec: string, from: string): Resolved {
+function resolveImport(specifier: string, from: string): Resolved {
+  // A Vite query (`?raw`: the postcode list, D-52) names the same file.
+  const spec = specifier.replace(/\?[a-z]+$/, "");
   let base: string;
   if (spec.startsWith("@participant/")) base = join(participantSrc, spec.slice("@participant/".length));
   else if (spec.startsWith(".")) base = resolve(dirname(from), spec);
@@ -96,7 +98,8 @@ function importGraph(entry: string): Graph {
     const file = queue.pop()!;
     if (graph.files.has(file)) continue;
     graph.files.add(file);
-    if (file.endsWith(".json")) continue;
+    // Data, not code: a manifest, or a text file bundled as a string.
+    if (file.endsWith(".json") || file.endsWith(".txt")) continue;
     const { imports, words } = scan(file);
     graph.words.set(file, words);
     for (const spec of imports) {

@@ -4,7 +4,7 @@ import {
   auditActions,
   livePointer,
   openStudy,
-  R730_HASH,
+  R800_HASH,
   seedHistoricalSitting,
   sittingJson,
   sittingsFor,
@@ -66,8 +66,8 @@ test("a researcher publishes a change and the public survey runs it, with histor
   await signIn(page);
   await expect(page.getByRole("heading", { name: "Set up from the live survey" })).toBeVisible();
   await page.getByRole("button", { name: "Set up from the live survey" }).click();
-  await expect(page.getByText(/r7\.3\.0/).first()).toBeVisible({ timeout: 60_000 });
-  expect((await livePointer(study.db))?.hash).toBe(R730_HASH);
+  await expect(page.getByText(/r8\.0\.0/).first()).toBeVisible({ timeout: 60_000 });
+  expect((await livePointer(study.db))?.hash).toBe(R800_HASH);
 
   // Into the editor for the survey.
   await page.goto("researcher/#/surveys/ybm_nd2026_standard/edit");
@@ -121,18 +121,18 @@ test("a researcher publishes a change and the public survey runs it, with histor
   // What changes: the reworded question and the new label, needing a MAJOR version.
   await expect(publish.getByText(new RegExp(NEW_WORDING.slice(0, 20))).first()).toBeVisible();
   await publish.getByRole("button", { name: "Continue" }).click();
-  await expect(publish.getByText("8.0.0").first()).toBeVisible();
+  await expect(publish.getByText("9.0.0").first()).toBeVisible();
   await publish.getByRole("button", { name: "Continue" }).click();
   await publish.getByLabel(/Release note for/).fill("Reword the smartphone question and label the study for the end-to-end test.");
   await publish.getByRole("button", { name: "Continue" }).click();
-  await publish.getByRole("button", { name: /^Publish r?8\.0\.0/ }).click();
+  await publish.getByRole("button", { name: /^Publish r?9\.0\.0/ }).click();
   // Reported live only once the public pointer names the new release.
   // (The dialog is retitled "Published" at that point.)
-  await expect(page.getByRole("dialog", { name: "Published" }).getByText(/8\.0\.0 is live/)).toBeVisible({ timeout: 60_000 });
+  await expect(page.getByRole("dialog", { name: "Published" }).getByText(/9\.0\.0 is live/)).toBeVisible({ timeout: 60_000 });
 
   const pointer = await livePointer(study.db);
-  expect(pointer?.version).toBe("8.0.0");
-  expect(pointer?.hash).not.toBe(R730_HASH);
+  expect(pointer?.version).toBe("9.0.0");
+  expect(pointer?.hash).not.toBe(R800_HASH);
   const newHash = pointer!.hash;
 
   // ── The public survey link loads the new version ───────────────────────────
@@ -140,7 +140,7 @@ test("a researcher publishes a change and the public survey runs it, with histor
   const participant = await participantContext.newPage();
   await participant.goto("./");
   await expect(participant.locator("p.study-title")).toHaveText(STUDY_LABEL, { timeout: 30_000 });
-  await expect(participant.locator("p.demo-note")).toContainText("release 8.0.0 (downloaded)");
+  await expect(participant.locator("p.demo-note")).toContainText("release 9.0.0 (downloaded)");
 
   // A sitting started now is stamped with it, on the device and in the study.
   await participant.locator("input.code").fill(CODE);
@@ -152,7 +152,7 @@ test("a researcher publishes a change and the public survey runs it, with histor
     .poll(async () => (await sittingsFor(study.db, CODE)).map((s) => s.releaseHash), { timeout: 60_000, intervals: [2_000] })
     .toEqual([newHash]);
   const [filed] = await sittingsFor(study.db, CODE);
-  expect(filed?.releaseKey).toBe("ybm_nd2026_standard_r8_0_0");
+  expect(filed?.releaseKey).toBe("ybm_nd2026_standard_r9_0_0");
 
   // ── History is untouched ───────────────────────────────────────────────────
   expect(await sittingJson(study.db, historical.id)).toBe(historical.before);

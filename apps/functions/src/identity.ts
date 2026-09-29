@@ -1,9 +1,9 @@
 import { onDocumentWritten } from "firebase-functions/v2/firestore";
 import { HttpsError, onCall, type CallableRequest } from "firebase-functions/v2/https";
 import * as logger from "firebase-functions/logger";
-import { FieldValue } from "firebase-admin/firestore";
+import { FieldValue, type Firestore } from "firebase-admin/firestore";
 import { joinSession, paths, type SessionDoc } from "@myself/firebase";
-import { ingest } from "@myself/store";
+import { ingest, parseHomeAddress, type HomeAddress } from "@myself/store";
 import { STUDY, identity, research } from "./apps.js";
 import { resolveRelease } from "./releases.js";
 
@@ -50,6 +50,85 @@ async function logAccess(actor: string, action: string, subject: string, justifi
   });
 }
 
+/** What one sitting said about who is taking it. */
+export interface SittingIdentity {
+  code: string;
+  study: string;
+  givenName: string | null;
+  familyName: string | null;
+  dateOfBirth: string | null;
+  /** r8.0.0 on (D-52), as given: {postcode, house, street}, any part absent. */
+  homeAddress: HomeAddress | null;
+  /** When the sitting started — what "most recent" is judged by. */
+  startedAt: string;
+}
+
+/**
+ * The registry fields capture owns, given what the entry held before.
+ *
+ * A name or date of birth is kept as first given: a later wave spelling it
+ * differently is evidence to look at, not a reason to overwrite the record.
+ * An address is the opposite — people move — so the entry holds the one from
+ * the most recent sitting, judged by when the sitting STARTED, not by when it
+ * arrived: an iPad that uploads a term late must not replace a newer address
+ * with an older one. Every sitting's claim keeps the address given then.
+ *
+ * An entry written before `homeAddressRecordedAt` existed has no date for its
+ * address, so the next sitting that gives one replaces it.
+ */
+export function registryFields(before: Record<string, unknown>, sitting: SittingIdentity): Record<string, unknown> {
+  const heldAt = typeof before["homeAddressRecordedAt"] === "string" ? before["homeAddressRecordedAt"] : null;
+  const held = heldAt ? Date.parse(heldAt) : Number.NaN;
+  const newer = sitting.homeAddress !== null && (Number.isNaN(held) || Date.parse(sitting.startedAt) >= held);
+  return {
+    participantCode: sitting.code,
+    study: sitting.study,
+    givenName: before["givenName"] ?? sitting.givenName,
+    familyName: before["familyName"] ?? sitting.familyName,
+    dateOfBirth: before["dateOfBirth"] ?? sitting.dateOfBirth,
+    homeAddress: newer ? sitting.homeAddress : (before["homeAddress"] ?? null),
+    homeAddressRecordedAt: newer ? sitting.startedAt : heldAt,
+    upn: before["upn"] ?? null,
+    nhsNumber: before["nhsNumber"] ?? null,
+  };
+}
+
+/**
+ * File one sitting's identity: its claim, then the registry entry.
+ *
+ * The registry is read and written in one transaction, so two sittings for the
+ * same person landing together cannot each decide against a stale entry, and a
+ * UPN linked in between is not written back over.
+ *
+ * `mergeFields`, not `merge`: `merge` folds a map into the stored one key by
+ * key, so a house number given at one sitting and left out at the next would
+ * survive under the new postcode — an address nobody gave. Each field named
+ * here is replaced whole; the fields capture does not own (who linked a UPN,
+ * from what source) are left alone.
+ */
+export async function fileIdentity(db: Firestore, sessionId: string, sitting: SittingIdentity): Promise<void> {
+  // The claim is what was typed at this sitting, kept whatever else happens:
+  // it is the evidence a twin split or a mistyped-code correction rests on.
+  await db.doc(paths.claim(sitting.study, sessionId)).set({
+    study: sitting.study,
+    sessionId,
+    claimedCode: sitting.code,
+    givenName: sitting.givenName,
+    familyName: sitting.familyName,
+    dateOfBirth: sitting.dateOfBirth,
+    homeAddress: sitting.homeAddress,
+    recordedAt: sitting.startedAt,
+  });
+
+  const ref = db.doc(paths.participant(sitting.study, sitting.code));
+  await db.runTransaction(async (tx) => {
+    const existing = await tx.get(ref);
+    const fields = registryFields((existing.data() ?? {}) as Record<string, unknown>, sitting);
+    const data = { ...fields, updatedAt: FieldValue.serverTimestamp() };
+    tx.set(ref, data, { mergeFields: Object.keys(data) });
+  });
+}
+
 /**
  * Derive and file the identity partition for a sitting that has just arrived.
  *
@@ -92,40 +171,15 @@ export const captureIdentity = onDocumentWritten("studies/{study}/sessions/{sess
 
   const values: Record<string, string> = {};
   for (const row of rows) values[row.variable] = row.value;
-  const code = rows[0]!.participantId;
-  const db = identity();
-
-  // The claim is what was typed at this sitting, kept whatever else happens:
-  // it is the evidence a twin split or a mistyped-code correction rests on.
-  await db.doc(paths.claim(after.study, after.sessionId)).set({
+  await fileIdentity(identity(), after.sessionId, {
+    code: rows[0]!.participantId,
     study: after.study,
-    sessionId: after.sessionId,
-    claimedCode: code,
     givenName: values["first_name"] ?? null,
     familyName: values["last_name"] ?? null,
     dateOfBirth: values["dob"] ?? null,
-    recordedAt: after.startedAt,
+    homeAddress: parseHomeAddress(values["home_address"]),
+    startedAt: after.startedAt,
   });
-
-  // The registry keeps the first name given for a code. A later wave spelling
-  // it differently is evidence to look at, not a reason to overwrite the
-  // record — which is why this merges rather than replaces.
-  const ref = db.doc(paths.participant(after.study, code));
-  const existing = await ref.get();
-  const before = (existing.data() ?? {}) as Record<string, unknown>;
-  await ref.set(
-    {
-      participantCode: code,
-      study: after.study,
-      givenName: before["givenName"] ?? values["first_name"] ?? null,
-      familyName: before["familyName"] ?? values["last_name"] ?? null,
-      dateOfBirth: before["dateOfBirth"] ?? values["dob"] ?? null,
-      upn: before["upn"] ?? null,
-      nhsNumber: before["nhsNumber"] ?? null,
-      updatedAt: FieldValue.serverTimestamp(),
-    },
-    { merge: true },
-  );
 });
 
 /** Code -> person. */

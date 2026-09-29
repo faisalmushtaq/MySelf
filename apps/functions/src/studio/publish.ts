@@ -27,6 +27,7 @@ import {
   highestVersion,
   historyHashes,
   identityIssues,
+  assetEscapes,
   licenceEscapes,
   lockBaseline,
   readReleases,
@@ -203,6 +204,7 @@ export async function publish(db: Firestore, args: PublishArgs): Promise<Publish
     const issues: Issue[] = [
       ...identityIssues(draft, surveyId, study),
       ...licenceEscapes(draft, origin ? [...published, origin.raw] : published),
+      ...assetEscapes(draft, origin ? [...published, origin.raw] : published),
       ...validateDraft(draft, {
         reserved: reservedFrom(versions),
         baseline: baseline ?? lockBaseline(origin ? draftOf(origin) : null, draft),
@@ -244,7 +246,7 @@ export async function publish(db: Firestore, args: PublishArgs): Promise<Publish
         version,
         publishedAt: now().toISOString(),
         publishedBy: `studio:${actor.uid}`,
-        engineVersion: requiredEngineVersion(composition as Parameters<typeof requiredEngineVersion>[0]),
+        engineVersion: requiredEngineVersion(composition as Parameters<typeof requiredEngineVersion>[0], registries),
       });
     } catch (error) {
       if (error instanceof PublishGateError) {

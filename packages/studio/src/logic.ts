@@ -128,7 +128,9 @@ function leafFromLogic(expr: LogicExpr): SimpleCondition | null {
     }
     return null;
   }
-  if (expr.op === "all" || expr.op === "any" || expr.op === "in_group" || expr.op === "not_empty") return null;
+  // An age judged on the day of the sitting (D-51) has no rule in the builder:
+  // it is shown read-only, in words.
+  if (expr.op === "all" || expr.op === "any" || expr.op === "in_group" || expr.op === "not_empty" || expr.op === "age_gte") return null;
   // A test on one part of a multi-part answer has no simple form.
   if (expr.target.part !== undefined) return null;
   const itemKey = keyOf(expr.target);
@@ -267,6 +269,8 @@ function leafPhrase(expr: Exclude<LogicExpr, { op: "all" | "any" | "not" }>, dra
       return `${q} is less than ${expr.value}`;
     case "lte":
       return `${q} is ${expr.value} or less`;
+    case "age_gte":
+      return `the participant is ${expr.years} or older on the day of the sitting, going by ${q}`;
   }
 }
 

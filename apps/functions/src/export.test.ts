@@ -32,12 +32,12 @@ const UNKNOWN = `sha256:${"e".repeat(64)}`;
 
 type Raw = Record<string, unknown> & { release: Record<string, unknown>; hash?: string };
 
-/** r7.1.0's content republished as r8.0.0 — held only by the release store. */
+/** r8.0.0's content republished as r9.0.0 — held only by the release store. */
 async function studioRelease(): Promise<{ raw: Raw; hash: string }> {
-  const live = bundledManifests.find((b) => b.manifest.release.version === "7.1.0")!;
+  const live = bundledManifests.find((b) => b.manifest.release.version === "8.0.0")!;
   const body = structuredClone(live.raw) as Raw;
   delete body.hash;
-  body.release = { ...body.release, version: "8.0.0", key: "ybm_nd2026_standard_r8_0_0" };
+  body.release = { ...body.release, version: "9.0.0", key: "ybm_nd2026_standard_r9_0_0" };
   const hash = await contentHashAsync(body);
   return { raw: { ...body, hash }, hash };
 }
@@ -126,12 +126,12 @@ describe("the export's releases", () => {
     expect(built.unreadable).toEqual([]);
     expect(built.dataset.sessions.map((s) => s.sessionId)).toContain("ses_under_r8");
     expect(built.dataset.releaseHashes).toContain(hash);
-    expect(built.releases.map((r) => r.release.version).sort()).toEqual(["7.3.0", "8.0.0"]);
+    expect(built.releases.map((r) => r.release.version).sort()).toEqual(["8.0.0", "9.0.0"]);
 
     // The dataset-level files describe the newest release the export holds.
     const files = exportFiles(built, STUDY, []);
     const description = JSON.parse(files.find((f) => f.path === "dataset_description.json")!.content);
-    expect(description.SourceDatasets[0].ReleaseVersion).toBe("8.0.0");
+    expect(description.SourceDatasets[0].ReleaseVersion).toBe("9.0.0");
     expect(description.SourceDatasets[0].ReleaseHash).toBe(hash);
   });
 

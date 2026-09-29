@@ -287,7 +287,7 @@ export function buildBidsExport(data: Dataset, options: BidsOptions): BidsFile[]
     content: json({
       participant_id: {
         Description:
-          "Derived from the participant's own secret code. Stable across waves and not reversible to a name — the identifiers themselves are held in a separate, access-controlled schema and are not in this dataset.",
+          "The participant's pseudonymous ID: their own secret code up to survey version 7.3.0, and from 8.0.0 derived from name and date of birth (D-52). Stable across waves and not reversible to a name — the identifiers themselves are held in a separate, access-controlled schema and are not in this dataset.",
       },
       study: { Description: "Study the participant belongs to." },
       n_sessions: { Description: "Number of completed sittings for this participant." },

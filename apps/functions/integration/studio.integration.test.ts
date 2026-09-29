@@ -50,9 +50,9 @@ const PUBLISHER = { uid: "u_pat", email: "pat.publisher@example.org", owner: fal
 const EDITOR = { uid: "u_ed", email: "ed.editor@example.org" };
 
 const bundled = (version: string) => bundledManifests.find((b) => b.manifest.release.version === version)!;
-const R730 = bundled("7.3.0");
-const LIVE_HASH = R730.manifest.hash!;
-const IMPORTED = ["5.0.0", "6.0.0", "7.0.0", "7.0.1", "7.1.0", "7.2.0", "7.3.0"];
+const R800 = bundled("8.0.0");
+const LIVE_HASH = R800.manifest.hash!;
+const IMPORTED = ["5.0.0", "6.0.0", "7.0.0", "7.0.1", "7.1.0", "7.2.0", "7.3.0", "8.0.0"];
 
 let app: App;
 let db: Firestore;
@@ -161,25 +161,25 @@ const publishAs = (expectedRevision: number, version: string, releaseNote = "Add
 // ── Set up from the live survey ─────────────────────────────────────────────
 
 describe("setting up from the live survey", () => {
-  it("writes every bundled release, points the live survey at r7.3.0, and starts the draft from it", async () => {
+  it("writes every bundled release, points the live survey at r8.0.0, and starts the draft from it", async () => {
     const result = await setUp();
-    expect(result).toEqual({ surveyId: SURVEY, imported: IMPORTED, active: "7.3.0" });
+    expect(result).toEqual({ surveyId: SURVEY, imported: IMPORTED, active: "8.0.0" });
 
     const pointer = await data<PublishedPointerDoc & { publishedAt: Timestamp }>(ref.pointer());
-    expect(pointer).toMatchObject({ surveyId: SURVEY, study: STUDY, hash: LIVE_HASH, version: "7.3.0", releaseKey: "ybm_nd2026_standard_r7_3_0", generation: 1 });
+    expect(pointer).toMatchObject({ surveyId: SURVEY, study: STUDY, hash: LIVE_HASH, version: "8.0.0", releaseKey: "ybm_nd2026_standard_r8_0_0", generation: 1 });
     // A Firestore timestamp, which is what the participant app's REST read expects.
     expect(pointer.publishedAt).toBeInstanceOf(Timestamp);
-    expect(pointer.publishedAt.toDate().toISOString()).toBe(R730.manifest.release.publishedAt);
+    expect(pointer.publishedAt.toDate().toISOString()).toBe(R800.manifest.release.publishedAt);
 
     const survey = await data<SurveyDoc>(ref.survey());
     expect(survey).toMatchObject({
       surveyId: SURVEY,
-      title: R730.manifest.composition.title,
-      latestVersion: "7.3.0",
+      title: R800.manifest.composition.title,
+      latestVersion: "8.0.0",
       versionCount: IMPORTED.length,
       draftEditors: [],
       createdBy: ADMIN.uid,
-      active: { version: "7.3.0", hash: LIVE_HASH, generation: 1, publishedBy: "repository", publishedByEmail: null },
+      active: { version: "8.0.0", hash: LIVE_HASH, generation: 1, publishedBy: "repository", publishedByEmail: null },
     });
 
     for (const version of IMPORTED) {
@@ -208,9 +208,9 @@ describe("setting up from the live survey", () => {
     }
 
     const { doc, draft } = await currentDraft();
-    expect(doc).toMatchObject({ revision: 1, basedOn: { version: "7.3.0", hash: LIVE_HASH }, updatedBy: ADMIN.uid });
+    expect(doc).toMatchObject({ revision: 1, basedOn: { version: "8.0.0", hash: LIVE_HASH }, updatedBy: ADMIN.uid });
     // The draft round-trips: it is the live release, extracted.
-    expect(draft).toEqual(extractDraft(R730.raw));
+    expect(draft).toEqual(extractDraft(R800.raw));
 
     const rows = await audit("survey.imported");
     expect(rows).toHaveLength(1);
@@ -220,16 +220,16 @@ describe("setting up from the live survey", () => {
   it("is idempotent: a second run imports nothing and changes nothing", async () => {
     await setUp();
     const before = await dump();
-    await expect(setUp()).resolves.toEqual({ surveyId: SURVEY, imported: [], active: "7.3.0" });
+    await expect(setUp()).resolves.toEqual({ surveyId: SURVEY, imported: [], active: "8.0.0" });
     expect(await dump()).toEqual(before);
   });
 
   it("never overwrites what the Studio has done since", async () => {
     await setUp();
     const revision = await save(withQuestion((await currentDraft()).draft));
-    await publishAs(revision, "8.0.0");
+    await publishAs(revision, "9.0.0");
     const before = await dump();
-    await expect(setUp()).resolves.toEqual({ surveyId: SURVEY, imported: [], active: "8.0.0" });
+    await expect(setUp()).resolves.toEqual({ surveyId: SURVEY, imported: [], active: "9.0.0" });
     expect(await dump()).toEqual(before);
   });
 
@@ -250,8 +250,8 @@ describe("publishing", () => {
     const edited = withQuestion((await currentDraft()).draft);
     const revision = await save(edited);
 
-    const result = await publishAs(revision, "8.0.0");
-    expect(result).toMatchObject({ surveyId: SURVEY, version: "8.0.0", releaseKey: "ybm_nd2026_standard_r8_0_0", generation: 2, alreadyPublished: false });
+    const result = await publishAs(revision, "9.0.0");
+    expect(result).toMatchObject({ surveyId: SURVEY, version: "9.0.0", releaseKey: "ybm_nd2026_standard_r9_0_0", generation: 2, alreadyPublished: false });
 
     // The release: stored as JSON that verifies against its hash, naming the
     // publisher by uid only — the manifest is public.
@@ -259,7 +259,7 @@ describe("publishing", () => {
     const raw = JSON.parse(stored.manifest) as Record<string, unknown> & { release: Record<string, unknown> };
     expect(await verifyRawManifestHash(raw)).toBe(true);
     expect(raw["hash"]).toBe(result.hash);
-    expect(stored).toMatchObject({ surveyId: SURVEY, hash: result.hash, version: "8.0.0", releaseKey: "ybm_nd2026_standard_r8_0_0", engineVersion: "0.2.0" });
+    expect(stored).toMatchObject({ surveyId: SURVEY, hash: result.hash, version: "9.0.0", releaseKey: "ybm_nd2026_standard_r9_0_0", engineVersion: "0.2.0" });
     expect(stored.bytes).toBe(Buffer.byteLength(stored.manifest, "utf8"));
     expect(raw.release["publishedBy"]).toBe(`studio:${PUBLISHER.uid}`);
     expect(stored.manifest).not.toContain(PUBLISHER.email);
@@ -272,13 +272,13 @@ describe("publishing", () => {
     expect(diffDrafts(back, edited).entries).toEqual([]);
     expect(Object.keys(back.instruments).sort()).toEqual(Object.keys(edited.instruments).sort());
 
-    const version = await data<VersionDoc>(ref.version("8.0.0"));
+    const version = await data<VersionDoc>(ref.version("9.0.0"));
     expect(version).toMatchObject({
-      version: "8.0.0",
+      version: "9.0.0",
       hash: result.hash,
       source: "studio",
       draftRevision: revision,
-      basedOnVersion: "7.3.0",
+      basedOnVersion: "8.0.0",
       bump: "major",
       authors: [EDITOR.email],
       publishedBy: PUBLISHER.uid,
@@ -289,10 +289,10 @@ describe("publishing", () => {
     expect(version.itemKeys).toContain("ybm_studio.favourite_colour");
     expect(version.changeSummary?.entries.map((e) => e.kind)).toEqual(["question.added"]);
 
-    expect(await data<PublishedPointerDoc>(ref.pointer())).toMatchObject({ hash: result.hash, version: "8.0.0", generation: 2, engineVersion: "0.2.0" });
+    expect(await data<PublishedPointerDoc>(ref.pointer())).toMatchObject({ hash: result.hash, version: "9.0.0", generation: 2, engineVersion: "0.2.0" });
     expect(await data<SurveyDoc>(ref.survey())).toMatchObject({
-      active: { version: "8.0.0", hash: result.hash, generation: 2, publishedBy: PUBLISHER.uid, publishedByEmail: PUBLISHER.email },
-      latestVersion: "8.0.0",
+      active: { version: "9.0.0", hash: result.hash, generation: 2, publishedBy: PUBLISHER.uid, publishedByEmail: PUBLISHER.email },
+      latestVersion: "9.0.0",
       versionCount: IMPORTED.length + 1,
       draftEditors: [],
     });
@@ -301,15 +301,15 @@ describe("publishing", () => {
     const { doc } = await currentDraft();
     expect(doc.revision).toBe(revision);
     expect(parseDraft(doc.content)).toEqual(edited);
-    expect(doc.basedOn).toEqual({ version: "8.0.0", hash: result.hash });
+    expect(doc.basedOn).toEqual({ version: "9.0.0", hash: result.hash });
 
     const [row] = await audit("version.published");
     expect(row).toMatchObject({
       actor: PUBLISHER.uid,
       actorEmail: PUBLISHER.email,
       surveyId: SURVEY,
-      subject: "8.0.0",
-      detail: { version: "8.0.0", hash: result.hash, releaseNote: "Adds a question about colour.", bump: "major", draftRevision: revision },
+      subject: "9.0.0",
+      detail: { version: "9.0.0", hash: result.hash, releaseNote: "Adds a question about colour.", bump: "major", draftRevision: revision },
     });
     expect(row!.at).toBeInstanceOf(Timestamp);
   });
@@ -318,7 +318,7 @@ describe("publishing", () => {
     await setUp();
     const revision = await save(withQuestion((await currentDraft()).draft));
     await save(withQuestion((await currentDraft()).draft, "And your favourite animal?"));
-    const error = await refusedCleanly(() => publishAs(revision, "8.0.0"));
+    const error = await refusedCleanly(() => publishAs(revision, "9.0.0"));
     expect(error.code).toBe("aborted");
     expect(error.details).toEqual({ kind: "conflict", currentRevision: revision + 1 });
   });
@@ -330,7 +330,7 @@ describe("publishing", () => {
     const locked = Object.values(draft.instruments).find((d) => d.licence.modifiable !== "yes")!;
     (locked.forms[0]!.items[0] as { stem?: { text: string } }).stem = { text: "Something the licence never said" };
     const revision = await save(draft);
-    const error = await refusedCleanly(() => publishAs(revision, "8.0.0"));
+    const error = await refusedCleanly(() => publishAs(revision, "9.0.0"));
     expect(error.code).toBe("failed-precondition");
     const details = error.details as { kind: string; issues: { code: string; severity: string; location: { itemKey?: string } }[]; gate: string[] };
     expect(details.kind).toBe("invalid");
@@ -345,7 +345,7 @@ describe("publishing", () => {
     locked.licence = { ...locked.licence, modifiable: "yes" };
     (locked.forms[0]!.items[0] as { stem?: { text: string } }).stem = { text: "Reworded behind a changed licence" };
     const revision = await save(draft);
-    const error = await refusedCleanly(() => publishAs(revision, "8.0.0"));
+    const error = await refusedCleanly(() => publishAs(revision, "9.0.0"));
     expect((error.details as { issues: { code: string }[] }).issues.map((i) => i.code)).toContain("locked.licence_changed");
   });
 
@@ -354,44 +354,44 @@ describe("publishing", () => {
     const draft = withQuestion((await currentDraft()).draft);
     draft.composition = { ...draft.composition, key: "another_survey" };
     const revision = await save(draft);
-    const error = await refusedCleanly(() => publishAs(revision, "8.0.0"));
+    const error = await refusedCleanly(() => publishAs(revision, "9.0.0"));
     expect((error.details as { issues: { code: string }[] }).issues.map((i) => i.code)).toContain("survey.key_mismatch");
   });
 
   it("refuses to publish nothing new", async () => {
     await setUp();
-    const error = await refusedCleanly(() => publishAs(1, "8.0.0"));
+    const error = await refusedCleanly(() => publishAs(1, "9.0.0"));
     expect(error.code).toBe("failed-precondition");
     expect(error.details).toMatchObject({ kind: "invalid", issues: [{ code: "publish.no_changes" }] });
-    expect(error.message).toMatch(/Nothing has changed since the live version \(7\.3\.0\)/);
+    expect(error.message).toMatch(/Nothing has changed since the live version \(8\.0\.0\)/);
   });
 
   it("refuses a version number smaller than the changes need, or not above the latest", async () => {
     await setUp();
     // New finishing-screen text: participant-visible outside the questions, so MINOR.
     const revision = await save(updateScreen((await currentDraft()).draft, "finish", { title: "Thank you so much, {first_name}!" }).draft);
-    const small = await refusedCleanly(() => publishAs(revision, "7.3.1"));
+    const small = await refusedCleanly(() => publishAs(revision, "8.0.1"));
     expect(small.code).toBe("invalid-argument");
-    expect(small.details).toEqual({ kind: "bump_too_small", required: "minor", minimumVersion: "7.4.0" });
-    const lower = await refusedCleanly(() => publishAs(revision, "7.2.9"));
-    expect(lower.details).toEqual({ kind: "bump_too_small", required: "minor", minimumVersion: "7.4.0" });
-    expect(lower.message).toMatch(/not above the latest version, 7\.3\.0/);
+    expect(small.details).toEqual({ kind: "bump_too_small", required: "minor", minimumVersion: "8.1.0" });
+    const lower = await refusedCleanly(() => publishAs(revision, "7.9.9"));
+    expect(lower.details).toEqual({ kind: "bump_too_small", required: "minor", minimumVersion: "8.1.0" });
+    expect(lower.message).toMatch(/not above the latest version, 8\.0\.0/);
     // A larger bump than needed is always allowed.
-    await expect(publishAs(revision, "8.0.0")).resolves.toMatchObject({ version: "8.0.0" });
-    expect((await data<VersionDoc>(ref.version("8.0.0"))).bump).toBe("major");
+    await expect(publishAs(revision, "9.0.0")).resolves.toMatchObject({ version: "9.0.0" });
+    expect((await data<VersionDoc>(ref.version("9.0.0"))).bump).toBe("major");
   });
 
   it("refuses a version number already published", async () => {
     await setUp();
     const first = await save(withQuestion((await currentDraft()).draft));
-    await publishAs(first, "8.0.0");
+    await publishAs(first, "9.0.0");
     const second = await save(withQuestion((await currentDraft()).draft, "And your favourite animal?"));
-    const error = await refusedCleanly(() => publishAs(second, "8.0.0"));
+    const error = await refusedCleanly(() => publishAs(second, "9.0.0"));
     expect(error.code).toBe("already-exists");
-    expect(error.details).toEqual({ kind: "version_taken", version: "8.0.0" });
+    expect(error.details).toEqual({ kind: "version_taken", version: "9.0.0" });
     // An imported version number is just as taken.
-    const imported = await refusedCleanly(() => publishAs(second, "7.3.0"));
-    expect(imported.details).toEqual({ kind: "version_taken", version: "7.3.0" });
+    const imported = await refusedCleanly(() => publishAs(second, "8.0.0"));
+    expect(imported.details).toEqual({ kind: "version_taken", version: "8.0.0" });
   });
 
   it("credits the saver of the published revision even when the trigger has not yet run for it", async () => {
@@ -409,8 +409,8 @@ describe("publishing", () => {
       updatedBy: LATE.uid,
       updatedByEmail: LATE.email,
     });
-    await publishAs(revision, "8.0.0");
-    expect((await data<VersionDoc>(ref.version("8.0.0"))).authors).toEqual([EDITOR.email, LATE.email]);
+    await publishAs(revision, "9.0.0");
+    expect((await data<VersionDoc>(ref.version("9.0.0"))).authors).toEqual([EDITOR.email, LATE.email]);
     // The trigger arriving late still credits nobody with the next version.
     const after = (await ref.draft().get()).data() as DraftSide;
     await recordDraftWrite(db, { study: STUDY, surveyId: SURVEY, docId: "current" }, before, after, new Date().toISOString());
@@ -420,9 +420,9 @@ describe("publishing", () => {
   it("returns the stored result when a publish that landed is retried", async () => {
     await setUp();
     const revision = await save(withQuestion((await currentDraft()).draft));
-    const first = await publishAs(revision, "8.0.0");
+    const first = await publishAs(revision, "9.0.0");
     const before = await dump();
-    const again = await publishAs(revision, "8.0.0");
+    const again = await publishAs(revision, "9.0.0");
     expect(again).toEqual({ ...first, alreadyPublished: true });
     expect(await dump()).toEqual(before);
   });
@@ -430,7 +430,7 @@ describe("publishing", () => {
   it("lets exactly one of two publishes racing from the same draft win, and the loser writes nothing", async () => {
     await setUp();
     const revision = await save(withQuestion((await currentDraft()).draft));
-    const results = await Promise.allSettled([publishAs(revision, "8.0.0"), publishAs(revision, "9.0.0")]);
+    const results = await Promise.allSettled([publishAs(revision, "9.0.0"), publishAs(revision, "10.0.0")]);
 
     const won = results.filter((r): r is PromiseFulfilledResult<Awaited<ReturnType<typeof publishAs>>> => r.status === "fulfilled");
     const lost = results.filter((r): r is PromiseRejectedResult => r.status === "rejected");
@@ -457,34 +457,34 @@ describe("making an earlier version live again", () => {
   it("repoints the live pointer, moves the generation on, and records why", async () => {
     await setUp();
     const revision = await save(withQuestion((await currentDraft()).draft));
-    const r8 = await publishAs(revision, "8.0.0");
+    const r9 = await publishAs(revision, "9.0.0");
 
-    const back = await activateVersion(db, { study: STUDY, surveyId: SURVEY, version: "7.3.0", reason: "r8 shows a blank screen on older iPads", actor: PUBLISHER });
-    expect(back).toEqual({ version: "7.3.0", hash: LIVE_HASH, generation: 3 });
-    expect(await data<PublishedPointerDoc>(ref.pointer())).toMatchObject({ hash: LIVE_HASH, version: "7.3.0", generation: 3, engineVersion: "0.1.0" });
+    const back = await activateVersion(db, { study: STUDY, surveyId: SURVEY, version: "8.0.0", reason: "r9 shows a blank screen on older iPads", actor: PUBLISHER });
+    expect(back).toEqual({ version: "8.0.0", hash: LIVE_HASH, generation: 3 });
+    expect(await data<PublishedPointerDoc>(ref.pointer())).toMatchObject({ hash: LIVE_HASH, version: "8.0.0", generation: 3, engineVersion: "0.2.0" });
     const survey = await data<SurveyDoc>(ref.survey());
-    expect(survey.active).toMatchObject({ version: "7.3.0", hash: LIVE_HASH, generation: 3, publishedBy: "repository" });
+    expect(survey.active).toMatchObject({ version: "8.0.0", hash: LIVE_HASH, generation: 3, publishedBy: "repository" });
     // The highest version ever published is still r8: its number is never reused.
-    expect(survey.latestVersion).toBe("8.0.0");
+    expect(survey.latestVersion).toBe("9.0.0");
     expect(survey.versionCount).toBe(IMPORTED.length + 1);
 
     const [row] = await audit("version.activated");
     expect(row).toMatchObject({
       actor: PUBLISHER.uid,
-      subject: "7.3.0",
-      detail: { version: "7.3.0", hash: LIVE_HASH, previous: { version: "8.0.0", hash: r8.hash, generation: 2 }, reason: "r8 shows a blank screen on older iPads", generation: 3 },
+      subject: "8.0.0",
+      detail: { version: "8.0.0", hash: LIVE_HASH, previous: { version: "9.0.0", hash: r9.hash, generation: 2 }, reason: "r9 shows a blank screen on older iPads", generation: 3 },
     });
 
     // Already live: refused, nothing written.
     const error = await refusedCleanly(() =>
-      activateVersion(db, { study: STUDY, surveyId: SURVEY, version: "7.3.0", reason: "pressing it twice by mistake", actor: PUBLISHER }),
+      activateVersion(db, { study: STUDY, surveyId: SURVEY, version: "8.0.0", reason: "pressing it twice by mistake", actor: PUBLISHER }),
     );
     expect(error.details).toMatchObject({ kind: "invalid", issues: [{ code: "version.already_live" }] });
 
     // And forward again.
     await expect(
-      activateVersion(db, { study: STUDY, surveyId: SURVEY, version: "8.0.0", reason: "the fix for older iPads is out", actor: PUBLISHER }),
-    ).resolves.toEqual({ version: "8.0.0", hash: r8.hash, generation: 4 });
+      activateVersion(db, { study: STUDY, surveyId: SURVEY, version: "9.0.0", reason: "the fix for older iPads is out", actor: PUBLISHER }),
+    ).resolves.toEqual({ version: "9.0.0", hash: r9.hash, generation: 4 });
   });
 
   it("refuses a version that was never published", async () => {
@@ -507,14 +507,14 @@ describe("making an earlier version live again", () => {
 
   it("after a rollback, the next publish is compared with what is live and numbered above everything", async () => {
     await setUp();
-    await publishAs(await save(withQuestion((await currentDraft()).draft)), "8.0.0");
-    await activateVersion(db, { study: STUDY, surveyId: SURVEY, version: "7.3.0", reason: "r8 shows a blank screen", actor: PUBLISHER });
+    await publishAs(await save(withQuestion((await currentDraft()).draft)), "9.0.0");
+    await activateVersion(db, { study: STUDY, surveyId: SURVEY, version: "8.0.0", reason: "r9 shows a blank screen", actor: PUBLISHER });
     const revision = (await currentDraft()).doc.revision;
-    // The draft still has r8's question, which is a change from live r7.3.0 —
+    // The draft still has r8's question, which is a change from live r8.0.0 —
     // and 8.x is taken, so the lowest allowed is 9.0.0.
-    const error = await refusedCleanly(() => publishAs(revision, "8.1.0"));
-    expect(error.details).toEqual({ kind: "bump_too_small", required: "major", minimumVersion: "9.0.0" });
-    await expect(publishAs(revision, "9.0.0")).resolves.toMatchObject({ version: "9.0.0", generation: 4 });
+    const error = await refusedCleanly(() => publishAs(revision, "9.1.0"));
+    expect(error.details).toEqual({ kind: "bump_too_small", required: "major", minimumVersion: "10.0.0" });
+    await expect(publishAs(revision, "10.0.0")).resolves.toMatchObject({ version: "10.0.0", generation: 4 });
   });
 });
 
@@ -522,15 +522,15 @@ describe("restoring a version into the draft", () => {
   it("replaces the content, moves the revision on, keeps what the Studio knows, and records it", async () => {
     await setUp();
     const revision = await save(withQuestion((await currentDraft()).draft));
-    await publishAs(revision, "8.0.0");
+    await publishAs(revision, "9.0.0");
 
-    const result = await restoreVersion(db, { study: STUDY, surveyId: SURVEY, version: "7.3.0", expectedRevision: revision, actor: PUBLISHER });
+    const result = await restoreVersion(db, { study: STUDY, surveyId: SURVEY, version: "8.0.0", expectedRevision: revision, actor: PUBLISHER });
     expect(result).toEqual({ revision: revision + 1 });
 
     const { doc, draft } = await currentDraft();
-    expect(doc).toMatchObject({ revision: revision + 1, updatedBy: PUBLISHER.uid, updatedByEmail: PUBLISHER.email, basedOn: { version: "7.3.0", hash: LIVE_HASH } });
+    expect(doc).toMatchObject({ revision: revision + 1, updatedBy: PUBLISHER.uid, updatedByEmail: PUBLISHER.email, basedOn: { version: "8.0.0", hash: LIVE_HASH } });
     expect(doc.updatedAt).toBeInstanceOf(Timestamp);
-    const restored = extractDraft(R730.raw);
+    const restored = extractDraft(R800.raw);
     expect(draft.composition).toEqual(restored.composition);
     // r8's question is not lost: it is archived, under its reserved ID.
     expect(liveQuestions(draft).map((q) => q.itemKey)).not.toContain("ybm_studio.favourite_colour");
@@ -539,15 +539,15 @@ describe("restoring a version into the draft", () => {
     const [row] = await audit("draft.restored");
     expect(row).toMatchObject({
       actor: PUBLISHER.uid,
-      subject: "7.3.0",
-      detail: { version: "7.3.0", hash: LIVE_HASH, fromRevision: revision, toRevision: revision + 1, archived: ["ybm_studio.favourite_colour"] },
+      subject: "8.0.0",
+      detail: { version: "8.0.0", hash: LIVE_HASH, fromRevision: revision, toRevision: revision + 1, archived: ["ybm_studio.favourite_colour"] },
     });
 
     // The ordinary rollback: restore, then publish it as a new version.
-    await expect(publishAs(revision + 1, "9.0.0", "Back to the r7.3.0 questions.")).resolves.toMatchObject({ version: "9.0.0", generation: 3 });
-    const v9 = await data<VersionDoc>(ref.version("9.0.0"));
-    expect(v9.basedOnVersion).toBe("7.3.0");
-    expect(v9.changeSummary?.entries.map((e) => e.kind)).toEqual(["question.archived"]);
+    await expect(publishAs(revision + 1, "10.0.0", "Back to the r8.0.0 questions.")).resolves.toMatchObject({ version: "10.0.0", generation: 3 });
+    const v10 = await data<VersionDoc>(ref.version("10.0.0"));
+    expect(v10.basedOnVersion).toBe("8.0.0");
+    expect(v10.changeSummary?.entries.map((e) => e.kind)).toEqual(["question.archived"]);
   });
 
   it("refuses a stale revision, writing nothing", async () => {
@@ -562,9 +562,9 @@ describe("restoring a version into the draft", () => {
   it("mends a draft nobody can read", async () => {
     await setUp();
     await ref.draft().update({ content: "{broken", revision: 2 });
-    await expect(restoreVersion(db, { study: STUDY, surveyId: SURVEY, version: "7.3.0", expectedRevision: 2, actor: PUBLISHER })).resolves.toEqual({ revision: 3 });
+    await expect(restoreVersion(db, { study: STUDY, surveyId: SURVEY, version: "8.0.0", expectedRevision: 2, actor: PUBLISHER })).resolves.toEqual({ revision: 3 });
     const { draft } = await currentDraft();
-    const release = extractDraft(R730.raw);
+    const release = extractDraft(R800.raw);
     expect({ composition: draft.composition, instruments: draft.instruments, scales: draft.scales, archived: draft.archived }).toEqual({
       composition: release.composition,
       instruments: release.instruments,
@@ -592,9 +592,9 @@ describe("a new survey", () => {
 
   it("copied from a published version publishes as its own 1.0.0 — with the copied locks still holding", async () => {
     await setUp();
-    await createSurvey(db, { study: STUDY, surveyId: "ybm_copy", title: "YBM copy", from: { surveyId: SURVEY, version: "7.3.0" }, actor: ADMIN });
+    await createSurvey(db, { study: STUDY, surveyId: "ybm_copy", title: "YBM copy", from: { surveyId: SURVEY, version: "8.0.0" }, actor: ADMIN });
     const { doc, draft } = await currentDraft("ybm_copy");
-    expect(doc.basedOn).toEqual({ version: "7.3.0", hash: LIVE_HASH });
+    expect(doc.basedOn).toEqual({ version: "8.0.0", hash: LIVE_HASH });
     expect(draft.composition).toMatchObject({ key: "ybm_copy", title: "YBM copy" });
 
     // A reworded licensed question in the copy is refused, though the copy has
@@ -785,7 +785,7 @@ describe("the draft trigger", () => {
     await setUp();
     const revision = await save(withQuestion((await currentDraft()).draft));
     const before = (await ref.draft().get()).data() as DraftSide;
-    await publishAs(revision, "8.0.0");
+    await publishAs(revision, "9.0.0");
     const after = (await ref.draft().get()).data() as DraftSide;
     const edited = await audit("draft.edited");
     await expect(recordDraftWrite(db, { study: STUDY, surveyId: SURVEY, docId: "current" }, before, after, new Date().toISOString())).resolves.toEqual({
@@ -795,7 +795,7 @@ describe("the draft trigger", () => {
     expect(await audit("draft.edited")).toEqual(edited);
     // And a late event for a save the publish already included adds nobody to the next version's authors.
     expect((await data<SurveyDoc>(ref.survey())).draftEditors).toEqual([]);
-    const late = { ...before, revision: revision - 1, content: serialiseDraft(extractDraft(R730.raw)) };
+    const late = { ...before, revision: revision - 1, content: serialiseDraft(extractDraft(R800.raw)) };
     await recordDraftWrite(db, { study: STUDY, surveyId: SURVEY, docId: "current" }, late, before, new Date().toISOString());
     expect((await data<SurveyDoc>(ref.survey())).draftEditors).toEqual([]);
   });

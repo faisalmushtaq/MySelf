@@ -3,6 +3,7 @@ import { AnswerStore, Walker } from "@myself/engine";
 import { releaseManifest } from "@myself/schema";
 import rawManifest from "../../../releases/ybm_nd2026_standard_r7.0.0.manifest.json";
 import r710 from "../../../releases/ybm_nd2026_standard_r7.1.0.manifest.json";
+import currentManifest from "../../../releases/ybm_nd2026_standard_r8.0.0.manifest.json";
 import { flattenManifest, reminderOf } from "./lib/flatten.js";
 import { resolveText } from "./lib/pipes.js";
 
@@ -417,5 +418,66 @@ describe("manifest flattening", () => {
       new Date(),
     );
     expect(text).toContain("Minecraft");
+  });
+});
+
+describe("the SDQ form by age, in the release participants run (D-51)", () => {
+  const current = releaseManifest.parse(currentManifest);
+  const units = flattenManifest(current).units;
+  const dob = { instrument: "ybm_identity", item: "dob", revision: 1 };
+  const started = new Date("2026-09-29T09:10:00Z");
+  const sdqShown = (iso: string | null, at: Date | null = started) => {
+    const store = new AnswerStore();
+    if (iso) store.set(dob, { status: "answered", value: { kind: "date", iso } });
+    const visible = new Walker(units, store, true, at ?? undefined).visibleUnits().map((i) => units[i]!);
+    return [...new Set(visible.filter((u) => u.instrument.startsWith("sdq") && u.item.responseType !== "info").map((u) => u.instrument))];
+  };
+
+  it("gives a 15-year-old the 11–17 form, word for word", () => {
+    expect(sdqShown("2011-03-14")).toEqual(["sdq25_s"]);
+    const q20 = units.find((u) => u.instrument === "sdq25_s" && u.item.key === "q20")!.item;
+    expect(q20.stem.text).toBe("I often volunteer to help others (parents, teachers, children)");
+  });
+
+  it("gives someone 18 or over on the day of the sitting the 18+ form", () => {
+    expect(sdqShown("2008-09-29")).toEqual(["sdq25_s18"]); // 18th birthday today
+    expect(sdqShown("2008-09-30")).toEqual(["sdq25_s"]); // 18 tomorrow
+    expect(sdqShown("1999-06-01")).toEqual(["sdq25_s18"]);
+  });
+
+  it("falls back to the 11–17 form without a date of birth or a sitting date", () => {
+    expect(sdqShown(null)).toEqual(["sdq25_s"]);
+    expect(sdqShown("1999-06-01", null)).toEqual(["sdq25_s"]);
+  });
+});
+
+describe("the home address (D-52)", () => {
+  const current = releaseManifest.parse(currentManifest);
+  const units = flattenManifest(current).units;
+
+  it("asks for the address instead of a secret code, on one screen", () => {
+    const identity = units.filter((u) => u.instrument === "ybm_identity").map((u) => u.item.key);
+    expect(identity).toEqual(["first_name", "last_name", "dob", "home_address"]);
+    const address = units.find((u) => u.item.key === "home_address")!.item;
+    expect(address.responseType).toBe("form_fields");
+    if (address.responseType !== "form_fields") return;
+    expect(address.fields.map((f) => f.key)).toEqual(["postcode", "house", "street"]);
+    // every part optional: a participant gives what they know
+    expect(address.fields.every((f) => !f.required)).toBe(true);
+    expect(address.identifying).toBe(true);
+  });
+
+  it("checks postcodes against exactly the list the release pins", async () => {
+    const { createHash } = await import("node:crypto");
+    const { POSTCODE_LISTS, postcodeList } = await import("./lib/postcodes.js");
+    for (const [asset, pinned] of Object.entries(current.assets)) {
+      const text = POSTCODE_LISTS[asset];
+      expect(text, asset).toBeDefined();
+      expect(`sha256:${createHash("sha256").update(text!, "utf8").digest("hex")}`, asset).toBe(pinned.sha256);
+    }
+    const list = postcodeList("postcodes_west_yorkshire")!;
+    expect(list.lookup("ls2 9jt")).toEqual({ ward: "Little London & Woodhouse", district: "Leeds" });
+    expect(list.lookup("HG1 1AA")).toBeNull();
+    expect(postcodeList("no_such_list")).toBeNull();
   });
 });

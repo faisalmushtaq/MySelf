@@ -1,5 +1,12 @@
 import Dexie, { type EntityTable } from "dexie";
-import { isEncryptedEnvelope, openExport, type DeviceSession, type IdentityRow } from "@myself/store";
+import {
+  formatHomeAddress,
+  isEncryptedEnvelope,
+  openExport,
+  parseHomeAddress,
+  type DeviceSession,
+  type IdentityRow,
+} from "@myself/store";
 import {
   createVault,
   openVault,
@@ -57,8 +64,21 @@ export interface PersonRecord {
   /** Collected in the survey under explicit approval, or given by a parent. */
   nhsNumber: string | null;
   nhsSource: string | null;
+  /**
+   * The home address from the most recent sitting that gave one (r8.0.0 on,
+   * D-52), as "house street, postcode". Absent from records sealed before it
+   * existed.
+   */
+  homeAddress?: string | null;
   /** Every code this person has typed, right or wrong, wave by wave. */
-  claims: { sessionId: string; claimedCode: string; givenName: string | null; familyName: string | null; recordedAt: string }[];
+  claims: {
+    sessionId: string;
+    claimedCode: string;
+    givenName: string | null;
+    familyName: string | null;
+    homeAddress?: string | null;
+    recordedAt: string;
+  }[];
 }
 
 export interface CodeCorrection {
@@ -406,6 +426,7 @@ interface PersonSecrets {
   upnSource: string | null;
   nhsNumber: string | null;
   nhsSource: string | null;
+  homeAddress?: string | null;
   claims: PersonRecord["claims"];
 }
 
@@ -418,6 +439,7 @@ async function sealPerson(person: PersonRecord): Promise<StoredPerson> {
     upnSource: person.upnSource,
     nhsNumber: person.nhsNumber,
     nhsSource: person.nhsSource,
+    homeAddress: person.homeAddress ?? null,
     claims: person.claims,
   };
   return {
@@ -453,6 +475,19 @@ async function allPeople(): Promise<PersonRecord[]> {
  * time, so unlocking the vault and re-deriving brings them all back. That is also
  * why a forgotten passphrase costs the typed-in fields and not the names.
  */
+/**
+ * The address a person's claims say is current: the one from the most recent
+ * sitting that gave one, judged by when the sitting happened rather than when
+ * it was loaded, so a sitting imported late does not replace a newer address.
+ */
+function currentAddress(claims: PersonRecord["claims"]): string | null {
+  const latest = [...claims]
+    .sort((a, b) => a.recordedAt.localeCompare(b.recordedAt))
+    .reverse()
+    .find((c) => c.homeAddress);
+  return latest?.homeAddress ?? null;
+}
+
 export async function storeIdentity(rows: IdentityRow[]): Promise<number> {
   if (!identityIsUnlocked()) return 0;
   const bySession = new Map<string, { participantId: string; study: string; recordedAt: string; values: Record<string, string> }>();
@@ -472,20 +507,33 @@ export async function storeIdentity(rows: IdentityRow[]): Promise<number> {
     const given = entry.values["first_name"] ?? null;
     const family = entry.values["last_name"] ?? null;
     const dob = entry.values["dob"] ?? null;
+    const address = formatHomeAddress(parseHomeAddress(entry.values["home_address"]));
     const row = await db.people.get(entry.participantId);
     const existing = row ? await openPerson(row) : undefined;
-    const claim = { sessionId, claimedCode: entry.participantId, givenName: given, familyName: family, recordedAt: entry.recordedAt };
+    const claim = {
+      sessionId,
+      claimedCode: entry.participantId,
+      givenName: given,
+      familyName: family,
+      homeAddress: address,
+      recordedAt: entry.recordedAt,
+    };
     if (existing) {
       // The name first given stands. A later wave spelling it differently is
       // evidence to look at, not a reason to overwrite the record quietly.
-      const claims = existing.claims.filter((c) => c.sessionId !== sessionId);
+      const claims = [...existing.claims.filter((c) => c.sessionId !== sessionId), claim].sort((a, b) =>
+        a.recordedAt.localeCompare(b.recordedAt),
+      );
       await db.people.put(
         await sealPerson({
           ...existing,
           givenName: existing.givenName ?? given,
           familyName: existing.familyName ?? family,
           dateOfBirth: existing.dateOfBirth ?? dob,
-          claims: [...claims, claim].sort((a, b) => a.recordedAt.localeCompare(b.recordedAt)),
+          // Unlike a name, an address is expected to change: keep the one from
+          // the most recent sitting, whichever order the sittings arrived in.
+          homeAddress: currentAddress(claims) ?? existing.homeAddress ?? null,
+          claims,
         }),
       );
     } else {
@@ -500,6 +548,7 @@ export async function storeIdentity(rows: IdentityRow[]): Promise<number> {
           upnSource: null,
           nhsNumber: null,
           nhsSource: null,
+          homeAddress: address,
           claims: [claim],
         }),
       );
@@ -686,17 +735,21 @@ export async function allRelationships(): Promise<Relationship[]> {
 export async function identifierFile(justification: string): Promise<string> {
   await noteAccess("identifier_file", "all participants", justification);
   const people = (await allPeople()).sort((a, b) => a.participantCode.localeCompare(b.participantCode));
-  const escape = (value: string | null) => {
-    if (value === null || value === "") return "";
+  const escape = (raw: string | null) => {
+    if (raw === null || raw === "") return "";
+    // Anything a participant typed is opened in a spreadsheet here: a leading
+    // =, +, - or @ would run as a formula, so it is made plain text.
+    const value = /^[=+\-@\t\r]/.test(raw) ? `'${raw}` : raw;
     return /[",\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
   };
-  const header = "participant_id,given_name,family_name,date_of_birth,upn,nhs_number,n_sittings";
+  const header = "participant_id,given_name,family_name,date_of_birth,home_address,upn,nhs_number,n_sittings";
   const rows = people.map((p) =>
     [
       p.participantCode,
       escape(p.givenName),
       escape(p.familyName),
       escape(p.dateOfBirth),
+      escape(p.homeAddress ?? null),
       escape(p.upn),
       escape(p.nhsNumber),
       String(p.claims.length),

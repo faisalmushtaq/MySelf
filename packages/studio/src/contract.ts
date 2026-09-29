@@ -66,6 +66,13 @@ export interface StudioDraft {
   unlocked: Record<string, Unlock>;
   /** Studio-only notes per question ID. Never frozen into a release. */
   notes: Record<string, QuestionNotes>;
+  /**
+   * Files the release pins, as it pins them (D-52): the postcode list an
+   * address question checks against. Carried unchanged from the release the
+   * draft came from; the Studio does not edit them. Absent in drafts saved
+   * before releases carried assets.
+   */
+  assets?: Record<string, { path: string; sha256: string; bytes: number }>;
 }
 
 export interface ArchivedQuestion {

@@ -108,15 +108,13 @@ async function answerCurrentScreen(page: Page): Promise<boolean> {
     /**
      * Try values until the app accepts one.
      *
-     * The secret-code questions are single-character fields with their own
-     * validation — "the first digit of your house number", "the first letter of
-     * your street" — and a sentence typed into one is truncated to its first
-     * character and rejected. Rather than encoding which question wants which
-     * kind of character, which would make this test a second copy of the
-     * questionnaire, offer a digit, a letter and a sentence and keep whichever
-     * one clears the error.
+     * Some fields have their own validation — a postcode must look like one
+     * (D-52) — and a sentence typed into one is truncated and rejected. Rather
+     * than encoding which question wants which kind of value, which would make
+     * this test a second copy of the questionnaire, offer a digit, a letter, a
+     * West Yorkshire postcode and a sentence, and keep whichever clears the error.
      */
-    for (const candidate of ["1", "A", "Something I would say about this."]) {
+    for (const candidate of ["1", "A", "LS2 9JT", "Something I would say about this."]) {
       await text.fill(candidate);
       if (await acceptsCurrentAnswer(page)) return true;
     }
@@ -174,7 +172,7 @@ async function tryClick(page: Page, selector: string): Promise<boolean> {
  * Pick an option, and if the app objects, pick a different one.
  *
  * Some items are checked against earlier answers rather than on their own: "the
- * month you were born" has to agree with the date of birth given two screens
+ * month you were born" (to r7.3.0) had to agree with the date of birth given two screens
  * back, and the engine refuses the sitting until it does. That consistency check
  * is a feature, and a walker that always took the first option would be stopped
  * by it every run.

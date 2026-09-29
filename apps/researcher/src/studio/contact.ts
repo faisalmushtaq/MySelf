@@ -4,7 +4,7 @@
  * from the release bundled with this build rather than written out again here.
  */
 
-const bundled = import.meta.glob("../../../../releases/ybm_nd2026_standard_r7.3.0.manifest.json", {
+const bundled = import.meta.glob("../../../../releases/ybm_nd2026_standard_r8.0.0.manifest.json", {
   eager: true,
   import: "default",
 }) as Record<string, unknown>;

@@ -53,7 +53,7 @@ import { SurveyScreen } from "./components/SurveyScreen.js";
  * MySelf Go — participant application (preview build).
  * Renders a frozen release entirely from its manifest — the one the study has
  * published, once this device has downloaded and verified it, and the built-in
- * YBM r7.3.0 until then (lib/releases.ts) — saves every response to encrypted
+ * YBM r8.0.0 until then (lib/releases.ts) — saves every response to encrypted
  * IndexedDB before advancing, works offline via the service worker, and returns
  * to a neutral start screen on handover.
  */
@@ -433,9 +433,16 @@ export default function App({ initialRuntime }: { initialRuntime: Runtime }) {
     void checkpointRunningSessions().catch(() => undefined);
   }, [online, device, phase.kind]);
 
+  const runningSession = phase.kind === "running" ? (phase as { session: SessionRow }).session : null;
   const walker = useMemo(
-    () => new Walker(flattened.units, storeRef.current, manifest.composition.allowBackNavigation),
-    [phase.kind === "running" ? (phase as { session: SessionRow }).session.sessionId : "", runtime],
+    () =>
+      new Walker(
+        flattened.units,
+        storeRef.current,
+        manifest.composition.allowBackNavigation,
+        runningSession ? new Date(runningSession.startedAt) : undefined,
+      ),
+    [runningSession?.sessionId ?? "", runtime],
   );
 
   const tMono = () => Math.round(performance.now() - monoStart.current);
@@ -489,7 +496,7 @@ export default function App({ initialRuntime }: { initialRuntime: Runtime }) {
       skipRun.current = { count: 0, firstIndex: null };
       fastRun.current = 0;
       timing.current = new SessionTiming(rt.effort);
-      const w = new Walker(rt.flattened.units, store, rt.manifest.composition.allowBackNavigation);
+      const w = new Walker(rt.flattened.units, store, rt.manifest.composition.allowBackNavigation, new Date(session.startedAt));
       // A saved position is an index into the sitting's own release, and `rt` is
       // that release: `sittingToResume` only pairs a sitting with its own hash.
       const index = existing ? Math.min(session.currentIndex, rt.flattened.units.length - 1) : (w.first() ?? 0);
@@ -719,7 +726,12 @@ export default function App({ initialRuntime }: { initialRuntime: Runtime }) {
         return;
       }
 
-      const w = new Walker(flattened.units, storeRef.current, manifest.composition.allowBackNavigation);
+      const w = new Walker(
+        flattened.units,
+        storeRef.current,
+        manifest.composition.allowBackNavigation,
+        new Date(phase.session.startedAt),
+      );
       const next = w.next(from);
 
       if (
@@ -792,7 +804,12 @@ export default function App({ initialRuntime }: { initialRuntime: Runtime }) {
         setPhase({ kind: "review", session: phase.session });
         return;
       }
-      const w = new Walker(flattened.units, storeRef.current, manifest.composition.allowBackNavigation);
+      const w = new Walker(
+        flattened.units,
+        storeRef.current,
+        manifest.composition.allowBackNavigation,
+        new Date(phase.session.startedAt),
+      );
       const prev = w.back(from);
       if (prev !== null) {
         await leaveItem(from, false);

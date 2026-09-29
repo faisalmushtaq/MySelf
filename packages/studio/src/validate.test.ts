@@ -777,3 +777,27 @@ describe("never throws", () => {
     expect(validateDraft(null as unknown as StudioDraft)[0]?.code).toBe("draft.malformed");
   });
 });
+
+describe("r8.0.0: age conditions, the home address and linkage by name (D-51, D-52)", () => {
+  const r8 = extractDraft(read("ybm_nd2026_standard_r8.0.0.manifest.json"));
+
+  it("opens the live survey with no errors — its age-judged SDQ blocks included", () => {
+    expect(errors(validateDraft(r8, { baseline: r8 }))).toEqual([]);
+  });
+
+  it("links sittings on first name, last name and date of birth, so their labels are held", () => {
+    const draft = structuredClone(r8);
+    item(draft, "ybm_identity.dob").variable = "birth_date";
+    const issue = expectIssue(validateDraft(draft, { baseline: r8 }), "linkage.variable_changed", { itemKey: "ybm_identity.dob" });
+    expect(issue.hint).toMatch(/first name, last name and date of birth/);
+  });
+
+  it("still links on the four-part code in a survey that asks for it", () => {
+    const draft = edit((d) => {
+      item(d, "ybm_identity.dob").variable = "birth_date";
+    });
+    // dob is an identity question there, not a linkage one: its own check, not linkage's.
+    const codes = validateDraft(draft, { baseline: live }).map((i) => i.code);
+    expect(codes).not.toContain("linkage.variable_changed");
+  });
+});

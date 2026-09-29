@@ -12,7 +12,7 @@ export const STUDY = "ybm";
 export const SURVEY = "ybm_nd2026_standard";
 export const R710_HASH = "sha256:308f47ba5b447f455613a183430d9b4a4ad86a9c39d1de43576b12d15d975bee";
 /** The newest release in the repository, which importing the live survey makes live. */
-export const R730_HASH = "sha256:3f0793a4a5e879ec9dc5aa509ffbfb891a9eceacb1be4ff05c62ddeae9de0e2a";
+export const R800_HASH = "sha256:f991abbbc93b2d9dc58a30d25bd9ac169b8363a588e6dc765ccab9312937bba5";
 
 export interface Study {
   db: Firestore;

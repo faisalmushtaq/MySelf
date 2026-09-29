@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { allInstruments, allModules, allScales } from "@myself/library";
 import { allScoring } from "@myself/scoring";
+import { releaseAssets } from "./assets.js";
 import { ybmComposition } from "./compose-ybm.js";
 import { freezeRelease, requiredEngineVersion, type PublishMeta, type Registries } from "./gate.js";
 
@@ -22,6 +23,7 @@ const registries: Registries = {
   modules: allModules,
   scales: allScales,
   scoring: allScoring,
+  assets: releaseAssets(),
 };
 
 const meta = (engineVersion: string): PublishMeta => ({
@@ -128,14 +130,21 @@ describe("subset membership", () => {
 });
 
 describe("engine version", () => {
-  it("is 0.2.0 only when a placement uses a subset", () => {
-    expect(requiredEngineVersion(ybmComposition)).toBe("0.1.0");
-    const withSubset = structuredClone(ybmComposition);
-    smartphone(withSubset).items = SMARTPHONE;
-    expect(requiredEngineVersion(withSubset)).toBe("0.2.0");
+  it("is 0.2.0 when a placement uses a subset, a condition judges age, or a question checks postcodes", () => {
+    const plain = { sections: [{ components: [{ kind: "module" }, { kind: "instrument" }] }] };
+    expect(requiredEngineVersion(plain)).toBe("0.1.0");
+    expect(requiredEngineVersion({ sections: [{ components: [{ kind: "module", items: ["a"] }] }] })).toBe("0.2.0");
     // Screens and narratives have no questions to subset.
     expect(requiredEngineVersion({ sections: [{ components: [{ kind: "screen", items: ["x"] }] }] })).toBe("0.1.0");
-    expect(requiredEngineVersion({ sections: [{ components: [{ kind: "module" }, { kind: "instrument" }] }] })).toBe("0.1.0");
+    // Age (D-51): in a block condition, or inside a question's own.
+    const age = { op: "age_gte", target: { item: { instrument: "ybm_identity", item: "dob", revision: 1 } }, years: 18 };
+    expect(requiredEngineVersion({ sections: [{ components: [{ kind: "module", displayIf: age }] }] } as unknown as typeof plain)).toBe("0.2.0");
+    expect(requiredEngineVersion(plain, { instruments: [{ forms: [{ items: [{ displayIf: age }] }] }] })).toBe("0.2.0");
+    // Postcodes (D-52): a pinned list, or a question that checks against one.
+    expect(requiredEngineVersion(plain, { assets: { postcodes_west_yorkshire: {} } })).toBe("0.2.0");
+    expect(requiredEngineVersion(plain, { instruments: [{ forms: [{ items: [{ postcodeCheck: {} }] }] }] })).toBe("0.2.0");
+    // The live composition uses both.
+    expect(requiredEngineVersion(ybmComposition)).toBe("0.2.0");
   });
 
   it("refuses a subset-using release that declares the older engine", () => {

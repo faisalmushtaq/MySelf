@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { contentHashAsync } from "@myself/schema";
 import { buildDemoSessions, type DeviceSession } from "@myself/store";
-import live from "../../../releases/ybm_nd2026_standard_r7.1.0.manifest.json";
+import live from "../../../releases/ybm_nd2026_standard_r8.0.0.manifest.json";
 import { buildDatasetWithStore, resolveFromStore, type ReleaseFetcher } from "./lib/build.js";
 import { latestRelease, readStoredRelease, releasesByHash, type KnownRelease } from "./lib/releases.js";
 
@@ -18,8 +18,8 @@ import { latestRelease, readStoredRelease, releasesByHash, type KnownRelease } f
 
 type Raw = Record<string, unknown> & { release: Record<string, unknown>; hash?: string };
 
-/** r7.1.0's content republished as another version: held only by the store. */
-async function studioRelease(version = "8.0.0"): Promise<{ raw: Raw; hash: string }> {
+/** r8.0.0's content republished as another version: held only by the store. */
+async function studioRelease(version = "9.0.0"): Promise<{ raw: Raw; hash: string }> {
   const body = structuredClone(live) as unknown as Raw;
   delete body.hash;
   body.release = { ...body.release, version, key: `ybm_nd2026_standard_r${version.replaceAll(".", "_")}` };
@@ -41,7 +41,7 @@ describe("asking the release store", () => {
     const { raw, hash } = await studioRelease();
     const { found, refused } = await resolveFromStore([hash], fetcherOf({ [hash]: storeDoc(raw, hash) }));
     expect(refused).toEqual([]);
-    expect(found.map((r) => [r.hash, r.version])).toEqual([[hash, "8.0.0"]]);
+    expect(found.map((r) => [r.hash, r.version])).toEqual([[hash, "9.0.0"]]);
   });
 
   it("refuses a stored manifest whose content was altered", async () => {
@@ -58,12 +58,12 @@ describe("asking the release store", () => {
   });
 
   it("refuses an intact release filed under another release's hash", async () => {
-    const eight = await studioRelease("8.0.0");
     const nine = await studioRelease("9.0.0");
+    const ten = await studioRelease("10.0.0");
     vi.spyOn(console, "error").mockImplementation(() => undefined);
     const { found, refused } = await resolveFromStore(
-      [nine.hash],
-      fetcherOf({ [nine.hash]: { ...storeDoc(eight.raw, eight.hash), hash: nine.hash } }),
+      [ten.hash],
+      fetcherOf({ [ten.hash]: { ...storeDoc(nine.raw, nine.hash), hash: ten.hash } }),
     );
     expect(found).toEqual([]);
     expect(refused).toHaveLength(1);
@@ -71,7 +71,7 @@ describe("asking the release store", () => {
   });
 
   it("leaves a hash unknown when the store has nothing, the fetch fails or it never answers", async () => {
-    const [a, b, c] = await Promise.all([studioRelease("8.0.0"), studioRelease("8.0.1"), studioRelease("8.0.2")]);
+    const [a, b, c] = await Promise.all([studioRelease("9.0.0"), studioRelease("9.0.1"), studioRelease("9.0.2")]);
     const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
     const fetchRelease = vi.fn<ReleaseFetcher>(async (hash) => {
       if (hash === b.hash) throw new Error("offline");

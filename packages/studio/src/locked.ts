@@ -65,6 +65,26 @@ export const LINKAGE_ITEM_KEYS: readonly string[] = [
   "ybm_identity.ps_postcode_letters",
 ];
 
+/**
+ * Name and date of birth: what a participant's sittings are linked on from
+ * r8.0.0, which asks for no secret code (D-52; ingest.ts `nameAndBirth`).
+ */
+export const NAME_AND_BIRTH_ITEM_KEYS: readonly string[] = ["ybm_identity.first_name", "ybm_identity.last_name", "ybm_identity.dob"];
+
+/**
+ * The questions this survey links sittings on, decided as ingest decides it:
+ * the four secret-code parts while the survey asks them (to r7.3.0), otherwise
+ * name and date of birth (D-52).
+ */
+export function linkageItemKeys(draft: Pick<StudioDraft, "instruments">): readonly string[] {
+  const asksCode = Object.values(draft.instruments).some(
+    (def) =>
+      (def as { instrument?: unknown }).instrument === "ybm_identity" &&
+      ((def as { forms?: { items?: { key?: unknown }[] }[] }).forms ?? []).some((f) => (f.items ?? []).some((i) => i.key === "ps_mother_initials")),
+  );
+  return asksCode ? LINKAGE_ITEM_KEYS : NAME_AND_BIRTH_ITEM_KEYS;
+}
+
 export type EditTier = "locked" | "protected" | "editable";
 
 /**

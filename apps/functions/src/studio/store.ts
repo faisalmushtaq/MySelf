@@ -1,7 +1,7 @@
 import type { DocumentReference, DocumentSnapshot, Firestore, Transaction } from "firebase-admin/firestore";
 import { paths } from "@myself/firebase";
 import { compareVersions } from "@myself/release/gate";
-import { hashHex, sha256, type ReleaseManifest } from "@myself/schema";
+import { canonicalJson, hashHex, sha256, type ReleaseManifest } from "@myself/schema";
 import {
   editTier,
   extractDraft,
@@ -174,6 +174,37 @@ export function licenceEscapes(draft: StudioDraft, published: Iterable<StudioDra
         "locked.licence_changed",
         `${name} is a licensed, validated instrument, and its licence in this draft has been changed to say it may be modified. A licence isn't something the Studio can change. Restore the draft from a published version, or remove the instrument.`,
         { kind: "block", refKey },
+      ),
+    );
+  }
+  return issues;
+}
+
+/**
+ * A file a draft says the release should pin (D-52: the postcode list) that no
+ * published release pins with exactly that path, hash and size. The Studio does
+ * not edit assets, so a pin it has never seen came from somewhere else — and a
+ * wrong hash would only be caught later, on every device, as a release the app
+ * refuses.
+ */
+export function assetEscapes(draft: StudioDraft, published: Iterable<Record<string, unknown>>): Issue[] {
+  const known = new Map<string, Set<string>>();
+  for (const source of published) {
+    const assets = (source as { assets?: unknown }).assets;
+    if (!assets || typeof assets !== "object") continue;
+    for (const [key, pin] of Object.entries(assets as Record<string, unknown>)) {
+      const set = known.get(key) ?? new Set<string>();
+      set.add(canonicalJson(pin));
+      known.set(key, set);
+    }
+  }
+  const issues: Issue[] = [];
+  for (const [key, pin] of Object.entries(draft.assets ?? {})) {
+    if (known.get(key)?.has(canonicalJson(pin))) continue;
+    issues.push(
+      problem(
+        "asset.unknown",
+        `The draft pins a file ('${key}') that no published version pins in exactly that form. Files like the postcode list can't be changed in the Studio. Restore the draft from a published version.`,
       ),
     );
   }

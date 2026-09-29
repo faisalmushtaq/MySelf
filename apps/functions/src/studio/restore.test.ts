@@ -13,7 +13,7 @@ import {
 } from "@myself/studio";
 import { bundledManifests } from "../releases.js";
 import { authorsOf, bumpTaken } from "./publish.js";
-import { identityIssues, licenceEscapes, lockBaseline } from "./store.js";
+import { assetEscapes, identityIssues, licenceEscapes, lockBaseline } from "./store.js";
 import { mergeRestore } from "./versions.js";
 
 vi.mock("firebase-functions/logger", () => ({ error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn(), log: vi.fn(), write: vi.fn() }));
@@ -172,6 +172,17 @@ describe("what the server refuses beyond Studio validation", () => {
     expect(issues).toHaveLength(1);
     expect(issues[0]).toMatchObject({ severity: "error", code: "locked.licence_changed", location: { refKey } });
     expect(licenceEscapes(live, [live])).toEqual([]);
+  });
+
+  it("a file pin no published version has, such as a different postcode list", () => {
+    const live = draftOf("8.0.0");
+    const published = [bundledManifests.find((b) => b.manifest.release.version === "8.0.0")!.raw as Record<string, unknown>];
+    expect(assetEscapes(live, published)).toEqual([]);
+    const tampered = structuredClone(live);
+    tampered.assets!["postcodes_west_yorkshire"]!.sha256 = `sha256:${"0".repeat(64)}`;
+    expect(assetEscapes(tampered, published).map((i) => i.code)).toEqual(["asset.unknown"]);
+    // A survey that pins nothing has nothing to check.
+    expect(assetEscapes(draftOf("7.3.0"), published)).toEqual([]);
   });
 
   it("a draft that claims to be another survey, or another study's", () => {

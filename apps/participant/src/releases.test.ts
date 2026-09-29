@@ -32,7 +32,7 @@ import { buildRuntime } from "./lib/runtime.js";
  */
 
 const BUILT_IN_TEXT = readFileSync(
-  fileURLToPath(new URL("../../../releases/ybm_nd2026_standard_r7.3.0.manifest.json", import.meta.url)),
+  fileURLToPath(new URL("../../../releases/ybm_nd2026_standard_r8.0.0.manifest.json", import.meta.url)),
   "utf8",
 );
 const BUILT_IN_HASH = (JSON.parse(BUILT_IN_TEXT) as { hash: string }).hash;
@@ -56,8 +56,8 @@ async function derived(edit: (body: Json) => void): Promise<{ json: string; hash
 /** A new version: different words on the first screen, and a new version number. */
 const nextRelease = () =>
   derived((body) => {
-    body["release"]["version"] = "7.2.0";
-    body["release"]["key"] = "ybm_nd2026_standard_r7_2_0";
+    body["release"]["version"] = "8.1.0";
+    body["release"]["key"] = "ybm_nd2026_standard_r8_1_0";
     body["composition"]["studyLabel"] = "Published from the Studio";
   });
 
@@ -67,8 +67,8 @@ function pointerDoc(hash: string, extra: Json = {}): Json {
     fields: {
       surveyId: { stringValue: SURVEY },
       hash: { stringValue: hash },
-      version: { stringValue: "7.2.0" },
-      releaseKey: { stringValue: "ybm_nd2026_standard_r7_2_0" },
+      version: { stringValue: "8.1.0" },
+      releaseKey: { stringValue: "ybm_nd2026_standard_r8_1_0" },
       engineVersion: { stringValue: "0.1.0" },
       generation: { integerValue: "3" },
       publishedAt: { timestampValue: "2026-09-28T12:00:00.000Z" },
@@ -144,14 +144,14 @@ describe("what this build can render", () => {
     expect([...SUPPORTED_ENGINE_VERSIONS]).toEqual([...ENGINE_VERSIONS]);
   });
 
-  it("carries r7.3.0 as the built-in release, parsed as App always parsed it", () => {
+  it("carries r8.0.0 as the built-in release, parsed as App always parsed it", () => {
     expect(BUILT_IN.hash).toBe(BUILT_IN_HASH);
-    expect(BUILT_IN.manifest.release.version).toBe("7.3.0");
+    expect(BUILT_IN.manifest.release.version).toBe("8.0.0");
     expect(BUILT_IN.source).toBe("built-in");
     // And its runtime is today's: the same unit list the flattening tests describe.
     const runtime = buildRuntime(BUILT_IN.manifest);
     expect(runtime.hash).toBe(BUILT_IN_HASH);
-    expect(runtime.releaseKey).toBe("ybm_nd2026_standard_r7_3_0");
+    expect(runtime.releaseKey).toBe("ybm_nd2026_standard_r8_0_0");
     expect(runtime.flattened.units.length).toBeGreaterThan(100);
     expect(runtime.unitKeyOf(0)).toBe("ybm_intro_consent.intro");
     expect(runtime.wordsAt(0)).toBeGreaterThan(0);
@@ -163,8 +163,8 @@ describe("the study's public documents over REST", () => {
   it("reads the pointer, including a generation written as a string", () => {
     expect(parsePointerDocument(pointerDoc(BUILT_IN_HASH))).toEqual({
       hash: BUILT_IN_HASH,
-      version: "7.2.0",
-      releaseKey: "ybm_nd2026_standard_r7_2_0",
+      version: "8.1.0",
+      releaseKey: "ybm_nd2026_standard_r8_1_0",
       engineVersion: "0.1.0",
       generation: 3,
       publishedAt: "2026-09-28T12:00:00.000Z",
@@ -247,7 +247,7 @@ describe("whether a downloaded release may be rendered", () => {
     const result = await verifyRelease(BUILT_IN_TEXT, BUILT_IN_HASH, { surveyId: SURVEY });
     expect(result.ok).toBe(true);
     if (result.ok) {
-      expect(result.manifest.release.version).toBe("7.3.0");
+      expect(result.manifest.release.version).toBe("8.0.0");
       expect(result.raw["hash"]).toBe(BUILT_IN_HASH);
     }
   });
@@ -256,6 +256,25 @@ describe("whether a downloaded release may be rendered", () => {
     const next = await nextRelease();
     const result = await verifyRelease(next.json, next.hash, { surveyId: SURVEY });
     expect(result.ok).toBe(true);
+  });
+
+  it("refuses a release pinning a postcode list other than the one this build carries", async () => {
+    // Genuinely published (it hashes), but the list it pins is not this build's:
+    // the address question would check postcodes against the wrong list (D-52).
+    const other = await derived((body) => {
+      body["assets"]["postcodes_west_yorkshire"]["sha256"] = `sha256:${"0".repeat(64)}`;
+    });
+    expect(await verifyRelease(other.json, other.hash)).toEqual({
+      ok: false,
+      reason: "its file 'postcodes_west_yorkshire' is not the one this version of the app carries",
+    });
+    const unknown = await derived((body) => {
+      body["assets"]["postcodes_elsewhere"] = { path: "releases/assets/elsewhere.txt", sha256: `sha256:${"1".repeat(64)}`, bytes: 1 };
+    });
+    expect(await verifyRelease(unknown.json, unknown.hash)).toEqual({
+      ok: false,
+      reason: "it needs the file 'postcodes_elsewhere', which this version of the app does not carry",
+    });
   });
 
   it("refuses a manifest with one label changed and the old hash kept", async () => {
@@ -363,7 +382,7 @@ describe("what the start screen shows, from this device alone", () => {
     cache.rows.set(next.hash, {
       hash: next.hash,
       releaseKey: "k",
-      version: "7.2.0",
+      version: "8.1.0",
       json: next.json.replace("Published from the Studio", "Altered on the device"),
       cachedAt: "2026-09-28T12:00:00.000Z",
     });
@@ -385,7 +404,7 @@ describe("what the start screen shows, from this device alone", () => {
     const releases = service(cache);
     await releases.cacheRelease(next.json, next.hash);
     expect(await releases.releaseForHash(BUILT_IN_HASH)).toBe(BUILT_IN);
-    expect((await releases.releaseForHash(next.hash))?.manifest.release.version).toBe("7.2.0");
+    expect((await releases.releaseForHash(next.hash))?.manifest.release.version).toBe("8.1.0");
     expect(await releases.releaseForHash(`sha256:${"a".repeat(64)}`)).toBeNull();
   });
 });
@@ -425,7 +444,7 @@ describe("looking for a newer release", () => {
     const releases = service(cache, transport);
 
     const result = await releases.refreshActiveRelease();
-    expect(result.record.outcome).toEqual({ kind: "activated", hash: next.hash, version: "7.2.0" });
+    expect(result.record.outcome).toEqual({ kind: "activated", hash: next.hash, version: "8.1.0" });
     expect(result.activeHash).toBe(next.hash);
     expect(cache.current?.activeHash).toBe(next.hash);
     // Stored as the exact string, so it can be verified again when read back.
@@ -442,7 +461,7 @@ describe("looking for a newer release", () => {
 
     // A second look finds nothing new, and downloads nothing.
     const again = await releases.refreshActiveRelease();
-    expect(again.record.outcome).toEqual({ kind: "up_to_date", hash: next.hash, version: "7.2.0" });
+    expect(again.record.outcome).toEqual({ kind: "up_to_date", hash: next.hash, version: "8.1.0" });
     expect(calls).toHaveLength(3);
   });
 
@@ -517,10 +536,10 @@ describe("looking for a newer release", () => {
     const cache = memoryCache();
     await service(cache).cacheRelease(next.json, next.hash);
     await cache.saveState({ activeHash: next.hash });
-    const { transport, calls } = study({ pointer: pointerDoc(BUILT_IN_HASH, { version: { stringValue: "7.3.0" } }) });
+    const { transport, calls } = study({ pointer: pointerDoc(BUILT_IN_HASH, { version: { stringValue: "8.0.0" } }) });
 
     const result = await service(cache, transport).refreshActiveRelease();
-    expect(result.record.outcome).toEqual({ kind: "activated", hash: BUILT_IN_HASH, version: "7.3.0" });
+    expect(result.record.outcome).toEqual({ kind: "activated", hash: BUILT_IN_HASH, version: "8.0.0" });
     expect(result.activeHash).toBe(BUILT_IN_HASH);
     expect(calls).toHaveLength(1);
   });
@@ -532,8 +551,8 @@ describe("looking for a newer release", () => {
     // launch would open on the built-in release and could not resume them.
     const a = await nextRelease();
     const b = await derived((body) => {
-      body["release"]["version"] = "7.3.0";
-      body["release"]["key"] = "ybm_nd2026_standard_r7_3_0";
+      body["release"]["version"] = "8.2.0";
+      body["release"]["key"] = "ybm_nd2026_standard_r8_2_0";
       body["composition"]["studyLabel"] = "Published again";
     });
     const docs: { pointer: Json | null; releases: Record<string, Json> } = {
@@ -574,7 +593,7 @@ describe("looking for a newer release", () => {
   });
 
   it("says what happened in words a researcher can act on", () => {
-    expect(describeCheck({ kind: "up_to_date", hash: BUILT_IN_HASH, version: "7.3.0" })).toBe("up to date.");
+    expect(describeCheck({ kind: "up_to_date", hash: BUILT_IN_HASH, version: "8.0.0" })).toBe("up to date.");
     expect(describeCheck({ kind: "refused", hash: BUILT_IN_HASH, version: "8.0.0", reason: "it needs survey engine 9.0.0" })).toMatch(
       /\(8\.0\.0\) was not used, because it needs survey engine 9\.0\.0/,
     );

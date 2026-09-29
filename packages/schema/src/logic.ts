@@ -29,7 +29,8 @@ export type LogicExpr =
   | { op: "gt"; target: z.infer<typeof answerTarget>; value: number }
   | { op: "gte"; target: z.infer<typeof answerTarget>; value: number }
   | { op: "lt"; target: z.infer<typeof answerTarget>; value: number }
-  | { op: "lte"; target: z.infer<typeof answerTarget>; value: number };
+  | { op: "lte"; target: z.infer<typeof answerTarget>; value: number }
+  | { op: "age_gte"; target: z.infer<typeof answerTarget>; years: number };
 
 export const logicExpr: z.ZodType<LogicExpr> = z.lazy(() =>
   z.discriminatedUnion("op", [
@@ -52,6 +53,12 @@ export const logicExpr: z.ZodType<LogicExpr> = z.lazy(() =>
     z.object({ op: z.literal("gte"), target: answerTarget, value: z.number() }),
     z.object({ op: z.literal("lt"), target: answerTarget, value: z.number() }),
     z.object({ op: z.literal("lte"), target: answerTarget, value: z.number() }),
+    /**
+     * The participant is at least `years` old, in whole years, on the day the
+     * sitting started. The target is a date-of-birth answer. False when the date
+     * is missing or unreadable, or when no sitting date is supplied (D-51).
+     */
+    z.object({ op: z.literal("age_gte"), target: answerTarget, years: z.number().int().min(0).max(120) }),
   ]),
 ) as z.ZodType<LogicExpr>;
 

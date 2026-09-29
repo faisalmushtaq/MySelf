@@ -215,6 +215,168 @@ now lists only a definition's items, and ingest and the participant app fill onl
 those. This is a fix in the reading, not in any release: rebuilding a dataset
 gives every version's totals.
 
+### The SDQ by age: the 11–17 and 18+ forms (r8.0.0, D-51)
+
+**The problem (A-7).** youthinmind publishes the self-report SDQ in two forms: one
+for 11–17 year olds (S11-17, © Robert Goodman 2005) and one for adults (S18+,
+© 2009). r1.0.0–r7.3.0 administered one form to everyone, and it was neither:
+22 items were the S11-17 wording and three were the S18+ wording, word for word —
+19 "Other people pick on me or bully me" (S11-17: "Other children or young
+people…"), 20 "I often offer to help others (family members, friends,
+colleagues)" (S11-17: "I often volunteer to help others (parents, teachers,
+children)") and 22 "…from home, work or elsewhere" (S11-17: "…home, school or
+elsewhere"). Checked against both forms as downloaded from sdqinfo.org (English,
+UK).
+
+**The decision.** Each participant is given the form published for their age:
+
+- **Under 18 → `sdq25_s` 2.0, the S11-17 verbatim.** Items 19, 20 and 22 take
+  the S11-17 wording as **revision 2**; the other 22 items are unchanged (revision
+  1). Variables are unchanged (`sdq25_q19`…): names survive versions, and the
+  codebook and long format carry the item revision (§2). MAJOR on the instrument,
+  because three items read differently: sittings before and after r8.0.0 pool on
+  the other 22 items, and on 19, 20 and 22 only with a comparability argument.
+- **18 and over → `sdq25_s18` 1.0, the S18+ verbatim.** A separate instrument,
+  because 12 of its 25 items read differently from the S11-17 ("I would rather be
+  alone than with other people", "I am generally willing to do what other people
+  want", "I have at least one good friend", "I am kind to children", …).
+  Variables `sdq25_s18_q1`…`sdq25_s18_q25`. Same subscales, reverse-scored items
+  and pro-rating as the S11-17 (`score.sdq25_s18`): youthinmind's scoring
+  instructions (20 June 2016) are "identical for the similarly-worded '18+' SDQ",
+  but the 4–17 cut-points "have not been validated for use with the 18+ SDQ, so
+  … it is safest to use continuous scores rather than categories". No bands.
+- **Age** is whole years from the date of birth (`ybm_identity.dob`, asked in
+  "About you", before the SDQ) to the **day the sitting started** — the UTC
+  calendar date of the session's start, so the device and anything re-evaluating
+  the sitting later reach the same answer. In the UK that date differs from the
+  local one only between midnight and 1 am in summer. A sitting resumed on a later
+  day keeps the form it started with. If the date of birth is missing or cannot be
+  read (it is required, so this should not happen), the participant is given the
+  S11-17 — the study's population.
+
+**How it is expressed.** The wellbeing section places both instruments with
+component conditions: `sdq25_s18` when `age_gte(dob, 18)`, `sdq25_s` when
+`not(age_gte(dob, 18))`. `age_gte` is a new logic operator: true when the target
+is a date answer and the participant's age on the evaluation date is at least
+`years`; false when the date is missing, unreadable, or no evaluation date was
+supplied. Exactly one of the two conditions holds for every sitting, so every
+participant sees exactly one SDQ. The walker takes the session's start date and
+passes it to `evaluate()`; the publish gate's dependency audit already requires
+the date of birth to be asked before anything that depends on it.
+
+**Unchanged.** The as-administered Qualtrics form (`ybm-asadmin`, A-6/A-7) keeps
+its wording and codes: it records what was fielded before MySelf and is never
+administered. Instructions are the screen adaptation used since r4.0.0 for both
+forms (the S11-17 and S18+ paper instructions are the same text).
+
+**Licence.** The research team's youthinmind permission (D-10) covers the SDQ for
+electronic administration; that it extends to the S18+ form is to be confirmed
+with youthinmind, and is recorded on the instrument as unverified until then.
+
+**For analysts.** Scores for under-18s are `score.sdq25_s`, for adults
+`score.sdq25_s18`; the two share a scale structure, not norms. The research
+dashboard reports them as separate instruments and bands only the S11-17.
+
+### The home address instead of a secret code (r8.0.0, D-52)
+
+**Decision.** The four questions that built a secret code (mother's initials, a
+house digit, birth month, postcode letters) and their introduction are removed.
+In their place participants give their **home address** — the one they live at
+most of the time; a young person who lives across two homes gives the one they
+stay at most. The research team derives an identifier from what participants
+give, rather than asking them to construct one. Ethics: the team confirmed the
+approval covers collecting addresses (PSCETHS-1449); the information screen and
+consent statements say so (below).
+
+**The question.** One screen (`ybm_identity.home_address`, a `form_fields` item
+with a `postcodeCheck`), after name and date of birth: postcode first, then house
+number or name, and street, stored as given as `{postcode, house, street}`. The postcode is checked on the device against
+a list of every West Yorkshire postcode in use (`releases/assets/`, built by
+`scripts/build-postcodes.mjs` from the ONS Postcode Directory, Open Government
+Licence), and the ward and district it lies in are shown back — "Little London &
+Woodhouse, Leeds" — so a mistyped postcode is noticed at once. The list ships
+with the release and is pinned by hash in `manifest.assets`, so the check needs
+no network and no postcode leaves the device. A postcode that is not in the list
+(outside West Yorkshire, too new for the list, or mistyped) is **never refused**:
+the participant confirms twice — that it is typed correctly, then that their home
+is outside West Yorkshire ("No — I'll check my postcode" takes them back to it) —
+and whatever they give is kept as typed. Nothing else is recorded: whether a saved
+postcode is in the list can be worked out at any time from the postcode and the
+list the release pins. Every field is optional — many 11-year-olds do not know
+their postcode — so a participant gives what they know.
+
+**Identity.** The address is identifying (`identifying: true`), frozen into the
+release and diverted by ingest into the identity partition like the name and
+date of birth; it never becomes a response row or reaches an export.
+
+**The participant identifier.** From r8.0.0 a sitting carries no code, so ingest
+derives the participant ID from **first name, last name and date of birth**:
+`P` followed by ten characters of a SHA-256 of the three, each normalised
+(letters and digits only, lower case, accents removed — so spacing, hyphens and apostrophes never split a person; the date as YYYY-MM-DD). Like the
+code before it, the ID is a pseudonym, not an anonymisation: anyone holding a
+name and a date of birth can recompute it, so it is handled as pseudonymous data.
+The address is deliberately **not** part of it: people move, and some young
+people live in two homes, so an address would split one person into two.
+Different first names separate twins, which a shared secret code could not.
+A participant who gives a different form of their name at a later wave (Tom,
+Thomas) arrives as a new ID and is joined by a correction record, exactly as a
+mistyped code was (§7). Sittings under r1.0.0–r7.3.0 keep their secret-code IDs;
+the two schemes never produce the same ID (codes never begin `P` followed by
+ten base-32 characters).
+
+**Where the address is kept.** Ingest files it as an identity row (JSON of the
+fields given). Every store reads that value through one helper,
+`parseHomeAddress` in `packages/store`, which keeps only `postcode`, `house` and
+`street`, trimmed, and drops a value it cannot read rather than storing it as
+text. Each of the three stores below keeps it in two places. Every sitting's
+claim keeps the address given at that sitting. The participant's record keeps
+the address from the **most recent sitting that gave one**. Recency is judged by
+when the sitting started, not when it arrived, so a sitting uploaded late does
+not replace a newer address with an older one. A sitting that gives no address
+leaves the one on file. Unlike a name, which keeps its first spelling, an
+address is expected to change.
+
+- **Firebase identity service** (`apps/functions`). The claim and registry
+  documents carry `homeAddress`. The registry also carries
+  `homeAddressRecordedAt`, the start time of the sitting the address came from.
+  The registry is read and written in one transaction, with `mergeFields` rather
+  than `merge`. `merge` folds a map into the stored one key by key, so a house
+  number given once and left out later would survive under a new postcode. The
+  first version deployed with r8.0.0 had that flaw. It would only show for
+  someone who sat twice with different addresses, and on their next sitting the
+  address is replaced whole. An address filed before `homeAddressRecordedAt`
+  existed has no date, so the next sitting that gives one replaces it.
+- **Postgres API** (`apps/api`, not deployed). Migration
+  `006_home_address.sql` adds nullable columns:
+  - `identity.code_claims.home_address`;
+  - `identity.participants.home_address`;
+  - `identity.participants.home_address_recorded_at`.
+
+  The migration is additive. It rewrites no row, and a database that has never
+  had an r8.0.0 sitting behaves as before. The columns fall under the existing
+  table grants: the linkage role can read and write them, and the research role
+  cannot reach the identity schema at all. The owner-only `/identity/lookup`
+  returns `homeAddress`.
+- **Researcher view**. The address is kept in the sealed person record, taken
+  from the latest claim that has one. It is also added to the identifier file,
+  with spreadsheet formulas neutralised.
+
+**Wording.** The information screen no longer promises "an anonymous code"; it
+says the team collects name, date of birth and home address, keeps them apart
+from the answers, and uses them to link a young person's answers across visits
+and to find them if they ask to withdraw. The consent statement "my name will
+not be linked with the research materials" becomes "my name, date of birth and
+address will be kept separately from my answers". The team should check this
+wording against the documents the ethics committee approved.
+
+**SDQ 18+ item 22.** The published S18+ reads "I take things that are not mine
+from home, work or elsewhere". Many of the study's 18-year-olds are still at
+school or college, or at university, so the study asks "…from home, school or
+college, university, work or elsewhere". This departs from youthinmind's
+published wording, which their terms do not allow without permission; it is
+recorded on the item and in the instrument's changelog, and should be raised
+with youthinmind with the S18+ licence question (D-51).
+
 ## 7. Identifiers and linkage (r7.0.0, D-37)
 
 Section 6 described the data layer as built. This corrects a gap in it that was

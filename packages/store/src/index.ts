@@ -1,3 +1,4 @@
+export * from "./address.js";
 export * from "./bids.js";
 export * from "./dataset.js";
 export * from "./demo.js";

@@ -37,6 +37,7 @@ export function extractDraft(raw: unknown): StudioDraft {
     retiredCodes: {},
     unlocked: {},
     notes: {},
+    ...(Object.keys(manifest.assets).length > 0 ? { assets: structuredClone(manifest.assets) } : {}),
   };
 }
 
@@ -62,6 +63,7 @@ export function compileDraft(draft: StudioDraft): { composition: CompositionInpu
       modules,
       scales: Object.values(draft.scales),
       scoring: Object.values(draft.scoring),
+      ...(draft.assets ? { assets: draft.assets } : {}),
     },
   };
 }
@@ -92,7 +94,7 @@ export function previewRelease(draft: StudioDraft): PreviewRelease {
     const { composition, registries } = compileDraft(draft);
     const { body, failures } = freezeRelease(composition, registries, {
       ...PREVIEW_META,
-      engineVersion: requiredEngineVersion(composition as { sections: { components: { kind: string }[] }[] }),
+      engineVersion: requiredEngineVersion(composition as { sections: { components: { kind: string }[] }[] }, registries),
     });
     return { manifest: releaseManifest.parse(body), failures, error: null };
   } catch (error) {
@@ -151,6 +153,7 @@ export function parseDraft(json: string): StudioDraft {
     retiredCodes: d.retiredCodes ?? {},
     unlocked: d.unlocked ?? {},
     notes: d.notes ?? {},
+    ...(d.assets ? { assets: d.assets } : {}),
   };
 }
 

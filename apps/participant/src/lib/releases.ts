@@ -10,7 +10,7 @@ import {
   type ReleaseManifest,
 } from "@myself/schema";
 import { z } from "zod";
-import builtInJson from "../../../../releases/ybm_nd2026_standard_r7.3.0.manifest.json";
+import builtInJson from "../../../../releases/ybm_nd2026_standard_r8.0.0.manifest.json";
 import {
   getCachedRelease,
   getReleaseState,
@@ -21,6 +21,7 @@ import {
   type ReleaseStateRow,
 } from "./db.js";
 import { flattenManifest } from "./flatten.js";
+import { POSTCODE_LISTS } from "./postcodes.js";
 
 /**
  * Which release this device runs, and how a new one gets here (docs/16 §5.3).
@@ -39,7 +40,7 @@ import { flattenManifest } from "./flatten.js";
  *   - A SITTING KEEPS ITS RELEASE. What changes here is which release a NEW
  *     sitting starts under; resuming one is App's business, through
  *     `releaseForHash`, and is always under the sitting's own hash.
- *   - THE BUILT-IN RELEASE (r7.3.0) IS THE FLOOR. With nothing published, nothing
+ *   - THE BUILT-IN RELEASE (r8.0.0) IS THE FLOOR. With nothing published, nothing
  *     cached, or anything at all going wrong, the app renders what it rendered
  *     before any of this existed.
  *
@@ -101,6 +102,21 @@ export type Verification =
  * Nothing is mutated: zod returns new objects, and the raw JSON is what App
  * flattens, exactly as it always flattened the built-in manifest.
  */
+const assetHashes = new Map<string, Promise<string>>();
+
+/** `sha256:<hex>` of a bundled file, over its UTF-8 bytes as the release pins it; computed once. */
+function bundledAssetHash(key: string, text: string): Promise<string> {
+  let hash = assetHashes.get(key);
+  if (!hash) {
+    hash = crypto.subtle.digest("SHA-256", new TextEncoder().encode(text)).then((digest) => {
+      const hex = [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
+      return `sha256:${hex}`;
+    });
+    assetHashes.set(key, hash);
+  }
+  return hash;
+}
+
 export async function verifyRelease(
   json: string,
   expectedHash: string,
@@ -163,6 +179,16 @@ async function verify(json: string, expectedHash: string, options: { surveyId?: 
   for (const [key, scoring] of Object.entries(manifest.scoring)) {
     const result = scoringDefinition.safeParse(scoring);
     if (!result.success) return refuse(`scoring '${key}' is not valid (${firstIssue(result.error)})`);
+  }
+  // Every file the release pins must be one this build carries, byte for byte
+  // (D-52). A postcode list the app does not have would quietly switch the
+  // check off; a different one would check against the wrong list.
+  for (const [key, pin] of Object.entries(manifest.assets)) {
+    const text = POSTCODE_LISTS[key];
+    if (text === undefined) return refuse(`it needs the file '${key}', which this version of the app does not carry`);
+    if ((await bundledAssetHash(key, text)) !== pin.sha256) {
+      return refuse(`its file '${key}' is not the one this version of the app carries`);
+    }
   }
 
   let units: ReturnType<typeof flattenManifest>["units"];

@@ -25,6 +25,27 @@ describe("a release opened in the Studio", () => {
     expect(rebuilt.hash).toBe(r730.hash);
   });
 
+  it("does the same for every release from r7.2.0, including r8.0.0's age conditions and postcode list", () => {
+    // Earlier releases carry the SWEMWBS and STAI-5 scoring r7.2.0 fixed, which the gate now refuses.
+    for (const version of ["7.2.0", "7.3.0", "8.0.0"]) {
+      const raw = JSON.parse(
+        readFileSync(resolve(__dirname, `../../../releases/ybm_nd2026_standard_r${version}.manifest.json`), "utf8"),
+      ) as typeof r730;
+      const draft = parseDraft(serialiseDraft(extractDraft(raw)));
+      const { composition, registries } = compileDraft(draft);
+      const rebuilt = buildRelease(composition, registries, {
+        version: raw.release.version,
+        publishedAt: raw.release.publishedAt,
+        publishedBy: raw.release.publishedBy,
+        engineVersion: raw.release.engineVersion,
+        ...(raw.release.decisionRefs ? { decisionRefs: raw.release.decisionRefs } : {}),
+      });
+      expect(rebuilt.hash, version).toBe(raw.hash);
+      // What the Studio would declare for it on its own is what was declared.
+      expect(previewRelease(draft).manifest?.release.engineVersion, version).toBe(raw.release.engineVersion);
+    }
+  });
+
   it("survives being stored and read back", () => {
     const draft = extractDraft(r730);
     expect(parseDraft(serialiseDraft(draft))).toEqual(draft);

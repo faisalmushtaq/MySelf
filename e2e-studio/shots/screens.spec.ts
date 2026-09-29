@@ -73,13 +73,13 @@ test("photograph every Studio screen", async ({ page, browser }) => {
   await expect(search).toBeVisible({ timeout: 60_000 });
   await page.goto("researcher/#/surveys");
   await expect(page.getByRole("table", { name: "Surveys" })).toBeVisible({ timeout: 30_000 });
-  await expect(page.getByText(/r7\.3\.0/).first()).toBeVisible({ timeout: 60_000 });
+  await expect(page.getByText(/r8\.0\.0/).first()).toBeVisible({ timeout: 60_000 });
   await shot(page, "04-surveys");
 
   // The editor, once the live version it started from is known.
   await page.goto("researcher/#/surveys/ybm_nd2026_standard/edit");
   await expect(search).toBeVisible({ timeout: 60_000 });
-  await expect(page.getByText(/^r7\.3\.0 · /).first()).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByText(/^r8\.0\.0 · /).first()).toBeVisible({ timeout: 30_000 });
   await shot(page, "05-editor-overview");
 
   await search.fill("smartphone");
@@ -152,8 +152,8 @@ test("photograph every Studio screen", async ({ page, browser }) => {
   await shot(page, "19-publish-note");
   await publish.getByRole("button", { name: "Continue" }).click();
   await shot(page, "20-publish-confirm");
-  await publish.getByRole("button", { name: /^Publish r?8/ }).click();
-  await expect(page.getByText(/8\.0\.0 is live/)).toBeVisible({ timeout: 60_000 });
+  await publish.getByRole("button", { name: /^Publish r?9/ }).click();
+  await expect(page.getByText(/9\.0\.0 is live/)).toBeVisible({ timeout: 60_000 });
   await expect(page.getByText(/In sync with live|Draft differs from live/).first()).toBeVisible({ timeout: 15_000 });
   await shot(page, "21-published", { keepToasts: true });
   await page.keyboard.press("Escape");
@@ -164,11 +164,11 @@ test("photograph every Studio screen", async ({ page, browser }) => {
   await shot(page, "22-preview");
 
   await page.goto("researcher/#/surveys/ybm_nd2026_standard/versions");
-  await expect(page.getByText(/8\.0\.0/).first()).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByText(/9\.0\.0/).first()).toBeVisible({ timeout: 30_000 });
   // The sittings column fills in once the count comes back (a cold function, the first time).
   await expect(page.getByRole("status", { name: "Counting sittings" })).toHaveCount(0, { timeout: 60_000 });
   await shot(page, "23-versions");
-  // The version before the live one against the draft: the draft is r8.0.0 now, so comparing that would show nothing.
+  // The version before the live one against the draft: the draft is r9.0.0 now, so comparing that would show nothing.
   const compare = page.getByRole("button", { name: /^Compare .* with the draft$/ }).nth(1);
   if (await compare.count()) {
     await compare.click();

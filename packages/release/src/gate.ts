@@ -50,6 +50,12 @@ export interface Registries {
    * be run.
    */
   narrativeProtocols?: NarrativeProtocol[];
+  /**
+   * Files items refer to — the postcode list an address question checks
+   * against (D-52) — with their content hashes. Only the ones the composition
+   * uses are frozen into the release.
+   */
+  assets?: Record<string, { path: string; sha256: string; bytes: number }>;
 }
 
 export interface PublishMeta {
@@ -70,18 +76,26 @@ export class PublishGateError extends Error {
 /**
  * The renderer capability a composition needs (D-49).
  *
- * 0.1.0 is every release up to r7.1.0. 0.2.0 adds component `items` subsets.
+ * 0.1.0 is every release up to r7.1.0. 0.2.0 adds component `items` subsets,
+ * `age_gte` conditions (D-51) and postcode-checked address fields (D-52) — the
+ * first build that loads releases at runtime renders all three.
  * The participant app refuses a release that needs more than it can render and
  * keeps running the one it has, so a feature can never reach a device that
  * would show it as a blank screen.
  */
 export const ENGINE_VERSIONS = ["0.1.0", "0.2.0"] as const;
 
-export function requiredEngineVersion(composition: { sections: { components: { kind: string; items?: unknown }[] }[] }): string {
+export function requiredEngineVersion(
+  composition: { sections: { components: { kind: string; items?: unknown }[] }[] },
+  registries?: { instruments?: unknown; modules?: unknown; assets?: Record<string, unknown> },
+): string {
   const usesSubsets = composition.sections.some((s) =>
     s.components.some((c) => (c.kind === "instrument" || c.kind === "module") && Array.isArray(c.items)),
   );
-  return usesSubsets ? "0.2.0" : "0.1.0";
+  const definitions = JSON.stringify([composition, registries?.instruments ?? null, registries?.modules ?? null]);
+  const usesAge = definitions.includes('"op":"age_gte"');
+  const usesPostcodes = Object.keys(registries?.assets ?? {}).length > 0 || definitions.includes('"postcodeCheck":');
+  return usesSubsets || usesAge || usesPostcodes ? "0.2.0" : "0.1.0";
 }
 
 /** -1 / 0 / 1, numerically by MAJOR.MINOR.PATCH. */
@@ -337,7 +351,7 @@ export interface ManifestBody {
   narrativeProtocols: Record<string, unknown>;
   prompts: Record<string, unknown>;
   modelConfigs: Record<string, unknown>;
-  assets: Record<string, never>;
+  assets: Record<string, { path: string; sha256: string; bytes: number }>;
 }
 
 /**
@@ -373,6 +387,7 @@ export function freezeRelease(
   const scaleByKey = new Map(scales.map((s) => [s.key, s]));
   const scoringByKey = new Map(scoring.map((s) => [s.key, s]));
   const seenVariables = new Map<string, string>();
+  const frozenAssets: Record<string, { path: string; sha256: string; bytes: number }> = {};
   /** Question ID -> the section that first administers it. */
   const administered = new Map<string, string>();
 
@@ -471,6 +486,15 @@ export function freezeRelease(
             frozenScales[item.scale] = scale;
           }
         }
+        if (item.responseType === "form_fields" && item.postcodeCheck) {
+          const check = item.postcodeCheck;
+          const asset = registries.assets?.[check.asset];
+          if (!asset) failures.push(`${ref.instrument}/${item.key}: postcode list '${check.asset}' is not among the release's assets`);
+          else frozenAssets[check.asset] = asset;
+          if (!item.fields.some((f) => f.key === check.field)) {
+            failures.push(`${ref.instrument}/${item.key}: postcode check names field '${check.field}', which the item does not have`);
+          }
+        }
         const pipes = item.stem.pipes ?? {};
         for (const [name, pipe] of Object.entries(pipes)) {
           if (!item.stem.text.includes(`{${name}}`)) {
@@ -515,7 +539,7 @@ export function freezeRelease(
   // A release must say what it needs to be rendered, and must not claim less:
   // a device that believed it could render a subset-using release would show
   // every question of the instrument in every placement.
-  const needed = requiredEngineVersion(draft);
+  const needed = requiredEngineVersion(draft, { instruments: frozenInstruments, assets: frozenAssets });
   if (compareVersions(meta.engineVersion, needed) < 0) {
     failures.push(`this composition needs engine ${needed}, but the release declares engine ${meta.engineVersion}`);
   }
@@ -539,7 +563,7 @@ export function freezeRelease(
     narrativeProtocols: frozenProtocols,
     prompts: frozenPrompts,
     modelConfigs: frozenModelConfigs,
-    assets: {},
+    assets: frozenAssets,
   };
   return { body, failures };
 }

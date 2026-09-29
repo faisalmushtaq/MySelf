@@ -28,9 +28,9 @@ const STUDY = "ybm";
 type Raw = Record<string, unknown> & { release: Record<string, unknown>; hash?: string };
 
 /** The live release, republished under a new version: a release only the store holds. */
-async function studioRelease(version = "8.0.0"): Promise<{ raw: Raw; hash: string }> {
-  const live = bundledManifests.find((b) => b.manifest.release.version === "7.1.0");
-  if (!live) throw new Error("r7.1.0 is not bundled");
+async function studioRelease(version = "9.0.0"): Promise<{ raw: Raw; hash: string }> {
+  const live = bundledManifests.find((b) => b.manifest.release.version === "8.0.0");
+  if (!live) throw new Error("r8.0.0 is not bundled");
   const body = structuredClone(live.raw) as Raw;
   delete body.hash;
   body.release = {
@@ -85,7 +85,7 @@ describe("the bundled releases", () => {
       expect(await verifyRawManifestHash(raw)).toBe(true);
       expect(releasesByHash.get(manifest.hash!)).toBe(manifest);
     }
-    expect(latestRelease?.release.version).toBe("7.3.0");
+    expect(latestRelease?.release.version).toBe("8.0.0");
   });
 });
 
@@ -107,7 +107,7 @@ describe("resolving a release by hash", () => {
     const found = await releaseResolver()(db, STUDY, hash);
     expect(found?.source).toBe("store");
     expect(found?.manifest.hash).toBe(hash);
-    expect(found?.manifest.release.version).toBe("8.0.0");
+    expect(found?.manifest.release.version).toBe("9.0.0");
     expect(logger.error).not.toHaveBeenCalled();
   });
 
@@ -130,12 +130,12 @@ describe("resolving a release by hash", () => {
   it("refuses an intact release filed under another release's hash", async () => {
     // Every byte of it verifies — against its own hash. Read under the one it
     // is filed as, it would be exactly the silent misread D-35 forbids.
-    const eight = await studioRelease("8.0.0");
     const nine = await studioRelease("9.0.0");
+    const ten = await studioRelease("10.0.0");
     const { db, put } = fakeStore();
-    put(nine.hash, { ...storeDoc(eight.raw, eight.hash), hash: nine.hash });
+    put(ten.hash, { ...storeDoc(nine.raw, nine.hash), hash: ten.hash });
 
-    expect(await releaseResolver()(db, STUDY, nine.hash)).toBeNull();
+    expect(await releaseResolver()(db, STUDY, ten.hash)).toBeNull();
     expect(logger.error).toHaveBeenCalledWith(
       expect.stringMatching(/failed verification/),
       expect.objectContaining({ reason: expect.stringMatching(/different hash/) }),

@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { Db } from "../db/index.js";
 import { audit } from "../auth.js";
+import { parseHomeAddress, type HomeAddress } from "@myself/store";
 
 /**
  * The linkage service.
@@ -71,6 +72,8 @@ export interface IdentityRecord {
   givenName: string | null;
   familyName: string | null;
   dateOfBirth: string | null;
+  /** From the most recent sitting that gave one (r8.0.0 on, D-52). */
+  homeAddress: HomeAddress | null;
   upn: string | null;
   study: string;
 }
@@ -94,10 +97,11 @@ export async function lookupByCode(
     given_name: string | null;
     family_name: string | null;
     date_of_birth: Date | null;
+    home_address: HomeAddress | null;
     upn: string | null;
     study: string;
   }>(
-    `SELECT participant_code, given_name, family_name, date_of_birth, upn, study
+    `SELECT participant_code, given_name, family_name, date_of_birth, home_address, upn, study
        FROM identity.participants WHERE participant_code = $1`,
     [input.participantCode],
   );
@@ -108,6 +112,7 @@ export async function lookupByCode(
     givenName: row.given_name,
     familyName: row.family_name,
     dateOfBirth: row.date_of_birth ? new Date(row.date_of_birth).toISOString().slice(0, 10) : null,
+    homeAddress: row.home_address ?? null,
     upn: row.upn,
     study: row.study,
   };
@@ -300,25 +305,40 @@ export async function storeIdentity(
     const given = entry.values["first_name"] ?? null;
     const family = entry.values["last_name"] ?? null;
     const dob = entry.values["dob"] ?? null;
+    const address = parseHomeAddress(entry.values["home_address"]);
+    const addressJson = address ? JSON.stringify(address) : null;
 
     await db.query(
-      `INSERT INTO identity.code_claims (study, session_id, claimed_code, given_name, family_name, date_of_birth, recorded_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
+      `INSERT INTO identity.code_claims (study, session_id, claimed_code, given_name, family_name, date_of_birth, home_address, recorded_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8)
        ON CONFLICT (session_id) DO NOTHING`,
-      [study, sessionId, entry.participantId, given, family, dob, entry.recordedAt],
+      [study, sessionId, entry.participantId, given, family, dob, addressJson, entry.recordedAt],
     );
 
     // The registry keeps the first name given for a code and does not
     // overwrite it: a later wave with a different spelling is evidence to look
-    // at, not a reason to quietly replace what is on file.
+    // at, not a reason to quietly replace what is on file. An address is the
+    // opposite — people move — so it holds the one from the most recent sitting,
+    // judged by when the sitting happened, not by when it arrived.
     await db.query(
-      `INSERT INTO identity.participants (participant_code, study, given_name, family_name, date_of_birth)
-       VALUES ($1, $2, $3, $4, $5)
+      `INSERT INTO identity.participants
+         (participant_code, study, given_name, family_name, date_of_birth, home_address, home_address_recorded_at)
+       VALUES ($1, $2, $3, $4, $5, $6::jsonb, CASE WHEN $6::jsonb IS NULL THEN NULL ELSE $7::timestamptz END)
        ON CONFLICT (participant_code) DO UPDATE SET
          given_name = COALESCE(identity.participants.given_name, EXCLUDED.given_name),
          family_name = COALESCE(identity.participants.family_name, EXCLUDED.family_name),
-         date_of_birth = COALESCE(identity.participants.date_of_birth, EXCLUDED.date_of_birth)`,
-      [entry.participantId, study, given, family, dob],
+         date_of_birth = COALESCE(identity.participants.date_of_birth, EXCLUDED.date_of_birth),
+         home_address = CASE
+           WHEN EXCLUDED.home_address IS NOT NULL
+            AND (identity.participants.home_address_recorded_at IS NULL
+                 OR EXCLUDED.home_address_recorded_at >= identity.participants.home_address_recorded_at)
+           THEN EXCLUDED.home_address ELSE identity.participants.home_address END,
+         home_address_recorded_at = CASE
+           WHEN EXCLUDED.home_address IS NOT NULL
+            AND (identity.participants.home_address_recorded_at IS NULL
+                 OR EXCLUDED.home_address_recorded_at >= identity.participants.home_address_recorded_at)
+           THEN EXCLUDED.home_address_recorded_at ELSE identity.participants.home_address_recorded_at END`,
+      [entry.participantId, study, given, family, dob, addressJson, entry.recordedAt],
     );
     written += 1;
   }
