@@ -377,6 +377,90 @@ published wording, which their terms do not allow without permission; it is
 recorded on the item and in the instrument's changelog, and should be raised
 with youthinmind with the S18+ licence question (D-51).
 
+### Shorter consent, sleep quality and sanity checks (r9.0.0, D-53)
+
+A batch of changes the team asked for after fielding r8.0.0. Every one is
+participant-visible, so together they make a MAJOR release. No existing variable
+changes meaning, and no response code changes.
+
+**Consent moves on by itself.** The consent screen (`ybm_intro_consent.consent`)
+goes to the next screen as soon as the last statement is ticked. There is no
+Continue to press. A screen that moves on after an input has to say beforehand
+that it will (WCAG 2.2, 3.2.2 On Input), so the instruction now ends "…and we'll
+move on once they're all ticked." The move waits a moment, so the last tick is
+seen landing. Coming back to the screen does not move it on again: only the tick
+that completes the set does. Schema: `checkbox_set.autoAdvance`.
+
+**"I understand".** The screen on why accurate answers matter
+(`ybm_intro_consent.why_it_matters`) is answered with "I understand" rather than
+"Continue". Schema: `info.advanceLabel`.
+
+**Contact address.** The consent statement and the data-handling text gave a
+team member's personal address (m.faizah@leeds.ac.uk). Both now give the study's
+address, brainpop@leeds.ac.uk, which the cover already showed.
+
+**Linkage with Connected Yorkshire.** A new question straight after consent
+(`ybm_intro_consent.linkage_consent`, Yes / No) asks whether the participant
+agrees to their answers being linked, pseudonymously, with health and education
+records through the Connected Yorkshire research data platform. The screen
+explains what is linked, that the details used to make the link are removed
+before any researcher sees the data, that it continues unless they withdraw, and
+how to withdraw. It is optional: saying no changes nothing else about taking part.
+The team confirmed that linkage is covered by the ethics approval
+(PSCETHS-1449). The wording is a draft for the team to check against the
+approved documents before this release is fielded. The answer is an ordinary
+research variable, and a researcher linking a record must check it first.
+
+**Ethnic origin in West Yorkshire order.** The 19 options of
+`scale.ethnicity_uk20` are listed most common first. The order uses usual
+residents of the five West Yorkshire districts in the 2021 Census (table TS021,
+ONS, Open Government Licence). "English, Welsh, Scottish, Northern Irish or
+British" (72.0%) comes first, then "Pakistani" (10.7%) and "Any other White
+background" (3.7%), down to "Gypsy or Irish Traveller" (0.1%). "Prefer not to
+say" stays last. Only the order on screen changes: every code is as before, so
+the data are comparable with earlier releases. The scale becomes 2.0.0.
+
+**Sleep quality.** The Sleep Quality Scale (SQS; Snyder et al., 2018, *J Clin
+Sleep Med* 14(11)) is asked before the Karolinska Sleepiness Scale: "During the
+past 7 days, how would you rate your sleep quality overall?", from 0 to 10.
+The eleven numbers sit in one row, with the published groupings drawn beneath
+them: 0 Terrible, 1–3 Poor, 4–6 Fair, 7–9 Good, 10 Excellent. The score is the
+number chosen. Its licence is recorded as unverified until the team confirms
+permission. Schema: `responseScale.bands` and the `numbered` presentation.
+
+**Handedness pictures.** The four objects (pen, ball, toothbrush, spoon) are
+drawn from Microsoft's Fluent Emoji (MIT licence) instead of the study's own line
+drawings. Each is stood upright, so no picture leans towards one hand (D-32).
+
+**How long without social media.** An answer over 90 days is read back in
+months and days ("That's about 1 year, 1 month and 5 days — is that right?")
+and needs a tap on "Yes, that's right" before moving on. Nothing is refused: the
+upper limit stays at 3,650 days. Schema: `numeric.confirmAbove`.
+
+**How family manage social media.** Someone who answers Yes to "Does your family
+manage or control your social media use?" is asked how, choosing all that apply
+(`ybm_social_media.family_control_how`). If they choose "Something else", a short
+box asks them to describe it (`family_control_other`). The options are the
+study's own and are not a published measure.
+
+**Not knowing the postcode.** On the address screen, someone who does not know
+their postcode can say so after the warning. They then type their street, which
+is matched against every named road in West Yorkshire (OS Open Names, Ordnance
+Survey, Open Government Licence). The closest matches are offered with their
+area and postcode district, e.g. "Hyde Park Road — Leeds · LS6" (there is also
+one in Halifax). The search allows for abbreviations ("Rd", "St"), a house
+number typed in front and small typing mistakes. Choosing one records the street
+as the list spells it, with its area and district, under the keys the item's
+`streetCheck` names (`area`, `postcode_district`). Nothing is refused: a street
+not in the list is kept as typed. The list (39,718 street entries, built by
+`scripts/build-streets.mjs` from the July 2026 edition) ships with the release
+and is pinned by hash like the postcode list. The app loads it only when someone
+says they don't know their postcode, as a separate part of the app that is still
+stored for offline use.
+
+**Welcome screen.** Pending: the team will mark what to remove, and the
+screen will be titled "Taking part".
+
 ## 7. Identifiers and linkage (r7.0.0, D-37)
 
 Section 6 described the data layer as built. This corrects a gap in it that was

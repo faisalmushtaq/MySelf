@@ -341,6 +341,20 @@ export function buildRelease(
             failures.push(`unresolved scale '${item.scale}' on ${ref.instrument}/${item.key}`);
           } else {
             frozenScales[item.scale] = scale;
+            // Bands drawn under a numbered row must each cover real options and
+            // not overlap, or the picture would group numbers that don't exist.
+            const codes = new Set(scale.options.map((o) => o.code));
+            const banded = new Set<number>();
+            for (const band of scale.bands ?? []) {
+              for (let c = band.from; c <= band.to; c += 1) {
+                if (!codes.has(c)) failures.push(`${item.scale}: band '${band.label}' covers ${c}, which is not an option`);
+                if (banded.has(c)) failures.push(`${item.scale}: ${c} is in more than one band`);
+                banded.add(c);
+              }
+            }
+            if (item.responseType === "single_choice" && item.presentation === "numbered" && !scale.bands?.length) {
+              failures.push(`${ref.instrument}/${item.key}: a numbered row needs its scale's bands`);
+            }
           }
         }
         if (item.responseType === "form_fields" && item.postcodeCheck) {
@@ -350,6 +364,30 @@ export function buildRelease(
           else frozenAssets[check.asset] = asset;
           if (!item.fields.some((f) => f.key === check.field)) {
             failures.push(`${ref.instrument}/${item.key}: postcode check names field '${check.field}', which the item does not have`);
+          }
+        }
+        if (item.responseType === "form_fields" && item.streetCheck) {
+          const check = item.streetCheck;
+          const asset = registries.assets?.[check.asset];
+          if (!asset) failures.push(`${ref.instrument}/${item.key}: street list '${check.asset}' is not among the release's assets`);
+          else frozenAssets[check.asset] = asset;
+          if (!item.fields.some((f) => f.key === check.field)) {
+            failures.push(`${ref.instrument}/${item.key}: street check names field '${check.field}', which the item does not have`);
+          }
+          // Offered to someone who says they don't know their postcode, so it
+          // only makes sense beside a postcode check (D-53).
+          if (!item.postcodeCheck) failures.push(`${ref.instrument}/${item.key}: a street check needs a postcode check beside it`);
+          for (const k of [check.areaKey, check.districtKey]) {
+            if (item.fields.some((f) => f.key === k)) {
+              failures.push(`${ref.instrument}/${item.key}: street check records '${k}', which is already a field`);
+            }
+          }
+          if (check.areaKey === check.districtKey) failures.push(`${ref.instrument}/${item.key}: street check records area and district under one key`);
+        }
+        if (item.responseType === "numeric" && item.confirmAbove !== undefined) {
+          const { confirmAbove: above, min, max } = item;
+          if ((min !== undefined && above < min) || (max !== undefined && above >= max)) {
+            failures.push(`${ref.instrument}/${item.key}: confirmAbove ${above} is outside the item's range`);
           }
         }
         const pipes = item.stem.pipes ?? {};

@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Illustration } from "./illustrations.js";
-import { normalisePostcode, type AnswerValue } from "@myself/engine";
+import { normalisePostcode, type AnswerValue, type StreetList, type StreetMatch } from "@myself/engine";
 import { postcodeList } from "../lib/postcodes.js";
+import { streetList as loadStreets } from "../lib/streets.js";
 import { ABSOLUTE_MAX_AGE_YEARS, type ItemDefinition, type ResponseScale } from "@myself/schema";
 
 /**
@@ -15,7 +16,11 @@ export interface ControlProps {
   item: ItemDefinition;
   scale?: ResponseScale | undefined;
   value?: AnswerValue | undefined;
-  onAnswer: (value: AnswerValue, autoAdvance: boolean) => void;
+  /**
+   * `autoAdvance` moves the screen on after a short pause; a number sets the
+   * pause, for a control whose last input deserves to be seen landing first.
+   */
+  onAnswer: (value: AnswerValue, autoAdvance: boolean | { afterMs: number }) => void;
   /**
    * Controls that can hold an unusable draft report it here, so the screen can
    * refuse to advance. `ok` is false while anything on screen fails its format
@@ -102,6 +107,58 @@ export function SingleChoice({ item, scale, value, onAnswer }: ControlProps) {
         </div>
         <p className="spectrum-status" aria-live="polite">
           {chosen ? chosen.label : "Tap anywhere along the line"}
+        </p>
+      </div>
+    );
+  }
+
+  // Numbered row (D-53): 0-10 in one line, with the published groupings drawn
+  // beneath as brackets — the SQS's Terrible / Poor / Fair / Good / Excellent.
+  // Each number's accessible name carries its band, since the brackets are
+  // decoration a screen reader never meets.
+  if (item.presentation === "numbered") {
+    const options = scale.options;
+    const bands = scale.bands ?? [];
+    const bandOf = (code: number) => bands.find((b) => code >= b.from && code <= b.to);
+    const column = (code: number) => options.findIndex((o) => o.code === code) + 1;
+    const chosen = options.find((o) => o.code === selected);
+    const cols = { gridTemplateColumns: `repeat(${options.length}, minmax(0, 1fr))` };
+    return (
+      <div className="numbered" role="radiogroup" aria-label={item.stem.text}>
+        <div className="numbered-row" style={cols}>
+          {options.map((o) => {
+            const band = bandOf(o.code);
+            return (
+              <button
+                key={o.code}
+                type="button"
+                role="radio"
+                aria-checked={selected === o.code}
+                aria-label={band ? `${o.label}, ${band.label}` : o.label}
+                className={`numbered-option${selected === o.code ? " selected" : ""}`}
+                onClick={() => onAnswer({ kind: "choice", code: o.code }, auto)}
+              >
+                {o.label}
+              </button>
+            );
+          })}
+        </div>
+        {bands.length > 0 && (
+          <div className="numbered-bands" style={cols} aria-hidden="true">
+            {bands.map((b) => (
+              <span
+                key={b.label}
+                className={`numbered-band${b.from === b.to ? " single" : ""}`}
+                style={{ gridColumn: `${column(b.from)} / ${column(b.to) + 1}` }}
+              >
+                <span className="band-bracket" />
+                <span className="band-label">{b.label}</span>
+              </span>
+            ))}
+          </div>
+        )}
+        <p className="numbered-status" aria-live="polite">
+          {chosen ? `${chosen.label}${bandOf(chosen.code) ? ` — ${bandOf(chosen.code)!.label}` : ""}` : "\u00a0"}
         </p>
       </div>
     );
@@ -368,12 +425,37 @@ export function LadderControl({ item, value, onAnswer }: ControlProps) {
   );
 }
 
+/**
+ * A number of days as a person would say it: "1 year, 1 month and 5 days".
+ * Months are taken as 30 days and years as 365 — it is read back as "about",
+ * to make a slipped digit obvious, not to be a calendar.
+ */
+export function daysInWords(n: number): string {
+  const years = Math.floor(n / 365);
+  const months = Math.floor((n - years * 365) / 30);
+  const days = n - years * 365 - months * 30;
+  const unit = (k: number, word: string) => `${k} ${word}${k === 1 ? "" : "s"}`;
+  const parts = [
+    ...(years ? [unit(years, "year")] : []),
+    ...(months ? [unit(months, "month")] : []),
+    ...(days || (!years && !months) ? [unit(days, "day")] : []),
+  ];
+  return parts.length > 1 ? `${parts.slice(0, -1).join(", ")} and ${parts.at(-1)}` : parts[0]!;
+}
+
 export function NumericControl({ item, value, onAnswer, onValidity, onSubmit }: ControlProps) {
   if (item.responseType !== "numeric") return null;
   const current = value?.kind === "number" ? String(value.value) : "";
   const [text, setText] = useState(current);
   const [error, setError] = useState<string | null>(null);
+  // An unusually large answer is read back and confirmed before moving on
+  // (D-53). One already saved was confirmed when it was given.
+  const [confirmed, setConfirmed] = useState<number | null>(value?.kind === "number" ? value.value : null);
+  const [checking, setChecking] = useState<number | null>(null);
+  const inputRef = useRef<HTMLInputElement | null>(null);
   useEffect(() => setText(current), [current]);
+  const needsCheck = (n: number, ok: number | null) =>
+    item.confirmAbove !== undefined && n > item.confirmAbove && n !== ok;
 
   // Only characters that can form a valid answer are accepted at all: a
   // participant cannot type or paste "12e5" or "--3" and be told off later.
@@ -409,13 +491,22 @@ export function NumericControl({ item, value, onAnswer, onValidity, onSubmit }: 
       return;
     }
     setError(null);
-    onValidity?.({ ok: true, complete: true });
+    // Recorded as typed either way — it is what the participant said — but the
+    // screen holds until they confirm a large one.
+    const check = needsCheck(n, confirmed);
+    setChecking(check ? n : null);
+    onValidity?.({ ok: !check, complete: !check });
     onAnswer({ kind: "number", value: n }, false);
   };
+
+  const unit = item.unitLabel ?? "";
+  const readBack = (n: number) =>
+    /^days?$/i.test(unit) ? `That's about ${daysInWords(n)}.` : `You typed ${n}${unit ? ` ${unit}` : ""}.`;
 
   return (
     <div className="numeric-wrap">
       <input
+        ref={inputRef}
         // Never type="number": it ignores maxLength, accepts "e"/"+"/"-", and
         // reports an empty value for text the participant can still see.
         type="text"
@@ -440,6 +531,36 @@ export function NumericControl({ item, value, onAnswer, onValidity, onSubmit }: 
         <p className="error" role="alert">
           {error}
         </p>
+      )}
+      {checking !== null && !error && (
+        <div className="number-check" role="status">
+          <p className="number-check-text">
+            {readBack(checking)} Is that right?
+          </p>
+          <div className="confirm-row">
+            <button
+              type="button"
+              className="confirm-postcode"
+              onClick={() => {
+                setConfirmed(checking);
+                setChecking(null);
+                onValidity?.({ ok: true, complete: true });
+              }}
+            >
+              Yes, that&apos;s right
+            </button>
+            <button
+              type="button"
+              className="confirm-postcode"
+              onClick={() => {
+                inputRef.current?.focus();
+                inputRef.current?.select();
+              }}
+            >
+              No — I&apos;ll change it
+            </button>
+          </div>
+        </div>
       )}
     </div>
   );
@@ -681,6 +802,37 @@ export function FormFieldsControl({ item, value, onAnswer, onValidity, onSubmit 
     const area = normal ? list.lookup(normal) : null;
     return { normal, area, needsConfirm: normal !== null && area === null && confirmedPostcode !== normal };
   };
+
+  // Someone who doesn't know their postcode can say so, and find their street
+  // in the release's list instead (D-53). The match they choose is recorded
+  // beside the fields; a street the list does not know is kept as typed.
+  const streets = check ? item.streetCheck : undefined;
+  const [noPostcode, setNoPostcode] = useState(
+    streets !== undefined && !(current[check!.field] ?? "").trim() && Boolean(current[streets.areaKey] || current[streets.districtKey]),
+  );
+  const [streetList, setStreetList] = useState<StreetList | null>(null);
+  const [streetQuery, setStreetQuery] = useState("");
+  const streetInput = useRef<HTMLInputElement | null>(null);
+  useEffect(() => {
+    if (!noPostcode || !streets) return;
+    let live = true;
+    void loadStreets(streets.asset).then((l) => live && setStreetList(l));
+    return () => {
+      live = false;
+    };
+  }, [noPostcode, streets?.asset]);
+  // Searched a beat after typing stops, not on every keystroke.
+  useEffect(() => {
+    if (!noPostcode || !streets) return;
+    const t = setTimeout(() => setStreetQuery(values[streets.field] ?? ""), 250);
+    return () => clearTimeout(t);
+  }, [noPostcode, streets?.field, values[streets?.field ?? ""]]);
+  const chosenStreet = streets && values[streets.areaKey] !== undefined ? values : null;
+  const matches = useMemo(
+    () => (streetList && noPostcode && !chosenStreet && streetQuery.trim() ? streetList.search(streetQuery, 5) : []),
+    [streetList, noPostcode, chosenStreet, streetQuery],
+  );
+
   const report = (next: Record<string, string>, confirmedPostcode: string | null) => {
     if (item.responseType !== "form_fields") return;
     // Validity is judged across the whole form, not just the field just typed
@@ -697,26 +849,12 @@ export function FormFieldsControl({ item, value, onAnswer, onValidity, onSubmit 
   };
   const postcode = postcodeState(values, confirmed);
 
-  const commit = (key: string, raw: string) => {
-    // Truncate here, not only via maxLength: iOS AutoFill/QuickType inserts
-    // values programmatically and bypasses the attribute entirely.
-    // A numeric field never holds a letter: strip rather than accept-and-scold.
-    const field0 = item.responseType === "form_fields" ? item.fields.find((f) => f.key === key) : undefined;
-    const cleaned = field0?.kind === "numeric" ? raw.replace(/[^0-9]/g, "") : raw;
-    const v = field0 ? cleaned.slice(0, field0.maxChars) : cleaned;
-    const next = { ...values, [key]: v };
+  /** Put a new set of values on screen, check it, and autosave it after a pause. */
+  const apply = (next: Record<string, string>, nextErrors: Record<string, string>) => {
     setValues(next);
-    if (item.responseType !== "form_fields") return;
-    const field = item.fields.find((f) => f.key === key);
-    const bad = field?.pattern && v.trim().length > 0 && !new RegExp(field.pattern).test(v.trim());
-
-    const nextErrors = { ...errors };
-    if (bad) nextErrors[key] = field?.patternHint ?? "Please check the format";
-    else delete nextErrors[key];
     setErrors(nextErrors);
     report(next, confirmed);
-
-    if (bad) {
+    if (Object.keys(nextErrors).length > 0) {
       pending.current = null;
       if (timer.current) clearTimeout(timer.current);
       return;
@@ -727,6 +865,47 @@ export function FormFieldsControl({ item, value, onAnswer, onValidity, onSubmit 
       pending.current = null;
       if (Object.values(next).some((x) => x.trim().length > 0)) onAnswer({ kind: "fields", values: next }, false);
     }, 400);
+  };
+
+  /** The values without a chosen street match: it no longer describes what is typed. */
+  const withoutMatch = (vals: Record<string, string>) => {
+    if (!streets) return vals;
+    const { [streets.areaKey]: _area, [streets.districtKey]: _district, ...rest } = vals;
+    return rest;
+  };
+
+  const commit = (key: string, raw: string) => {
+    if (item.responseType !== "form_fields") return;
+    // Truncate here, not only via maxLength: iOS AutoFill/QuickType inserts
+    // values programmatically and bypasses the attribute entirely.
+    // A numeric field never holds a letter: strip rather than accept-and-scold.
+    const field = item.fields.find((f) => f.key === key);
+    const cleaned = field?.kind === "numeric" ? raw.replace(/[^0-9]/g, "") : raw;
+    const v = field ? cleaned.slice(0, field.maxChars) : cleaned;
+    let next = { ...values, [key]: v };
+    // Changing the street, or giving a postcode after all, undoes a match.
+    if (streets && (key === streets.field || (key === check?.field && v.trim()))) next = withoutMatch(next);
+    if (streets && key === check?.field && v.trim() && noPostcode) setNoPostcode(false);
+    const bad = field?.pattern && v.trim().length > 0 && !new RegExp(field.pattern).test(v.trim());
+    const nextErrors = { ...errors };
+    if (bad) nextErrors[key] = field?.patternHint ?? "Please check the format";
+    else delete nextErrors[key];
+    apply(next, nextErrors);
+  };
+
+  const dontKnowPostcode = () => {
+    if (!check) return;
+    const nextErrors = { ...errors };
+    delete nextErrors[check.field];
+    setNoPostcode(true);
+    setTypedRight(null);
+    apply({ ...values, [check.field]: "" }, nextErrors);
+    streetInput.current?.focus();
+  };
+
+  const chooseStreet = (m: StreetMatch) => {
+    if (!streets) return;
+    apply({ ...values, [streets.field]: m.street, [streets.areaKey]: m.area, [streets.districtKey]: m.outward }, errors);
   };
 
   // Flush pending field edits on unmount (see TextControl).
@@ -741,20 +920,40 @@ export function FormFieldsControl({ item, value, onAnswer, onValidity, onSubmit 
     [],
   );
 
+  /** Offered wherever the postcode is empty or unknown to the list, never once it is found. */
+  const offerDontKnow =
+    streets !== undefined && !noPostcode && (postcode.normal === null ? !(values[check!.field] ?? "").trim() || !!errors[check!.field] : postcode.needsConfirm);
+
   return (
     <div className="fields">
       {item.fields.map((f) => {
         const isPostcode = check !== undefined && f.key === check.field;
+        const isStreet = streets !== undefined && f.key === streets.field;
         const noteId = `${item.key}-${f.key}-note`;
-        const note =
-          isPostcode && !errors[f.key] && postcode.normal
-            ? postcode.area
-              ? `✓ ${postcode.area.ward}, ${postcode.area.district}`
-              : postcode.needsConfirm
-                ? typedRight === postcode.normal
-                  ? `Is your home outside ${check!.areaName}?`
-                  : `We can't find ${postcode.normal} in ${check!.areaName}. Check it's typed correctly.`
-                : `✓ Kept as you gave it — outside ${check!.areaName}`
+        const note = isPostcode
+          ? noPostcode
+            ? "That's fine — type your street below and choose it from the list."
+            : !errors[f.key] && postcode.normal
+              ? postcode.area
+                ? `✓ ${postcode.area.ward}, ${postcode.area.district}`
+                : postcode.needsConfirm
+                  ? typedRight === postcode.normal
+                    ? `Is your home outside ${check!.areaName}?`
+                    : `We can't find ${postcode.normal} in ${check!.areaName}. Check it's typed correctly.`
+                  : `✓ Kept as you gave it — outside ${check!.areaName}`
+              : null
+          : isStreet && noPostcode
+            ? chosenStreet
+              ? `✓ ${values[streets!.field]}, ${values[streets!.areaKey]}${values[streets!.districtKey] ? ` (${values[streets!.districtKey]})` : ""}`
+              : !(values[f.key] ?? "").trim()
+                ? null
+                : streetList === null
+                  ? "Looking for your street…"
+                  : matches.length > 0
+                    ? "Is it one of these?"
+                    : streetQuery.trim().replace(/[^A-Za-z]/g, "").length >= 3
+                      ? `We can't find that street in ${check!.areaName}. Check the spelling — or carry on, and we'll keep it as you typed it.`
+                      : null
             : null;
         return (
           <div key={f.key} className="field-group">
@@ -772,8 +971,8 @@ export function FormFieldsControl({ item, value, onAnswer, onValidity, onSubmit 
                 spellCheck={false}
                 value={values[f.key] ?? ""}
                 aria-invalid={errors[f.key] !== undefined}
-                aria-describedby={isPostcode ? noteId : undefined}
-                ref={isPostcode ? postcodeInput : undefined}
+                aria-describedby={isPostcode || isStreet ? noteId : undefined}
+                ref={isPostcode ? postcodeInput : isStreet ? streetInput : undefined}
                 onChange={(e) => commit(f.key, e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key !== "Enter") return;
@@ -803,19 +1002,26 @@ export function FormFieldsControl({ item, value, onAnswer, onValidity, onSubmit 
                 </span>
               )}
             </label>
-            {isPostcode && (
+            {(isPostcode || (isStreet && noPostcode)) && (
               // Said back, not shouted: the area a postcode lies in, or a request to
-              // check one the list does not know (D-52).
+              // check one the list does not know (D-52); the street found (D-53).
               <p id={noteId} className="field-note" aria-live="polite">
                 {note}
               </p>
             )}
-            {isPostcode && !errors[f.key] && postcode.needsConfirm && typedRight !== postcode.normal && (
-              <button type="button" className="confirm-postcode" onClick={() => setTypedRight(postcode.normal)}>
-                It&apos;s typed correctly
-              </button>
+            {isPostcode && !noPostcode && !errors[f.key] && postcode.needsConfirm && typedRight !== postcode.normal && (
+              <div className="confirm-row">
+                <button type="button" className="confirm-postcode" onClick={() => setTypedRight(postcode.normal)}>
+                  It&apos;s typed correctly
+                </button>
+                {offerDontKnow && (
+                  <button type="button" className="confirm-postcode" onClick={dontKnowPostcode}>
+                    I don&apos;t know my postcode
+                  </button>
+                )}
+              </div>
             )}
-            {isPostcode && !errors[f.key] && postcode.needsConfirm && typedRight === postcode.normal && (
+            {isPostcode && !noPostcode && !errors[f.key] && postcode.needsConfirm && typedRight === postcode.normal && (
               <div className="confirm-row">
                 <button
                   type="button"
@@ -838,6 +1044,26 @@ export function FormFieldsControl({ item, value, onAnswer, onValidity, onSubmit 
                   No — I&apos;ll check my postcode
                 </button>
               </div>
+            )}
+            {isPostcode && offerDontKnow && !postcode.needsConfirm && (
+              <button type="button" className="dont-know" onClick={dontKnowPostcode}>
+                I don&apos;t know my postcode
+              </button>
+            )}
+            {isStreet && matches.length > 0 && (
+              <ul className="street-matches" aria-label="Streets that match">
+                {matches.map((m) => (
+                  <li key={`${m.street}|${m.area}|${m.outward}`}>
+                    <button type="button" className="street-match" onClick={() => chooseStreet(m)}>
+                      <span className="street-name">{m.street}</span>
+                      <span className="street-area">
+                        {m.area}
+                        {m.outward ? ` · ${m.outward}` : ""}
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
             )}
           </div>
         );
@@ -933,9 +1159,19 @@ export function RankGroupControl({ item, scale, value, onAnswer }: ControlProps)
 export function CheckboxSetControl({ item, value, onAnswer }: ControlProps) {
   if (item.responseType !== "checkbox_set") return null;
   const checked = value?.kind === "checkboxes" ? value.checked : [];
+  const required = item.statements.filter((s) => s.required).map((s) => s.key);
   const toggle = (key: string) => {
     const next = checked.includes(key) ? checked.filter((k) => k !== key) : [...checked, key];
-    onAnswer({ kind: "checkboxes", checked: next }, false);
+    // Only the tick that completes the set moves on (D-53): coming back to a
+    // finished set, or unticking and reticking, does not throw anyone forward
+    // unasked. The pause lets the last tick be seen landing.
+    const completes =
+      item.autoAdvance === true &&
+      !prefersReducedMotion() &&
+      !checked.includes(key) &&
+      required.every((k) => next.includes(k)) &&
+      !required.every((k) => checked.includes(k));
+    onAnswer({ kind: "checkboxes", checked: next }, completes ? { afterMs: 700 } : false);
   };
   return (
     <div className="consent-list">

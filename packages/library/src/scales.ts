@@ -46,38 +46,127 @@ export const gender4: ResponseScale = {
   ],
 };
 
-/** UK-census-style 20-option ethnicity list, codes identical to Qualtrics. */
+/**
+ * UK-census-style 20-option ethnicity list, codes identical to Qualtrics.
+ *
+ * 2.0.0 (D-53): listed most common first in West Yorkshire, so most people find
+ * theirs at the top. Order from usual residents of Bradford, Calderdale,
+ * Kirklees, Leeds and Wakefield in the 2021 Census (ONS table TS021, Open
+ * Government Licence), share of 2,351,579 in brackets. Codes are exactly those
+ * of 1.0.0 — only the order on screen changed — so answers compare across
+ * releases. "Prefer not to say" stays last.
+ */
+const ethnicityLabels: Record<number, string> = {
+  1: "Indian",
+  2: "Pakistani",
+  3: "Bangladeshi",
+  4: "Chinese",
+  5: "Any other Asian background",
+  6: "Caribbean",
+  7: "African",
+  8: "Any other Black, Black British, or Caribbean background",
+  9: "White and Black Caribbean",
+  10: "White and Black African",
+  11: "White and Asian",
+  12: "Any other Mixed or multiple ethnic backgrounds",
+  13: "English, Welsh, Scottish, Northern Irish or British",
+  14: "Irish",
+  15: "Gypsy or Irish Traveller",
+  16: "Roma",
+  17: "Any other White background",
+  18: "Any other ethnic group",
+  19: "Arab",
+};
+const ethnicityByWestYorkshire2021 = [
+  13, // White: English, Welsh, Scottish, Northern Irish or British (72.0%)
+  2, // Pakistani (10.7%)
+  17, // Other White (3.7%)
+  1, // Indian (2.7%)
+  7, // African (2.0%)
+  18, // Any other ethnic group (1.2%)
+  5, // Other Asian (1.2%)
+  9, // White and Black Caribbean (1.0%)
+  11, // White and Asian (0.9%)
+  3, // Bangladeshi (0.9%)
+  6, // Caribbean (0.7%)
+  14, // Irish (0.6%)
+  12, // Other Mixed (0.5%)
+  4, // Chinese (0.5%)
+  19, // Arab (0.5%)
+  8, // Other Black (0.4%)
+  10, // White and Black African (0.3%)
+  16, // Roma (0.2%)
+  15, // Gypsy or Irish Traveller (0.1%)
+];
+
 export const ethnicityUk20: ResponseScale = {
   key: "scale.ethnicity_uk20",
-  version: "1.0.0",
-  name: "Ethnic origin (UK, 20 options, as administered)",
+  version: "2.0.0",
+  name: "Ethnic origin (UK, 20 options; most common in West Yorkshire first)",
   direction: "unordered",
   options: [
-    ...opts(
-      [
-        "Indian",
-        "Pakistani",
-        "Bangladeshi",
-        "Chinese",
-        "Any other Asian background",
-        "Caribbean",
-        "African",
-        "Any other Black, Black British, or Caribbean background",
-        "White and Black Caribbean",
-        "White and Black African",
-        "White and Asian",
-        "Any other Mixed or multiple ethnic backgrounds",
-        "English, Welsh, Scottish, Northern Irish or British",
-        "Irish",
-        "Gypsy or Irish Traveller",
-        "Roma",
-        "Any other White background",
-        "Any other ethnic group",
-        "Arab",
-      ],
-      1,
-    ),
+    ...ethnicityByWestYorkshire2021.map((code) => opt(code, ethnicityLabels[code]!, code)),
     opt(20, "Prefer not to say", 20, "decline"),
+  ],
+};
+
+/**
+ * Consent to linkage through Connected Yorkshire (D-53). Worded as an
+ * agreement, so either answer is a complete one.
+ */
+export const linkageConsent: ResponseScale = {
+  key: "scale.linkage_consent",
+  version: "1.0.0",
+  name: "Linkage consent (Yes, I agree / No, I don't agree)",
+  direction: "unordered",
+  options: [opt(1, "Yes, I agree"), opt(2, "No, I don't agree")],
+};
+
+/**
+ * Sleep Quality Scale (Snyder et al., 2018): 0-10, with the published
+ * groupings drawn beneath the numbers (D-53). The number is the answer and
+ * the score; the band is shown, never stored.
+ */
+export const sqs11: ResponseScale = {
+  key: "scale.sqs_0_10",
+  version: "1.0.0",
+  name: "Sleep Quality Scale, 0 (Terrible) to 10 (Excellent)",
+  direction: "ascending",
+  options: Array.from({ length: 11 }, (_, n) => ({
+    code: n,
+    label: String(n),
+    value: n,
+    kind: "substantive" as const,
+    textEntry: false,
+  })),
+  bands: [
+    { label: "Terrible", from: 0, to: 0 },
+    { label: "Poor", from: 1, to: 3 },
+    { label: "Fair", from: 4, to: 6 },
+    { label: "Good", from: 7, to: 9 },
+    { label: "Excellent", from: 10, to: 10 },
+  ],
+  scoringNote: "Score = the number chosen, 0-10. Bands (Snyder et al., 2018): 0 terrible, 1-3 poor, 4-6 fair, 7-9 good, 10 excellent.",
+};
+
+/**
+ * How family manage social media (D-53). The study's own options, not a
+ * published measure; asked only of those who said their family does.
+ */
+export const smFamilyControlHow: ResponseScale = {
+  key: "scale.sm_family_control_how",
+  version: "1.0.0",
+  name: "How family manage social media use (select all)",
+  direction: "unordered",
+  options: [
+    opt(1, "They set time limits or times when I can't use it"),
+    opt(2, "They use parental controls or a monitoring app"),
+    opt(3, "They decide which apps or sites I can use"),
+    opt(4, "They check my messages, posts or who I follow"),
+    opt(5, "They know my passwords or can get into my accounts"),
+    opt(6, "They take my phone or device away at certain times"),
+    opt(7, "They have to agree before I get a new app or account"),
+    opt(8, "Something else", undefined, "other_specify"),
   ],
 };
 
@@ -633,6 +722,9 @@ export const allScales: ResponseScale[] = [
   yesNoSometimes,
   gender4,
   ethnicityUk20,
+  linkageConsent,
+  sqs11,
+  smFamilyControlHow,
   hairType12,
   month12,
   kss9Canonical,

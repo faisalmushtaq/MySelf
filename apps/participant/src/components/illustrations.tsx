@@ -1,12 +1,13 @@
-import type React from "react";
+import { FLUENT_OBJECTS } from "./fluent-emoji.js";
 
 /**
- * MySelf-authored illustrations.
+ * Illustrations.
  *
- * Drawn as inline SVG so they scale crisply, work offline with no asset
- * fetch, and carry no third-party image dependency or licence question.
- * Purely presentational: every illustration is paired with its authoritative
- * text label and marked aria-hidden.
+ * Inline SVG so they scale crisply and work offline with no asset fetch. The
+ * hair patterns are the study's own; the handedness objects are Fluent Emoji
+ * (MIT, see fluent-emoji.LICENSE.txt). Purely presentational: every
+ * illustration is paired with its authoritative text label and marked
+ * aria-hidden.
  */
 
 /** Curl pattern for a hair-type code (1a straight … 4c tightly coiled). */
@@ -79,59 +80,22 @@ export function HairPattern({ code }: { code: string }) {
 }
 
 /**
- * Everyday objects, drawn simply. Used where naming the object in words is
- * less immediate than showing it (handedness: "Writing" + a pen).
+ * Everyday objects, for the handedness questions ("Which hand do you write
+ * with?" + a pen). Microsoft's Fluent Emoji (MIT) since D-53, replacing line
+ * drawings people found odd. Each is stood upright: a pen leaning one way
+ * reads as held in one hand, and the picture must not suggest an answer (D-32).
  */
+const UPRIGHT: Record<string, number> = { pen: -45, ball: 0, toothbrush: 45, spoon: 45 };
+
 export function ObjectDrawing({ name }: { name: string }) {
-  const stroke = {
-    fill: "none",
-    stroke: "currentColor",
-    strokeWidth: 3,
-    strokeLinecap: "round" as const,
-    strokeLinejoin: "round" as const,
-  };
-  const wrap = (children: React.ReactNode) => (
-    <svg viewBox="0 0 64 64" width="100%" height="100%" aria-hidden="true" focusable="false">
-      {children}
+  const art = FLUENT_OBJECTS[name];
+  if (art === undefined) return null;
+  return (
+    <svg viewBox="-4 -4 40 40" width="100%" height="100%" aria-hidden="true" focusable="false">
+      {/* Bundled constant from fluent-emoji.ts, never participant input. */}
+      <g transform={`rotate(${UPRIGHT[name] ?? 0} 16 16)`} dangerouslySetInnerHTML={{ __html: art }} />
     </svg>
   );
-
-  switch (name) {
-    case "pen":
-      return wrap(
-        <>
-          <path d="M14 50 L18 40 L44 14 L50 20 L24 46 Z" {...stroke} />
-          <path d="M40 18 L46 24" {...stroke} />
-          <path d="M14 50 L20 48" {...stroke} />
-        </>,
-      );
-    case "ball":
-      // Tennis-ball seams read as a ball; equator + meridians read as a globe.
-      return wrap(
-        <>
-          <circle cx="32" cy="32" r="18" {...stroke} />
-          <path d="M17 22 C 26 30, 26 40, 19 46" {...stroke} />
-          <path d="M47 22 C 38 30, 38 40, 45 46" {...stroke} />
-        </>,
-      );
-    case "toothbrush":
-      return wrap(
-        <>
-          <path d="M20 50 L38 22" {...stroke} />
-          <path d="M36 20 q 6 -8 12 -4 q 4 4 -2 10 Z" {...stroke} />
-          <path d="M38 12 v -5 M44 15 v -5 M49 20 v -5" {...stroke} />
-        </>,
-      );
-    case "spoon":
-      return wrap(
-        <>
-          <path d="M26 52 L36 32" {...stroke} />
-          <ellipse cx="40" cy="22" rx="9" ry="12" transform="rotate(24 40 22)" {...stroke} />
-        </>,
-      );
-    default:
-      return null;
-  }
 }
 
 export function Illustration({ token }: { token: string }) {

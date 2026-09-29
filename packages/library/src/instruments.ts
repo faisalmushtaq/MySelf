@@ -51,7 +51,8 @@ const row = (
     key,
     revision: 1,
     variable,
-    legacyVariable,
+    // An item with no Qualtrics ancestor carries no legacy tag at all.
+    ...(legacyVariable ? { legacyVariable } : {}),
     stem: { text },
     scale,
     scaleVersion: "1.0.0",
@@ -91,6 +92,61 @@ export const kss: InstrumentInput = {
   ],
   timeEstimates: est([25, 20]),
   changelog: "1.0: encoded from YBM NotreDame2026 QSF; canonical labels restored per D-08.",
+  owner: "ybm",
+};
+
+// ---------------------------------------------------------------------------
+// Sleep Quality Scale (D-53)
+// ---------------------------------------------------------------------------
+
+/**
+ * One question on sleep quality over the past week, asked before the KSS so the
+ * section runs from the week to right now. The lede lists the things the SQS
+ * asks people to weigh, in the study's plain words; the item and the 0-10
+ * anchors are the published ones.
+ */
+export const sqs: InstrumentInput = {
+  instrument: "sqs",
+  version: "1.0",
+  name: "Sleep Quality Scale",
+  abbreviation: "SQS",
+  construct: "Sleep quality over the past 7 days",
+  citation:
+    "Snyder, E., Cai, B., DeMuro, C., Morrison, M. F., & Ball, W. (2018). A new single-item sleep quality scale: Results of psychometric evaluation in patients with chronic primary insomnia and depression. Journal of Clinical Sleep Medicine, 14(11), 1849-1857.",
+  ageRange: { min: 11, max: 120 },
+  licence: {
+    status: "open",
+    holder: "The authors (Snyder et al., 2018)",
+    modifiable: "no",
+    evidence:
+      "Item and anchors published in full in Snyder et al. (2018). Terms of use for this study not yet confirmed with the authors (D-53).",
+    verified: false,
+  },
+  forms: [
+    {
+      language: "en-GB",
+      label: "SQS (en-GB)",
+      items: [
+        row(
+          "q1",
+          "sqs_q1",
+          "",
+          "During the past 7 days, how would you rate your sleep quality overall?",
+          "scale.sqs_0_10",
+          {
+            presentation: "numbered",
+            lede: {
+              text: "Think about how many hours you slept, how easily you fell asleep, how often you woke up in the night, whether you woke up earlier than you needed to, and how refreshed you felt when you got up.",
+            },
+            researcherNote:
+              "Published item and 0-10 anchors (Snyder et al., 2018), shown as one row with the bands beneath (D-53). The lede is the study's plain-language list of the factors the SQS asks people to consider.",
+          },
+        ),
+      ],
+    },
+  ],
+  timeEstimates: est([20, 15]),
+  changelog: "1.0 (D-53): added before the KSS in r9.0.0.",
   owner: "ybm",
 };
 
@@ -767,6 +823,7 @@ export const doomscroll4: InstrumentInput = {
 
 export const allInstruments: InstrumentInput[] = [
   kss,
+  sqs,
   ehiSf,
   macarthurSsy,
   swemwbs,

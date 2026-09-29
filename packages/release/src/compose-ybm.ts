@@ -152,7 +152,12 @@ export const ybmComposition: AssessmentDraftInput = {
       // sleep") are dropped from this fielding (D-31). The module stays in the
       // library, encoded and versioned, so bringing it back is a composition
       // edit rather than a re-encoding.
-      components: [{ kind: "instrument", ref: { instrument: "kss", version: "1.0", ...en } }],
+      // Sleep quality over the past week first, then sleepiness right now
+      // (D-53): the section moves from the week to this moment.
+      components: [
+        { kind: "instrument", ref: { instrument: "sqs", version: "1.0", ...en } },
+        { kind: "instrument", ref: { instrument: "kss", version: "1.0", ...en } },
+      ],
     },
     {
       key: "wellbeing",

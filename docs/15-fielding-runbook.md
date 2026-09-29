@@ -228,6 +228,15 @@ to withdraw gives their name and date of birth. The **Linkage** tab finds their
 sittings by name; the participant ID is also recomputable from name and date of
 birth (docs/06, D-52), and their address confirms it is the right person.
 
+**Linkage with Connected Yorkshire (from 9.0.0, D-53).** Each sitting records
+whether the participant agreed to their answers being linked with health and
+education records (`linkage_consent`: 1 = yes, 2 = no). Only people whose
+most recent answer is yes may be sent for linkage; a sitting with no answer is
+treated as no. Someone who emails to stop linkage is withdrawn from linkage
+only, not from the study, unless they also ask for that. Record the date they
+asked, stop including them in any further linkage, and tell Connected Yorkshire
+by the route the data-sharing agreement sets out.
+
 ---
 
 ## 8. Stopping one device

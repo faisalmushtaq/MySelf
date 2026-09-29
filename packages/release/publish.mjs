@@ -39,7 +39,7 @@ const meta = {
   version,
   publishedAt: flag("at") ?? new Date().toISOString(),
   publishedBy: flag("by") ?? "unknown",
-  engineVersion: "0.2.0",
+  engineVersion: "0.3.0",
   decisionRefs: decisions.length > 0 ? decisions : ["D-10"],
 };
 

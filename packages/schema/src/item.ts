@@ -128,6 +128,12 @@ export const itemDefinition = z.discriminatedUnion("responseType", [
   z.object({
     ...baseItem,
     responseType: z.literal("info"), // descriptive text, no response
+    /**
+     * What the button that moves on says, where "Continue" is not what the
+     * screen asks for — "I understand" after a statement the participant is
+     * asked to take in (D-53). A label, not a consent: nothing is recorded.
+     */
+    advanceLabel: z.string().min(1).max(40).optional(),
   }),
   z.object({
     ...baseItem,
@@ -141,8 +147,11 @@ export const itemDefinition = z.discriminatedUnion("responseType", [
      * long list is still answered in one look rather than through a menu.
      * Menus ("dropdown"/"wheel") hide the options and cost an extra tap — use
      * them only where the list is genuinely too long to lay out.
+     * "numbered" is a single row of numbered boxes, 0–10 say, with the scale's
+     * bands drawn beneath them as the published form groups them (the SQS,
+     * D-53) — a rating read as a line, not as eleven separate statements.
      */
-    presentation: z.enum(["cards", "dropdown", "wheel", "grid", "spectrum", "compact"]).default("cards"),
+    presentation: z.enum(["cards", "dropdown", "wheel", "grid", "spectrum", "compact", "numbered"]).default("cards"),
     /** Display the spectrum in reverse option order (presentation only —
      * response codes are never affected). */
     spectrumReverse: z.boolean().default(false),
@@ -186,6 +195,13 @@ export const itemDefinition = z.discriminatedUnion("responseType", [
     max: z.number().optional(),
     integerOnly: z.boolean().default(true),
     unitLabel: z.string().optional(),
+    /**
+     * An answer above this is plausible enough to allow but unusual enough to
+     * check: it is read back — in months and days when the unit is days — and
+     * the participant confirms it before moving on (D-53). Nothing is refused;
+     * `max` stays the only hard limit.
+     */
+    confirmAbove: z.number().optional(),
   }),
   z.object({
     ...baseItem,
@@ -250,6 +266,29 @@ export const itemDefinition = z.discriminatedUnion("responseType", [
         areaName: z.string().min(1),
       })
       .optional(),
+    /**
+     * For someone who does not know their postcode (D-53): the street they type
+     * is matched against a list of named roads shipped with the release, and the
+     * closest are offered with their area and postcode district. Choosing one
+     * records it; a street the list does not know is kept as typed. Only offered
+     * alongside a postcodeCheck, once the participant says they don't know it.
+     */
+    streetCheck: z
+      .object({
+        /** The field holding the street. */
+        field: slug,
+        /** The release asset holding the street list (manifest.assets). */
+        asset: slug,
+        /**
+         * Keys the chosen match is recorded under, beside the declared fields:
+         * the area ("Headingley, Leeds") and the postcode district ("LS6"). Not
+         * fields — nothing is typed into them — so a validator must treat them
+         * as known keys of this item's answer.
+         */
+        areaKey: slug,
+        districtKey: slug,
+      })
+      .optional(),
   }),
   z.object({
     ...baseItem,
@@ -272,6 +311,12 @@ export const itemDefinition = z.discriminatedUnion("responseType", [
     statements: z
       .array(z.object({ key: slug, text: displayText, required: z.boolean().default(true) }))
       .min(1),
+    /**
+     * Move on by itself once every required statement is ticked (D-53). Only the
+     * tick that completes the set moves the screen: returning to a completed set
+     * does not. The stem must say it will happen (WCAG 3.2.2 On Input).
+     */
+    autoAdvance: z.boolean().optional(),
   }),
 ]);
 

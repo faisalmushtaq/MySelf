@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { AnswerStore, Walker } from "@myself/engine";
 import { releaseManifest } from "@myself/schema";
 import rawManifest from "../../../releases/ybm_nd2026_standard_r7.0.0.manifest.json";
-import currentManifest from "../../../releases/ybm_nd2026_standard_r8.0.0.manifest.json";
+import currentManifest from "../../../releases/ybm_nd2026_standard_r9.0.0.manifest.json";
 import { flattenManifest, reminderOf } from "./lib/flatten.js";
 import { resolveText } from "./lib/pipes.js";
 
@@ -410,7 +410,7 @@ describe("the home address (D-52)", () => {
   it("checks postcodes against exactly the list the release pins", async () => {
     const { createHash } = await import("node:crypto");
     const { POSTCODE_LISTS, postcodeList } = await import("./lib/postcodes.js");
-    for (const [asset, pinned] of Object.entries(current.assets)) {
+    for (const [asset, pinned] of Object.entries(current.assets).filter(([k]) => k.startsWith("postcodes_"))) {
       const text = POSTCODE_LISTS[asset];
       expect(text, asset).toBeDefined();
       expect(`sha256:${createHash("sha256").update(text!, "utf8").digest("hex")}`, asset).toBe(pinned.sha256);
@@ -419,5 +419,55 @@ describe("the home address (D-52)", () => {
     expect(list.lookup("ls2 9jt")).toEqual({ ward: "Little London & Woodhouse", district: "Leeds" });
     expect(list.lookup("HG1 1AA")).toBeNull();
     expect(postcodeList("no_such_list")).toBeNull();
+  });
+});
+
+describe("shorter consent, sleep quality and sanity checks (D-53)", () => {
+  const current = releaseManifest.parse(currentManifest);
+  const units = flattenManifest(current).units;
+  const find = (instrument: string, key: string) => units.find((u) => u.instrument === instrument && u.item.key === key)!.item;
+
+  it("searches streets against exactly the list the release pins", async () => {
+    const { createHash } = await import("node:crypto");
+    const { STREET_LISTS, streetList } = await import("./lib/streets.js");
+    const pinned = current.assets["streets_west_yorkshire"]!;
+    const text = await STREET_LISTS["streets_west_yorkshire"]!();
+    expect(`sha256:${createHash("sha256").update(text, "utf8").digest("hex")}`).toBe(pinned.sha256);
+    const list = (await streetList("streets_west_yorkshire"))!;
+    expect(list.search("hyde park rd")[0]?.street).toBe("Hyde Park Road");
+    expect(await streetList("no_such_list")).toBeNull();
+  });
+
+  it("walks consent, then linkage, then 'why it matters'", () => {
+    const keys = units.filter((u) => u.instrument === "ybm_intro_consent").map((u) => u.item.key);
+    expect(keys).toEqual(["intro", "consent", "linkage_consent", "why_it_matters"]);
+    expect(find("ybm_intro_consent", "consent")).toMatchObject({ autoAdvance: true });
+    expect(find("ybm_intro_consent", "why_it_matters")).toMatchObject({ advanceLabel: "I understand" });
+  });
+
+  it("asks sleep quality just before sleepiness", () => {
+    const at = (inst: string) => units.findIndex((u) => u.instrument === inst && u.item.responseType !== "info");
+    expect(at("sqs")).toBeGreaterThan(-1);
+    expect(at("sqs")).toBeLessThan(at("kss"));
+    expect(find("sqs", "q1")).toMatchObject({ responseType: "single_choice", presentation: "numbered" });
+  });
+
+  it("asks how family manage social media only after a yes, and what else only after 'something else'", () => {
+    const store = new AnswerStore();
+    for (const item of ["own", "sm_use"]) {
+      store.set({ instrument: "ybm_smartphone", item, revision: 1 }, { status: "answered", value: { kind: "choice", code: 1 } });
+    }
+    const shown = () => {
+      const walker = new Walker(units, store, true);
+      return walker.visibleUnits().map((i) => units[i]!.item.key);
+    };
+    const control = { instrument: "ybm_social_media", item: "family_control", revision: 1 };
+    store.set(control, { status: "answered", value: { kind: "choice", code: 2 } });
+    expect(shown()).not.toContain("family_control_how");
+    store.set(control, { status: "answered", value: { kind: "choice", code: 1 } });
+    expect(shown()).toContain("family_control_how");
+    expect(shown()).not.toContain("family_control_other");
+    store.set({ instrument: "ybm_social_media", item: "family_control_how", revision: 1 }, { status: "answered", value: { kind: "multi", codes: [1, 8] } });
+    expect(shown()).toContain("family_control_other");
   });
 });

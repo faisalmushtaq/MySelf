@@ -35,7 +35,7 @@ const PASSPHRASE = "six brown otters reading";
  * Playwright compiles these specs as CommonJS, where `import.meta` is a syntax
  * error, and the suite always runs from the repository root.
  */
-const MANIFEST = resolve("releases/ybm_nd2026_standard_r8.0.0.manifest.json");
+const MANIFEST = resolve("releases/ybm_nd2026_standard_r9.0.0.manifest.json");
 
 /**
  * `@myself/store` is ESM-only, so it is imported dynamically — a static import of a
@@ -352,6 +352,141 @@ test("the address screen names a postcode's area, and keeps one outside it only 
   await next.click();
   await expect(postcode).toHaveCount(0);
 });
+
+test("consent moves on by itself once every statement is ticked, then asks about linkage (D-53)", async ({ page }) => {
+  test.slow();
+  dateOfBirth = "2012-05-14";
+  const statements = page.locator(".consent-list input[type=checkbox]");
+  await walk(page, [], async () => (await statements.count()) > 0);
+
+  await expect(page.locator(".survey-body h1")).toContainText("We'll move on once they're all ticked");
+  const total = await statements.count();
+  for (let i = 0; i < total - 1; i += 1) await statements.nth(i).check();
+  // Not yet: one statement is still unticked.
+  await page.waitForTimeout(900);
+  await expect(statements).toHaveCount(total);
+  // The last tick moves the screen on without Next being pressed.
+  await statements.nth(total - 1).check();
+  await expect(page.locator(".survey-body h1")).toHaveText("Can we link your answers with your health and education records?");
+  await expect(page.locator(".survey-body .lede")).toContainText("Connected Yorkshire");
+  await expect(page.locator(".survey-body .lede")).toContainText("brainpop@leeds.ac.uk");
+
+  // Either answer is complete: saying no carries on as normal.
+  await page.getByRole("radio", { name: "No, I don't agree" }).click();
+  await expect(page.locator(".survey-body h1")).toHaveText("Why your answers matter");
+  await expect(page.locator("button.next:not(.big)")).toHaveText("I understand");
+
+  // Coming back to the finished consent screen does not throw anyone forward.
+  await page.locator("button.back").click();
+  await page.locator("button.back").click();
+  await expect(statements.first()).toBeChecked();
+  await page.waitForTimeout(1_200);
+  await expect(statements).toHaveCount(total);
+});
+
+test("someone who doesn't know their postcode finds their street instead (D-53)", async ({ page }) => {
+  test.slow();
+  dateOfBirth = "2012-05-14";
+  const postcode = page.getByRole("textbox", { name: "Postcode" });
+  await walk(page, [], async () => (await postcode.count()) > 0);
+
+  const next = page.locator("button.next:not(.big)").first();
+  // Offered from the start, for someone who knows straight away.
+  await expect(page.getByRole("button", { name: "I don't know my postcode" })).toBeVisible();
+
+  // A postcode the list doesn't know: warned, then allowed to say they don't know it.
+  await postcode.fill("LS99 9ZZ");
+  await expect(page.locator(".field-note").first()).toHaveText("We can't find LS99 9ZZ in West Yorkshire. Check it's typed correctly.");
+  await expect(next).toBeDisabled();
+  await page.getByRole("button", { name: "I don't know my postcode" }).click();
+  await expect(postcode).toHaveValue("");
+  await expect(page.locator(".field-note").first()).toHaveText("That's fine — type your street below and choose it from the list.");
+  await expect(next).toBeEnabled();
+
+  // A typo and an abbreviation still find it; the choice records the area and district.
+  const street = page.getByRole("textbox", { name: "Street" });
+  await expect(street).toBeFocused();
+  await street.fill("hyde prak rd");
+  const match = page.locator(".street-match", { hasText: "Hyde Park Road" }).filter({ hasText: "LS6" });
+  await expect(match).toBeVisible();
+  await match.click();
+  await expect(street).toHaveValue("Hyde Park Road");
+  await expect(page.locator(".field-note").nth(1)).toHaveText("✓ Hyde Park Road, Leeds (LS6)");
+  await expect(page.locator(".street-match")).toHaveCount(0);
+
+  // A street the list doesn't know is kept as typed, never refused.
+  await street.fill("Nowhere In Particular Lane");
+  await expect(page.locator(".field-note").nth(1)).toContainText("We can't find that street in West Yorkshire");
+  await expect(next).toBeEnabled();
+  await street.fill("hyde park rd");
+  await page.locator(".street-match", { hasText: "Hyde Park Road" }).filter({ hasText: "LS6" }).click();
+  await page.getByRole("textbox", { name: "House number or name" }).fill("12");
+  await next.click();
+  await expect(postcode).toHaveCount(0);
+});
+
+test("sleep quality is one numbered row, a long time without social media is checked, and family control asks how (D-53)", async ({ page }) => {
+  test.slow();
+  dateOfBirth = "2012-05-14";
+  const heading = page.locator(".survey-body h1");
+  // Read without waiting: the pace and check-in screens have no question heading.
+  const headingIs = (text: string) => async () =>
+    (await page.evaluate(() => document.querySelector(".survey-body h1")?.textContent ?? "")).includes(text);
+  await walk(page, [], headingIs("how would you rate your sleep quality overall"));
+
+  // Eleven numbers, each named with its band; the bands drawn beneath.
+  const numbers = page.locator(".numbered-option");
+  await expect(numbers).toHaveCount(11);
+  await expect(page.getByRole("radio", { name: "0, Terrible" })).toBeVisible();
+  await expect(page.getByRole("radio", { name: "5, Fair" })).toBeVisible();
+  await expect(page.getByRole("radio", { name: "10, Excellent" })).toBeVisible();
+  await expect(page.locator(".band-label")).toHaveText(["Terrible", "Poor", "Fair", "Good", "Excellent"]);
+  await page.getByRole("radio", { name: "7, Good" }).click();
+  // …then straight on to sleepiness right now.
+  await expect(heading).toHaveText("How sleepy are you feeling right now?");
+
+  await walk_on(page, headingIs("How long do you think you could go without social media?"));
+  const days = page.locator(".survey-body input.numeric");
+  const next = page.locator("button.next:not(.big)").first();
+  await days.fill("30");
+  await expect(page.locator(".number-check")).toHaveCount(0);
+  await expect(next).toBeEnabled();
+  await days.fill("400");
+  await expect(page.locator(".number-check-text")).toHaveText("That's about 1 year, 1 month and 5 days. Is that right?");
+  await expect(next).toBeDisabled();
+  await page.getByRole("button", { name: "Yes, that's right" }).click();
+  await expect(next).toBeEnabled();
+  await next.click();
+
+  await expect(heading).toHaveText("Does your family manage or control your social media use?");
+  await page.getByRole("radio", { name: "Yes" }).click();
+  await expect(heading).toHaveText("How does your family manage or control your social media use?");
+  await page.getByRole("checkbox", { name: "Something else" }).click();
+  await page.locator("button.next:not(.big)").first().click();
+  await expect(heading).toHaveText("What else does your family do?");
+});
+
+/** Carry on answering from the current screen, without starting a new sitting. */
+async function walk_on(page: Page, enough: () => Promise<boolean>): Promise<void> {
+  for (let screens = 0; screens < 400; screens += 1) {
+    if (await enough()) return;
+    const before = await position(page);
+    await answerAndRecord(page, []);
+    let moved = false;
+    for (let waited = 0; waited < 600; waited += 100) {
+      if ((await position(page)) !== before) {
+        moved = true;
+        break;
+      }
+      await page.waitForTimeout(100);
+    }
+    if (!moved) {
+      await advance(page);
+      await expect.poll(() => position(page), { timeout: 10_000 }).not.toBe(before);
+    }
+  }
+  throw new Error("never reached the screen the test was looking for");
+}
 
 test("the dataset says what the participant actually answered", async ({ page }) => {
   test.slow();

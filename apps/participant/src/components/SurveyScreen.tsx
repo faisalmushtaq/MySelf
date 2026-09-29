@@ -236,7 +236,7 @@ export function SurveyScreen(props: SurveyScreenProps) {
     item.responseType === "info" ||
     (!draftBlocked && (item.required === "hard" ? satisfied : true));
 
-  const handleAnswer = (value: AnswerValue, autoAdvance: boolean) => {
+  const handleAnswer = (value: AnswerValue, autoAdvance: boolean | { afterMs: number }) => {
     // An answer that contradicts an earlier one is still recorded — it is what
     // the participant said, and the raw log is never edited. But the screen
     // says so and holds here, because right now they can tell us which of the
@@ -253,11 +253,23 @@ export function SurveyScreen(props: SurveyScreenProps) {
     }
     if (autoAdvance) {
       if (advanceTimer.current) clearTimeout(advanceTimer.current);
-      advanceTimer.current = setTimeout(() => props.onAdvance(index, "next"), 300);
+      const afterMs = typeof autoAdvance === "object" ? autoAdvance.afterMs : 300;
+      advanceTimer.current = setTimeout(() => props.onAdvance(index, "next"), afterMs);
+    } else if (advanceTimer.current) {
+      // A later input that does not complete the screen (an untick straight
+      // after the last tick) cancels a move that was about to happen.
+      clearTimeout(advanceTimer.current);
+      advanceTimer.current = null;
     }
   };
 
   const handleNext = () => {
+    // Pressing Next while an automatic move is pending takes its place: the
+    // item is left once, not once by hand and again by the timer.
+    if (advanceTimer.current) {
+      clearTimeout(advanceTimer.current);
+      advanceTimer.current = null;
+    }
     if (item.responseType === "info") return props.onAdvance(index, "next");
     if (draftBlocked) return; // button is disabled; belt and braces
     if (satisfied) return props.onAdvance(index, "next");
@@ -470,7 +482,7 @@ export function SurveyScreen(props: SurveyScreenProps) {
               </button>
             )}
             <button type="button" className="next" disabled={!canAdvance} onClick={handleNext}>
-              {props.reviewEdit ? "Save" : item.responseType === "info" ? "Continue" : "Next"}
+              {props.reviewEdit ? "Save" : item.responseType === "info" ? (item.advanceLabel ?? "Continue") : "Next"}
             </button>
           </>
         )}
