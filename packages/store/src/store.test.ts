@@ -1042,4 +1042,25 @@ describe("SWEMWBS and STAI-5 totals in the dataset (D-49)", () => {
     expect(scored(stai).every((v) => v >= 5 && v <= 20)).toBe(true);
     expect([...swemwbs, ...stai].every((r) => r.scoringVersion === "1.0.1")).toBe(true);
   });
+
+  it("scores the SDQ total and the RCADS total from their subscales (S7), in every release", () => {
+    // The fix is in the reading, not the release: r7.1.0's frozen definitions total up too.
+    for (const version of ["7.1.0", "7.2.0"]) {
+      const release = load(version);
+      const { dataset } = ingest(buildDemoSessions({ manifest: release, participants: 8, seed: 49 }), { manifest: release, study: "demo" });
+      const of = (key: string, output: string, sessionId: string) => dataset.scores.find((r) => r.scoringKey === key && r.output === output && r.sessionId === sessionId)?.value ?? null;
+      let totals = 0;
+      for (const s of dataset.sessions) {
+        const parts = ["emotional", "conduct", "hyperactivity", "peer"].map((o) => of("score.sdq25_s", o, s.sessionId));
+        const total = of("score.sdq25_s", "total_difficulties", s.sessionId);
+        if (parts.every((v) => typeof v === "number")) {
+          expect(total, `${version} ${s.sessionId}`).toBe((parts as number[]).reduce((a, b) => a + b, 0));
+          totals += 1;
+        } else expect(total).toBeNull();
+        const [dep, anx] = [of("score.rcads25", "depression", s.sessionId), of("score.rcads25", "anxiety", s.sessionId)];
+        expect(of("score.rcads25", "total", s.sessionId)).toBe(typeof dep === "number" && typeof anx === "number" ? dep + anx : null);
+      }
+      expect(totals, version).toBeGreaterThan(0);
+    }
+  });
 });

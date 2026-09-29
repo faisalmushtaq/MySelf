@@ -1,6 +1,6 @@
 import type { AnswerStore } from "@myself/engine";
 import type { PipeRef, ScoringDefinition } from "@myself/schema";
-import { executeScoring } from "@myself/scoring";
+import { executeScoring, scoringItemKeys } from "@myself/scoring";
 
 /**
  * Resolve piped placeholders in participant-facing text. Only structured pipe
@@ -29,13 +29,9 @@ function resolveScore(pipe: PipeRef, store: AnswerStore): string | null {
   const def = scoringByKey.get(pipe.scoringKey);
   if (!def) return null;
   const values: Record<string, number | null> = {};
-  for (const step of def.steps) {
-    const items = "items" in step ? step.items : [];
-    for (const key of items) {
-      if (key in values) continue;
-      const rec = store.get({ instrument: def.instrument, item: key, revision: 1 });
-      values[key] = rec?.status === "answered" && rec.value?.kind === "choice" ? rec.value.code : null;
-    }
+  for (const key of scoringItemKeys(def)) {
+    const rec = store.get({ instrument: def.instrument, item: key, revision: 1 });
+    values[key] = rec?.status === "answered" && rec.value?.kind === "choice" ? rec.value.code : null;
   }
   const out = executeScoring(def, values).outputs[pipe.output];
   if (out === null || out === undefined) return null;

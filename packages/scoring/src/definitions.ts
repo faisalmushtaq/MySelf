@@ -35,15 +35,22 @@ export const scoreSdq25S: ScoringInput = {
 };
 
 /** RCADS-25: canonical 0-3 codes; plain subscale + total sums (T-score norms
- * are a later, versioned addition once the official tables are filed). */
+ * are a later, versioned addition once the official tables are filed).
+ *
+ * 2.0.0 (D-50) uses the published key: depression is items 1, 4, 8, 10, 13, 15,
+ * 16, 19, 21 and 24 — the full RCADS's ten major-depression items. 1.0.0 counted
+ * item 18 ("I think about death", a generalised-anxiety item in the RCADS-47)
+ * as depression and item 24 ("I feel restless", a major-depression item) as
+ * anxiety, so its subscales were each one item off in r1.0.0–r7.2.0; the total
+ * was right. MAJOR, because the subscales do not pool across the change. */
 export const scoreRcads25: ScoringInput = {
   key: "score.rcads25",
-  version: "1.0.0",
+  version: "2.0.0",
   instrument: "rcads25",
   instrumentVersion: "1.0",
   steps: [
-    { op: "sum", items: q([1, 4, 8, 10, 13, 15, 16, 18, 19, 21]), output: "depression", minValid: 10 },
-    { op: "sum", items: q([2, 3, 5, 6, 7, 9, 11, 12, 14, 17, 20, 22, 23, 24, 25]), output: "anxiety", minValid: 15 },
+    { op: "sum", items: q([1, 4, 8, 10, 13, 15, 16, 19, 21, 24]), output: "depression", minValid: 10 },
+    { op: "sum", items: q([2, 3, 5, 6, 7, 9, 11, 12, 14, 17, 18, 20, 22, 23, 25]), output: "anxiety", minValid: 15 },
     { op: "sum", items: ["depression", "anxiety"], output: "total", minValid: 2 },
   ],
   provenance:

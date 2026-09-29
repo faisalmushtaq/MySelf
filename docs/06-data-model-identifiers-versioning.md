@@ -193,6 +193,28 @@ schemes key on the real items and are checked against every release: it is the
 scoring source for all data, old and new. The survey's own `scores` table
 remains what the survey computed at the time.
 
+### The RCADS-25 key, and totals built from subscales (r7.3.0, D-50)
+
+**RCADS-25 (S8).** The scoring definition (1.0.0) counted item 18 ("I think about
+death") as depression and item 24 ("I feel restless") as anxiety. The published
+RCADS-25 key is the other way round: depression is items 1, 4, 8, 10, 13, 15, 16,
+19, 21 and 24 — the full RCADS's ten major-depression items (RCADS-47 items 2, 6,
+11, 15, 19, 21, 25, 29, 40, 47; item 37, "I think about death", is generalised
+anxiety). Definition **2.0.0** uses the published key; it is MAJOR because the
+subscales do not pool across the change (the total does). It is frozen into
+**r7.3.0**, a MINOR on r7.2.0 for the same reasons as D-49: nothing a participant
+reads or selects changes and no code changes. Sittings under r1.0.0–r7.2.0 keep
+the swapped subscales in the survey's own `scores`; the research dashboard scores
+every version with the published key.
+
+**Totals built from subscales (S7).** Ingest handed the executor a blank for every
+name a step reads, including the outputs of earlier steps, and the executor reads
+a name it was given before its own outputs — so the SDQ total difficulties and the
+RCADS total were blank in every sitting. `scoringItemKeys()` (`@myself/scoring`)
+now lists only a definition's items, and ingest and the participant app fill only
+those. This is a fix in the reading, not in any release: rebuilding a dataset
+gives every version's totals.
+
 ## 7. Identifiers and linkage (r7.0.0, D-37)
 
 Section 6 described the data layer as built. This corrects a gap in it that was
