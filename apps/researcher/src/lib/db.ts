@@ -1,5 +1,12 @@
 import Dexie, { type EntityTable } from "dexie";
-import { isEncryptedEnvelope, openExport, type DeviceSession, type IdentityRow } from "@myself/store";
+import {
+  formatHomeAddress,
+  isEncryptedEnvelope,
+  openExport,
+  parseHomeAddress,
+  type DeviceSession,
+  type IdentityRow,
+} from "@myself/store";
 import {
   createVault,
   openVault,
@@ -58,8 +65,9 @@ export interface PersonRecord {
   nhsNumber: string | null;
   nhsSource: string | null;
   /**
-   * The home address last given (r8.0.0 on, D-52), as "house street, postcode".
-   * Absent from records sealed before it existed.
+   * The home address from the most recent sitting that gave one (r8.0.0 on,
+   * D-52), as "house street, postcode". Absent from records sealed before it
+   * existed.
    */
   homeAddress?: string | null;
   /** Every code this person has typed, right or wrong, wave by wave. */
@@ -467,18 +475,17 @@ async function allPeople(): Promise<PersonRecord[]> {
  * time, so unlocking the vault and re-deriving brings them all back. That is also
  * why a forgotten passphrase costs the typed-in fields and not the names.
  */
-/** The address answer as ingest renders it (JSON of the fields given), as one line; null if none. */
-export function formatAddress(raw: string | undefined): string | null {
-  if (!raw) return null;
-  try {
-    const v = JSON.parse(raw) as Record<string, unknown>;
-    const part = (k: string) => (typeof v[k] === "string" ? (v[k] as string).trim() : "");
-    const line = [part("house"), part("street")].filter(Boolean).join(" ");
-    const out = [line, part("postcode")].filter(Boolean).join(", ");
-    return out === "" ? null : out;
-  } catch {
-    return null;
-  }
+/**
+ * The address a person's claims say is current: the one from the most recent
+ * sitting that gave one, judged by when the sitting happened rather than when
+ * it was loaded, so a sitting imported late does not replace a newer address.
+ */
+function currentAddress(claims: PersonRecord["claims"]): string | null {
+  const latest = [...claims]
+    .sort((a, b) => a.recordedAt.localeCompare(b.recordedAt))
+    .reverse()
+    .find((c) => c.homeAddress);
+  return latest?.homeAddress ?? null;
 }
 
 export async function storeIdentity(rows: IdentityRow[]): Promise<number> {
@@ -500,7 +507,7 @@ export async function storeIdentity(rows: IdentityRow[]): Promise<number> {
     const given = entry.values["first_name"] ?? null;
     const family = entry.values["last_name"] ?? null;
     const dob = entry.values["dob"] ?? null;
-    const address = formatAddress(entry.values["home_address"]);
+    const address = formatHomeAddress(parseHomeAddress(entry.values["home_address"]));
     const row = await db.people.get(entry.participantId);
     const existing = row ? await openPerson(row) : undefined;
     const claim = {
@@ -514,16 +521,19 @@ export async function storeIdentity(rows: IdentityRow[]): Promise<number> {
     if (existing) {
       // The name first given stands. A later wave spelling it differently is
       // evidence to look at, not a reason to overwrite the record quietly.
-      const claims = existing.claims.filter((c) => c.sessionId !== sessionId);
+      const claims = [...existing.claims.filter((c) => c.sessionId !== sessionId), claim].sort((a, b) =>
+        a.recordedAt.localeCompare(b.recordedAt),
+      );
       await db.people.put(
         await sealPerson({
           ...existing,
           givenName: existing.givenName ?? given,
           familyName: existing.familyName ?? family,
           dateOfBirth: existing.dateOfBirth ?? dob,
-          // Unlike a name, an address is expected to change: keep the latest.
-          homeAddress: address ?? existing.homeAddress ?? null,
-          claims: [...claims, claim].sort((a, b) => a.recordedAt.localeCompare(b.recordedAt)),
+          // Unlike a name, an address is expected to change: keep the one from
+          // the most recent sitting, whichever order the sittings arrived in.
+          homeAddress: currentAddress(claims) ?? existing.homeAddress ?? null,
+          claims,
         }),
       );
     } else {

@@ -325,12 +325,41 @@ the two schemes never produce the same ID (codes never begin `P` followed by
 ten base-32 characters).
 
 **Where the address is kept.** Ingest files it as an identity row (JSON of the
-fields given). The Firebase identity service keeps it on every sitting's claim
-(what was given then) and the latest on the participant's record — unlike a name,
-an address is expected to change; the researcher view keeps it in its sealed
-person record and adds it to the identifier file (with spreadsheet formulas
-neutralised). The Postgres API (`apps/api`, not deployed) does not yet keep it:
-its identity table has no address column, and adding one is a schema migration.
+fields given). Every store reads that value through one helper,
+`parseHomeAddress` in `packages/store`, which keeps only `postcode`, `house` and
+`street`, trimmed, and drops a value it cannot read rather than storing it as
+text. Each of the three stores below keeps it in two places. Every sitting's
+claim keeps the address given at that sitting. The participant's record keeps
+the address from the **most recent sitting that gave one**. Recency is judged by
+when the sitting started, not when it arrived, so a sitting uploaded late does
+not replace a newer address with an older one. A sitting that gives no address
+leaves the one on file. Unlike a name, which keeps its first spelling, an
+address is expected to change.
+
+- **Firebase identity service** (`apps/functions`). The claim and registry
+  documents carry `homeAddress`. The registry also carries
+  `homeAddressRecordedAt`, the start time of the sitting the address came from.
+  The registry is read and written in one transaction, with `mergeFields` rather
+  than `merge`. `merge` folds a map into the stored one key by key, so a house
+  number given once and left out later would survive under a new postcode. The
+  first version deployed with r8.0.0 had that flaw. It would only show for
+  someone who sat twice with different addresses, and on their next sitting the
+  address is replaced whole. An address filed before `homeAddressRecordedAt`
+  existed has no date, so the next sitting that gives one replaces it.
+- **Postgres API** (`apps/api`, not deployed). Migration
+  `006_home_address.sql` adds nullable columns:
+  - `identity.code_claims.home_address`;
+  - `identity.participants.home_address`;
+  - `identity.participants.home_address_recorded_at`.
+
+  The migration is additive. It rewrites no row, and a database that has never
+  had an r8.0.0 sitting behaves as before. The columns fall under the existing
+  table grants: the linkage role can read and write them, and the research role
+  cannot reach the identity schema at all. The owner-only `/identity/lookup`
+  returns `homeAddress`.
+- **Researcher view**. The address is kept in the sealed person record, taken
+  from the latest claim that has one. It is also added to the identifier file,
+  with spreadsheet formulas neutralised.
 
 **Wording.** The information screen no longer promises "an anonymous code"; it
 says the team collects name, date of birth and home address, keeps them apart
