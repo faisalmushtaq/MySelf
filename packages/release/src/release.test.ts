@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { readdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
@@ -5,6 +6,7 @@ import { allInstruments, allModules, allScales } from "@myself/library";
 import { microNarrativeFull, type NarrativeProtocol } from "@myself/narrative";
 import { allScoring, scoringReferenceProblems } from "@myself/scoring";
 import { scoringDefinition } from "@myself/schema";
+import { releaseAssets } from "./assets.js";
 import { buildRelease, PublishGateError, verifyManifestHash, type Registries } from "./builder.js";
 import { canonicalJson, contentHash } from "./canonical.js";
 import { ybmComposition } from "./compose-ybm.js";
@@ -14,6 +16,7 @@ const registries: Registries = {
   modules: allModules,
   scales: allScales,
   scoring: allScoring,
+  assets: releaseAssets(),
 };
 
 /**
@@ -23,16 +26,18 @@ const registries: Registries = {
  * the day the sitting started: the 11–17 self-report (sdq25_s 2.0, now word for
  * word — items 19, 20 and 22 were the 18+ form's wording) under 18, the 18+
  * self-report (sdq25_s18) from 18. MAJOR: what a participant reads changes.
+ * It also replaces the secret code with the home address (D-52), checked
+ * against a West Yorkshire postcode list the release pins by hash.
  *
  * r7.3.0 (D-50) froze the published RCADS-25 key; r7.2.0 (D-49) named the
  * SWEMWBS and STAI-5 items by their real keys.
  */
 const meta = {
   version: "8.0.0",
-  publishedAt: "2026-09-29T17:38:00.000Z",
+  publishedAt: "2026-09-29T18:46:00.000Z",
   publishedBy: "faisalmushtaq",
   engineVersion: "0.2.0",
-  decisionRefs: ["D-51"],
+  decisionRefs: ["D-51", "D-52"],
 };
 
 describe("canonical JSON", () => {
@@ -197,7 +202,8 @@ describe("the SDQ by age (D-51)", () => {
     const s11 = manifest.instruments["sdq25_s@2.0/en-GB/self/standard"] as { forms: { items: { key: string; stem: { text: string } }[] }[] };
     const s18 = manifest.instruments["sdq25_s18@1.0/en-GB/self/standard"] as typeof s11;
     expect(s11.forms[0]!.items.find((i) => i.key === "q22")!.stem.text).toContain("home, school or elsewhere");
-    expect(s18.forms[0]!.items.find((i) => i.key === "q22")!.stem.text).toContain("home, work or elsewhere");
+    // the study's adaptation of the S18+ item 22 (D-52)
+    expect(s18.forms[0]!.items.find((i) => i.key === "q22")!.stem.text).toContain("home, school or college, university, work or elsewhere");
     const scoring = manifest.scoring["score.sdq25_s18"] as { steps: { op: string }[] };
     expect(scoring.steps).toEqual((manifest.scoring["score.sdq25_s"] as typeof scoring).steps);
     expect(scoring.steps.some((x) => x.op === "classify")).toBe(false);
@@ -221,6 +227,42 @@ describe("the SDQ by age (D-51)", () => {
         byAge ? ["sdq25_s@2.0/en-GB/self/standard", "sdq25_s18@1.0/en-GB/self/standard"] : ["sdq25_s@1.0/en-GB/self/standard"],
       );
     }
+  });
+});
+
+describe("the home address instead of a secret code (D-52)", () => {
+  const manifest = buildRelease(ybmComposition, registries, meta);
+  const identity = manifest.instruments["ybm_identity@1.0/en-GB/self/standard"] as {
+    forms: { items: { key: string; identifying?: boolean; responseType: string; postcodeCheck?: { asset: string } }[] }[];
+  };
+  const items = identity.forms[0]!.items;
+
+  it("asks name, date of birth and address, and no secret code", () => {
+    expect(items.map((i) => i.key)).toEqual(["first_name", "last_name", "dob", "home_address"]);
+    const address = items.find((i) => i.key === "home_address")!;
+    expect(address).toMatchObject({ responseType: "form_fields", identifying: true, postcodeCheck: { asset: "postcodes_west_yorkshire" } });
+  });
+
+  it("pins the postcode list it checks against, by hash", () => {
+    const pinned = manifest.assets["postcodes_west_yorkshire"]!;
+    const file = readFileSync(fileURLToPath(new URL(`../../../${pinned.path}`, import.meta.url)));
+    expect(pinned.bytes).toBe(file.length);
+    expect(pinned.sha256).toBe(`sha256:${createHash("sha256").update(file).digest("hex")}`);
+    expect(Object.keys(manifest.assets)).toEqual(["postcodes_west_yorkshire"]);
+  });
+
+  it("refuses to publish an address question whose postcode list it does not have", () => {
+    expect(() => buildRelease(ybmComposition, { ...registries, assets: {} }, meta)).toThrow(
+      /home_address: postcode list 'postcodes_west_yorkshire' is not among the release's assets/,
+    );
+  });
+
+  it("tells participants what is collected instead of promising an anonymous code", () => {
+    const text = JSON.stringify(manifest.instruments["ybm_intro_consent@1.0/en-GB/self/standard"]);
+    expect(text).not.toContain("anonymous code");
+    expect(text).not.toContain("SECRET CODE");
+    expect(text).toContain("name, date of birth and home address");
+    expect(text).toContain("my name, date of birth and address will be kept separately from my answers");
   });
 });
 
@@ -276,8 +318,8 @@ describe("publish gate", () => {
   it("rejects a cross-check against a question that does not exist", () => {
     const bad = structuredClone(registries);
     const identity = bad.modules.find((m) => m.instrument === "ybm_identity")!;
-    const month = identity.forms[0]!.items.find((i) => i.key === "ps_birth_month")!;
-    month.crossChecks = [
+    const surname = identity.forms[0]!.items.find((i) => i.key === "last_name")!;
+    surname.crossChecks = [
       {
         kind: "matches_month_of_date",
         against: { instrument: "ybm_identity", item: "nonexistent", revision: 1 },
@@ -288,13 +330,15 @@ describe("publish gate", () => {
   });
 
   it("rejects an option limit derived from a date collected afterwards", () => {
-    const bad = structuredClone(registries);
-    const identity = bad.modules.find((m) => m.instrument === "ybm_identity")!;
-    // Move date of birth to the end of the module, after the month it feeds
-    const items = identity.forms[0]!.items;
-    const dob = items.splice(items.findIndex((i) => i.key === "dob"), 1)[0]!;
-    items.push(dob);
-    expect(() => buildRelease(ybmComposition, bad, meta)).toThrow(/asked later/);
+    // Ask about phones before "About you": the age-of-first-phone options would
+    // be limited by a date of birth nobody has given yet.
+    const early = structuredClone(ybmComposition);
+    const at = early.sections.findIndex((x) => x.key === "phones");
+    const [phones] = early.sections.splice(at, 1);
+    early.sections.splice(1, 0, phones!);
+    expect(() => buildRelease(early, registries, meta)).toThrow(
+      /ybm_smartphone\.age_smartphone: option limit 'at_most_age_now' depends on 'ybm_identity\.dob', which is asked later/,
+    );
   });
 
   it("rejects an undeclared pipe placeholder", () => {

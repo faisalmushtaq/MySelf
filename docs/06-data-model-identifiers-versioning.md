@@ -277,6 +277,76 @@ with youthinmind, and is recorded on the instrument as unverified until then.
 `score.sdq25_s18`; the two share a scale structure, not norms. The research
 dashboard reports them as separate instruments and bands only the S11-17.
 
+### The home address instead of a secret code (r8.0.0, D-52)
+
+**Decision.** The four questions that built a secret code (mother's initials, a
+house digit, birth month, postcode letters) and their introduction are removed.
+In their place participants give their **home address** — the one they live at
+most of the time; a young person who lives across two homes gives the one they
+stay at most. The research team derives an identifier from what participants
+give, rather than asking them to construct one. Ethics: the team confirmed the
+approval covers collecting addresses (PSCETHS-1449); the information screen and
+consent statements say so (below).
+
+**The question.** One screen (`ybm_identity.home_address`, a `form_fields` item
+with a `postcodeCheck`), after name and date of birth: postcode first, then house
+number or name, and street, stored as given as `{postcode, house, street}`. The postcode is checked on the device against
+a list of every West Yorkshire postcode in use (`releases/assets/`, built by
+`scripts/build-postcodes.mjs` from the ONS Postcode Directory, Open Government
+Licence), and the ward and district it lies in are shown back — "Little London &
+Woodhouse, Leeds" — so a mistyped postcode is noticed at once. The list ships
+with the release and is pinned by hash in `manifest.assets`, so the check needs
+no network and no postcode leaves the device. A postcode that is not in the list
+(outside West Yorkshire, too new for the list, or mistyped) is **never refused**:
+the participant is asked to check it and confirms it ("This is my postcode"), and
+whatever they give is kept as typed. Nothing else is recorded: whether a saved
+postcode is in the list can be worked out at any time from the postcode and the
+list the release pins. Every field is optional — many 11-year-olds do not know
+their postcode — so a participant gives what they know.
+
+**Identity.** The address is identifying (`identifying: true`), frozen into the
+release and diverted by ingest into the identity partition like the name and
+date of birth; it never becomes a response row or reaches an export.
+
+**The participant identifier.** From r8.0.0 a sitting carries no code, so ingest
+derives the participant ID from **first name, last name and date of birth**:
+`P` followed by ten characters of a SHA-256 of the three, each normalised
+(letters and digits only, lower case, accents removed — so spacing, hyphens and apostrophes never split a person; the date as YYYY-MM-DD). Like the
+code before it, the ID is a pseudonym, not an anonymisation: anyone holding a
+name and a date of birth can recompute it, so it is handled as pseudonymous data.
+The address is deliberately **not** part of it: people move, and some young
+people live in two homes, so an address would split one person into two.
+Different first names separate twins, which a shared secret code could not.
+A participant who gives a different form of their name at a later wave (Tom,
+Thomas) arrives as a new ID and is joined by a correction record, exactly as a
+mistyped code was (§7). Sittings under r1.0.0–r7.3.0 keep their secret-code IDs;
+the two schemes never produce the same ID (codes never begin `P` followed by
+ten base-32 characters).
+
+**Where the address is kept.** Ingest files it as an identity row (JSON of the
+fields given). The Firebase identity service keeps it on every sitting's claim
+(what was given then) and the latest on the participant's record — unlike a name,
+an address is expected to change; the researcher view keeps it in its sealed
+person record and adds it to the identifier file (with spreadsheet formulas
+neutralised). The Postgres API (`apps/api`, not deployed) does not yet keep it:
+its identity table has no address column, and adding one is a schema migration.
+
+**Wording.** The information screen no longer promises "an anonymous code"; it
+says the team collects name, date of birth and home address, keeps them apart
+from the answers, and uses them to link a young person's answers across visits
+and to find them if they ask to withdraw. The consent statement "my name will
+not be linked with the research materials" becomes "my name, date of birth and
+address will be kept separately from my answers". The team should check this
+wording against the documents the ethics committee approved.
+
+**SDQ 18+ item 22.** The published S18+ reads "I take things that are not mine
+from home, work or elsewhere". Many of the study's 18-year-olds are still at
+school or college, or at university, so the study asks "…from home, school or
+college, university, work or elsewhere". This departs from youthinmind's
+published wording, which their terms do not allow without permission; it is
+recorded on the item and in the instrument's changelog, and should be raised
+with youthinmind with the S18+ licence question (D-51).
+
 ## 7. Identifiers and linkage (r7.0.0, D-37)
 
 Section 6 described the data layer as built. This corrects a gap in it that was

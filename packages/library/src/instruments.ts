@@ -406,9 +406,13 @@ const sdqAdministered: Record<number, string> = {
   22: "I take things that are not mine from home, work or elsewhere",
 };
 
+/** Item 22 of the 18+ form as this study words it (D-52); see sdq18Stems. */
+const SDQ18_ITEM_22 = "I take things that are not mine from home, school or college, university, work or elsewhere";
+
 /**
  * The SDQ self-report for those aged 18 and over (S18+) as youthinmind
- * publishes it (English, UK; © Robert Goodman, 2009), word for word.
+ * publishes it (English, UK; © Robert Goodman, 2009), word for word except
+ * item 22, which this study adapts for participants still in education (D-52).
  */
 const sdq18Stems: string[] = [
   "I try to be nice to other people. I care about their feelings",
@@ -432,7 +436,9 @@ const sdq18Stems: string[] = [
   "Other people pick on me or bully me",
   "I often offer to help others (family members, friends, colleagues)",
   "I think before I do things",
-  "I take things that are not mine from home, work or elsewhere",
+  // Adapted (D-52): the S18+ reads "…from home, work or elsewhere". Many of the
+  // study's 18-year-olds are still at school or college, or at university.
+  SDQ18_ITEM_22,
   "I get along better with older people than with people of my own age",
   "I have many fears, I am easily scared",
   "I finish the work I'm doing. My attention is good",
@@ -518,7 +524,7 @@ export const sdq25S18: InstrumentInput = {
   forms: [
     {
       language: "en-GB",
-      label: "SDQ self-report 18+ (S18+), canonical anchors ('Certainly True', coded 0-2)",
+      label: "SDQ self-report 18+ (S18+), canonical anchors ('Certainly True', coded 0-2); item 22 adapted (D-52)",
       instructions: sdqIntro,
       items: sdq18Stems.map((text, i) => {
         const n = i + 1;
@@ -526,7 +532,13 @@ export const sdq25S18: InstrumentInput = {
           required: "soft",
           allowDecline: true, // as the S11-17 (D-05)
         });
-        return item;
+        return n === 22
+          ? {
+              ...item,
+              researcherNote:
+                "Adapted by the study (D-52): the published S18+ reads 'I take things that are not mine from home, work or elsewhere'. 'school or college, university' added because many participants of 18 are still in education. youthinmind's terms do not allow changes without their permission.",
+            }
+          : item;
       }),
     },
   ],
@@ -537,7 +549,8 @@ export const sdq25S18: InstrumentInput = {
     { ageBand: "17-18", medianSeconds: 240, provenance: "estimated-heuristic" },
     { ageBand: "adult", medianSeconds: 220, provenance: "estimated-heuristic" },
   ],
-  changelog: "1.0 (D-51): the S18+ word for word, for participants aged 18 or over on the day the sitting started.",
+  changelog:
+    "1.0 (D-51, D-52): the S18+ word for word, for participants aged 18 or over on the day the sitting started, except item 22, adapted to name school or college and university as well as work.",
   owner: "ybm",
   researcherNotes:
     "Scored exactly as the S11-17: youthinmind's scoring instructions are 'identical for the similarly-worded 18+ SDQ' (Scoring the SDQ for age 4-17 or 18+, 20 June 2016). The 4–17 cut-points 'have not been validated for use with the 18+ SDQ': report continuous scores.",

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Illustration } from "./illustrations.js";
-import type { AnswerValue } from "@myself/engine";
+import { normalisePostcode, type AnswerValue } from "@myself/engine";
+import { postcodeList } from "../lib/postcodes.js";
 import { ABSOLUTE_MAX_AGE_YEARS, type ItemDefinition, type ResponseScale } from "@myself/schema";
 
 /**
@@ -660,6 +661,37 @@ export function FormFieldsControl({ item, value, onAnswer, onValidity, onSubmit 
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pending = useRef<Record<string, string> | null>(null);
 
+  // A postcode field is checked against the release's list (D-52). One the list
+  // does not know is questioned, not refused: the participant confirms it and
+  // it is kept as typed. A postcode already saved was confirmed when it was
+  // given, so coming back to the screen does not ask again.
+  const check = item.postcodeCheck;
+  const list = check ? postcodeList(check.asset) : null;
+  const [confirmed, setConfirmed] = useState<string | null>(
+    check ? normalisePostcode(current[check.field] ?? "") : null,
+  );
+  const postcodeState = (vals: Record<string, string>, confirmedPostcode: string | null) => {
+    if (!check || !list) return { normal: null, area: null, needsConfirm: false };
+    const normal = normalisePostcode(vals[check.field] ?? "");
+    const area = normal ? list.lookup(normal) : null;
+    return { normal, area, needsConfirm: normal !== null && area === null && confirmedPostcode !== normal };
+  };
+  const report = (next: Record<string, string>, confirmedPostcode: string | null) => {
+    if (item.responseType !== "form_fields") return;
+    // Validity is judged across the whole form, not just the field just typed
+    // in: a single bad entry must block the screen even if the others are fine.
+    const anyBad = item.fields.some((f) => {
+      const raw = (next[f.key] ?? "").trim();
+      return f.pattern !== undefined && raw.length > 0 && !new RegExp(f.pattern).test(raw);
+    });
+    const allRequiredPresent = item.fields.every((f) => !f.required || (next[f.key] ?? "").trim().length > 0);
+    // An emptied form is not an answer: it goes the way of any blank item.
+    const anyPresent = Object.values(next).some((x) => x.trim().length > 0);
+    const ok = !anyBad && !postcodeState(next, confirmedPostcode).needsConfirm;
+    onValidity?.({ ok, complete: ok && allRequiredPresent && anyPresent });
+  };
+  const postcode = postcodeState(values, confirmed);
+
   const commit = (key: string, raw: string) => {
     // Truncate here, not only via maxLength: iOS AutoFill/QuickType inserts
     // values programmatically and bypasses the attribute entirely.
@@ -677,15 +709,7 @@ export function FormFieldsControl({ item, value, onAnswer, onValidity, onSubmit 
     if (bad) nextErrors[key] = field?.patternHint ?? "Please check the format";
     else delete nextErrors[key];
     setErrors(nextErrors);
-
-    // Validity is judged across the whole form, not just the field just typed
-    // in: a single bad entry must block the screen even if the others are fine.
-    const anyBad = item.fields.some((f) => {
-      const raw = (next[f.key] ?? "").trim();
-      return f.pattern !== undefined && raw.length > 0 && !new RegExp(f.pattern).test(raw);
-    });
-    const allRequiredPresent = item.fields.every((f) => !f.required || (next[f.key] ?? "").trim().length > 0);
-    onValidity?.({ ok: !anyBad, complete: !anyBad && allRequiredPresent });
+    report(next, confirmed);
 
     if (bad) {
       pending.current = null;
@@ -714,51 +738,85 @@ export function FormFieldsControl({ item, value, onAnswer, onValidity, onSubmit 
 
   return (
     <div className="fields">
-      {item.fields.map((f) => (
-        <label key={f.key} className="field">
-          <span className="field-label">{f.label}</span>
-          <input
-            // Always type=text: type=number ignores maxLength and accepts "e",
-            // "+" and "-". inputMode drives the on-screen keyboard instead.
-            type="text"
-            inputMode={f.kind === "numeric" || /^\^\[0-9\]/.test(f.pattern ?? "") ? "numeric" : "text"}
-            className="text-input"
-            maxLength={f.maxChars}
-            autoComplete="off"
-            autoCorrect="off"
-            spellCheck={false}
-            value={values[f.key] ?? ""}
-            aria-invalid={errors[f.key] !== undefined}
-            onChange={(e) => commit(f.key, e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key !== "Enter") return;
-              e.preventDefault();
-              // Enter walks down the form, then moves on from the last field.
-              const inputs = Array.from(
-                e.currentTarget.closest(".fields")?.querySelectorAll("input") ?? [],
-              ) as HTMLInputElement[];
-              const at = inputs.indexOf(e.currentTarget);
-              const next = inputs[at + 1];
-              if (next) {
-                next.focus();
-                return;
-              }
-              if (timer.current) clearTimeout(timer.current);
-              const draft = pending.current;
-              pending.current = null;
-              if (draft && Object.values(draft).some((x) => x.trim().length > 0)) {
-                onAnswer({ kind: "fields", values: draft }, false);
-              }
-              onSubmit?.();
-            }}
-          />
-          {errors[f.key] && (
-            <span className="error" role="alert">
-              {errors[f.key]}
-            </span>
-          )}
-        </label>
-      ))}
+      {item.fields.map((f) => {
+        const isPostcode = check !== undefined && f.key === check.field;
+        const noteId = `${item.key}-${f.key}-note`;
+        const note =
+          isPostcode && !errors[f.key] && postcode.normal
+            ? postcode.area
+              ? `✓ ${postcode.area.ward}, ${postcode.area.district}`
+              : postcode.needsConfirm
+                ? `We can't find ${postcode.normal} in ${check!.areaName}. Check it's right — if it is, tap "This is my postcode".`
+                : "✓ Kept as you gave it"
+            : null;
+        return (
+          <div key={f.key} className="field-group">
+            <label className="field">
+              <span className="field-label">{f.label}</span>
+              <input
+                // Always type=text: type=number ignores maxLength and accepts "e",
+                // "+" and "-". inputMode drives the on-screen keyboard instead.
+                type="text"
+                inputMode={f.kind === "numeric" || /^\^\[0-9\]/.test(f.pattern ?? "") ? "numeric" : "text"}
+                className="text-input"
+                maxLength={f.maxChars}
+                autoComplete="off"
+                autoCorrect="off"
+                spellCheck={false}
+                value={values[f.key] ?? ""}
+                aria-invalid={errors[f.key] !== undefined}
+                aria-describedby={isPostcode ? noteId : undefined}
+                onChange={(e) => commit(f.key, e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key !== "Enter") return;
+                  e.preventDefault();
+                  // Enter walks down the form, then moves on from the last field.
+                  const inputs = Array.from(
+                    e.currentTarget.closest(".fields")?.querySelectorAll("input") ?? [],
+                  ) as HTMLInputElement[];
+                  const at = inputs.indexOf(e.currentTarget);
+                  const next = inputs[at + 1];
+                  if (next) {
+                    next.focus();
+                    return;
+                  }
+                  if (timer.current) clearTimeout(timer.current);
+                  const draft = pending.current;
+                  pending.current = null;
+                  if (draft && Object.values(draft).some((x) => x.trim().length > 0)) {
+                    onAnswer({ kind: "fields", values: draft }, false);
+                  }
+                  onSubmit?.();
+                }}
+              />
+              {errors[f.key] && (
+                <span className="error" role="alert">
+                  {errors[f.key]}
+                </span>
+              )}
+            </label>
+            {isPostcode && (
+              // Said back, not shouted: the area a postcode lies in, or a request to
+              // check one the list does not know (D-52).
+              <p id={noteId} className="field-note" aria-live="polite">
+                {note}
+              </p>
+            )}
+            {isPostcode && !errors[f.key] && postcode.needsConfirm && (
+              <button
+                type="button"
+                className="confirm-postcode"
+                onClick={() => {
+                  setConfirmed(postcode.normal);
+                  report(values, postcode.normal);
+                }}
+              >
+                This is my postcode
+              </button>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }

@@ -9,7 +9,15 @@ import { releaseManifest, type ReleaseManifest } from "@myself/schema";
 import { buildBidsExport } from "./bids.js";
 import { emptyDataset, type Dataset } from "./dataset.js";
 import { buildDemoSessions } from "./demo.js";
-import { deriveParticipantCode, isParticipantCode, monthNumber } from "./identity.js";
+import {
+  DERIVED_ID_PATTERN,
+  deriveParticipantCode,
+  deriveParticipantId,
+  isParticipantCode,
+  isParticipantId,
+  monthNumber,
+  nameKey,
+} from "./identity.js";
 import { ingest, resolveAlias, type DeviceEvent, type DeviceSession } from "./ingest.js";
 import {
   exportableNarratives,
@@ -1095,3 +1103,73 @@ describe("SWEMWBS and STAI-5 totals in the dataset (D-49)", () => {
     }
   });
 });
+
+describe("the participant ID from name and date of birth (D-52)", () => {
+  const load = (version: string): ReleaseManifest =>
+    releaseManifest.parse(
+      JSON.parse(readFileSync(fileURLToPath(new URL(`../../../releases/ybm_nd2026_standard_r${version}.manifest.json`, import.meta.url)), "utf8")),
+    );
+
+  it("is the same for the same person however the name is typed, and never partial", () => {
+    const a = deriveParticipantId({ firstName: "Amara", lastName: "Ahmed", dob: "2012-05-04" })!;
+    expect(a).toMatch(DERIVED_ID_PATTERN);
+    expect(deriveParticipantId({ firstName: " amara ", lastName: "AHMED", dob: "2012-05-04" })).toBe(a);
+    expect(deriveParticipantId({ firstName: "Zoë", lastName: "O'Neill-Bárta", dob: "2010-01-31" })).toBe(
+      deriveParticipantId({ firstName: "Zoe", lastName: "ONeill Barta", dob: "2010-01-31" }),
+    );
+    expect(nameKey("Anne-Marie")).toBe("annemarie");
+    expect(nameKey("Sam2")).not.toBe(nameKey("Sam"));
+    // a different person, or twins, get a different ID
+    expect(deriveParticipantId({ firstName: "Amira", lastName: "Ahmed", dob: "2012-05-04" })).not.toBe(a);
+    expect(deriveParticipantId({ firstName: "Amara", lastName: "Ahmed", dob: "2012-05-05" })).not.toBe(a);
+    for (const partial of [{ lastName: "Ahmed", dob: "2012-05-04" }, { firstName: "Amara", dob: "2012-05-04" }, { firstName: "Amara", lastName: "Ahmed" }, { firstName: "Amara", lastName: "Ahmed", dob: "2012-13-04" }, { firstName: "!!", lastName: "Ahmed", dob: "2012-05-04" }]) {
+      expect(deriveParticipantId(partial), JSON.stringify(partial)).toBeNull();
+    }
+  });
+
+  it("can never be mistaken for a secret code", () => {
+    const id = deriveParticipantId({ firstName: "Ben", lastName: "Brook", dob: "2011-11-11" })!;
+    expect(isParticipantCode(id)).toBe(false);
+    expect(isParticipantId(id)).toBe(true);
+    expect(isParticipantId("JA101CD")).toBe(true);
+    expect(DERIVED_ID_PATTERN.test("JA101CD")).toBe(false);
+  });
+
+  it("links a person's sittings under r8.0.0 by name and date of birth, and files the address as identity", () => {
+    const release = load("8.0.0");
+    const sessions = buildDemoSessions({ manifest: release, participants: 20, seed: 52 });
+    const { dataset, identity, rejected } = ingest(sessions, { manifest: release, study: "demo" });
+    expect(rejected).toEqual([]);
+    expect(dataset.sessions.every((x) => DERIVED_ID_PATTERN.test(x.participantId))).toBe(true);
+    // the made-up people who came back more than once are one participant each
+    const people = new Set(dataset.sessions.map((x) => x.participantId));
+    expect(people.size).toBeLessThan(dataset.sessions.length);
+    expect(people.size).toBe(20);
+    // the address never becomes a response; it is identity, as given
+    expect(dataset.responses.some((r) => r.item === "home_address")).toBe(false);
+    const address = identity.filter((r) => r.variable === "home_address");
+    expect(address.length).toBe(dataset.sessions.length);
+    expect(JSON.parse(address[0]!.value)).toMatchObject({ postcode: expect.stringMatching(/^XX\d \dXX$/), street: expect.any(String) });
+    expect(identity.some((r) => r.variable.startsWith("ps_"))).toBe(false);
+  });
+
+  it("keeps an older sitting's secret code even when it is read through r8.0.0", () => {
+    // An unknown hash falls back to the latest release in some readers: the
+    // sitting's own answers decide how it links, not the release it is read with.
+    const old = load("7.1.0");
+    const [sitting] = buildDemoSessions({ manifest: old, participants: 1, seed: 7 });
+    const { dataset } = ingest([sitting!], { manifest: load("8.0.0"), study: "demo" });
+    expect(dataset.sessions).toHaveLength(1);
+    expect(isParticipantCode(dataset.sessions[0]!.participantId)).toBe(true);
+  });
+
+  it("holds back a sitting with no name or date of birth, and says why", () => {
+    const release = load("8.0.0");
+    const [sitting] = buildDemoSessions({ manifest: release, participants: 1, seed: 3 });
+    const events = sitting!.events.filter((e) => e.itemKey !== "ybm_identity.dob");
+    const { dataset, rejected } = ingest([{ ...sitting!, events }], { manifest: release, study: "demo" });
+    expect(dataset.sessions).toHaveLength(0);
+    expect(rejected[0]!.reason).toContain("name or date of birth missing");
+  });
+});
+

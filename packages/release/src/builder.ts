@@ -43,6 +43,12 @@ export interface Registries {
    * be run.
    */
   narrativeProtocols?: NarrativeProtocol[];
+  /**
+   * Files items refer to — the postcode list an address question checks
+   * against (D-52) — with their content hashes. Only the ones the composition
+   * uses are frozen into the release.
+   */
+  assets?: Record<string, { path: string; sha256: string; bytes: number }>;
 }
 
 export interface PublishMeta {
@@ -255,6 +261,7 @@ export function buildRelease(
   const scaleByKey = new Map(scales.map((s) => [s.key, s]));
   const scoringByKey = new Map(scoring.map((s) => [s.key, s]));
   const seenVariables = new Map<string, string>();
+  const frozenAssets: Record<string, { path: string; sha256: string; bytes: number }> = {};
 
   for (const section of draft.sections) {
     for (const component of section.components) {
@@ -336,6 +343,15 @@ export function buildRelease(
             frozenScales[item.scale] = scale;
           }
         }
+        if (item.responseType === "form_fields" && item.postcodeCheck) {
+          const check = item.postcodeCheck;
+          const asset = registries.assets?.[check.asset];
+          if (!asset) failures.push(`${ref.instrument}/${item.key}: postcode list '${check.asset}' is not among the release's assets`);
+          else frozenAssets[check.asset] = asset;
+          if (!item.fields.some((f) => f.key === check.field)) {
+            failures.push(`${ref.instrument}/${item.key}: postcode check names field '${check.field}', which the item does not have`);
+          }
+        }
         const pipes = item.stem.pipes ?? {};
         for (const [name, pipe] of Object.entries(pipes)) {
           if (!item.stem.text.includes(`{${name}}`)) {
@@ -399,7 +415,7 @@ export function buildRelease(
     narrativeProtocols: frozenProtocols,
     prompts: frozenPrompts,
     modelConfigs: frozenModelConfigs,
-    assets: {},
+    assets: frozenAssets,
   };
 
   const hash = contentHash(manifestBody);

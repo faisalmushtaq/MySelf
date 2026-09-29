@@ -100,6 +100,14 @@ export function buildDemoSessions(options: DemoOptions): DeviceSession[] {
       birthMonthCode: 1 + Math.floor(random() * 12),
       postcodeLetters: letters(),
     };
+    // An address that cannot be real: no postcode area is XX (D-52). Drawn from
+    // its own stream, so adding it changed nothing else a seed produces.
+    const own = rng((options.seed ?? 20260101) + 7919 * (p + 1));
+    const address = {
+      postcode: `XX${1 + Math.floor(own() * 9)} ${1 + Math.floor(own() * 9)}XX`,
+      house: String(1 + Math.floor(own() * 99)),
+      street: ["Demo Street", "Example Road", "Sample Lane"][Math.floor(own() * 3)]!,
+    };
     const firstName = pick(FIRST_NAMES);
     const lastName = pick(LAST_NAMES);
     const birthYear = 2008 + Math.floor(random() * 6);
@@ -153,6 +161,7 @@ export function buildDemoSessions(options: DemoOptions): DeviceSession[] {
               lastName,
               dob,
               parts,
+              address,
               handednessLean,
             });
             if (value === null) continue;
@@ -219,6 +228,7 @@ interface AnswerContext {
   lastName: string;
   dob: string;
   parts: { motherInitials: string; houseDigit: string; birthMonthCode: number; postcodeLetters: string };
+  address: { postcode: string; house: string; street: string };
   handednessLean: number;
 }
 
@@ -239,6 +249,8 @@ function answerFor(item: FrozenItem, ctx: AnswerContext): unknown {
       return { kind: "text", value: ctx.parts.postcodeLetters };
     case "ps_birth_month":
       return { kind: "choice", code: ctx.parts.birthMonthCode };
+    case "home_address":
+      return { kind: "fields", values: { ...ctx.address } };
   }
 
   switch (item.responseType) {

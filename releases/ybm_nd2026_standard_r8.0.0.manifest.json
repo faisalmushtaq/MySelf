@@ -5,11 +5,12 @@
     "version": "8.0.0",
     "assessment": "ybm_nd2026_standard",
     "study": "ybm",
-    "publishedAt": "2026-09-29T17:38:00.000Z",
+    "publishedAt": "2026-09-29T18:46:00.000Z",
     "publishedBy": "faisalmushtaq",
     "engineVersion": "0.2.0",
     "decisionRefs": [
-      "D-51"
+      "D-51",
+      "D-52"
     ]
   },
   "composition": {
@@ -423,12 +424,12 @@
                 "text": "Yorkshire Brain Map School Workshop"
               },
               "lede": {
-                "text": "Citizen Neuroscience\n\nThank you for taking part in this workshop.\n\nIn this study, we'll use a special tool called electroencephalography (EEG) to collect information about your brain. We'll put sensors on your head, and they'll record your brain activity. You'll also help collect brain data from another person. This new way helps us gather brain data quickly with help from people who aren't experts. The EEG headset should not feel uncomfortable, so if it does at any point, just let a member of the research team know. EEG is safe, pain free, and non-invasive.\n\nIn addition to EEG, we'll also ask questions about your life and how you feel. We made a list of questions that ask about things like who you are, how you feel, and how happy you are. We care about keeping your answers private so we'll give you an anonymous code so your answers stay confidential during the study.\n\nJoining this study is your choice, and you can leave at any time with no problems. If you want to leave, please let a member of the research team or a teacher know.\n\nOur study has permission from the School of Psychology Ethics Committee (Ethics Reference: PSCETHS-1449, Date of Approval: 5/6/25).\n\nThe questions you're about to answer should take about 10 minutes to answer. Please finish the survey quickly and carefully so we can stay on schedule. Thank you for joining our study! If you have questions or worries, please feel free to ask."
+                "text": "Citizen Neuroscience\n\nThank you for taking part in this workshop.\n\nIn this study, we'll use a special tool called electroencephalography (EEG) to collect information about your brain. We'll put sensors on your head, and they'll record your brain activity. You'll also help collect brain data from another person. This new way helps us gather brain data quickly with help from people who aren't experts. The EEG headset should not feel uncomfortable, so if it does at any point, just let a member of the research team know. EEG is safe, pain free, and non-invasive.\n\nIn addition to EEG, we'll also ask questions about your life and how you feel. We made a list of questions that ask about things like who you are, how you feel, and how happy you are. We care about keeping your answers private. We'll ask for your name, date of birth and home address so we can keep your answers together if you take part again, and find them if you ask us to remove them. These are kept apart from your answers, and only the research team can see them.\n\nJoining this study is your choice, and you can leave at any time with no problems. If you want to leave, please let a member of the research team or a teacher know.\n\nOur study has permission from the School of Psychology Ethics Committee (Ethics Reference: PSCETHS-1449, Date of Approval: 5/6/25).\n\nThe questions you're about to answer should take about 10 minutes to answer. Please finish the survey quickly and carefully so we can stay on schedule. Thank you for joining our study! If you have questions or worries, please feel free to ask."
               },
               "moreInfo": {
                 "label": "How we look after your information",
                 "body": {
-                  "text": "WHAT WE COLLECT\nYour answers to these questions, the EEG recording from the session, and some details about how you used the app — such as how long you spent on each question. We also collect your name and date of birth so the research team can identify your session on the day.\n\nWHERE IT IS KEPT\nEverything is saved on this iPad first, encrypted, so it works even with no internet. It is later transferred to secure University of Leeds storage. Your name and date of birth are stored apart from your answers, so the two are not held together.\n\nWHO CAN SEE IT\nThe research team. When we publish or share the data, your name is never attached — only your code and your answers.\n\nYOUR SECRET CODE\nThe code you're about to make is how you can ask us to remove your answers later. Keep it somewhere you'll remember. We can't work out who you are from it, which is the point of it.\n\nCHANGING YOUR MIND\nYou can stop at any time, and you don't have to give a reason. If you want your answers taken out afterwards, contact the research team within 24 hours of finishing and tell them your code.\n\nQUESTIONS\nEmail the research team at m.faizah@leeds.ac.uk. Ethics reference PSCETHS-1449."
+                  "text": "WHAT WE COLLECT\nYour answers to these questions, the EEG recording from the session, and some details about how you used the app — such as how long you spent on each question. We also collect your name, date of birth and home address, so the research team can identify your session and keep your answers together if you take part again.\n\nWHERE IT IS KEPT\nEverything is saved on this iPad first, encrypted, so it works even with no internet. It is later transferred to secure University of Leeds storage. Your name, date of birth and address are stored apart from your answers, so they are not held together.\n\nWHO CAN SEE IT\nThe research team. When we publish or share the data, your name and address are never attached — only a study number and your answers.\n\nYOUR ADDRESS\nWe ask for the address you live at most of the time. With your name and date of birth, it helps us keep your answers together if you take part more than once. It is never published or shared.\n\nCHANGING YOUR MIND\nYou can stop at any time, and you don't have to give a reason. If you want your answers taken out afterwards, contact the research team within 24 hours of finishing and tell them your name and date of birth.\n\nQUESTIONS\nEmail the research team at m.faizah@leeds.ac.uk. Ethics reference PSCETHS-1449."
                 }
               },
               "required": "soft",
@@ -459,7 +460,7 @@
                 {
                   "key": "no_identification",
                   "text": {
-                    "text": "I understand that my name will not be linked with the research materials, and I will not be identified or identifiable in the report or reports that result from the research."
+                    "text": "I understand that my name, date of birth and address will be kept separately from my answers, and I will not be identified or identifiable in the report or reports that result from the research."
                   },
                   "required": true
                 },
@@ -599,7 +600,7 @@
               "required": "hard",
               "allowDecline": false,
               "identifying": true,
-              "researcherNote": "Direct identifier — identity-schema routed (D-09). Legacy tag carries a trailing space. Asked immediately after the name and before the secret code (D-25): the code's month component is cross-checked against it, and the age derived from it limits the age-of-first-device options later.",
+              "researcherNote": "Direct identifier — identity-schema routed (D-09). Legacy tag carries a trailing space. Asked immediately after the name (D-25). With the name it gives the participant ID (D-52); the age derived from it chooses the SDQ form (D-51) and limits the age-of-first-device options later.",
               "responseType": "date",
               "minYear": 1990,
               "maxYear": 2026,
@@ -607,112 +608,50 @@
               "maxAgeYears": 100
             },
             {
-              "key": "secret_code_intro",
+              "key": "home_address",
               "revision": 1,
-              "variable": "ps_id_intro",
+              "variable": "home_address",
               "stem": {
-                "text": "Next, you'll make your secret code"
+                "text": "What's your home address?"
               },
               "lede": {
-                "text": "The next four questions build a short code that is yours alone. It is made from things you will always remember, so you can tell us your code again later — if you ever want your answers taken out of the study, that code is how we find them.\n\nWe cannot work it out from your code who you are. That is the point of it: your answers stay linked to you without being labelled with your name."
+                "text": "The address you live at most of the time. If you live in more than one home, put the one you stay at most. Fill in what you know — it's fine to leave out anything you're not sure of."
               },
-              "required": "optional",
-              "allowDecline": false,
-              "identifying": false,
-              "researcherNote": "Explains the purpose of the ps_id components before collection (D-23). The code is participant-held; the research team cannot reverse it.",
-              "responseType": "info"
-            },
-            {
-              "key": "ps_mother_initials",
-              "revision": 1,
-              "variable": "ps_mother_initials",
-              "stem": {
-                "text": "The first two letters of your mother's first name"
-              },
-              "lede": {
-                "text": "For example, if her name is Jane, type JA."
-              },
-              "required": "hard",
+              "required": "soft",
               "allowDecline": false,
               "identifying": true,
-              "researcherNote": "Secret-code component 1 of 4 — identity-schema routed (D-09/D-23).",
-              "responseType": "text_short",
-              "minChars": 0,
-              "maxChars": 2,
-              "pattern": "^[A-Za-z]{2}$",
-              "patternHint": "Two letters, for example JA"
-            },
-            {
-              "key": "ps_house_digit",
-              "revision": 1,
-              "variable": "ps_house_digit",
-              "stem": {
-                "text": "The first digit of your house number"
-              },
-              "lede": {
-                "text": "For example, if you live at number 123, type 1."
-              },
-              "required": "hard",
-              "allowDecline": false,
-              "identifying": true,
-              "researcherNote": "Secret-code component 2 of 4 — identity-schema routed (D-09/D-23).",
-              "responseType": "text_short",
-              "minChars": 0,
-              "maxChars": 1,
-              "pattern": "^[0-9]$",
-              "patternHint": "One number, for example 1"
-            },
-            {
-              "key": "ps_birth_month",
-              "revision": 1,
-              "variable": "ps_birth_month",
-              "stem": {
-                "text": "The month you were born"
-              },
-              "lede": {
-                "text": "This is part of your code, so it needs to match the date of birth you gave a moment ago."
-              },
-              "required": "hard",
-              "allowDecline": false,
-              "identifying": true,
-              "crossChecks": [
+              "researcherNote": "Direct identifier — identity-schema routed (D-09, D-52). Stored as given, as {postcode, house, street}. The postcode is checked on the device against the release's West Yorkshire list; one not in the list is questioned once and then kept. The participant ID is derived from name and date of birth, not from the address.",
+              "responseType": "form_fields",
+              "fields": [
                 {
-                  "kind": "matches_month_of_date",
-                  "against": {
-                    "instrument": "ybm_identity",
-                    "item": "dob",
-                    "revision": 1
-                  },
-                  "message": "That's not the month in the date of birth you gave. Check which one is right — you can use Back to change the date."
+                  "key": "postcode",
+                  "label": "Postcode",
+                  "kind": "text",
+                  "required": false,
+                  "maxChars": 10,
+                  "pattern": "^[A-Za-z]{1,2}[0-9][A-Za-z0-9]?\\s*[0-9][A-Za-z]{2}$",
+                  "patternHint": "A postcode looks like LS6 2AA"
+                },
+                {
+                  "key": "house",
+                  "label": "House number or name",
+                  "kind": "text",
+                  "required": false,
+                  "maxChars": 60
+                },
+                {
+                  "key": "street",
+                  "label": "Street",
+                  "kind": "text",
+                  "required": false,
+                  "maxChars": 100
                 }
               ],
-              "researcherNote": "Secret-code component 3 of 4. Chosen from a list rather than typed, and cross-checked against dob so the derived ps_id cannot disagree with the recorded date of birth (D-23/D-25).",
-              "responseType": "single_choice",
-              "scale": "scale.month_12",
-              "scaleVersion": "1.0.0",
-              "presentation": "compact",
-              "spectrumReverse": false,
-              "autoAdvance": true
-            },
-            {
-              "key": "ps_postcode_letters",
-              "revision": 1,
-              "variable": "ps_postcode_letters",
-              "stem": {
-                "text": "The last two letters of your postcode"
-              },
-              "lede": {
-                "text": "For example, if your postcode is AB1 2CD, type CD."
-              },
-              "required": "hard",
-              "allowDecline": false,
-              "identifying": true,
-              "researcherNote": "Secret-code component 4 of 4 — identity-schema routed (D-09/D-23).",
-              "responseType": "text_short",
-              "minChars": 0,
-              "maxChars": 2,
-              "pattern": "^[A-Za-z]{2}$",
-              "patternHint": "Two letters, for example CD"
+              "postcodeCheck": {
+                "field": "postcode",
+                "asset": "postcodes_west_yorkshire",
+                "areaName": "West Yorkshire"
+              }
             }
           ],
           "presentationFidelity": "stepped_allowed"
@@ -730,10 +669,10 @@
           "provenance": "estimated-heuristic"
         }
       ],
-      "changelog": "1.0: encoded from QSF; collection preserved per D-09, storage separated at the data layer. 2.0 (D-23): the validation ID moved to the opening screen, where it is entered once before anything else, so the in-flow val_id item is removed. The ps_id form was split into four single-purpose screens preceded by an explanation of what the code is for; birth month is now chosen from a list. Legacy ps_id is derived from ps_mother_initials + ps_house_digit + ps_birth_month + ps_postcode_letters at export, and val_id from the session's participant code — the crosswalk records both derivations rather than recoding silently.",
+      "changelog": "1.0: encoded from QSF; collection preserved per D-09, storage separated at the data layer. 2.0 (D-23): the validation ID moved to the opening screen, where it is entered once before anything else, so the in-flow val_id item is removed. The ps_id form was split into four single-purpose screens preceded by an explanation of what the code is for; birth month is now chosen from a list. Legacy ps_id is derived from ps_mother_initials + ps_house_digit + ps_birth_month + ps_postcode_letters at export, and val_id from the session's participant code — the crosswalk records both derivations rather than recoding silently. D-52: the secret code (its introduction and four components) is replaced by the home address, one form_fields screen with the postcode checked against the release's West Yorkshire list; the participant ID is derived from first name, last name and date of birth at ingest.",
       "approvalStatus": "draft",
       "owner": "ybm",
-      "researcherNotes": "Legacy crosswalk: ps_id = initials + house digit + zero-padded month number + postcode letters (e.g. JA101CD); val_id = the participant code captured at the opening screen. Both are derived, never re-asked.",
+      "researcherNotes": "Legacy crosswalk (r1.0.0–r7.3.0): ps_id = initials + house digit + zero-padded month number + postcode letters (e.g. JA101CD); val_id = the participant code captured at the opening screen. Both are derived, never re-asked. From r8.0.0 (D-52) there is no ps_id: the participant ID is P + ten base-32 characters of a hash of name and date of birth.",
       "kind": "module",
       "study": "ybm"
     },
@@ -1989,7 +1928,7 @@
           "language": "en-GB",
           "readingLevel": "standard",
           "informant": "self",
-          "label": "SDQ self-report 18+ (S18+), canonical anchors ('Certainly True', coded 0-2)",
+          "label": "SDQ self-report 18+ (S18+), canonical anchors ('Certainly True', coded 0-2); item 22 adapted (D-52)",
           "instructions": "For each statement, choose Not True, Somewhat True or Certainly True. It would help us if you answered them all as best you can, even if you are not absolutely certain. Answer on the basis of how things have been for you over the last six months.",
           "items": [
             {
@@ -2354,11 +2293,12 @@
               "revision": 1,
               "variable": "sdq25_s18_q22",
               "stem": {
-                "text": "I take things that are not mine from home, work or elsewhere"
+                "text": "I take things that are not mine from home, school or college, university, work or elsewhere"
               },
               "required": "soft",
               "allowDecline": true,
               "identifying": false,
+              "researcherNote": "Adapted by the study (D-52): the published S18+ reads 'I take things that are not mine from home, work or elsewhere'. 'school or college, university' added because many participants of 18 are still in education. youthinmind's terms do not allow changes without their permission.",
               "responseType": "single_choice",
               "scale": "scale.sdq_3pt",
               "scaleVersion": "1.0.0",
@@ -2498,7 +2438,7 @@
           "provenance": "estimated-heuristic"
         }
       ],
-      "changelog": "1.0 (D-51): the S18+ word for word, for participants aged 18 or over on the day the sitting started.",
+      "changelog": "1.0 (D-51, D-52): the S18+ word for word, for participants aged 18 or over on the day the sitting started, except item 22, adapted to name school or college and university as well as work.",
       "approvalStatus": "draft",
       "owner": "ybm",
       "researcherNotes": "Scored exactly as the S11-17: youthinmind's scoring instructions are 'identical for the similarly-worded 18+ SDQ' (Scoring the SDQ for age 4-17 or 18+, 20 June 2016). The 4–17 cut-points 'have not been validated for use with the 18+ SDQ': report continuous scores."
@@ -5009,98 +4949,6 @@
     }
   },
   "scales": {
-    "scale.month_12": {
-      "key": "scale.month_12",
-      "version": "1.0.0",
-      "name": "Calendar month",
-      "options": [
-        {
-          "code": 1,
-          "label": "January",
-          "kind": "substantive",
-          "textEntry": false,
-          "value": 1
-        },
-        {
-          "code": 2,
-          "label": "February",
-          "kind": "substantive",
-          "textEntry": false,
-          "value": 2
-        },
-        {
-          "code": 3,
-          "label": "March",
-          "kind": "substantive",
-          "textEntry": false,
-          "value": 3
-        },
-        {
-          "code": 4,
-          "label": "April",
-          "kind": "substantive",
-          "textEntry": false,
-          "value": 4
-        },
-        {
-          "code": 5,
-          "label": "May",
-          "kind": "substantive",
-          "textEntry": false,
-          "value": 5
-        },
-        {
-          "code": 6,
-          "label": "June",
-          "kind": "substantive",
-          "textEntry": false,
-          "value": 6
-        },
-        {
-          "code": 7,
-          "label": "July",
-          "kind": "substantive",
-          "textEntry": false,
-          "value": 7
-        },
-        {
-          "code": 8,
-          "label": "August",
-          "kind": "substantive",
-          "textEntry": false,
-          "value": 8
-        },
-        {
-          "code": 9,
-          "label": "September",
-          "kind": "substantive",
-          "textEntry": false,
-          "value": 9
-        },
-        {
-          "code": 10,
-          "label": "October",
-          "kind": "substantive",
-          "textEntry": false,
-          "value": 10
-        },
-        {
-          "code": 11,
-          "label": "November",
-          "kind": "substantive",
-          "textEntry": false,
-          "value": 11
-        },
-        {
-          "code": 12,
-          "label": "December",
-          "kind": "substantive",
-          "textEntry": false,
-          "value": 12
-        }
-      ],
-      "direction": "ascending"
-    },
     "scale.ethnicity_uk20": {
       "key": "scale.ethnicity_uk20",
       "version": "1.0.0",
@@ -7327,6 +7175,12 @@
   "narrativeProtocols": {},
   "prompts": {},
   "modelConfigs": {},
-  "assets": {},
-  "hash": "sha256:a6807ab62529d9a3e66b889e90bc684d6a0176ffe7d6ce9b829da45a02bc4f06"
+  "assets": {
+    "postcodes_west_yorkshire": {
+      "path": "releases/assets/postcodes-west-yorkshire-2026-09-07.txt",
+      "sha256": "sha256:f9807eaff81524c5e8db7f948f5d2483fbb06e20bcddd72156d5a8ecf00a5e7e",
+      "bytes": 277351
+    }
+  },
+  "hash": "sha256:f991abbbc93b2d9dc58a30d25bd9ac169b8363a588e6dc765ccab9312937bba5"
 }

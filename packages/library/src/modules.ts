@@ -59,7 +59,7 @@ const introText = `Thank you for taking part in this workshop.
 
 In this study, we'll use a special tool called electroencephalography (EEG) to collect information about your brain. We'll put sensors on your head, and they'll record your brain activity. You'll also help collect brain data from another person. This new way helps us gather brain data quickly with help from people who aren't experts. The EEG headset should not feel uncomfortable, so if it does at any point, just let a member of the research team know. EEG is safe, pain free, and non-invasive.
 
-In addition to EEG, we'll also ask questions about your life and how you feel. We made a list of questions that ask about things like who you are, how you feel, and how happy you are. We care about keeping your answers private so we'll give you an anonymous code so your answers stay confidential during the study.
+In addition to EEG, we'll also ask questions about your life and how you feel. We made a list of questions that ask about things like who you are, how you feel, and how happy you are. We care about keeping your answers private. We'll ask for your name, date of birth and home address so we can keep your answers together if you take part again, and find them if you ask us to remove them. These are kept apart from your answers, and only the research team can see them.
 
 Joining this study is your choice, and you can leave at any time with no problems. If you want to leave, please let a member of the research team or a teacher know.
 
@@ -74,19 +74,19 @@ The questions you're about to answer should take about 10 minutes to answer. Ple
  * permissions — every claim here is one the protocol already makes.
  */
 const privacyText = `WHAT WE COLLECT
-Your answers to these questions, the EEG recording from the session, and some details about how you used the app — such as how long you spent on each question. We also collect your name and date of birth so the research team can identify your session on the day.
+Your answers to these questions, the EEG recording from the session, and some details about how you used the app — such as how long you spent on each question. We also collect your name, date of birth and home address, so the research team can identify your session and keep your answers together if you take part again.
 
 WHERE IT IS KEPT
-Everything is saved on this iPad first, encrypted, so it works even with no internet. It is later transferred to secure University of Leeds storage. Your name and date of birth are stored apart from your answers, so the two are not held together.
+Everything is saved on this iPad first, encrypted, so it works even with no internet. It is later transferred to secure University of Leeds storage. Your name, date of birth and address are stored apart from your answers, so they are not held together.
 
 WHO CAN SEE IT
-The research team. When we publish or share the data, your name is never attached — only your code and your answers.
+The research team. When we publish or share the data, your name and address are never attached — only a study number and your answers.
 
-YOUR SECRET CODE
-The code you're about to make is how you can ask us to remove your answers later. Keep it somewhere you'll remember. We can't work out who you are from it, which is the point of it.
+YOUR ADDRESS
+We ask for the address you live at most of the time. With your name and date of birth, it helps us keep your answers together if you take part more than once. It is never published or shared.
 
 CHANGING YOUR MIND
-You can stop at any time, and you don't have to give a reason. If you want your answers taken out afterwards, contact the research team within 24 hours of finishing and tell them your code.
+You can stop at any time, and you don't have to give a reason. If you want your answers taken out afterwards, contact the research team within 24 hours of finishing and tell them your name and date of birth.
 
 QUESTIONS
 Email the research team at m.faizah@leeds.ac.uk. Ethics reference PSCETHS-1449.`;
@@ -132,7 +132,7 @@ export const ybmIntroConsent: ModuleInput = {
             {
               key: "no_identification",
               text: {
-                text: "I understand that my name will not be linked with the research materials, and I will not be identified or identifiable in the report or reports that result from the research.",
+                text: "I understand that my name, date of birth and address will be kept separately from my answers, and I will not be identified or identifiable in the report or reports that result from the research.",
               },
             },
             {
@@ -240,89 +240,37 @@ export const ybmIdentity: ModuleInput = {
           maxAgeYears: 100,
           researcherNote:
             "Direct identifier — identity-schema routed (D-09). Legacy tag carries a trailing space. " +
-            "Asked immediately after the name and before the secret code (D-25): the code's month component is cross-checked against it, and the age derived from it limits the age-of-first-device options later.",
+            "Asked immediately after the name (D-25). With the name it gives the participant ID (D-52); the age derived from it chooses the SDQ form (D-51) and limits the age-of-first-device options later.",
         },
-        // The secret code is built one piece at a time. Four short screens beat
-        // one dense form: each piece gets its own instruction and its own
-        // validation, and nobody has to hold four rules in their head at once.
+        // The home address replaces the secret code (D-52): one screen instead of
+        // five, and the research team derives the ID rather than asking a child
+        // to construct one. Postcode first, so the area it lies in can be shown
+        // back before anything else is typed.
         {
-          responseType: "info",
-          key: "secret_code_intro",
+          responseType: "form_fields",
+          key: "home_address",
+          identifying: true,
           revision: 1,
-          variable: "ps_id_intro",
-          required: "optional",
-          stem: { text: "Next, you'll make your secret code" },
+          variable: "home_address",
+          required: "soft",
+          stem: { text: "What's your home address?" },
           lede: {
-            text: "The next four questions build a short code that is yours alone. It is made from things you will always remember, so you can tell us your code again later — if you ever want your answers taken out of the study, that code is how we find them.\n\nWe cannot work it out from your code who you are. That is the point of it: your answers stay linked to you without being labelled with your name.",
+            text: "The address you live at most of the time. If you live in more than one home, put the one you stay at most. Fill in what you know — it's fine to leave out anything you're not sure of.",
           },
-          researcherNote:
-            "Explains the purpose of the ps_id components before collection (D-23). The code is participant-held; the research team cannot reverse it.",
-        },
-        {
-          responseType: "text_short",
-          key: "ps_mother_initials",
-          identifying: true,
-          revision: 1,
-          variable: "ps_mother_initials",
-          required: "hard",
-          stem: { text: "The first two letters of your mother's first name" },
-          lede: { text: "For example, if her name is Jane, type JA." },
-          maxChars: 2,
-          pattern: "^[A-Za-z]{2}$",
-          patternHint: "Two letters, for example JA",
-          researcherNote: "Secret-code component 1 of 4 — identity-schema routed (D-09/D-23).",
-        },
-        {
-          responseType: "text_short",
-          key: "ps_house_digit",
-          identifying: true,
-          revision: 1,
-          variable: "ps_house_digit",
-          required: "hard",
-          stem: { text: "The first digit of your house number" },
-          lede: { text: "For example, if you live at number 123, type 1." },
-          maxChars: 1,
-          pattern: "^[0-9]$",
-          patternHint: "One number, for example 1",
-          researcherNote: "Secret-code component 2 of 4 — identity-schema routed (D-09/D-23).",
-        },
-        {
-          responseType: "single_choice",
-          key: "ps_birth_month",
-          identifying: true,
-          revision: 1,
-          variable: "ps_birth_month",
-          required: "hard",
-          stem: { text: "The month you were born" },
-          lede: { text: "This is part of your code, so it needs to match the date of birth you gave a moment ago." },
-          scale: "scale.month_12",
-          scaleVersion: "1.0.0",
-          presentation: "compact",
-          // Asked twice, so it must agree with itself. Caught here, while the
-          // participant can still say which one is right (D-25).
-          crossChecks: [
+          fields: [
             {
-              kind: "matches_month_of_date",
-              against: { instrument: "ybm_identity", item: "dob", revision: 1 },
-              message: "That's not the month in the date of birth you gave. Check which one is right — you can use Back to change the date.",
+              key: "postcode",
+              label: "Postcode",
+              maxChars: 10,
+              pattern: "^[A-Za-z]{1,2}[0-9][A-Za-z0-9]?\\s*[0-9][A-Za-z]{2}$",
+              patternHint: "A postcode looks like LS6 2AA",
             },
+            { key: "house", label: "House number or name", maxChars: 60 },
+            { key: "street", label: "Street", maxChars: 100 },
           ],
+          postcodeCheck: { field: "postcode", asset: "postcodes_west_yorkshire", areaName: "West Yorkshire" },
           researcherNote:
-            "Secret-code component 3 of 4. Chosen from a list rather than typed, and cross-checked against dob so the derived ps_id cannot disagree with the recorded date of birth (D-23/D-25).",
-        },
-        {
-          responseType: "text_short",
-          key: "ps_postcode_letters",
-          identifying: true,
-          revision: 1,
-          variable: "ps_postcode_letters",
-          required: "hard",
-          stem: { text: "The last two letters of your postcode" },
-          lede: { text: "For example, if your postcode is AB1 2CD, type CD." },
-          maxChars: 2,
-          pattern: "^[A-Za-z]{2}$",
-          patternHint: "Two letters, for example CD",
-          researcherNote: "Secret-code component 4 of 4 — identity-schema routed (D-09/D-23).",
+            "Direct identifier — identity-schema routed (D-09, D-52). Stored as given, as {postcode, house, street}. The postcode is checked on the device against the release's West Yorkshire list; one not in the list is questioned once and then kept. The participant ID is derived from name and date of birth, not from the address.",
         },
       ],
     },
@@ -334,10 +282,14 @@ export const ybmIdentity: ModuleInput = {
     "so the in-flow val_id item is removed. The ps_id form was split into four single-purpose screens preceded " +
     "by an explanation of what the code is for; birth month is now chosen from a list. Legacy ps_id is derived " +
     "from ps_mother_initials + ps_house_digit + ps_birth_month + ps_postcode_letters at export, and val_id from " +
-    "the session's participant code — the crosswalk records both derivations rather than recoding silently.",
+    "the session's participant code — the crosswalk records both derivations rather than recoding silently." +
+    " D-52: the secret code (its introduction and four components) is replaced by the home address, one form_fields " +
+    "screen with the postcode checked against the release's West Yorkshire list; the participant ID is derived from " +
+    "first name, last name and date of birth at ingest.",
   researcherNotes:
-    "Legacy crosswalk: ps_id = initials + house digit + zero-padded month number + postcode letters (e.g. JA101CD); " +
-    "val_id = the participant code captured at the opening screen. Both are derived, never re-asked.",
+    "Legacy crosswalk (r1.0.0–r7.3.0): ps_id = initials + house digit + zero-padded month number + postcode letters (e.g. JA101CD); " +
+    "val_id = the participant code captured at the opening screen. Both are derived, never re-asked. From r8.0.0 (D-52) " +
+    "there is no ps_id: the participant ID is P + ten base-32 characters of a hash of name and date of birth.",
 };
 
 // ---------------------------------------------------------------------------

@@ -361,6 +361,10 @@ describe("instruments and modules", () => {
     expect(items.find((i) => i.key === "q23")!.stem.text).toBe(
       "I get along better with older people than with people of my own age",
     );
+    // item 22 is the study's adaptation of the S18+ wording (D-52), and says so
+    const q22 = items.find((i) => i.key === "q22")!;
+    expect(q22.stem.text).toBe("I take things that are not mine from home, school or college, university, work or elsewhere");
+    expect(q22.researcherNote).toContain("home, work or elsewhere");
     // scored the same way: same subscales and reverse-scored items
     expect(adult.subscales).toEqual(sdq.subscales);
     expect(adult.reverseScoredItems).toEqual(sdq.reverseScoredItems);

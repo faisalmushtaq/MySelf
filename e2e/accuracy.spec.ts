@@ -139,7 +139,7 @@ async function answerAndRecord(page: Page, ledger: Tapped[]): Promise<void> {
       /**
        * Recorded whether or not the app accepts it, and that is the point.
        *
-       * Some items are checked against an earlier answer — "the month you were born"
+       * Some items are checked against an earlier answer — "the month you were born" (to r7.3.0)
        * has to agree with the date of birth — so the walker tries options until one
        * is accepted. Every tap along the way IS an answer the participant gave, and
        * the event log records all of them in order, because it is append-only.
@@ -212,7 +212,8 @@ async function answerAndRecord(page: Page, ledger: Tapped[]): Promise<void> {
 
   const text = page.locator(".survey-body textarea:visible, .survey-body input.text-input:visible").first();
   if ((await text.count()) > 0) {
-    for (const candidate of ["1", "A", "Something I would say about this."]) {
+    // A postcode for the address screen (D-52), which rejects the others.
+    for (const candidate of ["1", "A", "LS2 9JT", "Something I would say about this."]) {
       await text.fill(candidate);
       if (await accepted(page)) return;
     }
@@ -271,13 +272,13 @@ async function advance(page: Page): Promise<void> {
 }
 
 /** Answer screen after screen until the survey finishes, or `enough` says to stop. */
-async function walk(page: Page, ledger: Tapped[], enough: () => boolean = () => false): Promise<void> {
+async function walk(page: Page, ledger: Tapped[], enough: () => boolean | Promise<boolean> = () => false): Promise<void> {
   await page.goto("./");
   await page.locator("input.code").fill(CODE);
   await page.locator("button.next.big").click();
 
   for (let screens = 0; screens < 400; screens += 1) {
-    if ((await position(page)) === "finished" || enough()) break;
+    if ((await position(page)) === "finished" || (await enough())) break;
     const before = await position(page);
     await answerAndRecord(page, ledger);
     let moved = false;
@@ -309,6 +310,32 @@ test("someone 18 or over on the day is given the 18+ SDQ, word for word (D-51)",
   // and nothing from the 11–17 form
   expect(asked("I am restless, I cannot stay still for long")).toBe(false);
   expect(asked("Other children or young people pick on me or bully me")).toBe(false);
+});
+
+test("the address screen names a postcode's area, and keeps one it does not know once confirmed (D-52)", async ({ page }) => {
+  test.slow();
+  dateOfBirth = "2012-05-14";
+  const postcode = page.getByRole("textbox", { name: "Postcode" });
+  await walk(page, [], async () => (await postcode.count()) > 0);
+
+  const next = page.locator("button.next:not(.big)").first();
+  const note = page.locator(".field-note");
+  await postcode.fill("ls2 9jt");
+  await expect(note).toHaveText("✓ Little London & Woodhouse, Leeds");
+  await expect(next).toBeEnabled();
+
+  // Harrogate: a real postcode, outside West Yorkshire. Questioned, not refused.
+  await postcode.fill("HG1 2AA");
+  await expect(note).toContainText("We can't find HG1 2AA in West Yorkshire");
+  await expect(next).toBeDisabled();
+  await page.getByRole("button", { name: "This is my postcode" }).click();
+  await expect(note).toHaveText("✓ Kept as you gave it");
+  await expect(next).toBeEnabled();
+
+  // The rest is optional; what they know is what is kept.
+  await page.getByRole("textbox", { name: "House number or name" }).fill("12");
+  await next.click();
+  await expect(postcode).toHaveCount(0);
 });
 
 test("the dataset says what the participant actually answered", async ({ page }) => {

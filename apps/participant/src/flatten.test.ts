@@ -390,3 +390,34 @@ describe("the SDQ form by age, in the release participants run (D-51)", () => {
     expect(sdqShown("1999-06-01", null)).toEqual(["sdq25_s"]);
   });
 });
+
+describe("the home address (D-52)", () => {
+  const current = releaseManifest.parse(currentManifest);
+  const units = flattenManifest(current).units;
+
+  it("asks for the address instead of a secret code, on one screen", () => {
+    const identity = units.filter((u) => u.instrument === "ybm_identity").map((u) => u.item.key);
+    expect(identity).toEqual(["first_name", "last_name", "dob", "home_address"]);
+    const address = units.find((u) => u.item.key === "home_address")!.item;
+    expect(address.responseType).toBe("form_fields");
+    if (address.responseType !== "form_fields") return;
+    expect(address.fields.map((f) => f.key)).toEqual(["postcode", "house", "street"]);
+    // every part optional: a participant gives what they know
+    expect(address.fields.every((f) => !f.required)).toBe(true);
+    expect(address.identifying).toBe(true);
+  });
+
+  it("checks postcodes against exactly the list the release pins", async () => {
+    const { createHash } = await import("node:crypto");
+    const { POSTCODE_LISTS, postcodeList } = await import("./lib/postcodes.js");
+    for (const [asset, pinned] of Object.entries(current.assets)) {
+      const text = POSTCODE_LISTS[asset];
+      expect(text, asset).toBeDefined();
+      expect(`sha256:${createHash("sha256").update(text!, "utf8").digest("hex")}`, asset).toBe(pinned.sha256);
+    }
+    const list = postcodeList("postcodes_west_yorkshire")!;
+    expect(list.lookup("ls2 9jt")).toEqual({ ward: "Little London & Woodhouse", district: "Leeds" });
+    expect(list.lookup("HG1 1AA")).toBeNull();
+    expect(postcodeList("no_such_list")).toBeNull();
+  });
+});

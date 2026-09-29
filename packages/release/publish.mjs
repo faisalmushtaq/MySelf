@@ -2,7 +2,7 @@ import { writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { allInstruments, allModules, allScales } from "@myself/library";
 import { allScoring } from "@myself/scoring";
-import { buildRelease, ybmComposition } from "./dist/index.js";
+import { buildRelease, releaseAssets, ybmComposition } from "./dist/index.js";
 
 /**
  * Cut a release of the YBM standard questionnaire.
@@ -45,7 +45,7 @@ const meta = {
 
 const manifest = buildRelease(
   ybmComposition,
-  { instruments: allInstruments, modules: allModules, scales: allScales, scoring: allScoring },
+  { instruments: allInstruments, modules: allModules, scales: allScales, scoring: allScoring, assets: releaseAssets() },
   meta,
 );
 
