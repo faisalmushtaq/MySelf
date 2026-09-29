@@ -312,7 +312,7 @@ test("someone 18 or over on the day is given the 18+ SDQ, word for word (D-51)",
   expect(asked("Other children or young people pick on me or bully me")).toBe(false);
 });
 
-test("the address screen names a postcode's area, and keeps one it does not know once confirmed (D-52)", async ({ page }) => {
+test("the address screen names a postcode's area, and keeps one outside it only after two confirmations (D-52)", async ({ page }) => {
   test.slow();
   dateOfBirth = "2012-05-14";
   const postcode = page.getByRole("textbox", { name: "Postcode" });
@@ -324,12 +324,27 @@ test("the address screen names a postcode's area, and keeps one it does not know
   await expect(note).toHaveText("✓ Little London & Woodhouse, Leeds");
   await expect(next).toBeEnabled();
 
-  // Harrogate: a real postcode, outside West Yorkshire. Questioned, not refused.
+  // Harrogate: a real postcode, outside West Yorkshire. Questioned twice, never
+  // refused: is it typed correctly, and is the home really outside the area?
   await postcode.fill("HG1 2AA");
-  await expect(note).toContainText("We can't find HG1 2AA in West Yorkshire");
+  await expect(note).toHaveText("We can't find HG1 2AA in West Yorkshire. Check it's typed correctly.");
   await expect(next).toBeDisabled();
-  await page.getByRole("button", { name: "This is my postcode" }).click();
-  await expect(note).toHaveText("✓ Kept as you gave it");
+  await page.getByRole("button", { name: "It's typed correctly" }).click();
+  await expect(note).toHaveText("Is your home outside West Yorkshire?");
+  await expect(next).toBeDisabled();
+  // Saying no goes back to checking the postcode, with the box ready to edit.
+  await page.getByRole("button", { name: "No — I'll check my postcode" }).click();
+  await expect(note).toContainText("Check it's typed correctly");
+  await expect(postcode).toBeFocused();
+  await page.getByRole("button", { name: "It's typed correctly" }).click();
+  await page.getByRole("button", { name: "Yes, my home is outside West Yorkshire" }).click();
+  await expect(note).toHaveText("✓ Kept as you gave it — outside West Yorkshire");
+  await expect(next).toBeEnabled();
+  // A different postcode starts the questions again.
+  await postcode.fill("YO1 7HH");
+  await expect(next).toBeDisabled();
+  await page.getByRole("button", { name: "It's typed correctly" }).click();
+  await page.getByRole("button", { name: "Yes, my home is outside West Yorkshire" }).click();
   await expect(next).toBeEnabled();
 
   // The rest is optional; what they know is what is kept.

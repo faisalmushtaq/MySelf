@@ -298,8 +298,9 @@ Woodhouse, Leeds" — so a mistyped postcode is noticed at once. The list ships
 with the release and is pinned by hash in `manifest.assets`, so the check needs
 no network and no postcode leaves the device. A postcode that is not in the list
 (outside West Yorkshire, too new for the list, or mistyped) is **never refused**:
-the participant is asked to check it and confirms it ("This is my postcode"), and
-whatever they give is kept as typed. Nothing else is recorded: whether a saved
+the participant confirms twice — that it is typed correctly, then that their home
+is outside West Yorkshire ("No — I'll check my postcode" takes them back to it) —
+and whatever they give is kept as typed. Nothing else is recorded: whether a saved
 postcode is in the list can be worked out at any time from the postcode and the
 list the release pins. Every field is optional — many 11-year-olds do not know
 their postcode — so a participant gives what they know.

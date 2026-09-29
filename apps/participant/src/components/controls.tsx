@@ -662,14 +662,19 @@ export function FormFieldsControl({ item, value, onAnswer, onValidity, onSubmit 
   const pending = useRef<Record<string, string> | null>(null);
 
   // A postcode field is checked against the release's list (D-52). One the list
-  // does not know is questioned, not refused: the participant confirms it and
-  // it is kept as typed. A postcode already saved was confirmed when it was
-  // given, so coming back to the screen does not ask again.
+  // does not know is questioned, never refused, in two steps: is it typed
+  // correctly, and is the home really outside the area? Only a participant who
+  // says yes to both moves on with it, and it is kept as typed. A postcode
+  // already saved was confirmed when it was given, so a return visit does not
+  // ask again.
   const check = item.postcodeCheck;
   const list = check ? postcodeList(check.asset) : null;
-  const [confirmed, setConfirmed] = useState<string | null>(
-    check ? normalisePostcode(current[check.field] ?? "") : null,
-  );
+  const saved = check ? normalisePostcode(current[check.field] ?? "") : null;
+  /** The postcode the participant said is typed correctly (step one). */
+  const [typedRight, setTypedRight] = useState<string | null>(saved);
+  /** The postcode the participant said is outside the area (step two). */
+  const [confirmed, setConfirmed] = useState<string | null>(saved);
+  const postcodeInput = useRef<HTMLInputElement | null>(null);
   const postcodeState = (vals: Record<string, string>, confirmedPostcode: string | null) => {
     if (!check || !list) return { normal: null, area: null, needsConfirm: false };
     const normal = normalisePostcode(vals[check.field] ?? "");
@@ -746,8 +751,10 @@ export function FormFieldsControl({ item, value, onAnswer, onValidity, onSubmit 
             ? postcode.area
               ? `✓ ${postcode.area.ward}, ${postcode.area.district}`
               : postcode.needsConfirm
-                ? `We can't find ${postcode.normal} in ${check!.areaName}. Check it's right — if it is, tap "This is my postcode".`
-                : "✓ Kept as you gave it"
+                ? typedRight === postcode.normal
+                  ? `Is your home outside ${check!.areaName}?`
+                  : `We can't find ${postcode.normal} in ${check!.areaName}. Check it's typed correctly.`
+                : `✓ Kept as you gave it — outside ${check!.areaName}`
             : null;
         return (
           <div key={f.key} className="field-group">
@@ -766,6 +773,7 @@ export function FormFieldsControl({ item, value, onAnswer, onValidity, onSubmit 
                 value={values[f.key] ?? ""}
                 aria-invalid={errors[f.key] !== undefined}
                 aria-describedby={isPostcode ? noteId : undefined}
+                ref={isPostcode ? postcodeInput : undefined}
                 onChange={(e) => commit(f.key, e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key !== "Enter") return;
@@ -802,17 +810,34 @@ export function FormFieldsControl({ item, value, onAnswer, onValidity, onSubmit 
                 {note}
               </p>
             )}
-            {isPostcode && !errors[f.key] && postcode.needsConfirm && (
-              <button
-                type="button"
-                className="confirm-postcode"
-                onClick={() => {
-                  setConfirmed(postcode.normal);
-                  report(values, postcode.normal);
-                }}
-              >
-                This is my postcode
+            {isPostcode && !errors[f.key] && postcode.needsConfirm && typedRight !== postcode.normal && (
+              <button type="button" className="confirm-postcode" onClick={() => setTypedRight(postcode.normal)}>
+                It&apos;s typed correctly
               </button>
+            )}
+            {isPostcode && !errors[f.key] && postcode.needsConfirm && typedRight === postcode.normal && (
+              <div className="confirm-row">
+                <button
+                  type="button"
+                  className="confirm-postcode"
+                  onClick={() => {
+                    setConfirmed(postcode.normal);
+                    report(values, postcode.normal);
+                  }}
+                >
+                  Yes, my home is outside {check!.areaName}
+                </button>
+                <button
+                  type="button"
+                  className="confirm-postcode"
+                  onClick={() => {
+                    setTypedRight(null);
+                    postcodeInput.current?.focus();
+                  }}
+                >
+                  No — I&apos;ll check my postcode
+                </button>
+              </div>
             )}
           </div>
         );

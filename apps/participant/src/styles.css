@@ -1107,6 +1107,12 @@ input[type="range"] {
   color: var(--text);
 }
 
+.confirm-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
 .confirm-postcode {
   align-self: flex-start;
   min-height: 44px;
