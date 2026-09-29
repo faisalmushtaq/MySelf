@@ -5,8 +5,8 @@ import { extractDraft, outline, validateDraft } from "@myself/studio";
 import { dragItemOf, resolveHover } from "./hover.js";
 import { blockExpandKey, buildTree, indexIssues } from "./model.js";
 
-const r710 = JSON.parse(readFileSync(resolve(__dirname, "../../../../../../releases/ybm_nd2026_standard_r7.1.0.manifest.json"), "utf8"));
-const draft = extractDraft(r710);
+const r730 = JSON.parse(readFileSync(resolve(__dirname, "../../../../../../releases/ybm_nd2026_standard_r7.3.0.manifest.json"), "utf8"));
+const draft = extractDraft(r730);
 const o = outline(draft);
 const sdq = o.sections.find((s) => s.key === "wellbeing")!.blocks[1]!;
 const open = new Map([[blockExpandKey("wellbeing", sdq.refKey), true]]);

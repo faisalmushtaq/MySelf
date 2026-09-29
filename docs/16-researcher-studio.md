@@ -104,7 +104,7 @@ Each risk below is paired with how the design handles it.
 | # | Risk | Handling |
 |---|---|---|
 | R1 | **Readers only know bundled releases.** A release published at runtime would be read by the nightly export through `latestRelease` (silently wrong), skipped by identity capture, and read through the latest release (with a warning) by the researcher view. | Every reader resolves manifests by hash through one registry: bundled manifests first, then the Firestore release store, with the hash re-verified over the raw JSON. An unknown hash is reported loudly and never read through another release (§5.4). |
-| R2 | **Offline-first participant app.** iPads can be offline for days, sittings resume on the same device, and a sitting must never straddle two versions. | Each sitting is pinned to the release it started under. Manifests are cached in IndexedDB. The app switches release only at the start screen. The last known-good release (r7.1.0) stays bundled as the offline fallback, and a device never waits on the network (§5.3). |
+| R2 | **Offline-first participant app.** iPads can be offline for days, sittings resume on the same device, and a sitting must never straddle two versions. | Each sitting is pinned to the release it started under. Manifests are cached in IndexedDB. The app switches release only at the start screen. The last known-good release (r7.3.0) stays bundled as the offline fallback, and a device never waits on the network (§5.3). |
 | R3 | **Licensed, validated instruments.** The gate checks licence status but nothing enforces `modifiable: "no"`. A Studio that lets anyone reword the SDQ would break licence terms and psychometric validity. | Validated instruments are **locked** in the Studio: wording, options, codes, order and type cannot be changed. They can be moved, shown conditionally and made required or optional. The server refuses a draft whose locked content differs from the library (§4.4). |
 | R4 | **Ethics-approved wording.** The consent and intro text is approved under PSCETHS-1449 (D-24, D-40). | The consent module is **protected**. Editing it needs an explicit unlock that records an ethics acknowledgement in the audit log (§4.4). |
 | R5 | **Identity separation and participant linkage.** Ingest derives the participant code from four `ybm_identity` items and diverts `identifying` answers (D-37). Changing those items would break linkage or leak PII into the dataset. | The identity items are protected. Validation blocks removing them or changing their type, key or variable, and warns on any other change. Free-text questions carry a sensitivity warning. |
@@ -275,7 +275,7 @@ Editing draft ──validate──► Ready ──preview──► Publish (rele
 - *Validation: N errors, M warnings*
 - *Live: r8.0.0 (published 28 Sep by …)*
 
-**Version numbers** continue the existing release series (r7.1.0 → r8.0.0 …).
+**Version numbers** continue the existing release series (r7.3.0 → r8.0.0 …).
 The Studio suggests the bump from the diff, following docs/06 §3:
 
 | Bump | When |
@@ -331,7 +331,7 @@ The participant app resolves which release to run as follows:
    - Check its `engineVersion` against what this build can render.
    - Cache it in IndexedDB (Dexie v5, a new `releases` table; add-only).
 2. **Offline, or on any failure**, run the last verified cached release, or else
-   the bundled r7.1.0. A device never waits on the network, and a bad or
+   the bundled r7.3.0. A device never waits on the network, and a bad or
    incompatible release is never rendered.
 3. **Each sitting is pinned to its release.**
    - Resume finds the in-progress sitting by code whatever the hash, then
@@ -383,6 +383,14 @@ silently dropped.
 earlier, already-published hash. It needs a publisher, requires a reason and is
 audited. The ordinary rollback is to restore that version into the draft and
 publish it as a new version.
+
+A restore keeps the current draft's **scoring rules** for every questionnaire
+both have. Scoring is corrected in the library, not in the Studio (r7.2.0
+fixed SWEMWBS and STAI-5), so restoring older wording never brings back
+scoring that was put right. The emergency rollback has no such protection: it
+makes the old release live exactly as published, scoring included. Making
+r7.1.0 or earlier live again would field the SWEMWBS and STAI-5 scoring that
+r7.2.0 fixed.
 
 ### 5.6 Preview
 
@@ -461,13 +469,13 @@ Each row carries: `at` (server time), `actor` (uid), `actorEmail`, `surveyId`,
   through the bundled registry.
 - **One-time set-up is an explicit admin action** in the Studio, "Set up from
   the live survey" (`studioImportLive`). It:
-  - writes r5.0.0 through r7.1.0 from the functions bundle into
+  - writes r5.0.0 through r7.3.0 from the functions bundle into
     `publicReleases` and `versions` (marked `source: "repository"`);
-  - points `published/ybm_nd2026_standard` at r7.1.0, the release already live;
-  - creates the draft from r7.1.0.
+  - points `published/ybm_nd2026_standard` at r7.3.0, the release already live;
+  - creates the draft from r7.3.0.
 
   It is idempotent and touches only the new collections.
-- The first participant build that loads releases at runtime bundles r7.1.0 as
+- The first participant build that loads releases at runtime bundles r7.3.0 as
   its fallback. So on the day it ships, every device renders exactly what it
   renders today.
 
@@ -719,7 +727,7 @@ At the start screen, in the background and never blocking:
 4. It caches the release, then switches to it at the start screen.
 
 **Fallbacks:** offline, or on any failure, it uses the last release it verified,
-or the built-in r7.1.0.
+or the built-in r7.3.0.
 
 **Pinning:** each sitting stays on the release it started with, including when it
 is resumed after a newer publish. The footer's staff line shows the release in
@@ -745,7 +753,7 @@ use and whether it is built in or downloaded.
    `pages.yml` deploys the participant app (with runtime loading) and the Studio.
 
    Until step 4, the participant app finds nothing published and keeps running
-   the built-in r7.1.0, exactly as today.
+   the built-in r7.3.0, exactly as today.
 2. **Firebase console → Authentication:**
    - Google is enabled as a sign-in provider (the researcher view already uses
      it);
@@ -756,18 +764,18 @@ use and whether it is built in or downloaded.
      access*;
    - or run the `studio-access add` command above.
 4. **An admin opens the Studio and presses "Set up from the live survey".** This:
-   - imports r5.0.0 to r7.1.0 as version history, marked as from the
+   - imports r5.0.0 to r7.3.0 as version history, marked as from the
      repository;
-   - points the live pointer at r7.1.0;
+   - points the live pointer at r7.3.0;
    - creates the draft.
 
    It is idempotent.
 5. **Smoke test:**
-   - the participant link's staff footer should still show release 7.1.0;
+   - the participant link's staff footer should still show release 7.3.0;
    - make a harmless edit, preview, and publish a MINOR version (for example a
      study label);
    - the participant start screen shows it on its next load;
-   - roll it back with *Make live again* on r7.1.0.
+   - roll it back with *Make live again* on r7.3.0.
 
 The emulator end-to-end test (`pnpm test:e2e:studio`, and the `studio` CI job)
 performs this whole loop.

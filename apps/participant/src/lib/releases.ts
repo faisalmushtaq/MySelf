@@ -10,7 +10,7 @@ import {
   type ReleaseManifest,
 } from "@myself/schema";
 import { z } from "zod";
-import builtInJson from "../../../../releases/ybm_nd2026_standard_r7.1.0.manifest.json";
+import builtInJson from "../../../../releases/ybm_nd2026_standard_r7.3.0.manifest.json";
 import {
   getCachedRelease,
   getReleaseState,
@@ -39,7 +39,7 @@ import { flattenManifest } from "./flatten.js";
  *   - A SITTING KEEPS ITS RELEASE. What changes here is which release a NEW
  *     sitting starts under; resuming one is App's business, through
  *     `releaseForHash`, and is always under the sitting's own hash.
- *   - THE BUILT-IN RELEASE (r7.1.0) IS THE FLOOR. With nothing published, nothing
+ *   - THE BUILT-IN RELEASE (r7.3.0) IS THE FLOOR. With nothing published, nothing
  *     cached, or anything at all going wrong, the app renders what it rendered
  *     before any of this existed.
  *

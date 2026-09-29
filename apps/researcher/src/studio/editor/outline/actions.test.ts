@@ -22,8 +22,8 @@ import {
 import { archivedActions, blockActions, questionActions, sectionActions, type ActionFacts, type ActionSpec } from "./actions.js";
 import { keyboardBlockMove, keyboardQuestionMove, keyboardSectionMove } from "./dnd.js";
 
-const r710 = JSON.parse(readFileSync(resolve(__dirname, "../../../../../../releases/ybm_nd2026_standard_r7.1.0.manifest.json"), "utf8"));
-const live = () => extractDraft(r710);
+const r730 = JSON.parse(readFileSync(resolve(__dirname, "../../../../../../releases/ybm_nd2026_standard_r7.3.0.manifest.json"), "utf8"));
+const live = () => extractDraft(r730);
 const actor = { by: "tester@example.org", at: "2026-09-28T12:00:00.000Z" };
 const everything = new Set(liveQuestions(live()).map((q) => q.itemKey));
 

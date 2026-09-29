@@ -53,7 +53,7 @@ import { SurveyScreen } from "./components/SurveyScreen.js";
  * MySelf Go — participant application (preview build).
  * Renders a frozen release entirely from its manifest — the one the study has
  * published, once this device has downloaded and verified it, and the built-in
- * YBM r7.1.0 until then (lib/releases.ts) — saves every response to encrypted
+ * YBM r7.3.0 until then (lib/releases.ts) — saves every response to encrypted
  * IndexedDB before advancing, works offline via the service worker, and returns
  * to a neutral start screen on handover.
  */

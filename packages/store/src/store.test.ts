@@ -1005,3 +1005,62 @@ describe("the time a sitting took", () => {
     expect(row.wallClockMs).toBeGreaterThanOrEqual(0);
   });
 });
+
+describe("SWEMWBS and STAI-5 totals in the dataset (D-49)", () => {
+  const load = (version: string): ReleaseManifest =>
+    releaseManifest.parse(
+      JSON.parse(
+        readFileSync(
+          fileURLToPath(new URL(`../../../releases/ybm_nd2026_standard_r${version}.manifest.json`, import.meta.url)),
+          "utf8",
+        ),
+      ),
+    );
+  const totals = (release: ReleaseManifest, key: string, output: string) => {
+    const { dataset } = ingest(buildDemoSessions({ manifest: release, participants: 8, seed: 49 }), {
+      manifest: release,
+      study: "demo",
+    });
+    return dataset.scores.filter((s) => s.scoringKey === key && s.output === output);
+  };
+
+  it("are blank in every sitting under r7.1.0, whose definitions name items the forms do not have", () => {
+    const r710 = load("7.1.0");
+    const rows = [...totals(r710, "score.swemwbs", "raw_total"), ...totals(r710, "score.stai5", "state_anxiety")];
+    expect(rows.length).toBeGreaterThan(0);
+    expect(rows.every((r) => r.value === null && r.scoringVersion === "1.0.0")).toBe(true);
+  });
+
+  it("are scored from the answers under r7.2.0, within each scale's range", () => {
+    const r720 = load("7.2.0");
+    const swemwbs = totals(r720, "score.swemwbs", "raw_total");
+    const stai = totals(r720, "score.stai5", "state_anxiety");
+    const scored = (rows: typeof swemwbs) => rows.map((r) => r.value).filter((v): v is number => typeof v === "number");
+    expect(scored(swemwbs).length).toBeGreaterThan(0);
+    expect(scored(stai).length).toBeGreaterThan(0);
+    expect(scored(swemwbs).every((v) => v >= 7 && v <= 35)).toBe(true);
+    expect(scored(stai).every((v) => v >= 5 && v <= 20)).toBe(true);
+    expect([...swemwbs, ...stai].every((r) => r.scoringVersion === "1.0.1")).toBe(true);
+  });
+
+  it("scores the SDQ total and the RCADS total from their subscales (S7), in every release", () => {
+    // The fix is in the reading, not the release: r7.1.0's frozen definitions total up too.
+    for (const version of ["7.1.0", "7.2.0"]) {
+      const release = load(version);
+      const { dataset } = ingest(buildDemoSessions({ manifest: release, participants: 8, seed: 49 }), { manifest: release, study: "demo" });
+      const of = (key: string, output: string, sessionId: string) => dataset.scores.find((r) => r.scoringKey === key && r.output === output && r.sessionId === sessionId)?.value ?? null;
+      let totals = 0;
+      for (const s of dataset.sessions) {
+        const parts = ["emotional", "conduct", "hyperactivity", "peer"].map((o) => of("score.sdq25_s", o, s.sessionId));
+        const total = of("score.sdq25_s", "total_difficulties", s.sessionId);
+        if (parts.every((v) => typeof v === "number")) {
+          expect(total, `${version} ${s.sessionId}`).toBe((parts as number[]).reduce((a, b) => a + b, 0));
+          totals += 1;
+        } else expect(total).toBeNull();
+        const [dep, anx] = [of("score.rcads25", "depression", s.sessionId), of("score.rcads25", "anxiety", s.sessionId)];
+        expect(of("score.rcads25", "total", s.sessionId)).toBe(typeof dep === "number" && typeof anx === "number" ? dep + anx : null);
+      }
+      expect(totals, version).toBeGreaterThan(0);
+    }
+  });
+});

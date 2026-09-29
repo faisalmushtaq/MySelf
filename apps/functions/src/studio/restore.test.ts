@@ -22,7 +22,7 @@ vi.mock("firebase-functions/logger", () => ({ error: vi.fn(), warn: vi.fn(), inf
  * The decisions behind restore and publish that need no database: what a
  * restore keeps, what a never-published survey's locks are checked against,
  * and what the server refuses beyond Studio validation. Real releases
- * throughout — r7.0.1 and r7.1.0 from the repository — because the cases worth
+ * throughout — r7.0.1 and r7.3.0 from the repository — because the cases worth
  * catching are the ones real content produces.
  */
 
@@ -32,7 +32,7 @@ const keys = (d: StudioDraft) => new Set(definedQuestions(d).map((q) => q.itemKe
 
 describe("restoring a version into the draft", () => {
   const current = () => {
-    let d = draftOf("7.1.0");
+    let d = draftOf("7.3.0");
     const section = d.composition.sections[1]!.key;
     d = addQuestion(d, { sectionKey: section, typeId: "short_text", text: "What is your favourite colour?" }).draft;
     d = setQuestionNotes(d, "ybm_studio.favourite_colour", { codingNotes: "Free text; code later." }).draft;
@@ -50,6 +50,15 @@ describe("restoring a version into the draft", () => {
     expect(merged.draft.notes["ybm_studio.favourite_colour"]).toEqual({ codingNotes: "Free text; code later." });
     // Retired values stay retired.
     expect(merged.draft.retiredCodes["scale.kept_for_ever"]).toEqual([{ code: 7, label: "Old answer", retiredAt: AT }]);
+  });
+
+  it("keeps the current scoring rules, so going back to older wording never brings back scoring that was put right", () => {
+    // r7.0.1 predates the SWEMWBS and STAI-5 fixes of r7.2.0.
+    const merged = mergeRestore(draftOf("7.0.1"), current(), { at: AT, by: "u_pub", publishedCodes: new Map() });
+    expect(merged.draft.scoring["score.swemwbs"]).toEqual(draftOf("7.3.0").scoring["score.swemwbs"]);
+    expect(merged.draft.scoring["score.stai5"]).toEqual(draftOf("7.3.0").scoring["score.stai5"]);
+    const codes = validateDraft(merged.draft, { baseline: draftOf("7.3.0") }).map((i) => i.code);
+    expect(codes.filter((c) => c.startsWith("gate.scoring") || c === "locked.scoring")).toEqual([]);
   });
 
   it("drops unlocks: going back to a published version needs a fresh acknowledgement to change protected content", () => {
@@ -75,7 +84,7 @@ describe("restoring a version into the draft", () => {
   });
 
   it("brings nothing back as both live and archived", () => {
-    const restored = draftOf("7.1.0");
+    const restored = draftOf("7.3.0");
     const target = liveQuestions(restored).find((q) => editTier(restored, q.instrument) === "editable")!.itemKey;
     const now = archiveQuestion(restored, target, { by: "u_ed", at: AT }).draft;
     expect(now.archived.map((a) => a.itemKey)).toContain(target);
@@ -84,7 +93,7 @@ describe("restoring a version into the draft", () => {
   });
 
   it("retires every published option value the restored lists lack, and only those", () => {
-    const restored = draftOf("7.1.0");
+    const restored = draftOf("7.3.0");
     const [scaleKey, scale] = Object.entries(restored.scales)[0]!;
     const published = new Map<string, Map<number, string>>([
       [scaleKey, new Map([...scale.options.map((o) => [o.code, o.label] as [number, string]), [99, "An answer r8 added"]])],
@@ -104,26 +113,26 @@ describe("restoring a version into the draft", () => {
   });
 
   it("gives a draft the editor accepts, against the live version", () => {
-    const merged = mergeRestore(draftOf("7.1.0"), current(), { at: AT, by: "u_pub", publishedCodes: new Map() });
-    const errors = validateDraft(merged.draft, { baseline: draftOf("7.1.0") }).filter((i) => i.severity === "error");
+    const merged = mergeRestore(draftOf("7.3.0"), current(), { at: AT, by: "u_pub", publishedCodes: new Map() });
+    const errors = validateDraft(merged.draft, { baseline: draftOf("7.3.0") }).filter((i) => i.severity === "error");
     expect(errors).toEqual([]);
   });
 
   it("does not carry an unlock across, so going back over protected wording needs a fresh acknowledgement to publish", () => {
-    // r7.1.0 changed the consent introduction. Restoring r7.0.1 puts the old
+    // r7.1.0 changed the consent introduction (r7.3.0 keeps it). Restoring r7.0.1 puts the old
     // wording back, which is a change to ethics-approved text like any other:
     // the publisher unlocks the module and says why before it can go live.
     const merged = mergeRestore(draftOf("7.0.1"), current(), { at: AT, by: "u_pub", publishedCodes: new Map() });
-    const errors = validateDraft(merged.draft, { baseline: draftOf("7.1.0") }).filter((i) => i.severity === "error");
+    const errors = validateDraft(merged.draft, { baseline: draftOf("7.3.0") }).filter((i) => i.severity === "error");
     expect(errors.map((i) => `${i.code} ${i.location.itemKey}`)).toEqual(["protected.question ybm_intro_consent.intro"]);
     const unlocked = unlockModule(merged.draft, "ybm_intro_consent", { by: "u_pub", at: AT, reason: "Rolling back to the r7.0.1 wording, still approved." }).draft;
-    expect(validateDraft(unlocked, { baseline: draftOf("7.1.0") }).filter((i) => i.severity === "error")).toEqual([]);
+    expect(validateDraft(unlocked, { baseline: draftOf("7.3.0") }).filter((i) => i.severity === "error")).toEqual([]);
   });
 });
 
 describe("the locks on a survey that has never been published", () => {
   it("are checked against the release it was copied from — its licensed and protected instruments, and nothing else", () => {
-    const origin = draftOf("7.1.0");
+    const origin = draftOf("7.3.0");
     const base = lockBaseline(origin, origin);
     expect(base.composition.sections).toEqual([]);
     const instruments = Object.values(base.instruments).map((d) => d.instrument);
@@ -137,7 +146,7 @@ describe("the locks on a survey that has never been published", () => {
   });
 
   it("refuse a reworded licensed question in a copy", () => {
-    const origin = draftOf("7.1.0");
+    const origin = draftOf("7.3.0");
     const copy = structuredClone(origin);
     const locked = Object.values(copy.instruments).find((d) => d.licence.modifiable !== "yes")!;
     const item = locked.forms[0]!.items[0]! as { stem?: { text: string } };
@@ -147,7 +156,7 @@ describe("the locks on a survey that has never been published", () => {
   });
 
   it("refuse a licensed instrument in a survey started blank, where nothing vouches for it", () => {
-    const origin = draftOf("7.1.0");
+    const origin = draftOf("7.3.0");
     const errors = validateDraft(origin, { baseline: lockBaseline(null, origin) }).filter((i) => i.severity === "error");
     expect(errors.some((i) => i.code === "locked.introduced")).toBe(true);
   });
@@ -155,7 +164,7 @@ describe("the locks on a survey that has never been published", () => {
 
 describe("what the server refuses beyond Studio validation", () => {
   it("a licensed instrument whose licence the draft now says may be modified", () => {
-    const live = draftOf("7.1.0");
+    const live = draftOf("7.3.0");
     const draft = structuredClone(live);
     const [refKey, locked] = Object.entries(draft.instruments).find(([, d]) => d.licence.modifiable !== "yes")!;
     locked.licence = { ...locked.licence, modifiable: "yes" };
@@ -166,7 +175,7 @@ describe("what the server refuses beyond Studio validation", () => {
   });
 
   it("a draft that claims to be another survey, or another study's", () => {
-    const d = draftOf("7.1.0");
+    const d = draftOf("7.3.0");
     expect(identityIssues(d, "ybm_nd2026_standard", "ybm")).toEqual([]);
     expect(identityIssues(d, "other_survey", "ybm").map((i) => i.code)).toEqual(["survey.key_mismatch"]);
     expect(identityIssues(d, "ybm_nd2026_standard", "another_study").map((i) => i.code)).toEqual(["survey.study_mismatch"]);

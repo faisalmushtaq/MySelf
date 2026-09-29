@@ -4,8 +4,8 @@ import { describe, expect, it } from "vitest";
 import { extractDraft, moveBlock, moveQuestion, moveSection, outline, StudioOpError, type Outline, type StudioDraft } from "@myself/studio";
 import { applyMove, describeMoved, keyboardBlockMove, keyboardQuestionMove, keyboardSectionMove, moveLabel, planDrop, type MoveOp } from "./dnd.js";
 
-const r710 = JSON.parse(readFileSync(resolve(__dirname, "../../../../../../releases/ybm_nd2026_standard_r7.1.0.manifest.json"), "utf8"));
-const draft = extractDraft(r710);
+const r730 = JSON.parse(readFileSync(resolve(__dirname, "../../../../../../releases/ybm_nd2026_standard_r7.3.0.manifest.json"), "utf8"));
+const draft = extractDraft(r730);
 const o = outline(draft);
 const counts = draft.composition.sections.map((s) => s.components.length);
 

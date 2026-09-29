@@ -4,8 +4,8 @@ import { describe, expect, it } from "vitest";
 import { buildRelease, contentHash } from "@myself/release";
 import { compileDraft, emptyDraft, extractDraft, parseDraft, previewRelease, serialiseDraft } from "./draft.js";
 
-const r710 = JSON.parse(
-  readFileSync(resolve(__dirname, "../../../releases/ybm_nd2026_standard_r7.1.0.manifest.json"), "utf8"),
+const r730 = JSON.parse(
+  readFileSync(resolve(__dirname, "../../../releases/ybm_nd2026_standard_r7.3.0.manifest.json"), "utf8"),
 ) as { hash: string; release: { version: string; publishedAt: string; publishedBy: string; engineVersion: string; decisionRefs?: string[] } };
 
 describe("a release opened in the Studio", () => {
@@ -13,25 +13,25 @@ describe("a release opened in the Studio", () => {
     // The property everything else rests on: opening the live survey and
     // publishing it untouched must reproduce it byte for byte, not a
     // normalised lookalike with a new hash.
-    const draft = extractDraft(r710);
+    const draft = extractDraft(r730);
     const { composition, registries } = compileDraft(draft);
     const rebuilt = buildRelease(composition, registries, {
-      version: r710.release.version,
-      publishedAt: r710.release.publishedAt,
-      publishedBy: r710.release.publishedBy,
-      engineVersion: r710.release.engineVersion,
-      ...(r710.release.decisionRefs ? { decisionRefs: r710.release.decisionRefs } : {}),
+      version: r730.release.version,
+      publishedAt: r730.release.publishedAt,
+      publishedBy: r730.release.publishedBy,
+      engineVersion: r730.release.engineVersion,
+      ...(r730.release.decisionRefs ? { decisionRefs: r730.release.decisionRefs } : {}),
     });
-    expect(rebuilt.hash).toBe(r710.hash);
+    expect(rebuilt.hash).toBe(r730.hash);
   });
 
   it("survives being stored and read back", () => {
-    const draft = extractDraft(r710);
+    const draft = extractDraft(r730);
     expect(parseDraft(serialiseDraft(draft))).toEqual(draft);
   });
 
   it("previews without gate failures", () => {
-    const preview = previewRelease(extractDraft(r710));
+    const preview = previewRelease(extractDraft(r730));
     expect(preview.error).toBeNull();
     expect(preview.failures).toEqual([]);
     expect(preview.manifest?.composition.sections).toHaveLength(9);

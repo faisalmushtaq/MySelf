@@ -1,9 +1,10 @@
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { allInstruments, allModules, allScales } from "@myself/library";
 import { microNarrativeFull, type NarrativeProtocol } from "@myself/narrative";
-import { allScoring } from "@myself/scoring";
+import { allScoring, scoringReferenceProblems } from "@myself/scoring";
+import { scoringDefinition } from "@myself/schema";
 import { buildRelease, PublishGateError, verifyManifestHash, type Registries } from "./builder.js";
 import { canonicalJson, contentHash } from "./canonical.js";
 import { ybmComposition } from "./compose-ybm.js";
@@ -18,20 +19,23 @@ const registries: Registries = {
 /**
  * The current release.
  *
- * r7.1.0 is a MINOR on r7.0.1. It removes the site branding a participant sees —
- * the "Notre Dame · 2026" cover label (composition.studyLabel, now unset) and the
- * "— Notre Dame" suffix on the consent sheet's subtitle — for a fielding not at
- * that site. Per docs/06 §44-49 this is not PATCH (participant-visible wording
- * never is) and not MAJOR either: no question, response option or code changes, so
- * sittings under r7.0.1 and r7.1.0 are the same instrument and pool without a
- * comparability argument. A site label is presentation, not measurement — MINOR.
+ * r7.3.0 is a MINOR on r7.2.0 (D-50). Its RCADS-25 scoring definition (2.0.0)
+ * uses the published key: depression is items 1, 4, 8, 10, 13, 15, 16, 19, 21
+ * and 24. The 1.0.0 definition frozen into r1.0.0–r7.2.0 swapped items 18 and 24
+ * between depression and anxiety. Nothing a participant reads or selects changes
+ * and no code changes, so r7.2.0 and r7.3.0 sittings are the same instrument; the
+ * survey's own RCADS subscales change meaning across the two (the definition is
+ * MAJOR), but they are derived, the answers are unchanged, and the research
+ * dashboard scores every version with the published key — MINOR, as for D-49.
+ *
+ * r7.2.0 (D-49) named the SWEMWBS and STAI-5 items by their real keys.
  */
 const meta = {
-  version: "7.1.0",
-  publishedAt: "2026-09-28T11:30:00.000Z",
+  version: "7.3.0",
+  publishedAt: "2026-09-29T15:33:00.000Z",
   publishedBy: "faisalmushtaq",
   engineVersion: "0.1.0",
-  decisionRefs: ["D-24"],
+  decisionRefs: ["D-50"],
 };
 
 describe("canonical JSON", () => {
@@ -44,12 +48,12 @@ describe("canonical JSON", () => {
   });
 });
 
-describe("YBM release r7.1.0", () => {
+describe("YBM release r7.3.0", () => {
   it("passes the publish gate and produces a verifiable manifest", () => {
     const manifest = buildRelease(ybmComposition, registries, meta);
     expect(manifest.hash).toMatch(/^sha256:[0-9a-f]{64}$/);
     expect(verifyManifestHash(manifest)).toBe(true);
-    expect(manifest.release.key).toBe("ybm_nd2026_standard_r7_1_0");
+    expect(manifest.release.key).toBe("ybm_nd2026_standard_r7_3_0");
   });
 
   it("is deterministic: identical inputs give an identical hash", () => {
@@ -76,7 +80,7 @@ describe("YBM release r7.1.0", () => {
     // The frozen file is what devices actually run. If someone edits an item,
     // a scale or the composition without republishing, this fails: the release
     // on disk would no longer be the release the sources describe.
-    const path = fileURLToPath(new URL("../../../releases/ybm_nd2026_standard_r7.1.0.manifest.json", import.meta.url));
+    const path = fileURLToPath(new URL("../../../releases/ybm_nd2026_standard_r7.3.0.manifest.json", import.meta.url));
     const committed = JSON.parse(readFileSync(path, "utf8")) as {
       hash: string;
       release: { version: string; publishedAt: string; publishedBy: string; engineVersion: string; decisionRefs: string[] };
@@ -99,6 +103,79 @@ describe("YBM release r7.1.0", () => {
     const tampered = structuredClone(manifest);
     (tampered.composition.sections[0]!.title as string) = "Tampered";
     expect(verifyManifestHash(tampered)).toBe(false);
+  });
+});
+
+describe("scoring definitions against the items they score (D-49)", () => {
+  it("every definition in the library names only questions its instrument has", () => {
+    for (const def of allScoring) {
+      const instrument = allInstruments.find((i) => i.instrument === def.instrument && i.version === def.instrumentVersion);
+      expect(instrument, def.key).toBeDefined();
+      for (const form of instrument!.forms) {
+        expect(scoringReferenceProblems(scoringDefinition.parse(def), form.items), `${def.key} / ${form.language}`).toEqual([]);
+      }
+    }
+  });
+
+  it("the publish gate refuses a definition that names a question the form does not have", () => {
+    const bad = structuredClone(registries);
+    const swemwbs = bad.scoring.find((d) => d.key === "score.swemwbs")!;
+    swemwbs.steps = [{ op: "sum", items: ["q1", "q2", "q3", "q4", "q5", "q6", "q7"], output: "raw_total", minValid: 7 }];
+    expect(() => buildRelease(ybmComposition, bad, meta)).toThrow(PublishGateError);
+    expect(() => buildRelease(ybmComposition, bad, meta)).toThrow(/scoring definition 'score\.swemwbs': step 1 reads 'q1', which is neither a question of 'swemwbs'/);
+  });
+
+  it("every committed release from r7.2.0 scores every definition it freezes; the earlier ones fail only SWEMWBS and STAI-5", () => {
+    const dir = fileURLToPath(new URL("../../../releases/", import.meta.url));
+    const files = readdirSync(dir).filter((f) => /^ybm_nd2026_standard_r[\d.]+\.manifest\.json$/.test(f));
+    expect(files.length).toBeGreaterThanOrEqual(11);
+    for (const f of files) {
+      const m = JSON.parse(readFileSync(`${dir}${f}`, "utf8")) as {
+        release: { version: string };
+        scoring: Record<string, unknown>;
+        instruments: Record<string, { instrument: string; forms: { items: { key: string; responseType?: string }[] }[] }>;
+      };
+      const broken = Object.values(m.scoring)
+        .map((raw) => scoringDefinition.parse(raw))
+        .filter((sd) => {
+          const inst = Object.values(m.instruments).find((i) => i.instrument === sd.instrument);
+          return inst ? scoringReferenceProblems(sd, inst.forms[0]!.items).length > 0 : true;
+        })
+        .map((sd) => sd.key)
+        .sort();
+      const [major, minor] = m.release.version.split(".").map(Number) as [number, number];
+      const fixed = major > 7 || (major === 7 && minor >= 2);
+      expect(broken, `${m.release.version}`).toEqual(fixed ? [] : ["score.stai5", "score.swemwbs"]);
+    }
+  });
+});
+
+describe("the RCADS-25 key (D-50)", () => {
+  const DEPRESSION = ["q1", "q4", "q8", "q10", "q13", "q15", "q16", "q19", "q21", "q24"];
+  const itemsOf = (def: { steps: unknown[] }, output: string) =>
+    ((def.steps as { output?: string; items?: string[] }[]).find((s) => s.output === output)?.items ?? []).slice().sort();
+
+  it("the library's definition uses the published depression and anxiety items", () => {
+    const rcads = scoringDefinition.parse(allScoring.find((d) => d.key === "score.rcads25"));
+    expect(itemsOf(rcads, "depression")).toEqual([...DEPRESSION].sort());
+    const anxiety = itemsOf(rcads, "anxiety");
+    expect(anxiety).toHaveLength(15);
+    expect(anxiety).toContain("q18");
+    expect(anxiety.some((i) => DEPRESSION.includes(i))).toBe(false);
+  });
+
+  it("committed releases from r7.3.0 freeze it; the earlier ones keep the swap of items 18 and 24", () => {
+    const dir = fileURLToPath(new URL("../../../releases/", import.meta.url));
+    for (const f of readdirSync(dir).filter((x) => /^ybm_nd2026_standard_r[\d.]+\.manifest\.json$/.test(x))) {
+      const m = JSON.parse(readFileSync(`${dir}${f}`, "utf8")) as { release: { version: string }; scoring: Record<string, { steps: unknown[] }> };
+      const rcads = m.scoring["score.rcads25"];
+      if (!rcads) continue;
+      const [major, minor] = m.release.version.split(".").map(Number) as [number, number];
+      const fixed = major > 7 || (major === 7 && minor >= 3);
+      const depression = itemsOf(rcads, "depression");
+      expect(depression.includes("q24"), m.release.version).toBe(fixed);
+      expect(depression.includes("q18"), m.release.version).toBe(!fixed);
+    }
   });
 });
 

@@ -17,7 +17,7 @@ import { expect, test, type Page, type Route } from "@playwright/test";
  *     carries on as if nothing had been published.
  *
  * The study is a fake: `page.route` answers the build's survey source (see
- * playwright.config.ts) with Firestore REST documents, holding r7.1.0 edited and
+ * playwright.config.ts) with Firestore REST documents, holding r7.3.0 edited and
  * re-hashed the way a Studio publish produces a release. Service workers are
  * blocked so that every request the page makes reaches the fake; the worker is
  * not what is under test here.
@@ -27,7 +27,7 @@ test.use({ serviceWorkers: "block" });
 
 const SURVEY = "ybm_nd2026_standard";
 /** Resolved from the working directory: Playwright compiles specs as CommonJS, and runs from the root. */
-const R710 = resolve("releases/ybm_nd2026_standard_r7.1.0.manifest.json");
+const BUILT_IN = resolve("releases/ybm_nd2026_standard_r7.3.0.manifest.json");
 
 const OLD_INTRO = "Yorkshire Brain Map School Workshop";
 const OLD_CONSENT = "Please tap each statement";
@@ -44,14 +44,14 @@ interface Release {
 }
 
 /**
- * r7.1.0, changed where a participant would see it, and hashed again with the
+ * r7.3.0 (the built-in release), changed where a participant would see it, and hashed again with the
  * same canonical hash the app will recompute.
  */
 async function nextRelease(): Promise<Release> {
   const { contentHashAsync } = await import("@myself/schema");
-  const { hash: _previous, ...body } = JSON.parse(await readFile(R710, "utf8")) as Json;
-  body["release"]["version"] = "7.2.0";
-  body["release"]["key"] = "ybm_nd2026_standard_r7_2_0";
+  const { hash: _previous, ...body } = JSON.parse(await readFile(BUILT_IN, "utf8")) as Json;
+  body["release"]["version"] = "7.4.0";
+  body["release"]["key"] = "ybm_nd2026_standard_r7_4_0";
   body["composition"]["studyLabel"] = NEW_LABEL;
   const intro = body["instruments"]["ybm_intro_consent@1.0/en-GB/self/standard"]["forms"][0]["items"] as Json[];
   intro.find((item) => item["key"] === "intro")!["stem"]["text"] = NEW_INTRO;
@@ -64,15 +64,15 @@ const SHORT_LABEL = "A two-screen survey";
 const WHY = "Why your answers matter";
 
 /**
- * A second published release, short enough to finish in an e2e run: r7.1.0's
+ * A second published release, short enough to finish in an e2e run: r7.3.0's
  * welcome section showing only its two information screens (a placement subset,
  * engine 0.2.0). Position 1 is "Why your answers matter" here and the consent
- * question in r7.1.0 and `nextRelease`, so a resume drawn with the wrong release
+ * question in r7.3.0 and `nextRelease`, so a resume drawn with the wrong release
  * shows the wrong screen.
  */
 async function shortRelease(): Promise<Release> {
   const { contentHashAsync } = await import("@myself/schema");
-  const { hash: _previous, ...body } = JSON.parse(await readFile(R710, "utf8")) as Json;
+  const { hash: _previous, ...body } = JSON.parse(await readFile(BUILT_IN, "utf8")) as Json;
   body["release"]["version"] = "7.5.0";
   body["release"]["key"] = "ybm_nd2026_standard_r7_5_0";
   body["release"]["engineVersion"] = "0.2.0";
@@ -85,7 +85,7 @@ async function shortRelease(): Promise<Release> {
 }
 
 async function builtInHash(): Promise<string> {
-  return (JSON.parse(await readFile(R710, "utf8")) as { hash: string }).hash;
+  return (JSON.parse(await readFile(BUILT_IN, "utf8")) as { hash: string }).hash;
 }
 
 /** The study's two public documents, as Firestore's REST API serves them. */
@@ -218,12 +218,12 @@ test.describe("a survey published after this build", () => {
     await page.goto("./");
     // Usable at once, on the release built in, while the study has not answered.
     await expect(page.locator("h1.brand")).toHaveText("MySelf");
-    await expect(buildLine(page)).toContainText("release 7.1.0 (built in)");
+    await expect(buildLine(page)).toContainText("release 7.3.0 (built in)");
     await expect(page.locator("input.code")).toBeEnabled();
 
     // Then the published release, once it has been downloaded and verified.
     await expect(page.locator("p.study-title")).toHaveText(NEW_LABEL, { timeout: 15_000 });
-    await expect(buildLine(page)).toContainText("release 7.2.0 (downloaded)");
+    await expect(buildLine(page)).toContainText("release 7.4.0 (downloaded)");
     expect(study.requests).toEqual([`/__survey/published/${SURVEY}`, `/__survey/publicReleases/${next.hash.slice(7)}`]);
 
     await start(page, "NDC0101");
@@ -231,14 +231,14 @@ test.describe("a survey published after this build", () => {
 
     const [sitting] = await sittings(page);
     expect(sitting?.releaseHash).toBe(next.hash);
-    expect(sitting?.releaseKey).toBe("ybm_nd2026_standard_r7_2_0");
+    expect(sitting?.releaseKey).toBe("ybm_nd2026_standard_r7_4_0");
 
     // And it is this device's release from now on, read from its own storage:
     // with the study failing to answer, the next launch still opens on it.
     study.failing = true;
     await page.reload();
     await expect(page.locator("p.study-title")).toHaveText(NEW_LABEL);
-    await expect(buildLine(page)).toContainText("release 7.2.0 (downloaded)");
+    await expect(buildLine(page)).toContainText("release 7.4.0 (downloaded)");
   });
 
   test("a sitting started before the change is resumed under the release it began with", async ({ page }) => {
@@ -250,7 +250,7 @@ test.describe("a survey published after this build", () => {
     // Nothing published: a sitting starts under the built-in release, and gets
     // one screen in.
     await page.goto("./");
-    await expect(buildLine(page)).toContainText("release 7.1.0 (built in)");
+    await expect(buildLine(page)).toContainText("release 7.3.0 (built in)");
     await start(page, "NDC0202");
     await expect(heading(page)).toHaveText(OLD_INTRO);
     await page.locator("button.next:not(.big)").first().click();
@@ -331,7 +331,7 @@ test.describe("a survey published after this build", () => {
     // Handed back: the start screen is the live release again, straight away.
     await page.getByRole("button", { name: /hand back to the researcher/i }).click();
     await expect(page.locator("p.study-title")).toHaveText(NEW_LABEL);
-    await expect(buildLine(page)).toContainText("release 7.2.0 (downloaded)");
+    await expect(buildLine(page)).toContainText("release 7.4.0 (downloaded)");
     await start(page, "NDC0606");
     await expect(heading(page)).toHaveText(NEW_INTRO);
     const byCode = new Map((await sittings(page)).map((s) => [s.participantCode, s.releaseHash]));
@@ -344,10 +344,10 @@ test.describe("a survey published after this build", () => {
   }) => {
     // Rollout day. The device ran the build before this one, whose database is
     // Dexie version 4 (IndexedDB version 40), and holds a child's unfinished
-    // r7.1.0 sitting. This build opens it as version 5, which only ADDS tables
+    // r7.3.0 sitting. This build opens it as version 5, which only ADDS tables
     // (lib/db.ts): if that upgrade failed, the app would not open on a device
     // holding sittings. And with a new release already published, the sitting
-    // must still resume under r7.1.0, where it began.
+    // must still resume under r7.3.0, where it began.
     const old = await builtInHash();
     const next = await nextRelease();
     const study = new FakeStudy();
@@ -383,7 +383,7 @@ test.describe("a survey published after this build", () => {
             sessions.put({
               sessionId: "ses_before_the_upgrade",
               participantCode: "NDC0707",
-              releaseKey: "ybm_nd2026_standard_r7_1_0",
+              releaseKey: "ybm_nd2026_standard_r7_3_0",
               releaseHash,
               state: "in_progress",
               currentIndex: 1,
@@ -404,7 +404,7 @@ test.describe("a survey published after this build", () => {
     await page.goto("./");
     await expect(page.locator("p.study-title")).toHaveText(NEW_LABEL, { timeout: 15_000 });
     await start(page, "NDC0707");
-    // Position 1 of r7.1.0 is the consent question; in the new release it is the new wording.
+    // Position 1 of r7.3.0 is the consent question; in the new release it is the new wording.
     await expect(heading(page)).toContainText(OLD_CONSENT);
     await expect(heading(page)).not.toContainText(NEW_CONSENT);
 
@@ -429,7 +429,7 @@ test.describe("a survey published after this build", () => {
     await expect(note).toContainText("was not used", { timeout: 15_000 });
     await expect(note).toContainText("changed after it was published");
 
-    await expect(buildLine(page)).toContainText("release 7.1.0 (built in)");
+    await expect(buildLine(page)).toContainText("release 7.3.0 (built in)");
     await expect(page.locator("p.study-title")).toHaveCount(0);
 
     await start(page, "NDC0404");

@@ -35,15 +35,22 @@ export const scoreSdq25S: ScoringInput = {
 };
 
 /** RCADS-25: canonical 0-3 codes; plain subscale + total sums (T-score norms
- * are a later, versioned addition once the official tables are filed). */
+ * are a later, versioned addition once the official tables are filed).
+ *
+ * 2.0.0 (D-50) uses the published key: depression is items 1, 4, 8, 10, 13, 15,
+ * 16, 19, 21 and 24 — the full RCADS's ten major-depression items. 1.0.0 counted
+ * item 18 ("I think about death", a generalised-anxiety item in the RCADS-47)
+ * as depression and item 24 ("I feel restless", a major-depression item) as
+ * anxiety, so its subscales were each one item off in r1.0.0–r7.2.0; the total
+ * was right. MAJOR, because the subscales do not pool across the change. */
 export const scoreRcads25: ScoringInput = {
   key: "score.rcads25",
-  version: "1.0.0",
+  version: "2.0.0",
   instrument: "rcads25",
   instrumentVersion: "1.0",
   steps: [
-    { op: "sum", items: q([1, 4, 8, 10, 13, 15, 16, 18, 19, 21]), output: "depression", minValid: 10 },
-    { op: "sum", items: q([2, 3, 5, 6, 7, 9, 11, 12, 14, 17, 20, 22, 23, 24, 25]), output: "anxiety", minValid: 15 },
+    { op: "sum", items: q([1, 4, 8, 10, 13, 15, 16, 19, 21, 24]), output: "depression", minValid: 10 },
+    { op: "sum", items: q([2, 3, 5, 6, 7, 9, 11, 12, 14, 17, 18, 20, 22, 23, 25]), output: "anxiety", minValid: 15 },
     { op: "sum", items: ["depression", "anxiety"], output: "total", minValid: 2 },
   ],
   provenance:
@@ -53,25 +60,40 @@ export const scoreRcads25: ScoringInput = {
 
 /** SWEMWBS: raw sum 7-35. The published raw->metric conversion table must be
  * transcribed from the licensed Warwick scoring documentation — deliberately
- * NOT reproduced from memory here (no invented constants). */
+ * NOT reproduced from memory here (no invented constants).
+ *
+ * 1.0.1 (D-49) names the items by their keys. 1.0.0 summed `q1`…`q7`, which the
+ * instrument has never had — its items are keyed by meaning — so every raw total
+ * in releases r1.0.0–r7.1.0 is blank. The rule itself is unchanged. */
 export const scoreSwemwbs: ScoringInput = {
   key: "score.swemwbs",
-  version: "1.0.0",
+  version: "1.0.1",
   instrument: "swemwbs",
   instrumentVersion: "1.0",
-  steps: [{ op: "sum", items: q([1, 2, 3, 4, 5, 6, 7]), output: "raw_total", minValid: 7 }],
+  steps: [
+    {
+      op: "sum",
+      // In questionnaire order: items 1–7 of the published scale.
+      items: ["optimistic", "useful", "relaxed", "problems", "thinking", "close", "mind"],
+      output: "raw_total",
+      minValid: 7,
+    },
+  ],
   provenance:
     "SWEMWBS raw total (all 7 items required, per standard guidance). The metric-conversion lookup step is intentionally absent until the licensed conversion table is filed and transcribed (then added as version 1.1.0).",
   verified: false,
 };
 
-/** STAI-5 state: plain sum of the 5 items (all anxiety-present phrasing). */
+/** STAI-5 state: plain sum of the 5 items (all anxiety-present phrasing).
+ *
+ * 1.0.1 (D-49) names the items by their keys; 1.0.0 summed `q1`…`q5`, which the
+ * instrument has never had, so every total in releases r1.0.0–r7.1.0 is blank. */
 export const scoreStai5: ScoringInput = {
   key: "score.stai5",
-  version: "1.0.0",
+  version: "1.0.1",
   instrument: "stai5_s",
   instrumentVersion: "1.0",
-  steps: [{ op: "sum", items: q([1, 2, 3, 4, 5]), output: "state_anxiety", minValid: 5 }],
+  steps: [{ op: "sum", items: ["upset", "frightened", "nervous", "jittery", "confused"], output: "state_anxiety", minValid: 5 }],
   provenance: "Zsido et al. (2020) STAI-5: sum of five 1-4 items. Verify no reverse-scored items against the publication before approval.",
   verified: false,
 };

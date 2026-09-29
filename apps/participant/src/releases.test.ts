@@ -31,11 +31,11 @@ import { buildRuntime } from "./lib/runtime.js";
  * in every case is the same: prove it or keep what is running.
  */
 
-const R710_TEXT = readFileSync(
-  fileURLToPath(new URL("../../../releases/ybm_nd2026_standard_r7.1.0.manifest.json", import.meta.url)),
+const BUILT_IN_TEXT = readFileSync(
+  fileURLToPath(new URL("../../../releases/ybm_nd2026_standard_r7.3.0.manifest.json", import.meta.url)),
   "utf8",
 );
-const R710_HASH = (JSON.parse(R710_TEXT) as { hash: string }).hash;
+const BUILT_IN_HASH = (JSON.parse(BUILT_IN_TEXT) as { hash: string }).hash;
 const SOURCE = "https://firestore.example.test/v1/projects/p/databases/(default)/documents/studies/ybm";
 const SURVEY = "ybm_nd2026_standard";
 
@@ -43,11 +43,11 @@ const SURVEY = "ybm_nd2026_standard";
 type Json = Record<string, any>;
 
 /**
- * r7.1.0 changed by `edit`, re-hashed so that it is a genuine release in its own
+ * The built-in release changed by `edit`, re-hashed so that it is a genuine release in its own
  * right — the shape a Studio publish produces.
  */
 async function derived(edit: (body: Json) => void): Promise<{ json: string; hash: string }> {
-  const { hash: _old, ...body } = JSON.parse(R710_TEXT) as Json;
+  const { hash: _old, ...body } = JSON.parse(BUILT_IN_TEXT) as Json;
   edit(body);
   const hash = await contentHashAsync(body);
   return { json: JSON.stringify({ ...body, hash }), hash };
@@ -144,14 +144,14 @@ describe("what this build can render", () => {
     expect([...SUPPORTED_ENGINE_VERSIONS]).toEqual([...ENGINE_VERSIONS]);
   });
 
-  it("carries r7.1.0 as the built-in release, parsed as App always parsed it", () => {
-    expect(BUILT_IN.hash).toBe(R710_HASH);
-    expect(BUILT_IN.manifest.release.version).toBe("7.1.0");
+  it("carries r7.3.0 as the built-in release, parsed as App always parsed it", () => {
+    expect(BUILT_IN.hash).toBe(BUILT_IN_HASH);
+    expect(BUILT_IN.manifest.release.version).toBe("7.3.0");
     expect(BUILT_IN.source).toBe("built-in");
     // And its runtime is today's: the same unit list the flattening tests describe.
     const runtime = buildRuntime(BUILT_IN.manifest);
-    expect(runtime.hash).toBe(R710_HASH);
-    expect(runtime.releaseKey).toBe("ybm_nd2026_standard_r7_1_0");
+    expect(runtime.hash).toBe(BUILT_IN_HASH);
+    expect(runtime.releaseKey).toBe("ybm_nd2026_standard_r7_3_0");
     expect(runtime.flattened.units.length).toBeGreaterThan(100);
     expect(runtime.unitKeyOf(0)).toBe("ybm_intro_consent.intro");
     expect(runtime.wordsAt(0)).toBeGreaterThan(0);
@@ -161,8 +161,8 @@ describe("what this build can render", () => {
 
 describe("the study's public documents over REST", () => {
   it("reads the pointer, including a generation written as a string", () => {
-    expect(parsePointerDocument(pointerDoc(R710_HASH))).toEqual({
-      hash: R710_HASH,
+    expect(parsePointerDocument(pointerDoc(BUILT_IN_HASH))).toEqual({
+      hash: BUILT_IN_HASH,
       version: "7.2.0",
       releaseKey: "ybm_nd2026_standard_r7_2_0",
       engineVersion: "0.1.0",
@@ -178,7 +178,7 @@ describe("the study's public documents over REST", () => {
   });
 
   it("reads a release document as the exact string stored", () => {
-    expect(parseReleaseDocument(releaseDoc(R710_HASH, R710_TEXT))).toEqual({ manifest: R710_TEXT, hash: R710_HASH });
+    expect(parseReleaseDocument(releaseDoc(BUILT_IN_HASH, BUILT_IN_TEXT))).toEqual({ manifest: BUILT_IN_TEXT, hash: BUILT_IN_HASH });
     expect(parseReleaseDocument({ fields: { manifest: { mapValue: {} } } })).toBeNull();
   });
 
@@ -198,7 +198,7 @@ describe("the study's public documents over REST", () => {
     const reply = await fetchPointer(SOURCE, SURVEY, { transport });
     expect(reply.kind).toBe("unreachable");
     expect(reply.kind === "unreachable" && reply.reason).toMatch(/did not come from the study/);
-    expect((await fetchReleaseDocument(SOURCE, R710_HASH, { transport })).kind).toBe("unreachable");
+    expect((await fetchReleaseDocument(SOURCE, BUILT_IN_HASH, { transport })).kind).toBe("unreachable");
   });
 
   it("does not mistake somebody else's JSON, or broken JSON, for the study", async () => {
@@ -235,20 +235,20 @@ describe("the study's public documents over REST", () => {
   });
 
   it("asks for the release by the hex of its hash", async () => {
-    const { transport, calls } = study({ releases: { [R710_HASH.slice(7)]: releaseDoc(R710_HASH, R710_TEXT) } });
-    const reply = await fetchReleaseDocument(SOURCE, R710_HASH, { transport });
-    expect(reply).toEqual({ kind: "release", json: R710_TEXT, storedHash: R710_HASH });
-    expect(calls).toEqual([`${SOURCE}/publicReleases/${R710_HASH.slice(7)}`]);
+    const { transport, calls } = study({ releases: { [BUILT_IN_HASH.slice(7)]: releaseDoc(BUILT_IN_HASH, BUILT_IN_TEXT) } });
+    const reply = await fetchReleaseDocument(SOURCE, BUILT_IN_HASH, { transport });
+    expect(reply).toEqual({ kind: "release", json: BUILT_IN_TEXT, storedHash: BUILT_IN_HASH });
+    expect(calls).toEqual([`${SOURCE}/publicReleases/${BUILT_IN_HASH.slice(7)}`]);
   });
 });
 
 describe("whether a downloaded release may be rendered", () => {
-  it("accepts r7.1.0 exactly as published", async () => {
-    const result = await verifyRelease(R710_TEXT, R710_HASH, { surveyId: SURVEY });
+  it("accepts the built-in release exactly as published", async () => {
+    const result = await verifyRelease(BUILT_IN_TEXT, BUILT_IN_HASH, { surveyId: SURVEY });
     expect(result.ok).toBe(true);
     if (result.ok) {
-      expect(result.manifest.release.version).toBe("7.1.0");
-      expect(result.raw["hash"]).toBe(R710_HASH);
+      expect(result.manifest.release.version).toBe("7.3.0");
+      expect(result.raw["hash"]).toBe(BUILT_IN_HASH);
     }
   });
 
@@ -259,14 +259,14 @@ describe("whether a downloaded release may be rendered", () => {
   });
 
   it("refuses a manifest with one label changed and the old hash kept", async () => {
-    const tampered = JSON.parse(R710_TEXT) as Json;
+    const tampered = JSON.parse(BUILT_IN_TEXT) as Json;
     tampered["scales"]["scale.yes_no"]["options"][0]["label"] = "Definitely";
-    const result = await verifyRelease(JSON.stringify(tampered), R710_HASH);
+    const result = await verifyRelease(JSON.stringify(tampered), BUILT_IN_HASH);
     expect(result).toEqual({ ok: false, reason: expect.stringMatching(/changed after it was published/) });
   });
 
   it("refuses a genuine release that is not the one the pointer named", async () => {
-    const result = await verifyRelease(R710_TEXT, `sha256:${"0".repeat(64)}`);
+    const result = await verifyRelease(BUILT_IN_TEXT, `sha256:${"0".repeat(64)}`);
     expect(result).toEqual({ ok: false, reason: expect.stringMatching(/not the sha256:0000/) });
   });
 
@@ -320,21 +320,21 @@ describe("whether a downloaded release may be rendered", () => {
   });
 
   it("refuses another survey's release", async () => {
-    expect(await verifyRelease(R710_TEXT, R710_HASH, { surveyId: "some_other_survey" })).toEqual({
+    expect(await verifyRelease(BUILT_IN_TEXT, BUILT_IN_HASH, { surveyId: "some_other_survey" })).toEqual({
       ok: false,
       reason: expect.stringMatching(/not 'some_other_survey'/),
     });
   });
 
   it("refuses what is not JSON, without throwing", async () => {
-    expect(await verifyRelease("<html>", R710_HASH)).toEqual({ ok: false, reason: "it is not valid JSON" });
-    expect(await verifyRelease("[1,2]", R710_HASH)).toEqual({ ok: false, reason: "it is not a release manifest" });
+    expect(await verifyRelease("<html>", BUILT_IN_HASH)).toEqual({ ok: false, reason: "it is not valid JSON" });
+    expect(await verifyRelease("[1,2]", BUILT_IN_HASH)).toEqual({ ok: false, reason: "it is not a release manifest" });
   });
 
   it("does not change the manifest it checks", async () => {
-    const raw = JSON.parse(R710_TEXT) as Json;
+    const raw = JSON.parse(BUILT_IN_TEXT) as Json;
     const before = JSON.stringify(raw);
-    const result = await verifyRelease(R710_TEXT, R710_HASH);
+    const result = await verifyRelease(BUILT_IN_TEXT, BUILT_IN_HASH);
     expect(result.ok && JSON.stringify(result.raw)).toBe(before);
   });
 });
@@ -384,7 +384,7 @@ describe("what the start screen shows, from this device alone", () => {
     const cache = memoryCache();
     const releases = service(cache);
     await releases.cacheRelease(next.json, next.hash);
-    expect(await releases.releaseForHash(R710_HASH)).toBe(BUILT_IN);
+    expect(await releases.releaseForHash(BUILT_IN_HASH)).toBe(BUILT_IN);
     expect((await releases.releaseForHash(next.hash))?.manifest.release.version).toBe("7.2.0");
     expect(await releases.releaseForHash(`sha256:${"a".repeat(64)}`)).toBeNull();
   });
@@ -395,7 +395,7 @@ describe("looking for a newer release", () => {
     const { transport, calls } = study({});
     const result = await service(memoryCache(), transport, { source: "" }).refreshActiveRelease();
     expect(result.record.outcome).toEqual({ kind: "not_configured" });
-    expect(result.activeHash).toBe(R710_HASH);
+    expect(result.activeHash).toBe(BUILT_IN_HASH);
     expect(calls).toEqual([]);
   });
 
@@ -410,7 +410,7 @@ describe("looking for a newer release", () => {
     const cache = memoryCache();
     const result = await service(cache, study({ pointer: null }).transport).refreshActiveRelease();
     expect(result.record.outcome).toEqual({ kind: "nothing_published" });
-    expect(result.activeHash).toBe(R710_HASH);
+    expect(result.activeHash).toBe(BUILT_IN_HASH);
     // And it is remembered for the handover panel.
     expect(cache.current?.lastResult).toEqual(result.record);
   });
@@ -471,7 +471,7 @@ describe("looking for a newer release", () => {
     });
     const result = await service(cache, transport).refreshActiveRelease();
     expect(result.record.outcome).toMatchObject({ kind: "refused", hash: next.hash });
-    expect(result.activeHash).toBe(R710_HASH);
+    expect(result.activeHash).toBe(BUILT_IN_HASH);
     expect(cache.rows.size).toBe(0);
     expect(cache.current?.activeHash ?? null).toBeNull();
   });
@@ -489,7 +489,7 @@ describe("looking for a newer release", () => {
     const next = await nextRelease();
     const { transport } = study({
       pointer: pointerDoc(next.hash),
-      releases: { [next.hash.slice(7)]: releaseDoc(R710_HASH, next.json) },
+      releases: { [next.hash.slice(7)]: releaseDoc(BUILT_IN_HASH, next.json) },
     });
     const result = await service(memoryCache(), transport).refreshActiveRelease();
     expect(result.record.outcome).toMatchObject({ kind: "refused", reason: expect.stringMatching(/different hash/) });
@@ -509,7 +509,7 @@ describe("looking for a newer release", () => {
     });
     const result = await service(cache, transport).refreshActiveRelease();
     expect(result.record.outcome.kind).toBe("failed");
-    expect(result.activeHash).toBe(R710_HASH);
+    expect(result.activeHash).toBe(BUILT_IN_HASH);
   });
 
   it("rolls back to the built-in release without downloading anything", async () => {
@@ -517,11 +517,11 @@ describe("looking for a newer release", () => {
     const cache = memoryCache();
     await service(cache).cacheRelease(next.json, next.hash);
     await cache.saveState({ activeHash: next.hash });
-    const { transport, calls } = study({ pointer: pointerDoc(R710_HASH, { version: { stringValue: "7.1.0" } }) });
+    const { transport, calls } = study({ pointer: pointerDoc(BUILT_IN_HASH, { version: { stringValue: "7.3.0" } }) });
 
     const result = await service(cache, transport).refreshActiveRelease();
-    expect(result.record.outcome).toEqual({ kind: "activated", hash: R710_HASH, version: "7.1.0" });
-    expect(result.activeHash).toBe(R710_HASH);
+    expect(result.record.outcome).toEqual({ kind: "activated", hash: BUILT_IN_HASH, version: "7.3.0" });
+    expect(result.activeHash).toBe(BUILT_IN_HASH);
     expect(calls).toHaveLength(1);
   });
 
@@ -574,8 +574,8 @@ describe("looking for a newer release", () => {
   });
 
   it("says what happened in words a researcher can act on", () => {
-    expect(describeCheck({ kind: "up_to_date", hash: R710_HASH, version: "7.1.0" })).toBe("up to date.");
-    expect(describeCheck({ kind: "refused", hash: R710_HASH, version: "8.0.0", reason: "it needs survey engine 9.0.0" })).toMatch(
+    expect(describeCheck({ kind: "up_to_date", hash: BUILT_IN_HASH, version: "7.3.0" })).toBe("up to date.");
+    expect(describeCheck({ kind: "refused", hash: BUILT_IN_HASH, version: "8.0.0", reason: "it needs survey engine 9.0.0" })).toMatch(
       /\(8\.0\.0\) was not used, because it needs survey engine 9\.0\.0/,
     );
     expect(describeCheck({ kind: "not_configured" })).toMatch(/does not look/);
@@ -594,7 +594,7 @@ describe("which sitting a code resumes", () => {
     updatedAt,
     eventCount: 10,
   });
-  const OLD = R710_HASH;
+  const OLD = BUILT_IN_HASH;
   const NEW = `sha256:${"c".repeat(64)}`;
   const rows = [
     row("ses_old", OLD, "2026-09-28T10:00:00.000Z"),
@@ -652,11 +652,11 @@ describe("which release a resumed sitting is drawn with", () => {
     const verified = await verifyRelease(next.json, next.hash);
     if (!verified.ok) throw new Error(verified.reason);
     const onScreen = buildRuntime(verified.manifest, "cached");
-    const old = row("ses_old", R710_HASH, "2026-09-28T10:00:00.000Z");
+    const old = row("ses_old", BUILT_IN_HASH, "2026-09-28T10:00:00.000Z");
 
-    const chosen = await sittingToResume("NDC0042", onScreen, device([old], { [R710_HASH]: BUILT_IN }));
+    const chosen = await sittingToResume("NDC0042", onScreen, device([old], { [BUILT_IN_HASH]: BUILT_IN }));
     expect(chosen.session?.sessionId).toBe("ses_old");
-    expect(chosen.runtime.hash).toBe(R710_HASH);
+    expect(chosen.runtime.hash).toBe(BUILT_IN_HASH);
     expect(chosen.runtime).not.toBe(onScreen);
     // Drawn with that release's content, not the newer one on screen.
     expect(onScreen.manifest.composition.studyLabel).toBe("Published from the Studio");
@@ -665,7 +665,7 @@ describe("which release a resumed sitting is drawn with", () => {
 
   it("keeps the release on screen when the sitting was started under it", async () => {
     const onScreen = buildRuntime(BUILT_IN.manifest);
-    const lookup = device([row("ses_same", R710_HASH, "2026-09-28T10:00:00.000Z")], {});
+    const lookup = device([row("ses_same", BUILT_IN_HASH, "2026-09-28T10:00:00.000Z")], {});
     const chosen = await sittingToResume("NDC0042", onScreen, lookup);
     expect(chosen).toEqual({ session: expect.objectContaining({ sessionId: "ses_same" }), runtime: onScreen });
     expect(chosen.runtime).toBe(onScreen);
@@ -676,7 +676,7 @@ describe("which release a resumed sitting is drawn with", () => {
     const missing = `sha256:${"e".repeat(64)}`;
     const rows = [
       row("ses_unopenable", missing, "2026-09-28T11:00:00.000Z"),
-      row("ses_on_screen", R710_HASH, "2026-09-28T09:00:00.000Z"),
+      row("ses_on_screen", BUILT_IN_HASH, "2026-09-28T09:00:00.000Z"),
     ];
     // Not held at all, and a cache that throws: both leave the sitting alone.
     for (const held of [{}, { [missing]: new Error("IndexedDB went away") }]) {

@@ -3,7 +3,7 @@ import { AnswerStore, Walker, type PresentableUnit } from "@myself/engine";
 import { releaseManifest, responseScale, type ItemDefinition, type LogicExpr, type ResponseScale } from "@myself/schema";
 import { flattenManifest } from "@participant/lib/flatten.js";
 import { describeAnswer } from "@participant/components/ReviewScreen.js";
-import rawR710 from "../../../../../releases/ybm_nd2026_standard_r7.1.0.manifest.json";
+import rawR730 from "../../../../../releases/ybm_nd2026_standard_r7.3.0.manifest.json";
 import { describeCondition, type DescribeContext } from "./model-adapter.js";
 import {
   answerSummaries,
@@ -20,8 +20,8 @@ import {
 } from "./path.js";
 import type { StateMessage } from "./protocol.js";
 
-const r710 = releaseManifest.parse(rawR710);
-const yesNo = responseScale.parse(r710.scales["scale.yes_no"]);
+const r730 = releaseManifest.parse(rawR730);
+const yesNo = responseScale.parse(r730.scales["scale.yes_no"]);
 const scales = new Map<string, ResponseScale>([["scale.yes_no", yesNo]]);
 
 const ref = (item: string) => ({ instrument: "q", item, revision: 1 });
@@ -87,8 +87,8 @@ describe("preview visibility", () => {
     });
   });
 
-  it("agrees with the participant engine's own walk on r7.1.0", () => {
-    const flat = flattenManifest(r710);
+  it("agrees with the participant engine's own walk on r7.3.0", () => {
+    const flat = flattenManifest(r730);
     const store = new AnswerStore();
     const check = () => {
       const visibility = computeVisibility(flat.units, store, new Set());
@@ -171,7 +171,7 @@ describe("preview path rows", () => {
   });
 
   it("labels instruction screens by their instrument", () => {
-    const flat = flattenManifest(r710);
+    const flat = flattenManifest(r730);
     const swemwbs = flat.units.find((u) => u.item.key === "__instructions_swemwbs")!;
     expect(unitLabel(swemwbs, new Map([["swemwbs", "Short Warwick–Edinburgh Mental Wellbeing Scale"]]))).toBe(
       "Instructions: Short Warwick–Edinburgh Mental Wellbeing Scale",

@@ -27,7 +27,7 @@ vi.mock("firebase-functions/logger", () => ({ error: vi.fn(), warn: vi.fn(), inf
  * trigger's transaction against the emulator.
  */
 
-const live = bundledManifests.find((b) => b.manifest.release.version === "7.1.0")!;
+const live = bundledManifests.find((b) => b.manifest.release.version === "7.3.0")!;
 const base = (): StudioDraft => extractDraft(live.raw);
 const T = (iso: string) => Timestamp.fromDate(new Date(iso));
 

@@ -15,8 +15,8 @@ import {
   type TreeOptions,
 } from "./model.js";
 
-const r710 = JSON.parse(readFileSync(resolve(__dirname, "../../../../../../releases/ybm_nd2026_standard_r7.1.0.manifest.json"), "utf8"));
-const draft = extractDraft(r710);
+const r730 = JSON.parse(readFileSync(resolve(__dirname, "../../../../../../releases/ybm_nd2026_standard_r7.3.0.manifest.json"), "utf8"));
+const draft = extractDraft(r730);
 const o = outline(draft);
 const issues = validateDraft(draft);
 const index = indexIssues(issues);

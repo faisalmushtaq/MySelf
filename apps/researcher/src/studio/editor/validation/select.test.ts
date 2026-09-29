@@ -5,8 +5,8 @@ import { extractDraft, outline, shortText, validateDraft, type Issue, type Issue
 import { UNTITLED_QUESTION } from "../outline/model.js";
 import { groupIssues, selectionFor } from "./select.js";
 
-const r710 = JSON.parse(readFileSync(resolve(__dirname, "../../../../../../releases/ybm_nd2026_standard_r7.1.0.manifest.json"), "utf8"));
-const draft = extractDraft(r710);
+const r730 = JSON.parse(readFileSync(resolve(__dirname, "../../../../../../releases/ybm_nd2026_standard_r7.3.0.manifest.json"), "utf8"));
+const draft = extractDraft(r730);
 const o = outline(draft);
 
 const issue = (location: IssueLocation, severity: Issue["severity"] = "error"): Issue => ({ severity, code: "test", message: "Something", location });

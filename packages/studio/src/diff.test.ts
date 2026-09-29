@@ -9,8 +9,8 @@ import { validateDraft } from "./validate.js";
 // Test-only: drafts are edited here as plain JSON, the way the editor edits them.
 type Loose = Record<string, any>;
 
-const r710 = JSON.parse(readFileSync(resolve(__dirname, "../../../releases/ybm_nd2026_standard_r7.1.0.manifest.json"), "utf8")) as unknown;
-const baseline = extractDraft(r710);
+const r730 = JSON.parse(readFileSync(resolve(__dirname, "../../../releases/ybm_nd2026_standard_r7.3.0.manifest.json"), "utf8")) as unknown;
+const baseline = extractDraft(r730);
 
 function edit(change: (draft: StudioDraft) => void): StudioDraft {
   const draft = structuredClone(baseline);

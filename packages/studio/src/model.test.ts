@@ -21,8 +21,8 @@ import {
 import { archiveQuestion, unlockModule } from "./ops.js";
 import { liveQuestions } from "./walk.js";
 
-const r710 = JSON.parse(readFileSync(resolve(__dirname, "../../../releases/ybm_nd2026_standard_r7.1.0.manifest.json"), "utf8"));
-const draft = extractDraft(r710);
+const r730 = JSON.parse(readFileSync(resolve(__dirname, "../../../releases/ybm_nd2026_standard_r7.3.0.manifest.json"), "utf8"));
+const draft = extractDraft(r730);
 const actor = { by: "researcher@example.org", at: "2026-09-28T12:00:00.000Z" };
 
 describe("editability tiers", () => {

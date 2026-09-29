@@ -157,6 +157,64 @@ Not yet built: sync, server storage, access control, the audit slip and the
 codebook/crosswalk generators described in §5. Until those exist the researcher
 view is a laptop tool holding real answers, and is treated as such.
 
+### Scoring definitions are checked against their items (r7.2.0, D-49)
+
+**What was wrong.** The SWEMWBS and STAI-5 scoring definitions (1.0.0) summed
+items named `q1`…`q7` and `q1`…`q5`. Neither instrument has ever had items by
+those names — they are keyed by meaning (`optimistic` … `mind`; `upset` …
+`confused`) — and the executor reads a name it cannot find as "not answered".
+So in every sitting under r1.0.0–r7.1.0 the SWEMWBS raw total and the STAI-5
+state-anxiety total are blank. The answers themselves are complete and
+unaffected; only these two derived totals are missing. Nothing a participant
+sees depends on them (the only score shown in a sitting is the EHI handedness
+summary, whose definition is correct).
+
+**The fix.** Definitions 1.0.1 name the real items; the rule is unchanged.
+They are frozen into **r7.2.0**, a MINOR on r7.1.0: nothing a participant reads
+or selects and no code changes, so r7.1.0 and r7.2.0 sittings pool without a
+comparability argument (§3); it is not PATCH, because analysts now see totals
+where there were blanks.
+
+**The gate.** `scoringReferenceProblems()` (`@myself/scoring`) lists every name
+a definition reads that is neither a question of its instrument nor the output
+of an earlier step (or is an information screen). `buildRelease()` refuses to
+publish a release with any such definition, or with a definition for a
+different instrument than the one it is attached to. A test asserts that every
+committed release from r7.2.0 on passes, and that the earlier ones fail on
+exactly these two definitions — so a new broken definition cannot slip in
+behind the known ones.
+
+**Earlier releases stay as they are.** Nothing about a release is ever edited
+(§3), and a sitting is read back through the release it was collected under, so
+the survey's own SWEMWBS and STAI-5 totals stay blank for sittings under
+r1.0.0–r7.1.0. For analysis, scores are derived from the stored answers by the
+research dashboard (MySelf-Dashboard, docs/08 there), whose versioned scoring
+schemes key on the real items and are checked against every release: it is the
+scoring source for all data, old and new. The survey's own `scores` table
+remains what the survey computed at the time.
+
+### The RCADS-25 key, and totals built from subscales (r7.3.0, D-50)
+
+**RCADS-25 (S8).** The scoring definition (1.0.0) counted item 18 ("I think about
+death") as depression and item 24 ("I feel restless") as anxiety. The published
+RCADS-25 key is the other way round: depression is items 1, 4, 8, 10, 13, 15, 16,
+19, 21 and 24 — the full RCADS's ten major-depression items (RCADS-47 items 2, 6,
+11, 15, 19, 21, 25, 29, 40, 47; item 37, "I think about death", is generalised
+anxiety). Definition **2.0.0** uses the published key; it is MAJOR because the
+subscales do not pool across the change (the total does). It is frozen into
+**r7.3.0**, a MINOR on r7.2.0 for the same reasons as D-49: nothing a participant
+reads or selects changes and no code changes. Sittings under r1.0.0–r7.2.0 keep
+the swapped subscales in the survey's own `scores`; the research dashboard scores
+every version with the published key.
+
+**Totals built from subscales (S7).** Ingest handed the executor a blank for every
+name a step reads, including the outputs of earlier steps, and the executor reads
+a name it was given before its own outputs — so the SDQ total difficulties and the
+RCADS total were blank in every sitting. `scoringItemKeys()` (`@myself/scoring`)
+now lists only a definition's items, and ingest and the participant app fill only
+those. This is a fix in the reading, not in any release: rebuilding a dataset
+gives every version's totals.
+
 ## 7. Identifiers and linkage (r7.0.0, D-37)
 
 Section 6 described the data layer as built. This corrects a gap in it that was

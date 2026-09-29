@@ -67,6 +67,11 @@ function shellOf(def: InstrumentOrModule): InstrumentOrModule {
  *   records say so); an unpublished one is somebody's work, and a restore that
  *   silently deleted it could not be undone. Either can be brought back from
  *   the archive, with the option list and instrument it needs kept alongside.
+ * - SCORING RULES are the current draft's, for every questionnaire both have.
+ *   Scoring is not edited in the Studio — it is corrected in the library and
+ *   arrives with a release (r7.2.0 fixed SWEMWBS and STAI-5) — so going back
+ *   to older wording must not quietly bring back scoring that was put right,
+ *   or leave a draft whose only errors are ones nobody here can fix.
  * - UNLOCKS ARE NOT KEPT. An unlock is an acknowledgement for a change to
  *   protected content; restoring a published version returns that content to
  *   an approved state, and a further change needs a fresh acknowledgement.
@@ -86,6 +91,9 @@ export function mergeRestore(
 
   if (current) {
     d.notes = structuredClone(current.notes ?? {});
+    for (const [key, definition] of Object.entries(current.scoring ?? {})) {
+      if (d.scoring[key]) d.scoring[key] = structuredClone(definition);
+    }
     const defined = new Set(definedQuestions(d).map((q) => q.itemKey));
     const kept = (current.archived ?? []).filter((a) => !defined.has(a.itemKey));
     const keptKeys = new Set(kept.map((a) => a.itemKey));

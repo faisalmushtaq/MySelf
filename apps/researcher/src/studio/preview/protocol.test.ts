@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { releaseManifest } from "@myself/schema";
-import rawR710 from "../../../../../releases/ybm_nd2026_standard_r7.1.0.manifest.json";
+import rawR730 from "../../../../../releases/ybm_nd2026_standard_r7.3.0.manifest.json";
 import {
   fingerprint,
   fromExpected,
@@ -15,7 +15,7 @@ import {
   parseState,
 } from "./protocol.js";
 
-const manifest = releaseManifest.parse(rawR710);
+const manifest = releaseManifest.parse(rawR730);
 const nonce = "abcdef0123456789";
 
 describe("who the preview listens to", () => {
@@ -106,7 +106,7 @@ describe("messages from the frame", () => {
 
 describe("telling a changed survey from a re-saved one", () => {
   it("gives the same release the same fingerprint, and a changed one another", () => {
-    const copy = releaseManifest.parse(JSON.parse(JSON.stringify(rawR710)));
+    const copy = releaseManifest.parse(JSON.parse(JSON.stringify(rawR730)));
     expect(fingerprint(copy)).toBe(fingerprint(manifest));
 
     const reworded = structuredClone(manifest);

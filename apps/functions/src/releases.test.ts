@@ -85,7 +85,7 @@ describe("the bundled releases", () => {
       expect(await verifyRawManifestHash(raw)).toBe(true);
       expect(releasesByHash.get(manifest.hash!)).toBe(manifest);
     }
-    expect(latestRelease?.release.version).toBe("7.1.0");
+    expect(latestRelease?.release.version).toBe("7.3.0");
   });
 });
 

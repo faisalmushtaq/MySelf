@@ -15,12 +15,12 @@ const read = (file: string): unknown => JSON.parse(readFileSync(resolve(releases
 const published = readdirSync(releases)
   .filter((f) => /_r(5|6|7)\.\d+\.\d+\.manifest\.json$/.test(f))
   .map(read);
-const r710 = read("ybm_nd2026_standard_r7.1.0.manifest.json");
-const live = extractDraft(r710);
+const r730 = read("ybm_nd2026_standard_r7.3.0.manifest.json");
+const live = extractDraft(r730);
 
 /** Everything the publishing function knows about the live survey. */
 const fullContext: ValidationContext = {
-  baseline: extractDraft(r710),
+  baseline: extractDraft(r730),
   reserved: reservedFrom(published.map(manifestIndex)),
   publishedScaleCodes: publishedScaleCodes(published),
 };
@@ -678,6 +678,18 @@ describe("the publish gate and the schema", () => {
     const gate = issues.filter((i) => i.code.startsWith("gate."));
     expect(gate).toHaveLength(previewRelease(draft).failures.length);
     expectIssue(issues, "gate.scoring_missing", { kind: "block", refKey: "sdq25_s@1.0/en-GB/self/standard" });
+  });
+
+  it("says plainly when scoring rules name a question the questionnaire doesn't have", () => {
+    // r7.1.0's SWEMWBS scoring, fixed in r7.2.0 (D-49), scores questions the form never had.
+    const old = extractDraft(read("ybm_nd2026_standard_r7.1.0.manifest.json"));
+    const issues = validateDraft(
+      edit((d) => {
+        d.scoring["score.swemwbs"] = structuredClone(old.scoring["score.swemwbs"]!);
+      }),
+    );
+    expectIssue(issues, "gate.scoring_reference", { kind: "block", refKey: "swemwbs@1.0/en-GB/self/standard" });
+    expect(issues.some((i) => i.code === "gate.scoring_missing")).toBe(false);
   });
 
   it("locates what the schema rejects", () => {

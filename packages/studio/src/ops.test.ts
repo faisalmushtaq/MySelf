@@ -11,7 +11,7 @@ import { findQuestion, outline, scaleOf, StudioOpError, studioTypeOf } from "./m
 import * as ops from "./ops.js";
 import { liveQuestions } from "./walk.js";
 
-const r710 = JSON.parse(readFileSync(resolve(__dirname, "../../../releases/ybm_nd2026_standard_r7.1.0.manifest.json"), "utf8"));
+const r730 = JSON.parse(readFileSync(resolve(__dirname, "../../../releases/ybm_nd2026_standard_r7.3.0.manifest.json"), "utf8"));
 const actor = { by: "researcher@example.org", at: "2026-09-28T12:00:00.000Z" };
 
 /**
@@ -19,7 +19,7 @@ const actor = { by: "researcher@example.org", at: "2026-09-28T12:00:00.000Z" };
  * given, instead of a copy, would throw here.
  */
 function live(): StudioDraft {
-  return deepFreeze(extractDraft(r710));
+  return deepFreeze(extractDraft(r730));
 }
 
 function blank(): StudioDraft {
@@ -423,7 +423,7 @@ describe("archiving, restoring and deleting", () => {
 describe("options", () => {
   it("never reuses a retired or published value", () => {
     const withRetired: StudioDraft = {
-      ...extractDraft(r710),
+      ...extractDraft(r730),
       retiredCodes: { "scale.yes_no": [{ code: 3, label: "Maybe", retiredAt: actor.at }] },
     };
     const added = ops.addOption(deepFreeze(withRetired), "ybm_smartphone.own", { label: "Not sure" }, { publishedCodes: new Set([1, 2, 4]) });

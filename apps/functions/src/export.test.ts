@@ -126,7 +126,7 @@ describe("the export's releases", () => {
     expect(built.unreadable).toEqual([]);
     expect(built.dataset.sessions.map((s) => s.sessionId)).toContain("ses_under_r8");
     expect(built.dataset.releaseHashes).toContain(hash);
-    expect(built.releases.map((r) => r.release.version).sort()).toEqual(["7.1.0", "8.0.0"]);
+    expect(built.releases.map((r) => r.release.version).sort()).toEqual(["7.3.0", "8.0.0"]);
 
     // The dataset-level files describe the newest release the export holds.
     const files = exportFiles(built, STUDY, []);

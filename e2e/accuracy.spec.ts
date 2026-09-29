@@ -33,7 +33,7 @@ const PASSPHRASE = "six brown otters reading";
  * Playwright compiles these specs as CommonJS, where `import.meta` is a syntax
  * error, and the suite always runs from the repository root.
  */
-const MANIFEST = resolve("releases/ybm_nd2026_standard_r7.1.0.manifest.json");
+const MANIFEST = resolve("releases/ybm_nd2026_standard_r7.3.0.manifest.json");
 
 /**
  * `@myself/store` is ESM-only, so it is imported dynamically — a static import of a

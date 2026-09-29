@@ -1574,6 +1574,8 @@ const GATE_RULES: { re: RegExp; code: string; plain: string }[] = [
   { re: /^pipe '[^']+' declared but placeholder absent/, code: "gate.pipe_unused", plain: "An inserted answer is set up, but its placeholder is missing from the text" },
   { re: /^pipe '[^']+' on .* lacks an item reference/, code: "gate.pipe_item_missing", plain: "An inserted answer doesn't say which question it comes from" },
   { re: /^unresolved placeholder /, code: "gate.placeholder_unresolved", plain: "Some text contains a placeholder that nothing fills in" },
+  { re: /^scoring definition '[^']+' is for /, code: "gate.scoring_instrument", plain: "Scoring rules belong to a different questionnaire" },
+  { re: /^scoring definition '[^']+': /, code: "gate.scoring_reference", plain: "Scoring rules name a question this questionnaire doesn't have" },
   { re: /^scoring definition /, code: "gate.scoring_missing", plain: "An instrument's scoring rules are missing" },
   { re: /^duplicate section keys/, code: "gate.section_keys_duplicate", plain: "Two sections have the same ID" },
   { re: /which is not in this release$/, code: "gate.dependency_missing", plain: "A condition or check refers to a question that is not in the survey" },

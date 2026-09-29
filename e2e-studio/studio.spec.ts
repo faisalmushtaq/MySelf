@@ -4,7 +4,7 @@ import {
   auditActions,
   livePointer,
   openStudy,
-  R710_HASH,
+  R730_HASH,
   seedHistoricalSitting,
   sittingJson,
   sittingsFor,
@@ -66,8 +66,8 @@ test("a researcher publishes a change and the public survey runs it, with histor
   await signIn(page);
   await expect(page.getByRole("heading", { name: "Set up from the live survey" })).toBeVisible();
   await page.getByRole("button", { name: "Set up from the live survey" }).click();
-  await expect(page.getByText(/r7\.1\.0/).first()).toBeVisible({ timeout: 60_000 });
-  expect((await livePointer(study.db))?.hash).toBe(R710_HASH);
+  await expect(page.getByText(/r7\.3\.0/).first()).toBeVisible({ timeout: 60_000 });
+  expect((await livePointer(study.db))?.hash).toBe(R730_HASH);
 
   // Into the editor for the survey.
   await page.goto("researcher/#/surveys/ybm_nd2026_standard/edit");
@@ -132,7 +132,7 @@ test("a researcher publishes a change and the public survey runs it, with histor
 
   const pointer = await livePointer(study.db);
   expect(pointer?.version).toBe("8.0.0");
-  expect(pointer?.hash).not.toBe(R710_HASH);
+  expect(pointer?.hash).not.toBe(R730_HASH);
   const newHash = pointer!.hash;
 
   // ── The public survey link loads the new version ───────────────────────────
