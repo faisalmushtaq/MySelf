@@ -1171,7 +1171,7 @@ export function CheckboxSetControl({ item, value, onAnswer }: ControlProps) {
       !checked.includes(key) &&
       required.every((k) => next.includes(k)) &&
       !required.every((k) => checked.includes(k));
-    onAnswer({ kind: "checkboxes", checked: next }, completes ? { afterMs: 700 } : false);
+    onAnswer({ kind: "checkboxes", checked: next }, completes ? { afterMs: 450 } : false);
   };
   return (
     <div className="consent-list">
