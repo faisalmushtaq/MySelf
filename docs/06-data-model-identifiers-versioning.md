@@ -157,6 +157,42 @@ Not yet built: sync, server storage, access control, the audit slip and the
 codebook/crosswalk generators described in §5. Until those exist the researcher
 view is a laptop tool holding real answers, and is treated as such.
 
+### Scoring definitions are checked against their items (r7.2.0, D-49)
+
+**What was wrong.** The SWEMWBS and STAI-5 scoring definitions (1.0.0) summed
+items named `q1`…`q7` and `q1`…`q5`. Neither instrument has ever had items by
+those names — they are keyed by meaning (`optimistic` … `mind`; `upset` …
+`confused`) — and the executor reads a name it cannot find as "not answered".
+So in every sitting under r1.0.0–r7.1.0 the SWEMWBS raw total and the STAI-5
+state-anxiety total are blank. The answers themselves are complete and
+unaffected; only these two derived totals are missing. Nothing a participant
+sees depends on them (the only score shown in a sitting is the EHI handedness
+summary, whose definition is correct).
+
+**The fix.** Definitions 1.0.1 name the real items; the rule is unchanged.
+They are frozen into **r7.2.0**, a MINOR on r7.1.0: nothing a participant reads
+or selects and no code changes, so r7.1.0 and r7.2.0 sittings pool without a
+comparability argument (§3); it is not PATCH, because analysts now see totals
+where there were blanks.
+
+**The gate.** `scoringReferenceProblems()` (`@myself/scoring`) lists every name
+a definition reads that is neither a question of its instrument nor the output
+of an earlier step (or is an information screen). `buildRelease()` refuses to
+publish a release with any such definition, or with a definition for a
+different instrument than the one it is attached to. A test asserts that every
+committed release from r7.2.0 on passes, and that the earlier ones fail on
+exactly these two definitions — so a new broken definition cannot slip in
+behind the known ones.
+
+**Earlier releases stay as they are.** Nothing about a release is ever edited
+(§3), and a sitting is read back through the release it was collected under, so
+the survey's own SWEMWBS and STAI-5 totals stay blank for sittings under
+r1.0.0–r7.1.0. For analysis, scores are derived from the stored answers by the
+research dashboard (MySelf-Dashboard, docs/08 there), whose versioned scoring
+schemes key on the real items and are checked against every release: it is the
+scoring source for all data, old and new. The survey's own `scores` table
+remains what the survey computed at the time.
+
 ## 7. Identifiers and linkage (r7.0.0, D-37)
 
 Section 6 described the data layer as built. This corrects a gap in it that was

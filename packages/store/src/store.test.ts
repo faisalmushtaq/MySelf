@@ -1005,3 +1005,41 @@ describe("the time a sitting took", () => {
     expect(row.wallClockMs).toBeGreaterThanOrEqual(0);
   });
 });
+
+describe("SWEMWBS and STAI-5 totals in the dataset (D-49)", () => {
+  const load = (version: string): ReleaseManifest =>
+    releaseManifest.parse(
+      JSON.parse(
+        readFileSync(
+          fileURLToPath(new URL(`../../../releases/ybm_nd2026_standard_r${version}.manifest.json`, import.meta.url)),
+          "utf8",
+        ),
+      ),
+    );
+  const totals = (release: ReleaseManifest, key: string, output: string) => {
+    const { dataset } = ingest(buildDemoSessions({ manifest: release, participants: 8, seed: 49 }), {
+      manifest: release,
+      study: "demo",
+    });
+    return dataset.scores.filter((s) => s.scoringKey === key && s.output === output);
+  };
+
+  it("are blank in every sitting under r7.1.0, whose definitions name items the forms do not have", () => {
+    const r710 = load("7.1.0");
+    const rows = [...totals(r710, "score.swemwbs", "raw_total"), ...totals(r710, "score.stai5", "state_anxiety")];
+    expect(rows.length).toBeGreaterThan(0);
+    expect(rows.every((r) => r.value === null && r.scoringVersion === "1.0.0")).toBe(true);
+  });
+
+  it("are scored from the answers under r7.2.0, within each scale's range", () => {
+    const r720 = load("7.2.0");
+    const swemwbs = totals(r720, "score.swemwbs", "raw_total");
+    const stai = totals(r720, "score.stai5", "state_anxiety");
+    const scored = (rows: typeof swemwbs) => rows.map((r) => r.value).filter((v): v is number => typeof v === "number");
+    expect(scored(swemwbs).length).toBeGreaterThan(0);
+    expect(scored(stai).length).toBeGreaterThan(0);
+    expect(scored(swemwbs).every((v) => v >= 7 && v <= 35)).toBe(true);
+    expect(scored(stai).every((v) => v >= 5 && v <= 20)).toBe(true);
+    expect([...swemwbs, ...stai].every((r) => r.scoringVersion === "1.0.1")).toBe(true);
+  });
+});

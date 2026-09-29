@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { scoringDefinition } from "@myself/schema";
 import { executeScoring, type ItemValues } from "./executor.js";
-import { allScoring, scoreEhiSf, scoreSdq25S } from "./definitions.js";
+import { allScoring, scoreEhiSf, scoreSdq25S, scoreStai5, scoreSwemwbs } from "./definitions.js";
+import { scoringReferenceProblems } from "./references.js";
 
 const sdq = scoringDefinition.parse(scoreSdq25S);
 const ehi = scoringDefinition.parse(scoreEhiSf);
@@ -88,5 +89,62 @@ describe("EHI-SF laterality quotient", () => {
     const { outputs, warnings } = executeScoring(ehi, { writing: 9, throwing: 1, toothbrush: 1, spoon: 1 });
     expect(outputs["lq"]).toBeNull();
     expect(warnings.some((w) => w.includes("recode"))).toBe(true);
+  });
+});
+
+describe("SWEMWBS and STAI-5 read their real item keys (D-49)", () => {
+  const swemwbs = scoringDefinition.parse(scoreSwemwbs);
+  const stai5 = scoringDefinition.parse(scoreStai5);
+  const swemwbsItems = ["optimistic", "useful", "relaxed", "problems", "thinking", "close", "mind"];
+  const staiItems = ["upset", "frightened", "nervous", "jittery", "confused"];
+
+  it("SWEMWBS: seven answers 'Some of the time' (3) sum to a raw total of 21", () => {
+    const input = Object.fromEntries(swemwbsItems.map((k) => [k, 3]));
+    expect(executeScoring(swemwbs, input).outputs["raw_total"]).toBe(21);
+  });
+
+  it("SWEMWBS: a missing item leaves the raw total blank (all seven required)", () => {
+    const input: ItemValues = Object.fromEntries(swemwbsItems.map((k) => [k, 4]));
+    input["mind"] = null;
+    expect(executeScoring(swemwbs, input).outputs["raw_total"]).toBeNull();
+  });
+
+  it("STAI-5: 1 + 2 + 3 + 4 + 1 = 11", () => {
+    const input = Object.fromEntries(staiItems.map((k, i) => [k, [1, 2, 3, 4, 1][i]!]));
+    expect(executeScoring(stai5, input).outputs["state_anxiety"]).toBe(11);
+  });
+
+  it("the 1.0.0 definitions' q1… keys no longer score anything, so a wrong key cannot pass silently", () => {
+    const old = Object.fromEntries(Array.from({ length: 7 }, (_, i) => [`q${i + 1}`, 3]));
+    expect(executeScoring(swemwbs, old).outputs["raw_total"]).toBeNull();
+  });
+});
+
+describe("scoring references", () => {
+  const items = [{ key: "a" }, { key: "b" }, { key: "info", responseType: "info" }];
+
+  it("accept items and earlier outputs", () => {
+    const def = { instrument: "x", steps: [{ op: "sum" as const, items: ["a", "b"], output: "ab", minValid: 2, prorate: false }, { op: "sum" as const, items: ["ab"], output: "total", minValid: 1, prorate: false }] };
+    expect(scoringReferenceProblems(def, items)).toEqual([]);
+  });
+
+  it("name an item the instrument does not have, an output used before it exists, and an information screen", () => {
+    const def = {
+      instrument: "x",
+      steps: [
+        { op: "sum" as const, items: ["a", "q1", "later"], output: "s", minValid: 1, prorate: false },
+        { op: "mean" as const, items: ["info"], output: "later", minValid: 1 },
+      ],
+    };
+    expect(scoringReferenceProblems(def, items)).toEqual([
+      "step 1 reads 'q1', which is neither a question of 'x' nor an earlier output",
+      "step 1 reads 'later', which is neither a question of 'x' nor an earlier output",
+      "step 2 reads 'info', which is an information screen, not a question",
+    ]);
+  });
+
+  it("check a lookup or classify input too", () => {
+    const def = { instrument: "x", steps: [{ op: "classify" as const, input: "missing", bands: [{ label: "l", min: 0, max: 1 }], output: "band" }] };
+    expect(scoringReferenceProblems(def, items)).toHaveLength(1);
   });
 });

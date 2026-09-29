@@ -20,6 +20,7 @@ import {
   SCENARIO_SYSTEM,
   type NarrativeProtocol,
 } from "@myself/narrative";
+import { scoringReferenceProblems } from "@myself/scoring";
 import type { z } from "zod";
 import { canonicalJson, contentHash } from "./canonical.js";
 
@@ -357,7 +358,17 @@ export function buildRelease(
       if (def.scoringKey) {
         const sd = scoringByKey.get(def.scoringKey);
         if (!sd) failures.push(`scoring definition '${def.scoringKey}' for '${ref.instrument}' not found`);
-        else frozenScoring[def.scoringKey] = sd;
+        else {
+          frozenScoring[def.scoringKey] = sd;
+          // A definition that names an item the form does not have scores nothing,
+          // silently, for every sitting (D-49): refuse it here instead.
+          if (sd.instrument !== ref.instrument) {
+            failures.push(`scoring definition '${sd.key}' is for '${sd.instrument}', not '${ref.instrument}'`);
+          }
+          for (const problem of scoringReferenceProblems(sd, form.items)) {
+            failures.push(`scoring definition '${sd.key}': ${problem}`);
+          }
+        }
       }
     }
   }
