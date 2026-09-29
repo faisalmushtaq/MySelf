@@ -81,7 +81,7 @@ export function describeAnswer(
 
 export function ReviewScreen(props: ReviewScreenProps) {
   const { units, scales, store, allowBack, sectionTitles, sessionStart } = props;
-  const walker = new Walker(units, store, allowBack);
+  const walker = new Walker(units, store, allowBack, sessionStart);
   const visible = walker.visibleUnits();
 
   // Group in administered order, so the review reads like the session did.

@@ -26,6 +26,8 @@ import { expect, test, type Locator, type Page } from "@playwright/test";
  */
 
 const CODE = "NDC0042";
+/** The date of birth the walk gives: 14 in 2026, so the 11–17 SDQ (D-51). */
+let dateOfBirth = "2012-05-14";
 const PASSPHRASE = "six brown otters reading";
 /**
  * Resolved from the working directory rather than from `import.meta`.
@@ -33,7 +35,7 @@ const PASSPHRASE = "six brown otters reading";
  * Playwright compiles these specs as CommonJS, where `import.meta` is a syntax
  * error, and the suite always runs from the repository root.
  */
-const MANIFEST = resolve("releases/ybm_nd2026_standard_r7.3.0.manifest.json");
+const MANIFEST = resolve("releases/ybm_nd2026_standard_r8.0.0.manifest.json");
 
 /**
  * `@myself/store` is ESM-only, so it is imported dynamically — a static import of a
@@ -204,7 +206,7 @@ async function answerAndRecord(page: Page, ledger: Tapped[]): Promise<void> {
 
   const date = page.locator('.survey-body input[type="date"]:visible').first();
   if ((await date.count()) > 0) {
-    await date.fill("2012-05-14");
+    await date.fill(dateOfBirth);
     return;
   }
 
@@ -268,17 +270,14 @@ async function advance(page: Page): Promise<void> {
   throw new Error(`nothing to click on ${await position(page)}`);
 }
 
-test("the dataset says what the participant actually answered", async ({ page }) => {
-  test.slow();
-  const { stemOf, labelOf } = await definitions();
-  const ledger: Tapped[] = [];
-
+/** Answer screen after screen until the survey finishes, or `enough` says to stop. */
+async function walk(page: Page, ledger: Tapped[], enough: () => boolean = () => false): Promise<void> {
   await page.goto("./");
   await page.locator("input.code").fill(CODE);
   await page.locator("button.next.big").click();
 
   for (let screens = 0; screens < 400; screens += 1) {
-    if ((await position(page)) === "finished") break;
+    if ((await position(page)) === "finished" || enough()) break;
     const before = await position(page);
     await answerAndRecord(page, ledger);
     let moved = false;
@@ -294,6 +293,31 @@ test("the dataset says what the participant actually answered", async ({ page })
       await expect.poll(() => position(page), { timeout: 10_000 }).not.toBe(before);
     }
   }
+}
+
+test("someone 18 or over on the day is given the 18+ SDQ, word for word (D-51)", async ({ page }) => {
+  test.slow();
+  dateOfBirth = "2000-01-15";
+  const ledger: Tapped[] = [];
+  const asked = (stem: string) => ledger.some((t) => t.stem.includes(stem));
+  // Both forms end with the same item, so the walk can stop once it is answered.
+  await walk(page, ledger, () => asked("I finish the work I'm doing"));
+
+  expect(asked("I am restless, I find it hard to sit down for long")).toBe(true);
+  expect(asked("I get along better with older people than with people of my own age")).toBe(true);
+  expect(asked("I often offer to help others (family members, friends, colleagues)")).toBe(true);
+  // and nothing from the 11–17 form
+  expect(asked("I am restless, I cannot stay still for long")).toBe(false);
+  expect(asked("Other children or young people pick on me or bully me")).toBe(false);
+});
+
+test("the dataset says what the participant actually answered", async ({ page }) => {
+  test.slow();
+  dateOfBirth = "2012-05-14";
+  const { stemOf, labelOf } = await definitions();
+  const ledger: Tapped[] = [];
+
+  await walk(page, ledger);
 
   await expect(page.locator(".screen.finish")).toBeVisible();
   expect(ledger.length).toBeGreaterThan(20);

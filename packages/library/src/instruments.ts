@@ -363,6 +363,10 @@ export const swemwbs: InstrumentInput = {
 // SDQ 25 (self-report)
 // ---------------------------------------------------------------------------
 
+/**
+ * The SDQ self-report for 11–17 year olds (S11-17) as youthinmind publishes it
+ * (English, UK; © Robert Goodman, 2005), word for word.
+ */
 const sdqStems: string[] = [
   "I try to be nice to other people. I care about their feelings",
   "I am restless, I cannot stay still for long",
@@ -382,11 +386,54 @@ const sdqStems: string[] = [
   "I am nervous in new situations. I easily lose confidence",
   "I am kind to younger children",
   "I am often accused of lying or cheating",
+  "Other children or young people pick on me or bully me",
+  "I often volunteer to help others (parents, teachers, children)",
+  "I think before I do things",
+  "I take things that are not mine from home, school or elsewhere",
+  "I get on better with adults than with people my own age",
+  "I have many fears, I am easily scared",
+  "I finish the work I'm doing. My attention is good",
+];
+
+/**
+ * What YBM's Qualtrics survey and MySelf r1.0.0–r7.3.0 administered instead
+ * (A-7): these three items in the wording of the 18+ form. Revision 1 of each;
+ * the S11-17 wording above is revision 2 (D-51).
+ */
+const sdqAdministered: Record<number, string> = {
+  19: "Other people pick on me or bully me",
+  20: "I often offer to help others (family members, friends, colleagues)",
+  22: "I take things that are not mine from home, work or elsewhere",
+};
+
+/**
+ * The SDQ self-report for those aged 18 and over (S18+) as youthinmind
+ * publishes it (English, UK; © Robert Goodman, 2009), word for word.
+ */
+const sdq18Stems: string[] = [
+  "I try to be nice to other people. I care about their feelings",
+  "I am restless, I find it hard to sit down for long",
+  "I get a lot of headaches, stomach-aches or sickness",
+  "I usually share with others, for example food or drink",
+  "I get very angry and often lose my temper",
+  "I would rather be alone than with other people",
+  "I am generally willing to do what other people want",
+  "I worry a lot",
+  "I am helpful if someone is hurt, upset or feeling ill",
+  "I am constantly fidgeting or squirming",
+  "I have at least one good friend",
+  "I fight a lot. I can make other people do what I want",
+  "I am often unhappy, depressed or tearful",
+  "Other people generally like me",
+  "I am easily distracted, I find it difficult to concentrate",
+  "I am nervous in new situations. I easily lose confidence",
+  "I am kind to children",
+  "I am often accused of lying or cheating",
   "Other people pick on me or bully me",
   "I often offer to help others (family members, friends, colleagues)",
   "I think before I do things",
   "I take things that are not mine from home, work or elsewhere",
-  "I get on better with adults than with people my own age",
+  "I get along better with older people than with people of my own age",
   "I have many fears, I am easily scared",
   "I finish the work I'm doing. My attention is good",
 ];
@@ -394,31 +441,40 @@ const sdqStems: string[] = [
 const sdqIntro =
   "For each statement, choose Not True, Somewhat True or Certainly True. It would help us if you answered them all as best you can, even if you are not absolutely certain. Answer on the basis of how things have been for you over the last six months.";
 
-const sdqForm = (variant: string | undefined, label: string, scale: string) => ({
+const sdqSubscales = [
+  { key: "emotional", name: "Emotional symptoms", itemKeys: ["q3", "q8", "q13", "q16", "q24"] },
+  { key: "conduct", name: "Conduct problems", itemKeys: ["q5", "q7", "q12", "q18", "q22"] },
+  { key: "hyperactivity", name: "Hyperactivity/inattention", itemKeys: ["q2", "q10", "q15", "q21", "q25"] },
+  { key: "peer", name: "Peer relationship problems", itemKeys: ["q6", "q11", "q14", "q19", "q23"] },
+  { key: "prosocial", name: "Prosocial behaviour", itemKeys: ["q1", "q4", "q9", "q17", "q20"] },
+];
+
+const sdqForm = (variant: string | undefined, label: string, scale: string, asAdministered: boolean) => ({
   language: "en-GB" as const,
   ...(variant ? { variant } : {}),
   label,
   instructions: sdqIntro,
   items: sdqStems.map((text, i) => {
     const n = i + 1;
-    const item = row(`q${n}`, `sdq25_q${n}`, `sdq_${n}`, text, scale, {
+    const administered = sdqAdministered[n];
+    const item = row(`q${n}`, `sdq25_q${n}`, `sdq_${n}`, administered && asAdministered ? administered : text, scale, {
       required: "soft",
       allowDecline: true, // D-05: administered ForceResponse contradicted instructions (A-44)
     });
-    if (n === 20 || n === 22) {
-      return {
-        ...item,
-        researcherNote:
-          "Wording matches the SDQ 18+ self-report phrasing; verify against youthinmind S11-17 before approving the canonical form (A-7).",
-      };
-    }
-    return item;
+    if (!administered) return item;
+    return asAdministered
+      ? { ...item, researcherNote: "The 18+ form's wording, as administered up to r7.3.0 (A-7); the S11-17 wording is revision 2 (D-51)." }
+      : {
+          ...item,
+          revision: 2,
+          researcherNote: `Revision 2 (D-51): the S11-17 wording. Revision 1, administered in r1.0.0–r7.3.0, was the 18+ form's "${administered}" (A-7).`,
+        };
   }),
 });
 
 export const sdq25S: InstrumentInput = {
   instrument: "sdq25_s",
-  version: "1.0",
+  version: "2.0",
   name: "Strengths and Difficulties Questionnaire (self-report)",
   abbreviation: "SDQ",
   construct: "Emotional and behavioural difficulties; prosocial behaviour (last 6 months)",
@@ -427,24 +483,64 @@ export const sdq25S: InstrumentInput = {
   ageRange: { min: 11, max: 17 },
   licence: held("youthinmind, authorised for electronic administration", "no"),
   forms: [
-    sdqForm(undefined, "SDQ self-report, canonical anchors ('Certainly True', coded 0-2) per D-08", "scale.sdq_3pt"),
-    sdqForm("ybm-asadmin", "SDQ as administered, YBM 2026 ('Clearly true' anchor — A-6)", "scale.sdq_3pt_ybm"),
+    sdqForm(undefined, "SDQ self-report 11–17 (S11-17), canonical anchors ('Certainly True', coded 0-2) per D-08", "scale.sdq_3pt", false),
+    sdqForm("ybm-asadmin", "SDQ as administered, YBM 2026 ('Clearly true' anchor — A-6)", "scale.sdq_3pt_ybm", true),
   ],
-  subscales: [
-    { key: "emotional", name: "Emotional symptoms", itemKeys: ["q3", "q8", "q13", "q16", "q24"] },
-    { key: "conduct", name: "Conduct problems", itemKeys: ["q5", "q7", "q12", "q18", "q22"] },
-    { key: "hyperactivity", name: "Hyperactivity/inattention", itemKeys: ["q2", "q10", "q15", "q21", "q25"] },
-    { key: "peer", name: "Peer relationship problems", itemKeys: ["q6", "q11", "q14", "q19", "q23"] },
-    { key: "prosocial", name: "Prosocial behaviour", itemKeys: ["q1", "q4", "q9", "q17", "q20"] },
-  ],
+  subscales: sdqSubscales,
   reverseScoredItems: ["q7", "q11", "q14", "q21", "q25"],
   scoringKey: "score.sdq25_s",
   timeEstimates: est([300, 240]),
   changelog:
-    "1.0: encoded from QSF. Canonical form restores 'Certainly True' and 0-2 coding per D-08; items 20/22 flagged for edition verification (A-7). Administered form preserved as ybm-asadmin. Soft-required with decline per D-05.",
+    "1.0: encoded from QSF. Canonical form restores 'Certainly True' and 0-2 coding per D-08; items 20/22 flagged for edition verification (A-7). Administered form preserved as ybm-asadmin. Soft-required with decline per D-05. " +
+    "2.0 (D-51): the canonical form is the S11-17 word for word — items 19, 20 and 22 move from the 18+ form's wording to the S11-17's (revision 2); participants 18 and over are given sdq25_s18 instead. The administered form is unchanged.",
   owner: "ybm",
   researcherNotes:
     "youthinmind licence attested held (D-10). Subscale/reverse-item allocations follow published SDQ scoring; verify against youthinmind scoring sheet before approval.",
+};
+
+export const sdq25S18: InstrumentInput = {
+  instrument: "sdq25_s18",
+  version: "1.0",
+  name: "Strengths and Difficulties Questionnaire (self-report, 18+)",
+  abbreviation: "SDQ 18+",
+  construct: "Emotional and behavioural difficulties; prosocial behaviour (last 6 months)",
+  citation:
+    "Goodman, R. (1997). The Strengths and Difficulties Questionnaire: a research note. Journal of Child Psychology and Psychiatry, 38(5), 581-586. Form: youthinmind SDQ self-report for those aged 18 and over (S18+, © Robert Goodman, 2009).",
+  ageRange: { min: 18, max: 120 },
+  licence: {
+    status: "permission_held",
+    holder: "youthinmind, authorised for electronic administration",
+    modifiable: "no",
+    evidence:
+      "The research team's SDQ permission (D-10). That it covers the S18+ form is to be confirmed with youthinmind (D-51).",
+    verified: false,
+  },
+  forms: [
+    {
+      language: "en-GB",
+      label: "SDQ self-report 18+ (S18+), canonical anchors ('Certainly True', coded 0-2)",
+      instructions: sdqIntro,
+      items: sdq18Stems.map((text, i) => {
+        const n = i + 1;
+        const { legacyVariable: _none, ...item } = row(`q${n}`, `sdq25_s18_q${n}`, "", text, "scale.sdq_3pt", {
+          required: "soft",
+          allowDecline: true, // as the S11-17 (D-05)
+        });
+        return item;
+      }),
+    },
+  ],
+  subscales: sdqSubscales,
+  reverseScoredItems: ["q7", "q11", "q14", "q21", "q25"],
+  scoringKey: "score.sdq25_s18",
+  timeEstimates: [
+    { ageBand: "17-18", medianSeconds: 240, provenance: "estimated-heuristic" },
+    { ageBand: "adult", medianSeconds: 220, provenance: "estimated-heuristic" },
+  ],
+  changelog: "1.0 (D-51): the S18+ word for word, for participants aged 18 or over on the day the sitting started.",
+  owner: "ybm",
+  researcherNotes:
+    "Scored exactly as the S11-17: youthinmind's scoring instructions are 'identical for the similarly-worded 18+ SDQ' (Scoring the SDQ for age 4-17 or 18+, 20 June 2016). The 4–17 cut-points 'have not been validated for use with the 18+ SDQ': report continuous scores.",
 };
 
 // ---------------------------------------------------------------------------
@@ -662,6 +758,7 @@ export const allInstruments: InstrumentInput[] = [
   macarthurSsy,
   swemwbs,
   sdq25S,
+  sdq25S18,
   rcads25,
   stai5S,
   bisbas12Ybm,

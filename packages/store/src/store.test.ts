@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
+import { ageOn } from "@myself/engine";
 import { releaseManifest, type ReleaseManifest } from "@myself/schema";
 import { buildBidsExport } from "./bids.js";
 import { emptyDataset, type Dataset } from "./dataset.js";
@@ -1041,6 +1042,36 @@ describe("SWEMWBS and STAI-5 totals in the dataset (D-49)", () => {
     expect(scored(swemwbs).every((v) => v >= 7 && v <= 35)).toBe(true);
     expect(scored(stai).every((v) => v >= 5 && v <= 20)).toBe(true);
     expect([...swemwbs, ...stai].every((r) => r.scoringVersion === "1.0.1")).toBe(true);
+  });
+
+  it("gives each sitting the SDQ form for the participant's age, and scores it (D-51)", () => {
+    const release = load("8.0.0");
+    const sessions = buildDemoSessions({ manifest: release, participants: 40, seed: 51 });
+    const { dataset, identity } = ingest(sessions, { manifest: release, study: "demo" });
+    const seen = { under: 0, adult: 0 };
+    for (const s of dataset.sessions) {
+      const forms = new Set(
+        dataset.responses.filter((r) => r.sessionId === s.sessionId && r.instrument.startsWith("sdq")).map((r) => r.instrument),
+      );
+      const dob = identity.find((r) => r.sessionId === s.sessionId && r.variable === "dob");
+      if (!dob || forms.size === 0) continue; // abandoned before the SDQ
+      const started = sessions.find((x) => x.sessionId === s.sessionId)!.startedAt;
+      const adult = (ageOn(String(dob.value), new Date(started)) ?? 0) >= 18;
+      expect([...forms], s.sessionId).toEqual([adult ? "sdq25_s18" : "sdq25_s"]);
+      seen[adult ? "adult" : "under"] += 1;
+      // Every definition writes its outputs for every sitting, empty where nothing
+      // was answered — as for any questionnaire a participant was not given.
+      const given = adult ? "score.sdq25_s18" : "score.sdq25_s";
+      const scored = new Set(
+        dataset.scores.filter((r) => r.sessionId === s.sessionId && r.scoringKey.startsWith("score.sdq") && r.value !== null).map((r) => r.scoringKey),
+      );
+      expect([...scored], s.sessionId).toEqual([given]);
+      const of = (output: string) => dataset.scores.find((r) => r.sessionId === s.sessionId && r.output === output && r.scoringKey === given)?.value ?? null;
+      const parts = ["emotional", "conduct", "hyperactivity", "peer"].map(of);
+      if (parts.every((v) => typeof v === "number")) expect(of("total_difficulties")).toBe((parts as number[]).reduce((a, b) => a + b, 0));
+    }
+    expect(seen.under).toBeGreaterThan(0);
+    expect(seen.adult).toBeGreaterThan(0);
   });
 
   it("scores the SDQ total and the RCADS total from their subscales (S7), in every release", () => {

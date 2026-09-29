@@ -19,23 +19,20 @@ const registries: Registries = {
 /**
  * The current release.
  *
- * r7.3.0 is a MINOR on r7.2.0 (D-50). Its RCADS-25 scoring definition (2.0.0)
- * uses the published key: depression is items 1, 4, 8, 10, 13, 15, 16, 19, 21
- * and 24. The 1.0.0 definition frozen into r1.0.0–r7.2.0 swapped items 18 and 24
- * between depression and anxiety. Nothing a participant reads or selects changes
- * and no code changes, so r7.2.0 and r7.3.0 sittings are the same instrument; the
- * survey's own RCADS subscales change meaning across the two (the definition is
- * MAJOR), but they are derived, the answers are unchanged, and the research
- * dashboard scores every version with the published key — MINOR, as for D-49.
+ * r8.0.0 (D-51) gives each participant the SDQ form published for their age on
+ * the day the sitting started: the 11–17 self-report (sdq25_s 2.0, now word for
+ * word — items 19, 20 and 22 were the 18+ form's wording) under 18, the 18+
+ * self-report (sdq25_s18) from 18. MAJOR: what a participant reads changes.
  *
- * r7.2.0 (D-49) named the SWEMWBS and STAI-5 items by their real keys.
+ * r7.3.0 (D-50) froze the published RCADS-25 key; r7.2.0 (D-49) named the
+ * SWEMWBS and STAI-5 items by their real keys.
  */
 const meta = {
-  version: "7.3.0",
-  publishedAt: "2026-09-29T15:33:00.000Z",
+  version: "8.0.0",
+  publishedAt: "2026-09-29T17:38:00.000Z",
   publishedBy: "faisalmushtaq",
-  engineVersion: "0.1.0",
-  decisionRefs: ["D-50"],
+  engineVersion: "0.2.0",
+  decisionRefs: ["D-51"],
 };
 
 describe("canonical JSON", () => {
@@ -48,12 +45,12 @@ describe("canonical JSON", () => {
   });
 });
 
-describe("YBM release r7.3.0", () => {
+describe("YBM release r8.0.0", () => {
   it("passes the publish gate and produces a verifiable manifest", () => {
     const manifest = buildRelease(ybmComposition, registries, meta);
     expect(manifest.hash).toMatch(/^sha256:[0-9a-f]{64}$/);
     expect(verifyManifestHash(manifest)).toBe(true);
-    expect(manifest.release.key).toBe("ybm_nd2026_standard_r7_3_0");
+    expect(manifest.release.key).toBe("ybm_nd2026_standard_r8_0_0");
   });
 
   it("is deterministic: identical inputs give an identical hash", () => {
@@ -64,14 +61,14 @@ describe("YBM release r7.3.0", () => {
 
   it("freezes every component of the composition and its scales/scoring", () => {
     const manifest = buildRelease(ybmComposition, registries, meta);
-    // 18 since r6.0.0: the two sleep-priority questions were dropped from this
-    // fielding (D-31), so their module is no longer a component.
-    expect(Object.keys(manifest.instruments)).toHaveLength(18);
+    // 18 from r6.0.0, when the two sleep-priority questions were dropped (D-31);
+    // 19 from r8.0.0, when the SDQ became one form for under-18s and one for 18+ (D-51).
+    expect(Object.keys(manifest.instruments)).toHaveLength(19);
     expect(Object.keys(manifest.instruments).some((k) => k.includes("sleep_priorities"))).toBe(false);
     // canonical (variant-less) forms only (D-08)
     for (const key of Object.keys(manifest.instruments)) expect(key).not.toContain("+ybm-asadmin");
     expect(Object.keys(manifest.scoring)).toEqual(
-      expect.arrayContaining(["score.sdq25_s", "score.rcads25", "score.swemwbs", "score.stai5", "score.bisbas12_ybm", "score.ehi_sf"]),
+      expect.arrayContaining(["score.sdq25_s", "score.sdq25_s18", "score.rcads25", "score.swemwbs", "score.stai5", "score.bisbas12_ybm", "score.ehi_sf"]),
     );
     expect(Object.keys(manifest.scales).length).toBeGreaterThanOrEqual(25);
   });
@@ -80,7 +77,7 @@ describe("YBM release r7.3.0", () => {
     // The frozen file is what devices actually run. If someone edits an item,
     // a scale or the composition without republishing, this fails: the release
     // on disk would no longer be the release the sources describe.
-    const path = fileURLToPath(new URL("../../../releases/ybm_nd2026_standard_r7.3.0.manifest.json", import.meta.url));
+    const path = fileURLToPath(new URL("../../../releases/ybm_nd2026_standard_r8.0.0.manifest.json", import.meta.url));
     const committed = JSON.parse(readFileSync(path, "utf8")) as {
       hash: string;
       release: { version: string; publishedAt: string; publishedBy: string; engineVersion: string; decisionRefs: string[] };
@@ -175,6 +172,54 @@ describe("the RCADS-25 key (D-50)", () => {
       const depression = itemsOf(rcads, "depression");
       expect(depression.includes("q24"), m.release.version).toBe(fixed);
       expect(depression.includes("q18"), m.release.version).toBe(!fixed);
+    }
+  });
+});
+
+describe("the SDQ by age (D-51)", () => {
+  const manifest = buildRelease(ybmComposition, registries, meta);
+  const wellbeing = manifest.composition.sections.find((x) => x.key === "wellbeing")!;
+  const sdqs = wellbeing.components.filter(
+    (c): c is Extract<typeof c, { kind: "instrument" }> => c.kind === "instrument" && c.ref.instrument.startsWith("sdq"),
+  );
+
+  it("places the 11–17 and the 18+ forms under complementary conditions on the date of birth", () => {
+    const adult = { op: "age_gte", target: { item: { instrument: "ybm_identity", item: "dob", revision: 1 } }, years: 18 };
+    expect(sdqs.map((c) => [c.ref.instrument, c.ref.version])).toEqual([
+      ["sdq25_s", "2.0"],
+      ["sdq25_s18", "1.0"],
+    ]);
+    expect(sdqs[0]!.displayIf).toEqual({ op: "not", arg: adult });
+    expect(sdqs[1]!.displayIf).toEqual(adult);
+  });
+
+  it("freezes both forms with their own scoring, and no bands for the 18+", () => {
+    const s11 = manifest.instruments["sdq25_s@2.0/en-GB/self/standard"] as { forms: { items: { key: string; stem: { text: string } }[] }[] };
+    const s18 = manifest.instruments["sdq25_s18@1.0/en-GB/self/standard"] as typeof s11;
+    expect(s11.forms[0]!.items.find((i) => i.key === "q22")!.stem.text).toContain("home, school or elsewhere");
+    expect(s18.forms[0]!.items.find((i) => i.key === "q22")!.stem.text).toContain("home, work or elsewhere");
+    const scoring = manifest.scoring["score.sdq25_s18"] as { steps: { op: string }[] };
+    expect(scoring.steps).toEqual((manifest.scoring["score.sdq25_s"] as typeof scoring).steps);
+    expect(scoring.steps.some((x) => x.op === "classify")).toBe(false);
+  });
+
+  it("refuses the age condition when the date of birth is asked after the SDQ", () => {
+    const late = structuredClone(ybmComposition);
+    const about = late.sections.find((x) => x.key === "about_you")!;
+    const identity = about.components.shift()!;
+    late.sections.find((x) => x.key === "wellbeing")!.components.push(identity);
+    expect(() => buildRelease(late, registries, meta)).toThrow(/sdq25_s18\.q1: component condition depends on 'ybm_identity\.dob', which is asked later/);
+  });
+
+  it("releases before r8.0.0 froze the one mixed form", () => {
+    const dir = fileURLToPath(new URL("../../../releases/", import.meta.url));
+    for (const f of readdirSync(dir).filter((x) => /^ybm_nd2026_standard_r[\d.]+\.manifest\.json$/.test(x))) {
+      const m = JSON.parse(readFileSync(`${dir}${f}`, "utf8")) as { release: { version: string }; instruments: Record<string, unknown> };
+      const keys = Object.keys(m.instruments).filter((k) => k.startsWith("sdq"));
+      const byAge = Number(m.release.version.split(".")[0]) >= 8;
+      expect(keys, m.release.version).toEqual(
+        byAge ? ["sdq25_s@2.0/en-GB/self/standard", "sdq25_s18@1.0/en-GB/self/standard"] : ["sdq25_s@1.0/en-GB/self/standard"],
+      );
     }
   });
 });

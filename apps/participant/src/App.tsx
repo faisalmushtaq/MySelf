@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { AnswerStore, Walker, type AnswerValue, type PresentableUnit } from "@myself/engine";
 import { releaseManifest, responseScale, scoringDefinition, type ReleaseManifest, type ResponseScale } from "@myself/schema";
-import rawManifest from "../../../releases/ybm_nd2026_standard_r7.3.0.manifest.json";
+import rawManifest from "../../../releases/ybm_nd2026_standard_r8.0.0.manifest.json";
 import { flattenManifest } from "./lib/flatten.js";
 import { resolveText, useScoringDefinitions } from "./lib/pipes.js";
 import {
@@ -44,7 +44,7 @@ import { SurveyScreen } from "./components/SurveyScreen.js";
 
 /**
  * MySelf Go — participant application (preview build).
- * Renders the frozen YBM r7.3.0 release entirely from its manifest, saves
+ * Renders the frozen YBM r8.0.0 release entirely from its manifest, saves
  * every response to encrypted IndexedDB before advancing, works offline via
  * the service worker, and returns to a neutral start screen on handover.
  */
@@ -365,9 +365,16 @@ export default function App() {
     void checkpointRunningSessions().catch(() => undefined);
   }, [online, device, phase.kind]);
 
+  const runningSession = phase.kind === "running" ? (phase as { session: SessionRow }).session : null;
   const walker = useMemo(
-    () => new Walker(flattened.units, storeRef.current, manifest.composition.allowBackNavigation),
-    [phase.kind === "running" ? (phase as { session: SessionRow }).session.sessionId : ""],
+    () =>
+      new Walker(
+        flattened.units,
+        storeRef.current,
+        manifest.composition.allowBackNavigation,
+        runningSession ? new Date(runningSession.startedAt) : undefined,
+      ),
+    [runningSession?.sessionId ?? ""],
   );
 
   const tMono = () => Math.round(performance.now() - monoStart.current);
@@ -409,7 +416,7 @@ export default function App() {
       skipRun.current = { count: 0, firstIndex: null };
       fastRun.current = 0;
       timing.current = new SessionTiming(effort);
-      const w = new Walker(flattened.units, store, manifest.composition.allowBackNavigation);
+      const w = new Walker(flattened.units, store, manifest.composition.allowBackNavigation, new Date(session.startedAt));
       const index = existing ? Math.min(session.currentIndex, flattened.units.length - 1) : (w.first() ?? 0);
       if (existing) {
         await appendEvent(session, "session.resumed", undefined, { resumedAtIndex: index }, index, tMono());
@@ -631,7 +638,12 @@ export default function App() {
         return;
       }
 
-      const w = new Walker(flattened.units, storeRef.current, manifest.composition.allowBackNavigation);
+      const w = new Walker(
+        flattened.units,
+        storeRef.current,
+        manifest.composition.allowBackNavigation,
+        new Date(phase.session.startedAt),
+      );
       const next = w.next(from);
 
       if (
@@ -704,7 +716,12 @@ export default function App() {
         setPhase({ kind: "review", session: phase.session });
         return;
       }
-      const w = new Walker(flattened.units, storeRef.current, manifest.composition.allowBackNavigation);
+      const w = new Walker(
+        flattened.units,
+        storeRef.current,
+        manifest.composition.allowBackNavigation,
+        new Date(phase.session.startedAt),
+      );
       const prev = w.back(from);
       if (prev !== null) {
         await leaveItem(from, false);

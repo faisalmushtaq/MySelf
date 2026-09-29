@@ -40,12 +40,14 @@ export class Walker {
     private readonly units: PresentableUnit[],
     private readonly store: AnswerStore,
     private readonly allowBack: boolean,
+    /** When the sitting started: what age conditions are judged against (D-51). */
+    private readonly sessionStart?: Date,
   ) {}
 
   isVisible(index: number): boolean {
     const unit = this.units[index];
     if (!unit) return false;
-    return unit.displayIf === undefined || evaluate(unit.displayIf, this.store);
+    return unit.displayIf === undefined || evaluate(unit.displayIf, this.store, this.sessionStart);
   }
 
   /** All currently-visible units, in order (for progress computation). */

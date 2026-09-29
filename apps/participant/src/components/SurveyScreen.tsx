@@ -75,7 +75,11 @@ export interface SurveyScreenProps {
 export function SurveyScreen(props: SurveyScreenProps) {
   const { units, scales, store, allowBack, index, sessionStart, effort } = props;
   const unit = units[index];
-  const walker = useMemo(() => new Walker(units, store, allowBack), [units, store, allowBack]);
+  const startTime = sessionStart.getTime();
+  const walker = useMemo(
+    () => new Walker(units, store, allowBack, new Date(startTime)),
+    [units, store, allowBack, startTime],
+  );
   const [confirmingSkip, setConfirmingSkip] = useState(false);
   // Draft validity reported by the control on screen (formats, required parts).
   const [draft, setDraft] = useState<{ ok: boolean; complete: boolean } | null>(null);
