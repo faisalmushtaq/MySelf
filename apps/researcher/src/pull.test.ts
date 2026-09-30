@@ -116,6 +116,14 @@ describe("assembling a pull", () => {
     expect(pull.sessions).toEqual([]);
   });
 
+  it("keeps the time the study last received each sitting", async () => {
+    // The server's clock decides whether an unfinished sitting is in progress or
+    // abandoned, here as in the dashboard; a device clock can be hours out.
+    const stored = asStored("ses_1", 10).doc;
+    const pull = await assemblePull([{ ...stored, receivedAt: "2026-09-02T08:00:00.000Z" }], never);
+    expect(pull.sessions[0]!.receivedAt).toBe("2026-09-02T08:00:00.000Z");
+  });
+
   it("returns nothing, calmly, from an empty study", async () => {
     expect(await assemblePull([], never)).toEqual({ sessions: [], quarantined: 0, unreadable: [] });
   });

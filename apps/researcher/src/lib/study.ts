@@ -113,8 +113,18 @@ export function watchUser(listener: (user: StudyUser | null) => void): () => voi
   });
 }
 
+/**
+ * A sitting as pulled, with the time the study last received it.
+ *
+ * `receivedAt` is the server's clock, written on every upload. It is what decides
+ * whether an unfinished sitting is still in progress or has been abandoned, in the
+ * dashboard and here alike (`lifecycleOf` in @myself/store), and a device's own clock
+ * can be hours out — so it is kept rather than dropped at the door.
+ */
+export type PulledSitting = DeviceSession & { receivedAt?: string };
+
 export interface StudyPull {
-  sessions: DeviceSession[];
+  sessions: PulledSitting[];
   /** Sittings the study is holding back for review, and so left out of here. */
   quarantined: number;
   /** Sittings that could not be reassembled, named so somebody can go and look. */
@@ -159,7 +169,7 @@ export async function assemblePull(
   documents: readonly SessionDoc[],
   chunksFor: (sessionId: string) => Promise<ChunkDoc[]>,
 ): Promise<StudyPull> {
-  const sessions: DeviceSession[] = [];
+  const sessions: PulledSitting[] = [];
   const unreadable: string[] = [];
   let quarantined = 0;
 
@@ -173,7 +183,7 @@ export async function assemblePull(
       // and reading a collection that does not exist for every one of them would double
       // the cost of a pull for nothing.
       const chunks = data.chunkCount > 0 ? await chunksFor(data.sessionId) : [];
-      sessions.push(joinSession(data, chunks));
+      sessions.push({ ...joinSession(data, chunks), ...(data.receivedAt ? { receivedAt: data.receivedAt } : {}) });
     } catch {
       /**
        * Named, not dropped, and not allowed to fail the whole pull.

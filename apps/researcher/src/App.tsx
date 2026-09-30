@@ -1,22 +1,29 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { buildBidsExport, buildDemoSessions, buildZip, summarise, wideTable, type Dataset } from "@myself/store";
+import { buildBidsExport, buildDemoSessions, buildZip, wideTable, type Dataset } from "@myself/store";
 import { DataTable, downloadCsv } from "./components/DataTable.js";
 import { Linkage } from "./components/Linkage.js";
 import { ParticipantPanel } from "./components/ParticipantPanel.js";
 import { Protocols } from "./components/Protocols.js";
+import { Scope } from "./components/Scope.js";
 import { Summary } from "./components/Summary.js";
-import { buildDataset } from "./lib/build.js";
+import { buildDataset, countStudy } from "./lib/build.js";
 import {
   addSessions,
   aliases,
   assignSession,
   assignments,
   clearAll,
+  DEMONSTRATION,
   importExportFile,
+  lastPull,
   mergeFromStudy,
+  recordPull,
+  sourceOf,
   storeIdentity,
   storedSessions,
   type ImportReport,
+  type PullRecord,
+  type StoredSession,
 } from "./lib/db.js";
 import {
   pullSittings,
@@ -52,7 +59,11 @@ const plural = (n: number, noun: string): string => `${n} ${noun}${n === 1 ? "" 
 type Tab = "overview" | "table" | "linkage" | "mystory" | "data";
 
 export default function App() {
-  const [dataset, setDataset] = useState<Dataset | null>(null);
+  // Every stored sitting and the dataset ingest built from all of them. What the view
+  // shows is `counted` below: the same, with test sittings left out unless asked for.
+  const [built, setBuilt] = useState<{ stored: StoredSession[]; dataset: Dataset } | null>(null);
+  const [pullRecord, setPullRecord] = useState<PullRecord | null>(null);
+  const [includeTest, setIncludeTest] = useState(false);
   const [issues, setIssues] = useState<{
     rejected: { sessionId: string; reason: string }[];
     collisions: { participantId: string; names: string[]; sessions: string[] }[];
@@ -78,7 +89,8 @@ export default function App() {
     // Corrections are applied here, at derivation, so a repaired code joins a
     // participant's waves without anything being rewritten (D-37).
     const built = buildDataset(sessions, STUDY, await aliases(), await assignments());
-    setDataset(built.dataset);
+    setBuilt({ stored: sessions, dataset: built.dataset });
+    setPullRecord(await lastPull());
     // Names go to their own table, never into the dataset the rest of this
     // app reads. They are needed to repair a code and to link a UPN, and the
     // Linkage tab is the only place they surface.
@@ -99,6 +111,7 @@ export default function App() {
     try {
       const { sessions, quarantined, unreadable } = await pullSittings();
       const merged = await mergeFromStudy(sessions, "study");
+      await recordPull({ at: new Date().toISOString(), sittings: sessions.length, quarantined, unreadable });
       const parts = [
         `${plural(merged.added, "sitting")} new`,
         `${merged.superseded} superseded by a longer copy`,
@@ -119,8 +132,16 @@ export default function App() {
     }
   }, [reload]);
 
+  // Counted by the rules the research dashboard counts by (@myself/store counting.ts).
+  const counted = useMemo(() => (built ? countStudy(built.stored, built.dataset, includeTest) : null), [built, includeTest]);
+  const dataset = counted?.dataset ?? null;
+  const held = built?.stored.length ?? 0;
+  const sources = useMemo(() => {
+    const out = { study: 0, file: 0, demonstration: 0 };
+    for (const s of built?.stored ?? []) out[sourceOf(s)] += 1;
+    return out;
+  }, [built]);
   const table = useMemo(() => (dataset ? wideTable(dataset) : null), [dataset]);
-  const summary = useMemo(() => (dataset ? summarise(dataset) : null), [dataset]);
 
   useEffect(() => {
     if (!table) return;
@@ -149,8 +170,8 @@ export default function App() {
     if (!latestRelease) return;
     setBusy(true);
     const sessions = buildDemoSessions({ manifest: latestRelease.manifest, participants: 24 });
-    const added = await addSessions(sessions, "demonstration data");
-    setReports((r) => [{ file: "demonstration data", added, duplicates: sessions.length - added, errors: [] }, ...r]);
+    const added = await addSessions(sessions, DEMONSTRATION);
+    setReports((r) => [{ file: DEMONSTRATION, added, duplicates: sessions.length - added, errors: [] }, ...r]);
     await reload();
   };
 
@@ -179,8 +200,8 @@ export default function App() {
             MySelf <span className="dim">researcher view</span>
           </h1>
           <p className="note">
-            {STUDY} · {plural(dataset?.sessions.length ?? 0, "sitting")} ·{" "}
-            {plural(dataset?.participants.length ?? 0, "participant")}
+            {STUDY} · {plural(counted?.figures.sittings ?? 0, "sitting")} ·{" "}
+            {plural(counted?.figures.participants ?? 0, "participant")}
             {latestRelease ? ` · release ${latestRelease.version}` : ""} · build {__BUILD_STAMP__}
           </p>
         </div>
@@ -205,9 +226,11 @@ export default function App() {
 
       {issues.rejected.length > 0 && (
         <div className="alert">
-          <strong>{issues.rejected.length} sitting{issues.rejected.length === 1 ? "" : "s"} held back.</strong> These
-          could not be linked to a participant, so they are stored but not counted. Guessing the link would join one
-          child&apos;s answers to another&apos;s.
+          <strong>
+            {issues.rejected.length} sitting{issues.rejected.length === 1 ? "" : "s"} not linked to a participant.
+          </strong>{" "}
+          {issues.rejected.length === 1 ? "It is counted as a sitting" : "They are counted as sittings"}, but as
+          nobody&apos;s answers: guessing the link would join one child&apos;s answers to another&apos;s.
           <ul>
             {issues.rejected.slice(0, 5).map((r) => (
               <li key={r.sessionId}>
@@ -273,7 +296,18 @@ export default function App() {
         </details>
       )}
 
-      {dataset && dataset.sessions.length === 0 && (
+      {counted && held > 0 && (tab === "overview" || tab === "table" || tab === "data") && (
+        <Scope
+          counted={counted}
+          sources={sources}
+          pull={pullRecord}
+          studyAvailable={studyAvailable}
+          includeTest={includeTest}
+          onIncludeTest={setIncludeTest}
+        />
+      )}
+
+      {built && held === 0 && (
         <section className="empty">
           <h2>Nothing here yet</h2>
           <p>
@@ -291,9 +325,7 @@ export default function App() {
         </section>
       )}
 
-      {tab === "overview" && summary && dataset && table && dataset.sessions.length > 0 && (
-        <Summary summary={summary} rows={table.rows} />
-      )}
+      {tab === "overview" && counted && table && held > 0 && <Summary counted={counted} rows={table.rows} />}
 
       {tab === "table" && table && visible && dataset && dataset.sessions.length > 0 && (
         <DataTable
@@ -454,7 +486,8 @@ export default function App() {
           <p className="note">
             The BIDS folder is the archival copy: one file per instrument, a data dictionary beside each, and the
             release hash recorded in the dataset description so the answers stay interpretable. The CSV is whatever
-            the table is showing at the time.
+            the table is showing at the time. Both hold the sittings the Overview counts: test sittings only when
+            &ldquo;Include test sittings&rdquo; is ticked, and no sitting that could not be linked to a participant.
           </p>
           <div className="empty-actions">
             <button type="button" className="primary" disabled={!dataset || dataset.sessions.length === 0} onClick={downloadBids}>

@@ -111,9 +111,49 @@ body {
   color: var(--muted);
 }
 
+/* ── What is counted ───────────────────────────────────────────────────── */
+/* Above the cards on every tab they govern: how fresh, from where, what is left out. */
+.scope {
+  margin-top: 1rem;
+  padding: 0.65rem 1rem 0.75rem;
+  border: 1px solid var(--hairline);
+  border-radius: 10px;
+  background: var(--off-white);
+}
+
+.scope .note {
+  max-width: none;
+  margin: 0;
+}
+
+.scope .note + .note {
+  margin-top: 0.2rem;
+}
+
+.check {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin-top: 0.45rem;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.check input {
+  width: 1rem;
+  height: 1rem;
+  margin: 0;
+  accent-color: var(--accent);
+}
+
 /* ── Cards ─────────────────────────────────────────────────────────────── */
 .summary {
   margin-top: 1.25rem;
+}
+
+.summary > .note.definitions {
+  margin-top: 0.6rem;
+  max-width: 90ch;
 }
 
 .cards {

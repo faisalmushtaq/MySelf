@@ -1,5 +1,7 @@
 export * from "./address.js";
 export * from "./bids.js";
+export * from "./completeness.js";
+export * from "./counting.js";
 export * from "./dataset.js";
 export * from "./demo.js";
 export * from "./envelope.js";

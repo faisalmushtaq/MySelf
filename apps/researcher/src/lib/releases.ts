@@ -39,3 +39,6 @@ export const releasesByHash = new Map(releases.map((r) => [r.hash, r]));
 
 /** The most recent published release — what a new sitting will be collected under. */
 export const latestRelease = releases[releases.length - 1];
+
+/** Each release's manifest by hash, as the shared counting rules take them (@myself/store counting.ts). */
+export const manifestsByHash = new Map(releases.map((r) => [r.hash, r.manifest]));
