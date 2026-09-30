@@ -20,6 +20,7 @@ import {
 } from "./lib/db.js";
 import {
   pullSittings,
+  readPublishedReleases,
   revokeDevice,
   signIn,
   signOutOfStudy,
@@ -28,7 +29,7 @@ import {
   type StudyUser,
 } from "./lib/study.js";
 import { defaultColumns } from "./lib/filter.js";
-import { latestRelease } from "./lib/releases.js";
+import { addPublishedReleases, latestRelease } from "./lib/releases.js";
 
 /**
  * MySelf — researcher view.
@@ -66,6 +67,7 @@ export default function App() {
   const [user, setUser] = useState<StudyUser | null>(null);
   const [pulling, setPulling] = useState(false);
   const [pullNote, setPullNote] = useState<string | null>(null);
+  const [releaseNote, setReleaseNote] = useState<string | null>(null);
   const [revoking, setRevoking] = useState("");
   const [deviceNote, setDeviceNote] = useState<string | null>(null);
   // The study passphrase the iPads encrypted their handover files with. Held in
@@ -93,10 +95,38 @@ export default function App() {
 
   useEffect(() => watchUser(setUser), []);
 
+  /**
+   * Learn the versions published from the dashboard (D-54), so a sitting
+   * collected under one is read through it rather than through the latest
+   * built-in release with a warning. Each is checked against its hash first;
+   * one that fails is named here and never used. Returns how many were new.
+   */
+  const learnPublished = useCallback(async (): Promise<number> => {
+    try {
+      const { added, refused } = await addPublishedReleases(await readPublishedReleases());
+      setReleaseNote(
+        refused.length > 0
+          ? `${plural(refused.length, "published version")} did not match ${refused.length === 1 ? "its" : "their"} hash and ${refused.length === 1 ? "is" : "are"} not used: ${refused.map((r) => `${r.hash.slice(0, 19)}… (${r.problem})`).join("; ")}`
+          : null,
+      );
+      return added.length;
+    } catch (error) {
+      setReleaseNote(`Could not read the versions published from the dashboard: ${error instanceof Error ? error.message : "no reason given"}`);
+      return 0;
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!user) return;
+    void learnPublished().then((added) => (added > 0 ? reload() : undefined));
+  }, [user, learnPublished, reload]);
+
   const pull = useCallback(async () => {
     setPulling(true);
     setPullNote(null);
     try {
+      // First, so sittings under a version published since signing in are read through it.
+      await learnPublished();
       const { sessions, quarantined, unreadable } = await pullSittings();
       const merged = await mergeFromStudy(sessions, "study");
       const parts = [
@@ -117,7 +147,7 @@ export default function App() {
     } finally {
       setPulling(false);
     }
-  }, [reload]);
+  }, [reload, learnPublished]);
 
   const table = useMemo(() => (dataset ? wideTable(dataset) : null), [dataset]);
   const summary = useMemo(() => (dataset ? summarise(dataset) : null), [dataset]);
@@ -350,6 +380,7 @@ export default function App() {
                 </>
               )}
               {pullNote && <p className="note">{pullNote}</p>}
+              {releaseNote && <p className="note warn">{releaseNote}</p>}
             </div>
           )}
 
