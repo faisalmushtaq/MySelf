@@ -13,7 +13,7 @@ import {
   type StoredNarrativeRun,
 } from "@myself/store";
 import { STUDY, research } from "./apps.js";
-import { latestRelease, releasesByHash } from "./releases.js";
+import { knownReleases, releaseFor } from "./releases.js";
 
 /**
  * The archival copy, written nightly.
@@ -105,12 +105,15 @@ export async function buildStudyDataset(study: string): Promise<{ dataset: Datas
     else groups.set(s.releaseHash, [s]);
   }
 
+  // Bundled and published from the dashboard alike (D-54), each checked
+  // against its hash before it is used to read anything.
+  const known = await knownReleases();
   let dataset = emptyDataset();
   for (const [hash, group] of [...groups.entries()].sort((a, b) => {
     const earliest = (rows: DeviceSession[]) => rows.reduce((m, r) => (r.startedAt < m ? r.startedAt : m), rows[0]!.startedAt);
     return earliest(a[1]).localeCompare(earliest(b[1]));
   })) {
-    const manifest = releasesByHash.get(hash) ?? latestRelease;
+    const manifest = (await releaseFor(hash)) ?? known.latest;
     if (!manifest) continue;
     const result = ingest([...group].sort((a, b) => a.startedAt.localeCompare(b.startedAt)), {
       manifest,
@@ -136,6 +139,7 @@ export async function buildStudyDataset(study: string): Promise<{ dataset: Datas
 
 async function writeExport(study: string, prefix: string): Promise<{ files: number; bytes: number }> {
   const { dataset, sittings } = await buildStudyDataset(study);
+  const { latest: latestRelease } = await knownReleases();
   if (!latestRelease) throw new Error("no release manifest available");
 
   /**

@@ -11,6 +11,7 @@ import {
 import { collection, getDocs, getFirestore, type Firestore } from "firebase/firestore";
 import { getFunctions, httpsCallable, type Functions } from "firebase/functions";
 import { joinSession, paths, type ChunkDoc, type SessionDoc } from "@myself/firebase";
+import { publishedPaths } from "@myself/schema";
 import type { DeviceSession } from "@myself/store";
 
 /**
@@ -200,6 +201,21 @@ export async function assemblePull(
   return { sessions, quarantined, unreadable };
 }
 
+// ── Versions published from the dashboard (D-54) ──────────────────────────────
+
+/**
+ * The versions published from the dashboard, as the database holds them.
+ *
+ * Readable by anyone (`firestore.rules`), so this needs no role; it is read on
+ * signing in because that is when this view starts reading the study. The
+ * documents are checked against their hashes by `addPublishedReleases` in
+ * releases.ts, not here.
+ */
+export async function readPublishedReleases(): Promise<{ id: string; data: unknown }[]> {
+  const { db } = firebase();
+  const snapshot = await getDocs(collection(db, publishedPaths.releases(STUDY)));
+  return snapshot.docs.map((document) => ({ id: document.id, data: document.data() }));
+}
 
 // ── Devices ────────────────────────────────────────────────────────────────
 

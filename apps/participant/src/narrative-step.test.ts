@@ -1,14 +1,18 @@
 import { describe, expect, it } from "vitest";
+import { handoverUrl as buildHandoverUrl, readModuleMessage } from "./lib/narrative.js";
 
 /**
  * The hand-over from the survey to the module.
  *
  * What is worth testing here is not the iframe — that is the browser's job —
- * but the two things the hand-over gets wrong silently if they are wrong: the
- * URL the module is asked for, and which messages are believed.
+ * but the things the hand-over gets wrong silently if they are wrong: the URL
+ * the module is asked for, which messages are believed, and the protocol the
+ * survey sends (D-54).
+ *
+ * These used to test copies of the component's logic, kept in step by hand.
+ * The logic now lives in `lib/narrative.ts`, so they test the real thing.
  */
 
-/** The same URL the component builds, kept in step by being asserted on. */
 function handoverUrl(options: {
   moduleUrl: string;
   protocol: string;
@@ -16,15 +20,7 @@ function handoverUrl(options: {
   releaseHash: string;
   firstName?: string;
 }): URL {
-  const url = new URL(`${options.moduleUrl.replace(/\/$/, "")}/`);
-  url.searchParams.set("embed", "1");
-  url.searchParams.set("view", "participant");
-  url.searchParams.set("start", "1");
-  url.searchParams.set("protocol", options.protocol);
-  url.searchParams.set("sessionId", options.sessionId);
-  url.searchParams.set("releaseHash", options.releaseHash);
-  if (options.firstName) url.searchParams.set("name", options.firstName);
-  return url;
+  return buildHandoverUrl({ ...options, sendsProtocol: true });
 }
 
 const base = {
@@ -63,18 +59,19 @@ describe("what the survey hands to the module", () => {
     expect(handoverUrl({ ...base, moduleUrl: "https://x.example/" }).origin).toBe("https://x.example");
     expect(handoverUrl({ ...base, moduleUrl: "https://x.example" }).origin).toBe("https://x.example");
   });
+
+  it("tells the module a protocol is coming, so it waits for it rather than using its own list", () => {
+    expect(handoverUrl(base).searchParams.get("protocolFromHost")).toBe("1");
+    expect(buildHandoverUrl({ ...base, sendsProtocol: false }).searchParams.has("protocolFromHost")).toBe(false);
+  });
 });
 
-/** The rule the component applies to an arriving message. */
+/** Whether a message would advance the survey. */
 function believes(
   event: { origin: string; data: unknown },
   expected: { origin: string; sessionId: string },
 ): boolean {
-  if (event.origin !== expected.origin) return false;
-  const data = event.data as { type?: string; sessionId?: string } | null;
-  if (data?.type !== "mystory:finished") return false;
-  if (data.sessionId && data.sessionId !== expected.sessionId) return false;
-  return true;
+  return readModuleMessage(event, expected)?.kind === "finished";
 }
 
 describe("which messages advance the survey", () => {
@@ -101,5 +98,35 @@ describe("which messages advance the survey", () => {
     expect(believes({ origin: expected.origin, data: { type: "resize" } }, expected)).toBe(false);
     expect(believes({ origin: expected.origin, data: null }, expected)).toBe(false);
     expect(believes({ origin: expected.origin, data: "mystory:finished" }, expected)).toBe(false);
+  });
+});
+
+describe("the rest of the conversation with the module (D-54)", () => {
+  const expected = { origin: "https://myself-research.web.app", sessionId: "ses_01J" };
+
+  it("hears that the module is ready, which is when the protocol is sent", () => {
+    expect(readModuleMessage({ origin: expected.origin, data: { type: "mystory:ready", sessionId: "ses_01J" } }, expected)).toEqual({
+      kind: "ready",
+    });
+    // From anywhere else, nothing is sent: the protocol goes only to the module.
+    expect(readModuleMessage({ origin: "https://elsewhere.example", data: { type: "mystory:ready" } }, expected)).toBeNull();
+  });
+
+  it("hears that the module refused what it was sent, and why", () => {
+    const refused = { type: "mystory:refused", sessionId: "ses_01J", problem: "stage 'open' has no text" };
+    expect(readModuleMessage({ origin: expected.origin, data: refused }, expected)).toEqual({
+      kind: "refused",
+      problem: "stage 'open' has no text",
+    });
+    expect(readModuleMessage({ origin: expected.origin, data: { type: "mystory:refused" } }, expected)).toEqual({
+      kind: "refused",
+      problem: "no reason given",
+    });
+  });
+
+  it("keeps the reason the module gave for finishing", () => {
+    expect(
+      readModuleMessage({ origin: expected.origin, data: { type: "mystory:finished", reason: "stopped" } }, expected),
+    ).toEqual({ kind: "finished", reason: "stopped" });
   });
 });

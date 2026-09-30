@@ -2101,3 +2101,35 @@ input[type="range"] {
   font-size: 0.9rem;
   color: var(--text);
 }
+
+/* ── Choosing the version, and previewing a draft (D-54) ───────────────── */
+
+/* The line shown while the device settles which version to run, and in a
+   preview while it waits for the draft. Plain, because it is on screen for
+   seconds at most and must never look like an error. */
+.booting {
+  max-width: 36rem;
+  margin: 30vh auto 0;
+  padding: 0 1.75rem;
+  font-family: var(--font-ui);
+  font-size: 1rem;
+  line-height: 1.5;
+  text-align: center;
+  color: var(--muted);
+}
+
+/* On every screen of a preview, so nobody mistakes it for a sitting that
+   counts. Warn-coloured and fixed at the top, and not dismissable. */
+.preview-banner {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  margin: 0;
+  padding: calc(env(safe-area-inset-top, 0px) + 0.5rem) 1.75rem 0.5rem;
+  background: var(--warn);
+  color: #ffffff;
+  font-family: var(--font-ui);
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-align: center;
+}

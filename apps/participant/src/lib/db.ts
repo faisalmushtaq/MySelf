@@ -97,6 +97,34 @@ interface AccessibilityRow extends AccessibilityPreferences {
   updatedAt: string;
 }
 
+/**
+ * A version of the survey this device has run or checked (D-54), kept so a
+ * sitting can always be finished under the version it started with.
+ *
+ * Not sealed: a manifest is the questionnaire, which is public in the app's own
+ * bundle, and holds nothing about anybody. It is checked against its hash again
+ * each time it is read (`versions.ts`).
+ */
+interface ReleaseRow {
+  hash: string;
+  version: string;
+  key: string;
+  json: string;
+  storedAt: string;
+}
+
+/**
+ * Which version this device last found active, and a sitting waiting to be
+ * picked up under its own version after the app reloads into it.
+ */
+interface ReleaseStateRow {
+  id: "active" | "resume";
+  hash: string;
+  /** Only on `resume`: whose sitting to pick up. */
+  code?: string;
+  at: string;
+}
+
 /** How the handover panel names this device. */
 export interface Enrolment {
   deviceId: string;
@@ -136,6 +164,8 @@ class MySelfDb extends Dexie {
   receipts!: EntityTable<SyncReceiptRow, "sessionId">;
   checkpoints!: EntityTable<CheckpointRow, "sessionId">;
   accessibility!: EntityTable<AccessibilityRow, "id">;
+  releases!: EntityTable<ReleaseRow, "hash">;
+  release_state!: EntityTable<ReleaseStateRow, "id">;
 
   constructor() {
     super("myself");
@@ -198,6 +228,22 @@ class MySelfDb extends Dexie {
       checkpoints: "sessionId, at",
       accessibility: "id, updatedAt",
     });
+    /**
+     * Version 5: the versions this device has run (D-54). Two new tables and
+     * nothing else touched, which is the one kind of upgrade Dexie always does.
+     */
+    this.version(5).stores({
+      sessions: "sessionId, participantCode, state, updatedAt",
+      events: "eventId, sessionId, [sessionId+seq]",
+      device: "id",
+      install: "id",
+      sync_state: "sessionId, nextAttemptAt, syncedAt, quarantinedAt",
+      receipts: "sessionId, verifiedAt",
+      checkpoints: "sessionId, at",
+      accessibility: "id, updatedAt",
+      releases: "hash",
+      release_state: "id",
+    });
   }
 }
 
@@ -258,6 +304,59 @@ export async function findResumableSession(participantCode: string, releaseHash:
     .filter((session) => session.state === "in_progress" && session.releaseHash === releaseHash)
     .toArray();
   return rows.sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1))[0];
+}
+
+/**
+ * The most recent unfinished sitting for this code, under whichever version.
+ *
+ * A version published from the dashboard can become active between a child
+ * stopping and coming back. Their sitting is still finished under the version
+ * it was started with (D-54), so the start screen looks under every version.
+ */
+export async function latestResumableSession(participantCode: string): Promise<SessionRow | undefined> {
+  const rows = await db.sessions
+    .where("participantCode")
+    .equals(participantCode)
+    .filter((session) => session.state === "in_progress")
+    .toArray();
+  return rows.sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1))[0];
+}
+
+// ── Versions this device has run (D-54) ──────────────────────────────────────
+
+export async function storedReleaseJson(hash: string): Promise<string | null> {
+  return (await db.releases.get(hash))?.json ?? null;
+}
+
+export async function storeRelease(hash: string, version: string, key: string, json: string): Promise<void> {
+  await db.releases.put({ hash, version, key, json, storedAt: new Date().toISOString() });
+}
+
+export async function lastActiveRelease(): Promise<string | null> {
+  return (await db.release_state.get("active"))?.hash ?? null;
+}
+
+export async function setLastActiveRelease(hash: string): Promise<void> {
+  await db.release_state.put({ id: "active", hash, at: new Date().toISOString() });
+}
+
+/**
+ * Ask the next start-up to open under `hash` and pick up `code`'s sitting.
+ *
+ * Short-lived on purpose: it is read by the reload that follows at once, and a
+ * marker found much later is somebody else's moment, so it is ignored.
+ */
+export async function markResume(hash: string, code: string): Promise<void> {
+  await db.release_state.put({ id: "resume", hash, code, at: new Date().toISOString() });
+}
+
+export const RESUME_MARKER_MS = 2 * 60_000;
+
+export async function takeResume(now = Date.now()): Promise<{ hash: string; code: string } | null> {
+  const row = await db.release_state.get("resume");
+  if (!row?.code) return null;
+  await db.release_state.delete("resume");
+  return now - Date.parse(row.at) < RESUME_MARKER_MS ? { hash: row.hash, code: row.code } : null;
 }
 
 // Serialise writes so rapid successive answers can never race on sequence.

@@ -41,10 +41,37 @@ function deriveSittingsUrl(): string {
   }
 }
 
+/**
+ * Where the live version is read from (D-54).
+ *
+ * The project's own Firestore, derived from the same config as the upload
+ * endpoint, so a build reads its questionnaire from the study it files into
+ * and from nowhere else. No project, and the build runs the release bundled
+ * into it and asks nobody, which is what the public preview should do.
+ * `MYSELF_FIRESTORE_HOST` points a test build at the emulator.
+ */
+function deriveFirebaseProject(): string {
+  try {
+    return (JSON.parse(firebaseConfig || "null") as { projectId?: string } | null)?.projectId ?? "";
+  } catch {
+    return "";
+  }
+}
+
 export default defineConfig({
   base,
   define: {
     __BUILD_STAMP__: JSON.stringify(buildStamp),
+    __FIREBASE_PROJECT__: JSON.stringify(deriveFirebaseProject()),
+    __FIRESTORE_HOST__: JSON.stringify(process.env["MYSELF_FIRESTORE_HOST"] ?? "https://firestore.googleapis.com"),
+    // One study per project, as in the functions and the researcher view.
+    __STUDY__: JSON.stringify(process.env["MYSELF_STUDY"] ?? "ybm"),
+    /**
+     * Extra pages allowed to send this app a draft to preview, beyond the
+     * dashboard's own (lib/preview.ts). For a test build that serves its own
+     * stand-in dashboard; empty in every deployed build.
+     */
+    __PREVIEW_ORIGINS__: JSON.stringify(process.env["MYSELF_PREVIEW_ORIGINS"] ?? ""),
     /**
      * Where the narrative module is served from.
      *

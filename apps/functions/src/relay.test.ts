@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { modelConfig } from "@myself/llm";
 import { protocols } from "@myself/narrative";
+import type { ReleaseManifest } from "@myself/schema";
 import { releasesByHash } from "./releases.js";
 import {
   ALLOWED_ORIGIN,
   allowedOrigins,
   configFor,
+  configForPublished,
   LINK_CALL_CAP,
   LINK_DAYS,
   linkRefusal,
@@ -81,6 +83,33 @@ describe("which model configuration a call runs on", () => {
   it("refuses a key nobody declares, whoever is asking", () => {
     expect(() => configFor("mc.made.up", researcher)).toThrow(/no shipped protocol or published release/);
     expect(() => configFor("mc.made.up", device)).toThrow();
+  });
+
+  it("gives a device what a version published from the dashboard froze, once the relay has read it (D-54)", async () => {
+    // A MyStory run under a dashboard version, perhaps published a moment ago.
+    const shipped = protocols[0]!.models.find((m) => m.provider !== "mock")!;
+    const key = "mc.published.from.the.dashboard.v1";
+    const version = {
+      hash: `sha256:${"d".repeat(64)}`,
+      modelConfigs: { [key]: { ...shipped, key } },
+    } as unknown as ReleaseManifest;
+    expect(() => configFor(key, device)).toThrow(/only run published configurations/);
+
+    // Not in the last read; there on a second, sooner look.
+    const asked: (number | undefined)[] = [];
+    const load = async (maxAgeMs?: number) => {
+      asked.push(maxAgeMs);
+      return maxAgeMs === undefined ? [] : [version];
+    };
+    const config = await configForPublished(key, device, load, 5_000);
+    expect(config.key).toBe(key);
+    expect(config.model).toBe(shipped.model);
+    expect(asked).toEqual([undefined, 5_000]);
+
+    // A key no release froze is still refused to a device, after looking again.
+    await expect(configForPublished("mc.never.frozen", device, async () => [version])).rejects.toThrow(
+      /only run published configurations|no shipped protocol/,
+    );
   });
 
   it("returns the declared parameters, not anything the caller wanted", () => {

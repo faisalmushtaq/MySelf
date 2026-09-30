@@ -86,6 +86,13 @@ export default defineConfig({
     url: `http://127.0.0.1:${PORT}/MySelf/`,
     reuseExistingServer: !process.env["CI"],
     timeout: 180_000,
-    env: { MYSELF_FIREBASE_CONFIG: "", MYSELF_SITTINGS_URL: "", MYSELF_MYSTORY_URL: "" },
+    env: {
+      MYSELF_FIREBASE_CONFIG: "",
+      MYSELF_SITTINGS_URL: "",
+      MYSELF_MYSTORY_URL: "",
+      // The stand-in dashboard `preview.spec.ts` serves, allowed to send this
+      // build a draft to preview. A deployed build allows only the dashboard's own.
+      MYSELF_PREVIEW_ORIGINS: `http://127.0.0.1:${PORT + 10}`,
+    },
   },
 });

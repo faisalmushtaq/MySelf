@@ -6,13 +6,14 @@ import { onRequest } from "firebase-functions/v2/https";
 import { Gateway, OpenAiAdapter, type ModelCall } from "@myself/llm";
 import { paths } from "@myself/firebase";
 import { STUDY, auth, research } from "./apps.js";
+import { MISS_RETRY_MS, knownReleases } from "./releases.js";
 import {
   ALLOWED_ORIGIN,
   CALLS_PER_CALLER_PER_DAY,
   linkRefusal,
   type LinkRecord,
   RelayError,
-  configFor,
+  configForPublished,
   mayCall,
   relayRequest,
   type Caller,
@@ -28,8 +29,9 @@ import {
  *
  * That is not the only thing being held server-side. THE CALLER SENDS A MODEL
  * CONFIG KEY, NOT MODEL PARAMETERS. The provider, the model, the temperature
- * and the token ceiling are read from the frozen release manifest, which is
- * bundled into this function. A tampered page cannot raise the temperature,
+ * and the token ceiling are read from the frozen release manifests: those
+ * bundled into this function, and those published from the dashboard (D-54),
+ * each checked against its hash. A tampered page cannot raise the temperature,
  * point the study at a different model, or ask for ten thousand tokens — and a
  * study's published parameters remain the parameters it actually ran on, which
  * is the whole reason for freezing them.
@@ -381,7 +383,14 @@ export const llmRelay = onRequest(
       }
       const { prompt, modelConfigKey, protocolKey, schema } = parsed.data;
 
-      const config = configFor(modelConfigKey, caller);
+      // Frozen by a bundled release or by a version published from the
+      // dashboard (D-54); either way, only what a release froze.
+      const config = await configForPublished(
+        modelConfigKey,
+        caller,
+        async (maxAgeMs) => (await knownReleases(maxAgeMs === undefined ? {} : { maxAgeMs })).byHash.values(),
+        MISS_RETRY_MS,
+      );
       if (config.provider !== "openai") {
         throw new RelayError(400, "unknown", `this relay serves OpenAI; '${modelConfigKey}' asks for ${config.provider}`);
       }

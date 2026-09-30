@@ -36,7 +36,7 @@ A pnpm workspace: shared code in `packages/`, things that run in `apps/`.
 
 | Path | What it is |
 |---|---|
-| `packages/schema` | The definition layer: Zod schemas for items, response scales, instruments, compositions and release manifests. Everything else is typed from here. |
+| `packages/schema` | The definition layer: Zod schemas for items, response scales, instruments, compositions and release manifests. Everything else is typed from here. `published.ts` describes a version published from the dashboard (D-54): where it lives, its shape, and the hash check every reader makes before using one. |
 | `packages/engine` | The survey runtime, pure and deterministic: the walker (what is visible, where Next and Back land), display logic, answer store, consistency checks, and the postcode and street list parsers. Runs the same on the iPad and in Node. |
 | `packages/library` | The questionnaire content: validated instruments (`instruments.ts`), the study's own modules (`modules.ts`) and response scales (`scales.ts`). |
 | `packages/scoring` | Scoring definitions for the instruments and the executor that applies them. |
@@ -51,7 +51,7 @@ A pnpm workspace: shared code in `packages/`, things that run in `apps/`.
 | `apps/api` | A self-hosted Postgres alternative to `apps/functions` ([12-server-deployment.md](12-server-deployment.md)). Nothing deployed calls it. |
 | `apps/mystory-lab` | A standalone page for running a narrative protocol without the survey, for iterating on prompts. |
 | `releases/` | Frozen release manifests, one per published version, and `releases/assets/`, the dated files a release pins by hash (postcode and street lists). Never edited once committed. |
-| `scripts/` | Builders for the release assets (`build-postcodes.mjs`, `build-streets.mjs`) and the app icons. |
+| `scripts/` | Builders for the release assets (`build-postcodes.mjs`, `build-streets.mjs`), the app icons, and `pull-releases.mjs`, which copies versions published from the dashboard into `releases/` (§3.6). |
 | `e2e/`, `e2e-sync/` | Browser tests (Playwright). `e2e/support/walker.ts` is the survey walk the suites share. |
 | `infra/` | Firebase configuration and security rules (`infra/firebase/`), and the Docker stack for the self-hosted route. |
 | `migration/decisions.yaml` | The decision register, D-01 to D-41. Later decisions are written up in the document they concern (§6). |
@@ -67,12 +67,13 @@ an app.
 
 | Path | What it is |
 |---|---|
-| `src/App.tsx` | The sitting as a state machine (start, running, check-in, pace, review, finished), every write to storage, and the sync timers. The sitting's state lives here. |
+| `src/main.tsx` | Start-up: chooses the version to run (or, with `?preview=1`, waits for a draft from the dashboard), then loads App. |
+| `src/App.tsx` | The sitting as a state machine (start, running, check-in, pace, review, finished), every write to storage, and the sync timers. The sitting's state lives here. It builds its screens from the version `main.tsx` chose (`lib/running.ts`). |
 | `src/screens/` | The screens App shows between questions: start (with the researcher's `HandoverPanel`), check-in, "No rush", finish, and "Let's pause a moment" when a save fails. Presentational only: they take what they show as props and report taps back. |
 | `src/components/SurveyScreen.tsx` | One question per screen: the stem, the control, Next, Back, skipping and the effort prompts. |
 | `src/components/ReviewScreen.tsx` | The list of answers, offered from the finish screen (D-31). |
 | `src/components/controls/` | One file per response type (`SingleChoice.tsx`, `NumericControl.tsx`, `FormFieldsControl.tsx` …). `shared.ts` holds the props they all take; import them from `index.ts`. |
-| `src/lib/` | Everything that is not drawing: `flatten.ts` (manifest to screens), `db.ts` and `crypto.ts` (encrypted storage), `sync.ts` (uploads), `export.ts` (the handover file), `postcodes.ts` and `streets.ts` (release assets), `timing.ts`, `pipes.ts`, `durability.ts`, `space.ts`, `updates.ts`. |
+| `src/lib/` | Everything that is not drawing: `flatten.ts` (manifest to screens), `db.ts` and `crypto.ts` (encrypted storage), `sync.ts` (uploads), `export.ts` (the handover file), `postcodes.ts` and `streets.ts` (release assets), `timing.ts`, `pipes.ts`, `durability.ts`, `space.ts`, `updates.ts`. Which version runs (§3.6): `versions.ts` (the rules), `published.ts` (reading the study's database), `bundled.ts` (the release built in), `choice.ts` and `running.ts`. `preview.ts` is the dashboard's preview mode; `narrative.ts` is what passes between the survey and the MyStory module. |
 
 ---
 
@@ -95,7 +96,8 @@ an app.
    this test fails — and that is its job: the sources no longer describe the
    release devices are running. The answer is a new release (§3.4), never a
    weaker test.
-5. **Shown.** `apps/participant/src/App.tsx` imports one manifest. `lib/flatten.ts`
+5. **Shown.** The participant app runs one manifest at a time: the version the
+   study has made active, or the one bundled into it (§3.6). `lib/flatten.ts`
    turns it into an ordered list of screens; the engine's `Walker` decides what is
    visible and where Next and Back go; `SurveyScreen` renders every control and
    each one draws itself only for its own response type.
@@ -223,8 +225,12 @@ published ones, and a deliberate departure is a recorded decision.
 5. Use it where it matters: the control in `apps/participant/src/components/controls/`,
    the engine if it changes what is visible or valid, and `ingest` if it changes
    what is stored. If the engine's behaviour changes, bump the version in
-   `packages/engine/package.json` and `engineVersion` in
-   `packages/release/publish.mjs` to match, as r8.0.0 and r9.0.0 did.
+   `packages/engine/package.json`, `ENGINE_VERSION` in
+   `packages/engine/src/version.ts` (a test holds the two together) and
+   `engineVersion` in `packages/release/publish.mjs` to match, as r8.0.0 and
+   r9.0.0 did. A device runs a published version only if its engine has the
+   same MAJOR and a MINOR at least the release's (§3.6), so a MINOR bump is
+   what stops an older build running a release that needs the new behaviour.
 
 **A new response type** is the same, further: a new branch of `itemDefinition`
 in `packages/schema/src/item.ts`; if it needs one, a new answer kind in
@@ -258,8 +264,8 @@ practice most releases are MAJOR.
      `publishedAt`, `publishedBy`, `engineVersion` and `decisionRefs` from the
      new manifest's `release` block), the drift test's path, and the header
      comment;
-   - `apps/participant/src/App.tsx` — the `rawManifest` import, and the header
-     comment;
+   - `apps/participant/src/lib/bundled.ts` — the `rawManifest` import, and the
+     header comment;
    - `apps/participant/src/flatten.test.ts` — `currentManifest`;
    - `apps/functions/src/releases.ts` — import it and add it to `published`.
      Never remove an older one: sittings collected under it are read through it.
@@ -297,7 +303,97 @@ West Yorkshire postcode list (D-52) and street list (D-53). The pattern:
 5. **Parse it in the engine** (`packages/engine/src/postcodes.ts` and
    `streets.ts` are the examples), with tests against the committed file.
 
-The asset reaches participants only with a release that pins it.
+The asset reaches participants only with a release that pins it, on a build that
+carries it. A version published from the dashboard (§3.6) can use only the assets
+the deployed app already carries; one naming an asset it does not carry runs
+without that check, as an unknown asset always has.
+
+### 3.6 Versions published from the dashboard (D-54)
+
+The dashboard's survey editor publishes a version **straight to the live
+survey**, with no code change and no deploy. It builds the version with this
+repository's own `buildRelease`, so it is a release like any other: a frozen,
+hashed manifest. The design is in [06-data-model-identifiers-versioning.md](06-data-model-identifiers-versioning.md)
+("Versions published from the dashboard"); the dashboard's side is its docs/11.
+
+**Where it lives.** The dashboard's functions write two documents to this
+study's database with the Admin SDK:
+
+- `studies/{study}/releases/{hash}`: `{ hash, version, key, study, publishedAt,
+  publishedBy, engineVersion, manifestJson, source, notes? }`, where
+  `manifestJson` is the whole manifest as JSON;
+- `studies/{study}/config/activeRelease`: `{ hash, version, key, activatedAt,
+  activatedBy }`, the version new sittings use.
+
+Anyone may read both and no client may write either (`infra/firebase/firestore.rules`).
+The shape, the paths and the check are in `packages/schema/src/published.ts`.
+
+**How an iPad picks its version** (`apps/participant/src/lib/versions.ts`):
+
+1. A sitting is finished under the version it started with. If a participant's
+   code has an unfinished sitting under another version, the start screen reloads
+   into that version and carries on (`reopenUnderItsVersion` in `App.tsx`).
+2. Otherwise it reads `activeRelease`, waiting at most 4 s. A version it has not
+   stored is fetched (at most 8 s more) and used only if its manifest hashes to
+   the hash it was published under, the schema accepts it, the app's engine can
+   run it (the same MAJOR, and a MINOR no newer than `ENGINE_VERSION`), and the
+   app can draw it. It is then stored in IndexedDB.
+3. If anything fails, or there is no network, it runs the last active version it
+   stored, and failing that the one bundled into the build (`lib/bundled.ts`).
+
+A build with no Firebase project, such as the preview channel, asks nobody and
+runs the bundled release. After every handover a device asks again, and reloads
+onto a new version at the start screen, never in the middle of a sitting. The
+build line on the start screen says which version is running and where it came
+from ("live", "live when last checked", "built in", "finishing a sitting"), and
+why the live one is not running when that is so. Tap it five times, as ever, for
+the staff panel.
+
+**Once the study has made a version active, it decides what devices run.** A
+release cut here with `publish.mjs` and deployed is the bundled fallback; to make
+it the live version on devices, make it active in the dashboard's Versions page.
+
+**Everything that reads sittings knows the published versions too.** The
+functions read them from the database, cached for a minute and checked against
+their hash (`knownReleases` and `releaseFor` in `apps/functions/src/releases.ts`),
+for identity capture, the export, and the model configs the MyStory relay allows
+a device. The researcher view reads them on signing in and before every pull
+(`addPublishedReleases` in `apps/researcher/src/lib/releases.ts`). A document
+that does not match its hash is reported and never used.
+
+**MyStory.** A version that ends with MyStory runs the questions, then MyStory,
+then the finish screen, then the handover. The survey sends the embedded module
+the protocol frozen into the version (`myself:narrative-protocol`, after the
+module says `mystory:ready`), and the module runs that protocol or refuses to
+start; it never falls back to its own copy. The messages are described in
+`apps/participant/src/lib/narrative.ts` and `apps/mystory-lab/web/host-protocol.ts`.
+
+**Preview.** The editor opens the survey with `?preview=1` in an iframe. The app
+says `myself:preview-ready` and runs the draft the dashboard answers with
+(`myself:preview-manifest`), from the dashboard's own origins only
+(`lib/preview.ts`). Nothing is stored or sent, MyStory's place is shown rather
+than run, and a banner says "Preview — nothing is saved".
+
+**Bringing published versions into git.** `scripts/pull-releases.mjs` copies
+every published version into `releases/`, named as `publish.mjs` names them, so
+the repository keeps the whole history and `published.test.ts` checks them like
+the rest:
+
+```sh
+pnpm -r build                                   # the script reads @myself/schema's build
+export GOOGLE_APPLICATION_CREDENTIALS=<service-account.json>   # or: gcloud auth application-default login
+node scripts/pull-releases.mjs --dry-run        # list what is published, and what would be written
+node scripts/pull-releases.mjs                  # write the new ones
+```
+
+`--project` and `--study` default to `myself-research` and `ybm`. It refuses a
+manifest that does not hash to the hash it is filed under, and never overwrites
+a file: the same hash is left alone, and a different manifest under a version
+number already committed is refused. Either refusal exits non-zero. Then, as for
+any release (§3.4): add each new file to `published` in
+`apps/functions/src/releases.ts` (its test fails until you do), run the tests,
+and commit. Pulling is for the record; devices and the functions already have
+the versions from the database.
 
 ---
 
@@ -308,13 +404,15 @@ The asset reaches participants only with a release that pins it.
 | Unit, every package and app | `pnpm -r build && pnpm test` | nothing else |
 | One package | `pnpm --filter @myself/participant test` | a build of its dependencies |
 | Types | `pnpm -r typecheck` | |
-| Browser: the survey, offline, resumed, handed over, and the dataset against what was tapped | `pnpm test:e2e` | Playwright's browsers |
-| Functions against a real Firestore | `pnpm --filter @myself/functions test:integration` | Java 17+ |
-| The whole chain: browser → HTTP → Firestore | `pnpm test:e2e:sync` | Java 17+, Playwright's Chromium |
+| Browser: the survey, offline, resumed, handed over, the dataset against what was tapped, and a draft previewed from the dashboard | `pnpm test:e2e` | Playwright's browsers |
+| Functions against a real Firestore, including versions published from the dashboard | `pnpm --filter @myself/functions test:integration` | Java 17+ |
+| The whole chain: browser → HTTP → Firestore, and a version made active in the database reaching the iPad (`e2e-sync/releases.spec.ts`) | `pnpm test:e2e:sync` | Java 17+, Playwright's Chromium |
 | Firestore security rules | `cd infra/firebase/test && npm install && npm test` | Java 17+ |
 
 The three emulator suites start the Firestore emulator on port 8181 themselves,
-downloading it on first run; run them one at a time.
+downloading it on first run; run them one at a time. The survey suite also
+serves a stand-in dashboard on port 4183 (its own port plus ten) for the preview
+test.
 
 **Browser tests on a machine without Playwright's own browsers** — a sandbox, or
 anywhere `playwright install` is not allowed — point at a Chromium you have and

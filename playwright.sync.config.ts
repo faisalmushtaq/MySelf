@@ -16,6 +16,8 @@ import { defineConfig, devices } from "@playwright/test";
  */
 
 const PORT = 4174;
+/** The MyStory module, served beside the survey as it is in the field (`releases.spec.ts`). */
+const MYSTORY_PORT = 4175;
 const chromiumExecutable = process.env["PLAYWRIGHT_CHROMIUM_EXECUTABLE"];
 
 export default defineConfig({
@@ -41,23 +43,49 @@ export default defineConfig({
       },
     },
   ],
-  webServer: {
-    // Built with the study endpoint baked in, the same way a real deployment bakes in
-    // the project's — the app has no way to be pointed at one at runtime, deliberately.
-    command:
-      "pnpm --filter @myself/participant build && pnpm --filter @myself/participant preview --port 4174 --strictPort --host localhost",
-    url: `http://localhost:${PORT}/MySelf/`,
-    reuseExistingServer: false,
-    timeout: 180_000,
-    env: {
-      MYSELF_SITTINGS_URL: "http://127.0.0.1:4319/saveSitting",
-      MYSELF_FIREBASE_CONFIG: "",
-      MYSELF_MYSTORY_URL: "",
-      // Five seconds rather than two minutes, so the real checkpoint timer is exercised
-      // without a test waiting on production cadence. Not lower: at two seconds a walk
-      // of several minutes produced dozens of uploads, which made the suite slow and
-      // told it nothing extra.
-      MYSELF_CHECKPOINT_SECONDS: "5",
+  webServer: [
+    {
+      // Built with the study endpoint baked in, the same way a real deployment bakes in
+      // the project's — the app has no way to be pointed at one at runtime, deliberately.
+      command:
+        "pnpm --filter @myself/participant build && pnpm --filter @myself/participant preview --port 4174 --strictPort --host localhost",
+      url: `http://localhost:${PORT}/MySelf/`,
+      reuseExistingServer: false,
+      timeout: 180_000,
+      env: {
+        MYSELF_SITTINGS_URL: "http://127.0.0.1:4319/saveSitting",
+        /**
+         * The live version is read from the emulator (D-54, `releases.spec.ts`):
+         * the project the emulator runs as, and the emulator's own address, which
+         * `emulators:exec` hands over in FIRESTORE_EMULATOR_HOST. With nothing
+         * published there, as in the other specs, the app runs its bundled release.
+         */
+        MYSELF_FIREBASE_CONFIG: JSON.stringify({ projectId: "demo-myself" }),
+        MYSELF_FIRESTORE_HOST: `http://${process.env["FIRESTORE_EMULATOR_HOST"] ?? "127.0.0.1:8181"}`,
+        // The module below. No release fielded so far places MyStory, so only a
+        // version published in `releases.spec.ts` ever opens it.
+        MYSELF_MYSTORY_URL: `http://localhost:${MYSTORY_PORT}/`,
+        // Five seconds rather than two minutes, so the real checkpoint timer is exercised
+        // without a test waiting on production cadence. Not lower: at two seconds a walk
+        // of several minutes produced dozens of uploads, which made the suite slow and
+        // told it nothing extra.
+        MYSELF_CHECKPOINT_SECONDS: "5",
+      },
     },
-  },
+    {
+      /**
+       * The MyStory module, built as for Hosting (served from the root) and given no
+       * model: no relay, no local server. So it never talks to anybody, and what is
+       * exercised is the exchange with the survey — which protocol it runs, and that
+       * it refuses one it should not run (D-54). Its `/api` proxy logs
+       * ECONNREFUSED for port 4300 when the page looks for a local server: there
+       * is none, on purpose.
+       */
+      command: `pnpm --filter @myself/mystory-lab build && pnpm --filter @myself/mystory-lab preview --port ${MYSTORY_PORT} --strictPort --host localhost`,
+      url: `http://localhost:${MYSTORY_PORT}/`,
+      reuseExistingServer: false,
+      timeout: 180_000,
+      env: { MYSELF_MYSTORY_BASE: "/", MYSELF_FIREBASE_CONFIG: "", MYSELF_RELAY_URL: "" },
+    },
+  ],
 });
