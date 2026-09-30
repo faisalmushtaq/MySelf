@@ -415,6 +415,12 @@ export default function App() {
     try {
       const existing = await findResumableSession(trimmed, manifest.hash ?? "");
       if (!existing && !preview && (await reopenUnderItsVersion(trimmed))) return;
+      if (!existing && release.origin === "resumed") {
+        // This version was opened only to finish a sitting. A new one starts
+        // under the version the study has made active, which a fresh start picks.
+        location.reload();
+        return;
+      }
       const store = new AnswerStore();
       let session: SessionRow;
       if (existing) {
