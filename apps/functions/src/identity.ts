@@ -5,7 +5,7 @@ import { FieldValue, type Firestore } from "firebase-admin/firestore";
 import { joinSession, paths, type SessionDoc } from "@myself/firebase";
 import { ingest, parseHomeAddress, type HomeAddress } from "@myself/store";
 import { STUDY, identity, research } from "./apps.js";
-import { releasesByHash } from "./releases.js";
+import { releaseFor } from "./releases.js";
 
 /**
  * The identity side: names in, names out, both under control.
@@ -139,7 +139,9 @@ export const captureIdentity = onDocumentWritten("studies/{study}/sessions/{sess
   const after = event.data?.after?.data() as SessionDoc | undefined;
   if (!after) return;
 
-  const manifest = releasesByHash.get(after.releaseHash);
+  // Bundled, or published from the dashboard (D-54): looked for in the
+  // database too, since a version can go live minutes before its first sitting.
+  const manifest = await releaseFor(after.releaseHash);
   if (!manifest) {
     // Better to leave the identity record absent and say so than to read the
     // answers through the wrong instrument and file a name against the wrong

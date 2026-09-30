@@ -1,5 +1,6 @@
 import { modelConfig, type ModelConfig } from "@myself/llm";
 import { protocols } from "@myself/narrative";
+import type { ReleaseManifest } from "@myself/schema";
 import { z } from "zod";
 import { releasesByHash } from "./releases.js";
 
@@ -86,12 +87,28 @@ export type RelayRequest = z.infer<typeof relayRequest>;
  * nobody approved.
  */
 export const releasedConfigs = new Map<string, ModelConfig>();
-for (const release of releasesByHash.values()) {
-  for (const [key, raw] of Object.entries(release.modelConfigs ?? {})) {
-    const parsed = modelConfig.safeParse(raw);
-    if (parsed.success) releasedConfigs.set(key, parsed.data);
+const admitted = new Set<string>();
+
+/**
+ * Add the model configs these releases froze to the ones a device may run.
+ *
+ * The bundled releases are admitted as this module loads. A version published
+ * from the dashboard (D-54) is admitted when the relay has read it from the
+ * database (`knownReleases`), which has already checked it against its hash:
+ * a MyStory run under it then gets exactly the parameters it published.
+ */
+export function admitReleasedConfigs(releases: Iterable<ReleaseManifest>): void {
+  for (const release of releases) {
+    const hash = release.hash ?? "";
+    if (admitted.has(hash)) continue;
+    admitted.add(hash);
+    for (const [key, raw] of Object.entries(release.modelConfigs ?? {})) {
+      const parsed = modelConfig.safeParse(raw);
+      if (parsed.success) releasedConfigs.set(key, parsed.data);
+    }
   }
 }
+admitReleasedConfigs(releasesByHash.values());
 
 /**
  * Configs a shipped protocol declares but no release has frozen yet.
@@ -110,6 +127,25 @@ for (const protocol of protocols) {
   for (const config of protocol.models) {
     if (!releasedConfigs.has(config.key)) draftConfigs.set(config.key, config as ModelConfig);
   }
+}
+
+/**
+ * `configFor`, after admitting the versions published from the dashboard.
+ *
+ * `load` returns every known release, read within `maxAgeMs` (the relay passes
+ * `knownReleases`; this file stays free of Firebase). A key no release has
+ * frozen sends it back once, sooner, for a version published in the last
+ * minute, before a device is refused.
+ */
+export async function configForPublished(
+  key: string,
+  caller: Caller,
+  load: (maxAgeMs?: number) => Promise<Iterable<ReleaseManifest>>,
+  missRetryMs = 5_000,
+): Promise<ModelConfig> {
+  admitReleasedConfigs(await load());
+  if (!releasedConfigs.has(key)) admitReleasedConfigs(await load(missRetryMs));
+  return configFor(key, caller);
 }
 
 export function configFor(key: string, caller: Caller): ModelConfig {
