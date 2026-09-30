@@ -169,19 +169,15 @@ published ones, and a deliberate departure is a recorded decision.
 2. **Keep every published manifest readable.** The researcher view and the
    functions read each sitting through the manifest it was collected under, and
    both quietly skip a manifest that no longer parses — its sittings become
-   unreadable. So a new field must be `.optional()` or have a `.default()`. From
-   r5.0.0 on, every committed manifest parses today (r1–r4 and
-   `preview.manifest.json` predate fielding and do not). No test enforces this;
-   check it after a schema change:
-
-   ```sh
-   pnpm --filter @myself/schema build
-   cd packages/schema && node --input-type=module -e '
-     import { readdirSync, readFileSync } from "node:fs";
-     import { releaseManifest } from "./dist/index.js";
-     for (const f of readdirSync("../../releases").filter((f) => f.endsWith(".manifest.json")))
-       console.log(releaseManifest.safeParse(JSON.parse(readFileSync("../../releases/" + f, "utf8"))).success ? "ok  " : "FAIL", f);'
-   ```
+   unreadable. So a new field must be `.optional()` or have a `.default()`.
+   `packages/release/src/published.test.ts` enforces this. It checks that every
+   fielded release (r5.0.0 on) still parses, still carries its hash and was
+   never edited. r1–r4 and `preview.manifest.json` predate fielding and are
+   exempt. Two more tests check that each loader actually keeps every fielded
+   release: `apps/functions/src/releases.test.ts` and
+   `apps/researcher/src/releases.test.ts`. The schema is read from its build,
+   so run `pnpm --filter @myself/schema build` (or `pnpm -r build`) before the
+   tests after a schema change.
 
 3. The builder parses every record before hashing it, so a `.default()` is
    filled in on each one, the frozen content changes, and the drift test fails:
@@ -233,7 +229,8 @@ practice most releases are MAJOR.
      comment;
    - `apps/participant/src/flatten.test.ts` — `currentManifest`;
    - `apps/functions/src/releases.ts` — import it and add it to `published`.
-     Never remove an older one: sittings collected under it are read through it;
+     Never remove an older one: sittings collected under it are read through it.
+     `releases.test.ts` beside it fails until you do;
    - `e2e/accuracy.spec.ts` — `MANIFEST`.
 
    The researcher view loads every file in `releases/` by itself.
