@@ -48,6 +48,10 @@ export interface SurveyScreenProps {
         sessionId: string;
         releaseHash: string;
         firstName?: string | undefined;
+        /** The release's frozen protocols, by `key@version`; the module is sent its own (D-54). */
+        protocols?: Record<string, unknown> | undefined;
+        /** A preview of a draft, which never starts the module. */
+        preview?: boolean | undefined;
       }
     | undefined;
   scales: Map<string, ResponseScale>;
@@ -159,6 +163,29 @@ export function SurveyScreen(props: SurveyScreenProps) {
    */
   if (unit.narrative) {
     const handover = props.narrative;
+    // Whether anything follows. When MyStory is the last position, the finish
+    // screen comes next, and the words on the way out should say so.
+    const last = walker.next(index) === null;
+    if (handover?.preview) {
+      // A preview stores nothing and sends nothing, and the module would do
+      // both: a run filed against a sitting that does not exist, and model
+      // calls on the study's account. So its place is shown, not run.
+      return (
+        <div className="screen survey">
+          <div className="narrative-step">
+            <div className="narrative-after">
+              <p>
+                MyStory would start here ({unit.narrative.protocol}@{unit.narrative.version}). A preview does not run
+                it, so nothing is sent to the model or saved.
+              </p>
+              <button type="button" className="primary" onClick={() => props.onAdvance(index, "next")}>
+                {last ? "Finish" : "Keep going"}
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
     if (!handover?.moduleUrl) {
       // A build with no module configured. Said plainly rather than shown as
       // an empty rectangle, and never a dead end: the sitting must be
@@ -169,7 +196,7 @@ export function SurveyScreen(props: SurveyScreenProps) {
             <div className="narrative-after">
               <p>This part of the study is not available on this device.</p>
               <button type="button" className="primary" onClick={() => props.onAdvance(index, "skip")}>
-                Keep going
+                {last ? "Finish" : "Keep going"}
               </button>
             </div>
           </div>
@@ -182,6 +209,8 @@ export function SurveyScreen(props: SurveyScreenProps) {
           moduleUrl={handover.moduleUrl}
           protocol={unit.narrative.protocol}
           protocolVersion={unit.narrative.version}
+          definition={handover.protocols?.[`${unit.narrative.protocol}@${unit.narrative.version}`]}
+          last={last}
           sessionId={handover.sessionId}
           releaseHash={handover.releaseHash}
           firstName={handover.firstName}
