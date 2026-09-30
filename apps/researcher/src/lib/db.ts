@@ -43,6 +43,30 @@ export interface StoredSession extends DeviceSession {
    * — and for handover files written before the format carried it.
    */
   deviceId?: string;
+  /**
+   * When the study last received this sitting (server clock), set by a pull.
+   *
+   * Present means the study's database holds the sitting, so the dashboard sees it too;
+   * absent means it has only ever arrived here in a file. It also decides whether an
+   * unfinished sitting is in progress or abandoned, exactly as the dashboard decides it.
+   */
+  receivedAt?: string;
+}
+
+/**
+ * What the last pull from the study found.
+ *
+ * Kept because the pull's own report scrolls away, and the Overview has to say, every
+ * time it is opened, how old the data are and how many sittings the study was holding
+ * back — quarantined, or too torn to reassemble — that are therefore not counted here.
+ */
+export interface PullRecord {
+  id: "last";
+  at: string;
+  /** Sittings the study returned and this browser now holds from it. */
+  sittings: number;
+  quarantined: number;
+  unreadable: string[];
 }
 
 /**
@@ -144,6 +168,7 @@ class ResearcherDb extends Dexie {
   relationships!: EntityTable<StoredRelationship, "id">;
   identityAccess!: EntityTable<AccessRecord, "id">;
   vault!: EntityTable<VaultRecord, "id">;
+  pulls!: EntityTable<PullRecord, "id">;
 
   constructor() {
     super("myself-researcher");
@@ -199,6 +224,17 @@ class ResearcherDb extends Dexie {
         await tx.table("people").clear();
         await tx.table("relationships").clear();
       });
+    /** Version 5: the last pull is remembered, so the Overview can say how fresh it is. */
+    this.version(5).stores({
+      sessions: "sessionId, startedAt, studyCode, importedAt",
+      people: "participantCode, study",
+      corrections: "id, wrongCode, withdrawnAt",
+      assignments: "sessionId, participantCode",
+      relationships: "id",
+      identityAccess: "id, at",
+      vault: "id",
+      pulls: "id",
+    });
   }
 }
 
@@ -318,7 +354,10 @@ export interface MergeReport {
  * A local copy is never replaced by a shorter one — that would be the truncation
  * the write path refuses, arriving by the other road.
  */
-export async function mergeFromStudy(sessions: DeviceSession[], source: string): Promise<MergeReport> {
+export async function mergeFromStudy(
+  sessions: (DeviceSession & { receivedAt?: string })[],
+  source: string,
+): Promise<MergeReport> {
   const importedAt = new Date().toISOString();
   const report: MergeReport = { added: 0, superseded: 0, unchanged: 0 };
 
@@ -334,10 +373,38 @@ export async function mergeFromStudy(sessions: DeviceSession[], source: string):
       report.superseded += 1;
       continue;
     }
+    // The same log, but the study may have heard from the device since — and a copy
+    // that arrived by file first learns here that the study holds it too.
+    if (incoming.receivedAt && incoming.receivedAt !== existing.receivedAt) {
+      await db.sessions.update(incoming.sessionId, { receivedAt: incoming.receivedAt });
+    }
     report.unchanged += 1;
   }
   return report;
 }
+
+export async function recordPull(record: Omit<PullRecord, "id">): Promise<void> {
+  await db.pulls.put({ id: "last", ...record });
+}
+
+export async function lastPull(): Promise<PullRecord | null> {
+  return (await db.pulls.get("last")) ?? null;
+}
+
+export type SittingSource = "study" | "file" | "demonstration";
+
+/**
+ * Where a stored sitting came from, as far as the dashboard is concerned: a sitting the
+ * study's database holds is one the dashboard counts too; one that only ever arrived
+ * here in a file is not, and a count that includes it will not match the dashboard's.
+ */
+export function sourceOf(sitting: Pick<StoredSession, "source" | "receivedAt">): SittingSource {
+  if (sitting.source === DEMONSTRATION) return "demonstration";
+  return sitting.source === "study" || sitting.receivedAt !== undefined ? "study" : "file";
+}
+
+/** The source recorded against made-up sittings. */
+export const DEMONSTRATION = "demonstration data";
 
 /**
  * Should the copy just pulled replace the copy already here?
@@ -355,6 +422,8 @@ export function supersedes(incoming: { events: unknown[] }, existing: { events: 
 /** Remove everything. Used for clearing demonstration data before fieldwork. */
 export async function clearAll(): Promise<void> {
   await db.sessions.clear();
+  // The record of the last pull describes sittings that are no longer here.
+  await db.pulls.clear();
 }
 
 export async function clearSource(source: string): Promise<number> {

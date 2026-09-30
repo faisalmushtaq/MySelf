@@ -41,7 +41,7 @@ A pnpm workspace: shared code in `packages/`, things that run in `apps/`.
 | `packages/library` | The questionnaire content: validated instruments (`instruments.ts`), the study's own modules (`modules.ts`) and response scales (`scales.ts`). |
 | `packages/scoring` | Scoring definitions for the instruments and the executor that applies them. |
 | `packages/release` | The release builder and publish gate: resolves the composition (`compose-ybm.ts`) against the library, checks it, and freezes it into a content-hashed manifest. `publish.mjs` writes one to `releases/`. |
-| `packages/store` | Turning a device's event log into a dataset (`ingest.ts`), the identity rules (`identity.ts`), BIDS export, and the encrypted handover envelope. |
+| `packages/store` | Turning a device's event log into a dataset (`ingest.ts`), the identity rules (`identity.ts`), BIDS export, the encrypted handover envelope, and the rules for counting sittings that the researcher view and the research dashboard share (`completeness.ts`, `counting.ts`; §2.1). |
 | `packages/firebase` | How a study is laid out in Firestore, and the rule that a stored sitting is never overwritten. |
 | `packages/narrative` | MyStory, the micro-narrative module: protocol format, runner, prompts, and a `check` command for protocol files in `protocols/`. |
 | `packages/llm` | The gateway to a language model, with mock, OpenAI and relay adapters. |
@@ -118,6 +118,39 @@ an app.
    (`apps/functions/src/identity.ts`) files it in a separate project
    ([13-firebase.md](13-firebase.md) §1). Marking an item is a data-handling
    decision, which is why it is frozen into the release.
+10. **Counted.** The researcher view's Overview counts the sittings by the rules
+    in §2.1, which the research dashboard counts by too.
+
+### 2.1 How sittings are counted
+
+The researcher view and the research dashboard (faisalmushtaq/MySelf-Dashboard)
+read the same sittings from `studies/{study}/sessions`, and a number both show
+under one label is the same number. That holds because the rules are written
+once, in `packages/store/src/counting.ts` and `packages/store/src/completeness.ts`,
+and the dashboard vendors both files verbatim (its `scripts/vendor-survey.mjs`);
+its `scripts/check-vendored.mjs` fails its CI when the copies differ. Its
+`packages/core/src/survey/crossapp.test.ts` feeds one study through the
+researcher view's code and its own and requires every shared figure to match.
+
+| Rule | What it means |
+|---|---|
+| Left out, and counted | Quarantined sittings (two copies that contradict each other) and unreadable ones (a spilled log missing a chunk). The pull leaves them out (`assemblePull`) and the Overview says how many the study held back at the last pull. |
+| Test sittings | Study codes matching `^TST` or `^ZZZ`, in any case: the dashboard's default patterns. Left out unless "Include test sittings" is ticked; the Overview names the patterns. Demonstration data (sites beginning `DEMO`) is not test data. |
+| Sittings | Every other sitting, whatever its state — including one with no name or date of birth, which ingest cannot file under a participant. Those are counted and reported as "not linked to a participant", never dropped. |
+| Lifecycle | `lifecycleOf`: not started (nothing answered, skipped or declined); in progress or abandoned (not finished; abandoned once the study has not heard from it for 24 hours, by the server's `receivedAt` where there is one); incomplete (reached the end, a required answer missing); complete. |
+| Reached the end | Complete + incomplete, out of the sittings that have finished or been abandoned. |
+| All required answered | Complete — every required question that applied was answered or declined, judged against the sitting's own release by `assessSitting` (rule set `completeness@1`; required means `hard` and `soft`) — out of the same denominator. |
+| Participants, Followed up, Median length, Skipped, Answered very fast | From the linked sittings only (`headlineFigures`). Median length is device-timed, over linked sittings that reached the end; the dashboard's "Median completion time" is a different measure with a different name. |
+
+The counting defaults (`DEFAULT_COUNTING_RULES`) are the dashboard's policy
+defaults. An administrator can change the dashboard's policy; the researcher
+view cannot read it, so it counts with the defaults and says which it used.
+The two tools can still differ in the sittings they hold: the researcher view
+counts what was last pulled into that browser plus files imported there by
+hand, and says when it last pulled and how many sittings came from where.
+
+To change a rule, change it here, re-vendor it into the dashboard and run its
+tests, and update its `docs/03-completeness.md`, which is the prose definition.
 
 ---
 

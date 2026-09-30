@@ -1,4 +1,4 @@
-import type { DatasetSummary } from "@myself/store";
+import { rateOf, type CountResult } from "@myself/store";
 import { byWave } from "../lib/longitudinal.js";
 import type { Row } from "../lib/filter.js";
 
@@ -8,35 +8,78 @@ import type { Row } from "../lib/filter.js";
  *
  * Rates are shown with their denominators. "3% too fast" means nothing on its
  * own; "3% of 4,102 answers" is a fact somebody can act on.
+ *
+ * THE SAME FIGURES AS THE RESEARCH DASHBOARD. Every card is computed by
+ * `countSittings` (@myself/store counting.ts), which the dashboard vendors, and the
+ * dashboard's Overview shows these cards under these labels, computed by that code
+ * over the same sittings. Where the dashboard has a measure of its own — "Median
+ * completion time" beside "Median length" — the label differs and says what it counts.
  */
 
-const pct = (value: number): string => `${(value * 100).toFixed(1)}%`;
+const pct = (value: number | null): string => (value === null ? "—" : `${(value * 100).toFixed(1)}%`);
 const num = (value: number | null, dp = 1): string => (value === null ? "—" : value.toFixed(dp));
+const int = (value: number): string => value.toLocaleString("en-GB");
+const plural = (n: number, noun: string): string => `${int(n)} ${noun}${n === 1 ? "" : "s"}`;
 
-export function Summary({ summary, rows }: { summary: DatasetSummary; rows: Row[] }) {
+export function Summary({ counted, rows }: { counted: CountResult; rows: Row[] }) {
+  const f = counted.figures;
+  const summary = counted.summary;
   const scoreKeys = summary.scores.map((s) => s.key);
   const trajectories = scoreKeys
     .map((key) => ({ key, waves: byWave(rows, key) }))
     .filter((t) => t.waves.length > 1);
+  const judged = `of ${plural(f.finishedOrAbandoned, "finished or abandoned sitting")}`;
 
   return (
     <section className="summary">
       <div className="cards">
-        <Card label="Participants" value={String(summary.participants)} note={`${summary.sessions} sittings`} />
+        <Card
+          label="Sittings"
+          value={int(f.sittings)}
+          note={f.notLinked === 0 ? "all linked to a participant" : `${int(f.notLinked)} not linked to a participant`}
+        />
+        <Card label="Participants" value={int(f.participants)} note={`from ${plural(f.linked, "linked sitting")}`} />
         <Card
           label="Followed up"
-          value={String(summary.returning)}
+          value={int(f.followedUp)}
           note={
-            summary.participants === 0
+            f.participants === 0
               ? "no data yet"
-              : `${pct(summary.returning / summary.participants)} of participants · up to wave ${summary.maxWave}`
+              : `${pct(f.followedUp / f.participants)} of participants · up to wave ${f.maxWave}`
           }
         />
-        <Card label="Completed" value={pct(summary.completionRate)} note={`${summary.completeSessions} of ${summary.sessions} sittings`} />
-        <Card label="Median length" value={`${num(summary.durationMinutes.median)} min`} note={`range ${num(summary.durationMinutes.min)}–${num(summary.durationMinutes.max)}`} />
-        <Card label="Skipped" value={pct(summary.skipRate)} note="of items presented" />
-        <Card label="Answered very fast" value={pct(summary.tooFastRate)} note="of answers given" />
+        <Card
+          label="Reached the end"
+          value={pct(rateOf(f.reachedEnd, f.finishedOrAbandoned))}
+          note={`${int(f.reachedEnd)} ${judged}`}
+        />
+        <Card
+          label="All required answered"
+          value={pct(rateOf(f.allRequiredAnswered, f.finishedOrAbandoned))}
+          note={`${int(f.allRequiredAnswered)} ${judged}`}
+        />
+        <Card
+          label="Median length"
+          value={`${num(f.durationMinutes.median)} min`}
+          note={
+            f.durationMinutes.n === 0
+              ? "no sitting has reached the end"
+              : `${plural(f.durationMinutes.n, "sitting")} timed on the device · range ${num(f.durationMinutes.min)}–${num(f.durationMinutes.max)}`
+          }
+        />
+        <Card label="Skipped" value={pct(f.skipRate)} note={`of ${int(f.answered + f.skipped)} questions answered, skipped or declined`} />
+        <Card label="Answered very fast" value={pct(f.tooFastRate)} note={`of ${plural(f.answered, "answer")} given`} />
       </div>
+      <p className="note definitions">
+        Both completion measures are out of the sittings that have finished or been abandoned (no word for{" "}
+        {counted.rules.abandonAfterHours} hours).{" "}
+        {f.byLifecycle.in_progress + f.byLifecycle.not_started === 0
+          ? "None is still in progress."
+          : `${plural(f.byLifecycle.in_progress, "sitting")} still in progress and ${int(f.byLifecycle.not_started)} not started are in neither.`}{" "}
+        &ldquo;All required answered&rdquo; means every required question that applied was answered or declined;
+        required means {counted.rules.requiredLevels.join(" and ")} questions. Participants, length, skips and speed
+        come from the linked sittings only.
+      </p>
 
       {summary.sites.length > 0 && (
         <div className="panel">

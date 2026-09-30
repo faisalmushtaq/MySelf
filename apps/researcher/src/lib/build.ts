@@ -1,5 +1,14 @@
-import { emptyDataset, ingest, type Dataset, type DeviceSession, type IdentityRow } from "@myself/store";
-import { latestRelease, releasesByHash } from "./releases.js";
+import {
+  countSittings,
+  DEFAULT_COUNTING_RULES,
+  emptyDataset,
+  ingest,
+  type CountResult,
+  type Dataset,
+  type DeviceSession,
+  type IdentityRow,
+} from "@myself/store";
+import { latestRelease, manifestsByHash, releasesByHash } from "./releases.js";
 
 /**
  * Turning everything stored into one dataset.
@@ -82,4 +91,29 @@ export function buildDataset(
   }
 
   return { dataset, identity, rejected, collisions, warnings };
+}
+
+/** The rules this view counts by: the research dashboard's defaults. */
+export const COUNTING_RULES = DEFAULT_COUNTING_RULES;
+
+/**
+ * Count what is held, by the rules the research dashboard counts by.
+ *
+ * The rules are @myself/store's `countSittings`, which the dashboard vendors and checks
+ * against its own figures, so a number shown here and there under the same label is the
+ * same number for the same sittings. Each sitting is judged against its OWN release: one
+ * collected under a release this build does not know is counted, but cannot be called
+ * incomplete — unlike `buildDataset` above, which reads it through the latest release so
+ * its answers can at least be seen.
+ *
+ * `dataset` is `buildDataset`'s, over every stored sitting: test sittings are ingested
+ * too, so leaving them out never renumbers anybody's waves.
+ */
+export function countStudy(
+  sessions: readonly (DeviceSession & { receivedAt?: string })[],
+  dataset: Dataset,
+  includeTest: boolean,
+  now = new Date(),
+): CountResult {
+  return countSittings({ sittings: sessions, dataset, manifests: manifestsByHash, rules: COUNTING_RULES, includeTest, now });
 }
