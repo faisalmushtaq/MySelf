@@ -575,6 +575,44 @@ dashboard exports all of that as CSV or JSON.
 - Licensed instruments whose licence forbids modification (`modifiable: no`)
   cannot be reworded in the editor. They can only be included or left out.
 
+#### As built, on the survey's side
+
+Built as designed above. Where the design left a choice open, this is what was
+chosen; [16-maintainers-guide.md](16-maintainers-guide.md) §3.6 says where each
+part lives.
+
+- **Which engine can run a version**: the same MAJOR as the app's engine, and a
+  MINOR no newer (PATCH is ignored). The engine's version is `ENGINE_VERSION`,
+  held to its `package.json` by a test.
+- **How long a device waits**: 4 s for `activeRelease`, then 8 s for a manifest
+  it has not stored. The page says "Getting ready…" meanwhile.
+- **How it reads**: over Firestore's REST API (`batchGet`), with no SDK and no
+  credential. A version's document id is its hash, and a colon in a Google API
+  path is read as a method name, so the document is named in the request body.
+- **Every version a device runs is stored**, the bundled one included, so a
+  sitting can still be finished after a later build replaces it.
+- **Resuming under another version**: on the start screen, a code with an
+  unfinished sitting under another stored version reloads the app into that
+  version, which carries straight on. A sitting from before devices stored their
+  versions may not qualify; it starts afresh under the running version, as it
+  always did.
+- **After a handover**: the device asks again, stores a new version, and reloads
+  onto it only on the start screen with no code typed and the staff panel shut.
+- **Preview**: drafts are accepted from `https://myself-research-dashboard.web.app`,
+  `.firebaseapp.com` and its preview channels, and from localhost only in a
+  development build. A later, different draft reloads the page, which says it is
+  ready again. MyStory's place is shown, not run.
+- **MyStory's protocol**: the survey marks the module's URL `protocolFromHost=1`,
+  waits for `mystory:ready`, and sends `myself:narrative-protocol`. The module
+  runs it only if it parses, passes `checkProtocol` and has the key the URL
+  named; otherwise, or if nothing arrives within 15 s, it refuses and tells the
+  survey (`mystory:refused`), which offers a way on at once. The module's local
+  server can only run its own copies, so it refuses a different one. When MyStory
+  is last, its screen says the survey is done and its button says Finish.
+- **The functions** read published versions at most once a minute per instance,
+  and look again, no more than every 5 s, for a hash they have not seen. **The
+  researcher view** reads them on signing in and before every pull.
+
 ## 7. Identifiers and linkage (r7.0.0, D-37)
 
 Section 6 described the data layer as built. This corrects a gap in it that was
