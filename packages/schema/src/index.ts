@@ -8,3 +8,4 @@ export * from "./instrument.js";
 // second, older definition here; the two drifted, and a definition layer that
 // disagrees with itself is worse than no definition layer.
 export * from "./assessment.js";
+export * from "./published.js";

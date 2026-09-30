@@ -166,6 +166,34 @@ service cloud.firestore {
         allow read: if isPerson();
         allow write: if false;
       }
+
+      /**
+       * Versions published from the dashboard, and which one is live (D-54).
+       *
+       * READABLE BY ANYONE, signed in or not. An iPad reads them at start-up,
+       * before it has any credential, and a device must be able to pick up the
+       * live version whether or not it can reach the study. They hold the
+       * questionnaire, which is already public in the participant app's bundle,
+       * and nothing about any participant.
+       *
+       * WRITABLE BY NO CLIENT. The dashboard's functions write them with the
+       * Admin SDK, after an owner publishes, and are audited there. A version a
+       * browser could write is a questionnaire anybody could put in front of a
+       * child. Every reader also checks a manifest against its content hash
+       * before using it, so a changed document is refused as well as blocked.
+       *
+       * Only `activeRelease` is opened under `config`. Anything else put there
+       * later stays closed until it is written down here.
+       */
+      match /releases/{hash} {
+        allow read: if true;
+        allow write: if false;
+      }
+
+      match /config/activeRelease {
+        allow read: if true;
+        allow write: if false;
+      }
     }
 
     // Anything not named above is closed. Firestore's default is already deny,
