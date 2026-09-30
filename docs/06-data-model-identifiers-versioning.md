@@ -480,6 +480,101 @@ stored for offline use.
 **Welcome screen.** Pending: the team will mark what to remove, and the
 screen will be titled "Taking part".
 
+### Versions published from the dashboard (D-54) — design, before building
+
+The team asked for an editor: change the survey, see what changed, and publish
+it as a new, correctly numbered version, with the history easy to extract. They
+chose to have a publish go **straight to the live survey**, from the signed-in
+dashboard, rather than through a code change and a deploy. MyStory can be added
+at the end of any version, with a protocol chosen, and edited, in the editor.
+
+The editor itself lives in the dashboard (its docs/11). This section is what
+changes on the survey's side. It is written before any of it is built, as every
+change to the live survey has been.
+
+**What a version is does not change.** A published version is still a frozen
+release manifest, content-hashed with the same canonical JSON. The dashboard
+builds it with this repository's own release builder (`buildRelease`), vendored
+unchanged. So every publish runs the same publish gate a release cut here runs:
+licences, unresolved references, scales and bands, pipes, scoring references,
+street and postcode assets, and the MyStory protocol's own checks. A version from
+the editor is indistinguishable from one cut with `publish.mjs`.
+
+**Where a published version lives.** The dashboard's functions write two things
+to this study's database with the Admin SDK:
+
+- `studies/{study}/releases/{hash}`: the manifest (`manifestJson`), its version,
+  key, who published it, when, and why.
+- `studies/{study}/config/activeRelease`: which version new sittings use.
+  `{ hash, version, activatedAt, activatedBy }`.
+
+Both are readable by anyone and writable by no client. They hold the
+questionnaire, which is already public in the participant app's bundle; nothing
+about any participant.
+
+**How a device picks its version** (`apps/participant`):
+
+1. A device finishes any sitting it has started under the version it started
+   with. Resuming never switches version.
+2. Otherwise, at start-up it asks for `activeRelease`, with a short timeout. If
+   the version is one it has not stored, it fetches that manifest and parses it.
+   It keeps the manifest only if the content hashes to the stated hash, the
+   schema accepts it, and the release's `engineVersion` is one this build can
+   run. It then stores it (IndexedDB) and uses it.
+3. With no network, or anything wrong in step 2, it uses the last version it
+   stored, and failing that the one bundled in the build. It never shows a blank
+   screen and never an unverified manifest.
+4. The version reached on a device is recorded in the sitting, as today
+   (`releaseHash`). The start screen shows which version is running, so a
+   researcher can see it before handing the iPad over.
+5. A device that is already open picks up a new version when it returns to its
+   start screen after a handover, not in the middle of anything.
+
+**Everything that reads a sitting learns the published versions too.**
+- The functions (`releasesByHash`: ingest, export, the MyStory relay's model
+  allowlist) read the database versions alongside the bundled ones.
+- So does the researcher view, alongside the files in `releases/`.
+
+A sitting under a version published from the dashboard is read exactly like one
+under a bundled version. `scripts/pull-releases.mjs` copies published versions
+into `releases/`, so git keeps the full history and
+`packages/release/src/published.test.ts` checks them like any other.
+
+**MyStory, per version.**
+- A version either ends with MyStory or does not. When it does, MyStory is always
+  the last section, then the finish screen, then the handover to the researcher:
+  the device is only handed back after MyStory is done or left.
+- The protocol is chosen in the editor, and its TOML can be edited there. It is
+  frozen into the manifest's `narrativeProtocols`, as today, so a version fixes
+  exactly which protocol, prompts and models it used.
+- The embedded module is currently told only a protocol key, which it looks up
+  in its own bundled list. That cannot carry an edited protocol. So the survey
+  now also sends the frozen protocol to the module in a message. The module uses
+  it when it passes the same schema and checks, and otherwise refuses to start
+  rather than run something else.
+
+**Preview before publishing.** The participant app gains a preview mode for the
+dashboard. Opened inside the dashboard, it runs a draft sent to it in a message,
+from the dashboard's origins only. It stores nothing and uploads nothing.
+
+**Numbering and provenance.** The next version number follows §3, and the
+dashboard works it out from the change:
+- **MAJOR** for anything a participant could experience differently: wording,
+  options and their order, which questions are asked, conditions, screens, and
+  MyStory on, off or changed;
+- **MINOR** for additions that leave every existing path alone;
+- **PATCH** for researcher-facing metadata only.
+
+Each version records its base version, the list of changes, why it was
+published, who published it, and when it became and stopped being active. The
+dashboard exports all of that as CSV or JSON.
+
+**Safeguards.**
+- Only an owner can publish or make a version active, and both are audited.
+- Making an earlier version active again is the rollback. Nothing is deleted.
+- Licensed instruments whose licence forbids modification (`modifiable: no`)
+  cannot be reworded in the editor. They can only be included or left out.
+
 ## 7. Identifiers and linkage (r7.0.0, D-37)
 
 Section 6 described the data layer as built. This corrects a gap in it that was
