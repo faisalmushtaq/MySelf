@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { splitSession, type ChunkDoc, type SessionDoc } from "@myself/firebase";
+import { splitSession, type SessionDoc } from "@myself/firebase";
 import type { DeviceEvent, DeviceSession } from "@myself/store";
 import { assemblePull } from "./lib/study.js";
 

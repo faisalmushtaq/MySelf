@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { accepted, advance, position } from "./support/walker.js";
 
 /**
  * A sitting, from the start screen to a file a researcher can read.
@@ -12,7 +13,8 @@ import { expect, test, type Page } from "@playwright/test";
  * happens to present rather than knowing the YBM questionnaire, so a change to
  * the composition, a new response type, or a reordered section does not break it.
  * A test that had to be edited every time an instrument changed would be deleted
- * within a month, and the point of this one is that it keeps running.
+ * within a month, and the point of this one is that it keeps running. How it reads
+ * where it is and moves on is shared with the other suites, in `support/walker.ts`.
  */
 
 const CODE = "NDC0042";
@@ -116,7 +118,7 @@ async function answerCurrentScreen(page: Page): Promise<boolean> {
      */
     for (const candidate of ["1", "A", "LS2 9JT", "Something I would say about this."]) {
       await text.fill(candidate);
-      if (await acceptsCurrentAnswer(page)) return true;
+      if (await accepted(page)) return true;
     }
     // Leave the last attempt in place; `step` will report that nothing moved,
     // which is a more useful failure than a silent skip.
@@ -133,19 +135,6 @@ async function answerCurrentScreen(page: Page): Promise<boolean> {
 }
 
 /**
- * Whether the app considers the current screen answered.
- *
- * Read off the Next button, which is the app's own verdict: it is disabled until
- * the answer satisfies whatever the item requires. Asking the app beats
- * re-implementing its validation here and then disagreeing with it.
- */
-async function acceptsCurrentAnswer(page: Page): Promise<boolean> {
-  const next = page.locator("button.next:not(.big)").first();
-  if ((await next.count()) === 0) return true;
-  return next.isEnabled({ timeout: 2_000 }).catch(() => false);
-}
-
-/**
  * The first element matching `selector` that can actually be interacted with.
  *
  * Presence is not usability. The survey renders controls that are in the DOM but
@@ -159,13 +148,6 @@ async function usable(page: Page, selector: string) {
   if (!(await element.isVisible().catch(() => false))) return null;
   if (!(await element.isEnabled({ timeout: 1_000 }).catch(() => false))) return null;
   return element;
-}
-
-async function tryClick(page: Page, selector: string): Promise<boolean> {
-  const element = await usable(page, selector);
-  if (!element) return false;
-  await element.click({ timeout: 5_000 });
-  return true;
 }
 
 /**
@@ -192,91 +174,11 @@ async function chooseAnOption(page: Page, selector: string): Promise<boolean> {
     if (!(await option.isVisible().catch(() => false))) continue;
     if (!(await option.isEnabled({ timeout: 1_000 }).catch(() => false))) continue;
     await option.click({ timeout: 5_000 });
-    if (await acceptsCurrentAnswer(page)) return true;
+    if (await accepted(page)) return true;
   }
   // Every option refused. Leave the last one selected: `step` will report that
   // the survey did not move on, which names the screen that is stuck.
   return true;
-}
-
-/**
- * Where the walk currently is, as the app itself reports it.
- *
- * Used to prove each step actually moved. A walker that cannot tell progress from
- * a stuck screen spends its timeout clicking the same disabled button, and the
- * failure it eventually reports is "timed out" rather than "the survey would not
- * advance past this question" — which is the only version worth reading.
- */
-async function position(page: Page): Promise<string> {
-  return page.evaluate(() => {
-    // The app's own phase, read off the outermost screen's class list. Matching
-    // on a bare `.finish` risked a false positive from any element that happened
-    // to carry the class; the wrapper is unambiguous.
-    const screen = document.querySelector(".screen");
-    if (screen?.classList.contains("finish")) return "finished";
-    if (screen?.classList.contains("start")) return "start";
-    const heading = document.querySelector(".survey h1, .screen h1");
-    const segments = document.querySelector(".segments")?.getAttribute("aria-label") ?? "";
-    /**
-     * The step within the item, where there is one.
-     *
-     * Some items ask two things on one screen — "tap the apps you have", then
-     * "how long on each" — and the section and heading are identical across
-     * them. Without this, moving from step one to step two reads as not having
-     * moved at all, and the walk fails on a screen that is working perfectly.
-     */
-    const step = document.querySelector(".survey-body p")?.textContent?.slice(0, 60) ?? "";
-    /**
-     * Deliberately NOT including how many options are selected.
-     *
-     * It was here so that ticking a box counted as progress, and that made the
-     * walk loop: `step` treats any change as "the survey moved on", so selecting
-     * a second option on a multi-select looked like advancing and the walker
-     * stayed on one screen until it ran out of screens. Progress is a new
-     * question or a new step in one — not a changed answer to the same question.
-     */
-    return `${segments}|${heading?.textContent?.slice(0, 80) ?? ""}|${step}`;
-  });
-}
-
-/**
- * Advance past the current screen, dealing with anything the app puts in the way.
- *
- * The app deliberately interrupts: a check-in after a run of skips, a "no rush"
- * screen after a run of answers given faster than the question could be read.
- * A robot answers faster than any child, so the pace screen is not an edge case
- * here — it is the common path, and a test that did not handle it would fail on
- * the third question every time.
- */
-async function advance(page: Page): Promise<void> {
-  const candidates = [
-    ".screen.checkin button.next.big",
-    "button.next:not(.big)",
-    "button.skip-go",
-    ".screen button.primary",
-    "button.primary",
-  ];
-  for (const selector of candidates) {
-    const button = page.locator(selector).first();
-    // A short timeout on each speculative probe: these are "is this kind of
-    // screen showing" questions, and the default would spend ten seconds per
-    // miss on a walk hundreds of screens long.
-    if ((await button.count()) === 0) continue;
-    if (!(await button.isEnabled({ timeout: 1_000 }).catch(() => false))) continue;
-    await button.click({ timeout: 5_000 });
-    return;
-  }
-  const where = await page.evaluate(() => ({
-    classes: document.querySelector(".screen")?.className ?? "(no .screen)",
-    heading: document.querySelector("h1")?.textContent?.slice(0, 60) ?? "",
-    buttons: [...document.querySelectorAll("button")]
-      .filter((b) => !(b as HTMLButtonElement).disabled)
-      .map((b) => `${b.className}:${b.textContent?.slice(0, 24) ?? ""}`)
-      .slice(0, 8),
-  }));
-  throw new Error(
-    `no way forward from this screen: nothing recognised to click. ${JSON.stringify(where)}`,
-  );
 }
 
 /**

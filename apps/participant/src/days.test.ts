@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { daysInWords } from "./components/controls.js";
+import { daysInWords } from "./components/controls/index.js";
 
 describe("reading a number of days back (D-53)", () => {
   it("says it as a person would", () => {

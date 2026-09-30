@@ -16,7 +16,6 @@ export function HairPattern({ code }: { code: string }) {
   const sub = code[1] ?? "a"; // a < b < c: increasing definition/tightness
   const subIndex = sub === "a" ? 0 : sub === "b" ? 1 : 2;
 
-  const height = 64;
   const strands = [16, 32, 48];
 
   const path = (x: number): string => {

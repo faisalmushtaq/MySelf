@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { expect, test, type Locator, type Page } from "@playwright/test";
+import { accepted, advance, position } from "./support/walker.js";
 
 /**
  * What the child tapped, against what the study stored.
@@ -235,40 +236,6 @@ async function optionLabel(option: Locator): Promise<string> {
     const text = named?.textContent ?? element.textContent ?? "";
     return text.replace(/[\u2713\u2714]/g, "").trim();
   });
-}
-
-async function accepted(page: Page): Promise<boolean> {
-  const next = page.locator("button.next:not(.big)").first();
-  if ((await next.count()) === 0) return true;
-  return next.isEnabled({ timeout: 2_000 }).catch(() => false);
-}
-
-async function position(page: Page): Promise<string> {
-  return page.evaluate(() => {
-    const screen = document.querySelector(".screen");
-    if (screen?.classList.contains("finish")) return "finished";
-    const heading = document.querySelector(".survey h1, .screen h1");
-    const segments = document.querySelector(".segments")?.getAttribute("aria-label") ?? "";
-    const step = document.querySelector(".survey-body p")?.textContent?.slice(0, 60) ?? "";
-    return `${segments}|${heading?.textContent?.slice(0, 80) ?? ""}|${step}`;
-  });
-}
-
-async function advance(page: Page): Promise<void> {
-  for (const selector of [
-    ".screen.checkin button.next.big",
-    "button.next:not(.big)",
-    "button.skip-go",
-    ".screen button.primary",
-    "button.primary",
-  ]) {
-    const button = page.locator(selector).first();
-    if ((await button.count()) === 0) continue;
-    if (!(await button.isEnabled({ timeout: 1_000 }).catch(() => false))) continue;
-    await button.click({ timeout: 5_000 });
-    return;
-  }
-  throw new Error(`nothing to click on ${await position(page)}`);
 }
 
 /** Answer screen after screen until the survey finishes, or `enough` says to stop. */

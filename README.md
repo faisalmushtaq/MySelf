@@ -27,6 +27,10 @@ what is not, and what is deliberately left undone. Read §8 first.
 
 ## Development
 
+New to the code? **[docs/16-maintainers-guide.md](docs/16-maintainers-guide.md)** —
+what is where, how a question becomes data, and how to change a question, cut a
+release, run each test suite and deploy.
+
 ```sh
 pnpm install
 pnpm -r build && pnpm -r test   # unit tests across the packages and apps
