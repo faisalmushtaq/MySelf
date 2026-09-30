@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
+import { useCallback, useEffect, useReducer, useRef, useState } from "react";
 import { AnswerStore, Walker, type AnswerValue, type PresentableUnit } from "@myself/engine";
 import { releaseManifest, responseScale, scoringDefinition, type ReleaseManifest, type ResponseScale } from "@myself/schema";
 import rawManifest from "../../../releases/ybm_nd2026_standard_r9.0.0.manifest.json";
@@ -361,18 +361,6 @@ export default function App() {
     if (!online || !device || phase.kind !== "finished") return;
     void checkpointRunningSessions().catch(() => undefined);
   }, [online, device, phase.kind]);
-
-  const runningSession = phase.kind === "running" ? (phase as { session: SessionRow }).session : null;
-  const walker = useMemo(
-    () =>
-      new Walker(
-        flattened.units,
-        storeRef.current,
-        manifest.composition.allowBackNavigation,
-        runningSession ? new Date(runningSession.startedAt) : undefined,
-      ),
-    [runningSession?.sessionId ?? ""],
-  );
 
   const tMono = () => Math.round(performance.now() - monoStart.current);
 

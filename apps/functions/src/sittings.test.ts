@@ -323,7 +323,7 @@ describe("the same sitting from two devices", () => {
   it("keeps the copy already stored, rather than letting the second overwrite it", async () => {
     // Replacing one child's log with another's is the merge this platform
     // exists to never make. The second arrival has no better claim.
-    const { db, docs, collections } = fakeDb();
+    const { db, docs } = fakeDb();
     await storeSitting(db, "ybm", session([event(0), event(1)]), "dev_ipad_1");
     const outcome = await storeSitting(db, "ybm", session([event(0)]), "dev_ipad_2");
 

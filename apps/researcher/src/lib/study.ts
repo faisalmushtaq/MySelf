@@ -197,16 +197,17 @@ export async function assemblePull(
  * Stop one device filing anything more.
  *
  * NOTHING IS ENROLLED ANY MORE — a participant opens the URL on any iPad and takes
- * part, and the device signs itself in. So there is no enrolment panel here, and
- * `enrolDevice` in the functions is kept only for a study that wants named
- * devices; it is not part of fielding one.
+ * part, and the device registers itself on its first upload. So there is no
+ * enrolment panel here, and no `enrolDevice` in the functions: `revokeDevice` is
+ * what took its place.
  *
  * Revoking still matters, and arguably more: the way to deal with a device posting
  * something it should not — a stray iPad, a duplicate, an obvious test run from
  * outside the room — is to take its identity away. The device id is on every
- * sitting in the table, so it can be read off the row and pasted here. It disables
- * the account and revokes the refresh token, so the session the device already
- * holds stops working too.
+ * sitting in the table, so it can be read off the row and pasted here. The device
+ * is marked revoked, which `registerDevice` checks on every upload, and an older
+ * device that was given an account of its own has that account disabled and its
+ * refresh token revoked as well.
  */
 export async function revokeDevice(deviceId: string): Promise<void> {
   const call = httpsCallable<{ deviceId: string }, unknown>(firebase().fns, "revokeDevice");
