@@ -22,7 +22,7 @@ import {
   SingleChoice,
   SliderControl,
   TextControl,
-} from "./controls.js";
+} from "./controls/index.js";
 import { NarrativeStep } from "./NarrativeStep.js";
 
 export interface EffortPolicy extends DwellPolicy {
