@@ -9,11 +9,29 @@ import { displayText } from "./item.js";
  * produces a content hash. Nothing about a release is ever edited (docs/06 §3).
  */
 
+/**
+ * Which of the form's questions this placement shows, in the order it shows
+ * them (D-49).
+ *
+ * ABSENT MEANS THE WHOLE FORM, in form order — which is what every release up to
+ * r7.1.0 does, and why this is optional with no default: a stored manifest must
+ * parse, and hash, exactly as it did when it was published.
+ *
+ * It exists so a question can move to another section without changing its ID.
+ * A question's ID is `<instrument>.<key>`, so moving it into a different
+ * instrument would make it a different question in every export. Instead the
+ * same instrument is placed in both sections, each placement listing the
+ * questions it carries. The publish gate refuses a key the form does not have,
+ * and a question administered twice.
+ */
+const componentItems = z.array(slug).min(1).optional();
+
 export const sectionComponent = z.discriminatedUnion("kind", [
   z.object({
     kind: z.literal("instrument"),
     ref: instrumentRef,
     displayIf: logicExpr.optional(),
+    items: componentItems,
     /** Per-component overrides constrained by the instrument's fidelity flags. */
     overrides: z
       .object({
@@ -26,6 +44,7 @@ export const sectionComponent = z.discriminatedUnion("kind", [
     kind: z.literal("module"),
     ref: instrumentRef, // modules share the instrument reference shape
     displayIf: logicExpr.optional(),
+    items: componentItems,
   }),
   z.object({
     kind: z.literal("narrative"),

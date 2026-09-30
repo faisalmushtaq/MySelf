@@ -1,11 +1,11 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { buildBidsExport, buildDemoSessions, buildZip, summarise, wideTable, type Dataset } from "@myself/store";
 import { DataTable, downloadCsv } from "./components/DataTable.js";
 import { Linkage } from "./components/Linkage.js";
 import { ParticipantPanel } from "./components/ParticipantPanel.js";
 import { Protocols } from "./components/Protocols.js";
 import { Summary } from "./components/Summary.js";
-import { buildDataset } from "./lib/build.js";
+import { buildDatasetWithStore } from "./lib/build.js";
 import {
   addSessions,
   aliases,
@@ -49,9 +49,45 @@ const STUDY = "YBM-ND2026";
 
 const plural = (n: number, noun: string): string => `${n} ${noun}${n === 1 ? "" : "s"}`;
 
+/** The newest `reload` started; an older one that finishes after it is dropped. */
+let reloadGeneration = 0;
+
 type Tab = "overview" | "table" | "linkage" | "mystory" | "data";
 
+/**
+ * MySelf Studio (docs/16) lives at `#/…` addresses on the same page, loaded as
+ * its own chunk only when one is opened. Any other address is this view,
+ * exactly as before.
+ */
+const StudioRoot = lazy(() => import("./studio/StudioRoot.js"));
+
+function subscribeToHash(listener: () => void): () => void {
+  window.addEventListener("hashchange", listener);
+  // The Studio's router also announces address changes it makes without one.
+  window.addEventListener("studio:navigate", listener);
+  return () => {
+    window.removeEventListener("hashchange", listener);
+    window.removeEventListener("studio:navigate", listener);
+  };
+}
+
 export default function App() {
+  const inStudio = useSyncExternalStore(
+    subscribeToHash,
+    () => window.location.hash.startsWith("#/"),
+    () => false,
+  );
+  if (inStudio) {
+    return (
+      <Suspense fallback={<p className="working">Opening MySelf Studio…</p>}>
+        <StudioRoot />
+      </Suspense>
+    );
+  }
+  return <ResearcherView />;
+}
+
+function ResearcherView() {
   const [dataset, setDataset] = useState<Dataset | null>(null);
   const [issues, setIssues] = useState<{
     rejected: { sessionId: string; reason: string }[];
@@ -73,11 +109,18 @@ export default function App() {
   const [passphrase, setPassphrase] = useState("");
 
   const reload = useCallback(async () => {
+    const generation = ++reloadGeneration;
     setBusy(true);
     const sessions = await storedSessions();
     // Corrections are applied here, at derivation, so a repaired code joins a
     // participant's waves without anything being rewritten (D-37).
-    const built = buildDataset(sessions, STUDY, await aliases(), await assignments());
+    const built = await buildDatasetWithStore(sessions, STUDY, await aliases(), await assignments());
+    // Asking the release store can take seconds (up to its timeout when
+    // offline), so reloads now overlap: the page-load build can still be
+    // waiting when a pull or an import starts another. Only the newest may set
+    // what is shown — an older one finishing late would put back a dataset
+    // missing the sittings just added. The newest also clears `busy`.
+    if (generation !== reloadGeneration) return;
     setDataset(built.dataset);
     // Names go to their own table, never into the dataset the rest of this
     // app reads. They are needed to repair a code and to link a UPN, and the
@@ -198,6 +241,13 @@ export default function App() {
                       : "Data in and out"}
             </button>
           ))}
+          <a
+            className="tab"
+            href="#/surveys"
+            style={{ display: "inline-flex", alignItems: "center", textDecoration: "none", color: "var(--accent)" }}
+          >
+            Survey Studio&nbsp;<span aria-hidden="true">→</span>
+          </a>
         </nav>
       </header>
 

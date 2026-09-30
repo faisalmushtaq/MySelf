@@ -21,3 +21,15 @@ export { llmRelay } from "./relay.js";
 export { transcribe } from "./transcribe.js";
 export { saveNarrative } from "./narratives.js";
 export { saveSitting } from "./sittings.js";
+export {
+  studioSession,
+  studioImportLive,
+  studioCreateSurvey,
+  studioPublish,
+  studioRestoreVersion,
+  studioActivateVersion,
+  studioSetMember,
+  studioSetDomain,
+  studioResponseStats,
+  onStudioDraftWritten,
+} from "./studio/functions.js";

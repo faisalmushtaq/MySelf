@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en-GB">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex" />
+    <title>MySelf — page not found</title>
+    <!--
+      GitHub Pages has no single-page-app fallback: it serves this file for any
+      path it has no file for. The Studio's screens are addressed with hash
+      routes (/MySelf/researcher/#/surveys/…) precisely so they never need one,
+      but a path typed or bookmarked without the hash (/MySelf/researcher/surveys)
+      should still land on the right screen rather than on a dead end. Anything
+      under /researcher/ is therefore rewritten into its hash route; anything
+      else gets an honest "not found" with a way back to the survey.
+
+      This runs before any app code and touches no storage, so it cannot
+      interfere with the participant app or its service worker.
+    -->
+    <script>
+      (function () {
+        var path = window.location.pathname;
+        var marker = "/researcher/";
+        var at = path.indexOf(marker);
+        if (at >= 0) {
+          var rest = path.slice(at + marker.length).replace(/\/+$/, "");
+          if (rest && rest !== "index.html") {
+            var target = path.slice(0, at + marker.length) + "#/" + rest + window.location.search;
+            window.location.replace(target);
+          }
+        }
+      })();
+    </script>
+    <style>
+      body { margin: 0; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; background: #fcfcfb; color: #000; }
+      main { max-width: 32rem; margin: 18vh auto 0; padding: 0 1.5rem; }
+      h1 { font-size: 1.5rem; font-weight: 600; }
+      a { color: #067843; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>This page doesn't exist</h1>
+      <p>The address may be mistyped, or the page may have moved.</p>
+      <p><a href="/MySelf/">Go to MySelf</a></p>
+    </main>
+  </body>
+</html>

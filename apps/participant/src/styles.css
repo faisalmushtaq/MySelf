@@ -1333,8 +1333,13 @@ input[type="range"] {
   color: var(--text);
 }
 
-/* Centred over the axis it belongs to, not parked at the left-hand end. */
+/* Centred over the axis it belongs to, not parked at the left-hand end.
+   Larger than the default: these are the handedness objects, upright and
+   only about a third as wide as they are tall, and at 68px they looked faint
+   under the question. */
 .stem-object.centred {
+  width: 88px;
+  height: 88px;
   display: block;
   align-self: center;
   margin-bottom: 0.25rem;

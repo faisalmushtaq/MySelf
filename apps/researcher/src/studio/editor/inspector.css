@@ -1,0 +1,183 @@
+/*
+ * The settings panel (`sti-`), per DESIGN.md §5 "Inspector": groups (Answer ·
+ * Validation · Logic · Reporting · Status) with a 13px/600 heading and a
+ * hairline between them; rows of label left, control right at 36px; what a
+ * setting does behind an ⓘ. Boxes, switches and messages come from the
+ * centre editor's field styles (node.css), so they look the same everywhere.
+ */
+
+.sti {
+  /* Positioned, so screen-reader-only text stays inside the scrolling panel. */
+  position: relative;
+  min-height: 100%;
+  padding: 0 16px 48px;
+  background: var(--st-bg-subtle);
+}
+.sti-group {
+  padding: 16px 0;
+  border-bottom: 1px solid var(--st-border);
+}
+.sti-group:last-child {
+  border-bottom: 0;
+}
+.sti-titlerow {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-height: 20px;
+  margin-bottom: 6px;
+}
+.sti-title {
+  margin: 0;
+  font-size: 13px;
+  line-height: 20px;
+  font-weight: 600;
+  color: var(--st-text);
+}
+.sti-titlerow .st-infotip {
+  margin-left: 2px;
+}
+
+/* Rows */
+.sti-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+}
+.sti-row-label {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--st-text);
+}
+.sti-row-value {
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--st-text-secondary);
+}
+.sti-row .st-btn-ghost {
+  margin-right: -8px;
+}
+.studio .st-select.sti-select {
+  width: 148px;
+}
+.sti .stn-field {
+  margin-bottom: 12px;
+}
+.sti .stn-field.stn-field-inline {
+  margin-bottom: 0;
+}
+.sti .stn-field-inline + .stn-field:not(.stn-field-inline),
+.sti .stn-switchrow + .stn-field:not(.stn-field-inline) {
+  margin-top: 8px;
+}
+.sti .stn-field:last-child {
+  margin-bottom: 0;
+}
+.studio .sti .stn-field-inline > .stn-inputrow > .st-input {
+  width: 88px;
+}
+
+/* Notes and facts */
+.sti-note {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 6px;
+  margin: 4px 0 0;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--st-text-tertiary);
+}
+.sti-note .st-icon {
+  flex: none;
+}
+.sti-note .stn-locktip {
+  margin: 0;
+}
+.sti-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 28px;
+  margin: 0;
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--st-text);
+}
+.sti-status .st-infotip {
+  margin-left: -4px;
+}
+.sti-flag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.sti-flag .st-icon {
+  color: var(--st-text-tertiary);
+}
+.sti-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+.sti-actions .sti-note {
+  margin: 0;
+}
+.sti-actions + .stn-field,
+.sti-actions + .sti-note + .stn-field {
+  margin-top: 16px;
+}
+.studio .st-btn.sti-delete {
+  color: var(--st-danger);
+}
+.studio .st-btn.sti-delete:hover:not(:disabled) {
+  background: var(--st-danger-subtle);
+  color: var(--st-danger);
+}
+
+.sti-links {
+  margin: 0;
+  padding: 2px 0 4px 16px;
+  display: grid;
+  gap: 4px;
+  font-size: 13px;
+  line-height: 20px;
+}
+.sti-idrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.sti-idtools {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+}
+.sti .stn-details {
+  margin-top: 4px;
+}
+.sti .stn-details-body {
+  padding-left: 0;
+}
+.sti .stn-facts > div {
+  grid-template-columns: 104px minmax(0, 1fr);
+  gap: 8px;
+  padding: 4px 0;
+}
+.sti .stn-facts dt {
+  font-size: 12px;
+}
+.sti .stn-tester {
+  margin-top: -4px;
+}
+
+@media (max-width: 560px) {
+  .sti .stn-facts > div {
+    grid-template-columns: 1fr;
+  }
+}

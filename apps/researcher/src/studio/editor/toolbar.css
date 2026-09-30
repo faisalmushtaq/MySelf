@@ -1,0 +1,329 @@
+/*
+ * The editor toolbar (DESIGN.md §4): 44px, white, a hairline under it. State
+ * on the left in two or three words, actions on the right. Colour is only
+ * ever a second signal: every dot and icon sits beside words saying the same.
+ */
+
+.sto-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  min-height: var(--st-toolbar);
+  padding: 0 12px 0 16px;
+  background: var(--st-bg);
+  border-bottom: 1px solid var(--st-border);
+  font-size: 13px;
+  line-height: 20px;
+}
+
+.sto-tb-status,
+.sto-tb-actions {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+.sto-tb-status {
+  gap: 10px;
+  color: var(--st-text-secondary);
+}
+.sto-tb-actions {
+  gap: 6px;
+  flex: none;
+}
+.sto-tb-sep {
+  flex: none;
+  width: 1px;
+  height: 16px;
+  background: var(--st-border);
+  margin: 0 4px;
+}
+.sto-tb-status .sto-tb-sep {
+  margin: 0;
+}
+
+/* ── Save state: a dot and a word ─────────────────────────────────────── */
+.sto-save {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 28px;
+  white-space: nowrap;
+  color: var(--st-text-secondary);
+}
+.sto-save-text {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.sto-save-error {
+  color: var(--st-danger);
+  font-weight: 500;
+}
+.sto-save-warn {
+  color: var(--st-warn);
+  font-weight: 500;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .sto-save-busy .st-dot {
+    animation: sto-pulse 1s ease-in-out infinite alternate;
+  }
+}
+@keyframes sto-pulse {
+  to {
+    opacity: 0.3;
+  }
+}
+.sto-retry {
+  height: 24px;
+  padding: 0 8px;
+  color: var(--st-danger);
+}
+
+/* ── What is live ──────────────────────────────────────────────────────── */
+.sto-live {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  white-space: nowrap;
+}
+.sto-live-word {
+  color: var(--st-text-tertiary);
+}
+.sto-live-version {
+  color: var(--st-text);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+.sto-live-none {
+  color: var(--st-text-tertiary);
+}
+.sto-draft {
+  white-space: nowrap;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--st-text-tertiary);
+}
+/* Something to publish: a small neutral tag, the one thing on the left worth a glance. */
+.sto-draft-changed {
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: var(--st-radius-sm);
+  background: var(--st-bg-muted);
+  color: var(--st-text-secondary);
+  font-weight: 500;
+}
+
+/* ── Undo and redo ─────────────────────────────────────────────────────── */
+.sto-undo {
+  display: inline-flex;
+  gap: 2px;
+}
+/* aria-disabled (so focus survives the last undo), drawn as the kit's :disabled. */
+.sto-undo .st-iconbtn[aria-disabled="true"] {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+.sto-undo .st-iconbtn-ghost[aria-disabled="true"]:hover {
+  background: transparent;
+  color: var(--st-text-secondary);
+}
+
+/* ── The checks chip: the worst news in words, its icon's shape agreeing ── */
+.sto-checks {
+  gap: 6px;
+  padding: 0 8px;
+  background: transparent;
+  color: var(--st-text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+.sto-checks .st-icon {
+  width: 16px;
+  height: 16px;
+}
+.sto-checks:hover:not(:disabled) {
+  background: var(--st-bg-muted);
+  color: var(--st-text);
+}
+.sto-checks[aria-expanded="true"] {
+  background: var(--st-bg-emphasis);
+  color: var(--st-text);
+}
+.sto-checks-ok .st-icon {
+  color: var(--st-accent);
+}
+.sto-checks-warn .st-icon {
+  color: var(--st-warn);
+}
+.sto-checks-warn {
+  color: var(--st-text);
+}
+.sto-checks-error,
+.sto-checks-error:hover:not(:disabled),
+.sto-checks-error[aria-expanded="true"] {
+  color: var(--st-danger);
+}
+.sto-checks-error {
+  background: var(--st-danger-subtle);
+}
+.sto-checks-busy {
+  color: var(--st-text-tertiary);
+}
+
+.sto-preview {
+  text-decoration: none;
+}
+
+/* A disabled Publish that still explains itself on hover and focus. */
+.sto-tipwrap {
+  position: relative;
+  display: inline-flex;
+}
+.sto-tip {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 80;
+  width: max-content;
+  max-width: 260px;
+  padding: 6px 8px;
+  border-radius: var(--st-radius);
+  background: #18181b;
+  color: #fafafa;
+  box-shadow: var(--st-shadow-md);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 16px;
+  white-space: normal;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 120ms ease-out;
+}
+.sto-tipwrap:hover .sto-tip {
+  transition-delay: 300ms;
+}
+.sto-tipwrap:hover .sto-tip,
+.sto-tipwrap:focus-within .sto-tip {
+  opacity: 1;
+}
+
+/* ── Who else is here ──────────────────────────────────────────────────── */
+.sto-presence {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+  padding: 0 4px;
+  margin-right: 4px;
+  border-radius: var(--st-radius);
+  font-size: 12px;
+}
+.sto-presence-clash {
+  padding-right: 8px;
+  background: var(--st-warn-subtle);
+  color: var(--st-warn);
+  font-weight: 500;
+}
+.sto-presence-text {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+.sto-avatars {
+  display: inline-flex;
+}
+.sto-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--st-bg-emphasis);
+  color: var(--st-text);
+  font-size: 11px;
+  font-weight: 600;
+  box-shadow: 0 0 0 2px var(--st-bg);
+}
+.sto-avatar + .sto-avatar {
+  margin-left: -6px;
+}
+.sto-avatar-more {
+  background: var(--st-bg-muted);
+  color: var(--st-text-secondary);
+}
+
+/* ── The shortcuts dialog ──────────────────────────────────────────────── */
+.sto-keys {
+  display: grid;
+  margin: 0;
+}
+.sto-keys > div {
+  display: grid;
+  grid-template-columns: 200px 1fr;
+  gap: 16px;
+  align-items: center;
+  min-height: 36px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--st-border);
+  font-size: 13px;
+}
+.sto-keys > div:last-child {
+  border-bottom: 0;
+}
+.sto-keys dt {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+  color: var(--st-text-tertiary);
+  font-size: 12px;
+}
+.sto-keys dd {
+  margin: 0;
+  color: var(--st-text);
+}
+
+/* ── Narrow windows: two rows, nothing hidden ──────────────────────────── */
+/* A phone scrolls the whole page. The toolbar — saved or not, checks, Publish
+   — is the bar worth keeping in sight there, so it stays at the top of the
+   window and the page header scrolls away rather than stacking both on a
+   small screen (Toolbar.tsx keeps what takes focus clear of the toolbar). */
+@media (max-width: 760px) {
+  .stp-app:has(.sto-toolbar) > .stp-header {
+    position: relative;
+  }
+  .sto-toolbar {
+    flex-wrap: wrap;
+    padding: 8px 12px;
+  }
+  .sto-tb-actions {
+    flex: 1 1 auto;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+  .sto-tb-actions > .sto-tb-sep {
+    display: none;
+  }
+  .sto-keys > div {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+}
+@media (max-width: 480px) {
+  /* Words only, so the actions fit on one line at phone width. */
+  .sto-preview > .st-icon,
+  .sto-tb-actions .st-btn-accent > .st-icon {
+    display: none;
+  }
+  .sto-tb-actions {
+    gap: 4px;
+  }
+}

@@ -1,0 +1,3 @@
+# Files a release pins by SHA-256 (D-52): never convert line endings, or the
+# hash on a checkout would stop matching the one the release pins.
+releases/assets/** -text

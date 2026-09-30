@@ -41,6 +41,34 @@ function deriveSittingsUrl(): string {
   }
 }
 
+/**
+ * Where the survey itself is read from (docs/16 §5.3).
+ *
+ * The study's public, get-only documents — the `published/{surveyId}` pointer
+ * and the `publicReleases/{hash}` store — through the Firestore REST API, with
+ * plain `fetch` and no SDK, for the same reasons as the sittings endpoint above.
+ * Derived from the project in the same way, so a build that knows where to send
+ * sittings also knows where the survey is published. `MYSELF_STUDY` names the
+ * study document the collections live under; `MYSELF_SURVEY_SOURCE` overrides the
+ * whole thing, for an emulator or for the e2e suite's stand-in.
+ *
+ * EMPTY MEANS NEVER ASK. The public preview and the e2e build have no project,
+ * and run the release compiled into them exactly as every build before this did.
+ */
+function deriveSurveySource(): string {
+  const explicit = process.env["MYSELF_SURVEY_SOURCE"];
+  if (explicit) return explicit.replace(/\/+$/, "");
+  try {
+    const projectId = (JSON.parse(firebaseConfig || "null") as { projectId?: string } | null)?.projectId;
+    const study = process.env["MYSELF_STUDY"] || "ybm";
+    return projectId
+      ? `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/studies/${study}`
+      : "";
+  } catch {
+    return "";
+  }
+}
+
 export default defineConfig({
   base,
   define: {
@@ -68,11 +96,38 @@ export default defineConfig({
      * test that waits two real minutes to watch a timer fire.
      */
     __CHECKPOINT_SECONDS__: JSON.stringify(Number(process.env["MYSELF_CHECKPOINT_SECONDS"] ?? 120)),
+    __SURVEY_SOURCE__: JSON.stringify(deriveSurveySource()),
+    /**
+     * Which survey's pointer the start screen follows. Baked in, like the
+     * endpoints: which questionnaire a child is given is not something the page
+     * should let anybody change from the address bar.
+     */
+    __SURVEY_ID__: JSON.stringify(process.env["MYSELF_SURVEY_ID"] || "ybm_nd2026_standard"),
   },
   plugins: [
     react(),
     VitePWA({
-      registerType: "autoUpdate",
+      /**
+       * "prompt", and registered by hand in main.tsx, because "autoUpdate" reloads
+       * the page itself (docs/16 R11).
+       *
+       * In "autoUpdate" mode the generated worker takes over the moment it
+       * installs, and the plugin's registration code reloads the page when it
+       * does — unconditionally, before `lib/updates.ts` is asked. So a deploy
+       * landing mid-morning could put a child answering question forty back on
+       * the start screen, whatever the gate said. In "prompt" mode a new worker
+       * waits until it is told to take over, and main.tsx only tells it to when
+       * the gate says nobody is part-way through a sitting.
+       *
+       * `injectRegister: false` because main.tsx registers the worker itself,
+       * with workbox-window rather than the plugin's `virtual:pwa-register`: even
+       * in "prompt" mode, the plugin's registration reloads the page whenever a
+       * newer worker takes control — including one activated from another tab,
+       * mid-sitting in this one. Registering directly leaves `updates` the only
+       * thing on this page that ever reloads it.
+       */
+      registerType: "prompt",
+      injectRegister: false,
       includeAssets: ["apple-touch-icon.png", "icon-192.png", "icon-512.png"],
       manifest: {
         name: "MySelf",
