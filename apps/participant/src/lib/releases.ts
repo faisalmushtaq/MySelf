@@ -22,6 +22,7 @@ import {
 } from "./db.js";
 import { flattenManifest } from "./flatten.js";
 import { POSTCODE_LISTS } from "./postcodes.js";
+import { STREET_LISTS } from "./streets.js";
 
 /**
  * Which release this device runs, and how a new one gets here (docs/16 §5.3).
@@ -56,7 +57,7 @@ import { POSTCODE_LISTS } from "./postcodes.js";
  * holds the two lists equal, so the gate can never stamp a version the app
  * does not know.
  */
-export const SUPPORTED_ENGINE_VERSIONS = ["0.1.0", "0.2.0"] as const;
+export const SUPPORTED_ENGINE_VERSIONS = ["0.1.0", "0.2.0", "0.3.0"] as const;
 
 /**
  * Where a release came from:
@@ -91,11 +92,17 @@ export type Verification =
 
 const assetHashes = new Map<string, Promise<string>>();
 
+/** The files this build carries, by the key a release pins them under (D-52, D-53). */
+const CARRIED_ASSETS: Record<string, () => Promise<string>> = {
+  ...Object.fromEntries(Object.entries(POSTCODE_LISTS).map(([key, text]) => [key, () => Promise.resolve(text)])),
+  ...STREET_LISTS,
+};
+
 /** `sha256:<hex>` of a bundled file, over its UTF-8 bytes as the release pins it; computed once. */
-function bundledAssetHash(key: string, text: string): Promise<string> {
+function bundledAssetHash(key: string, load: () => Promise<string>): Promise<string> {
   let hash = assetHashes.get(key);
   if (!hash) {
-    hash = crypto.subtle.digest("SHA-256", new TextEncoder().encode(text)).then((digest) => {
+    hash = load().then((text) => crypto.subtle.digest("SHA-256", new TextEncoder().encode(text))).then((digest) => {
       const hex = [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
       return `sha256:${hex}`;
     });
@@ -184,9 +191,9 @@ async function verify(json: string, expectedHash: string, options: { surveyId?: 
   // (D-52). A postcode list the app does not have would quietly switch the
   // check off; a different one would check against the wrong list.
   for (const [key, pin] of Object.entries(manifest.assets)) {
-    const text = POSTCODE_LISTS[key];
-    if (text === undefined) return refuse(`it needs the file '${key}', which this version of the app does not carry`);
-    if ((await bundledAssetHash(key, text)) !== pin.sha256) {
+    const load = CARRIED_ASSETS[key];
+    if (load === undefined) return refuse(`it needs the file '${key}', which this version of the app does not carry`);
+    if ((await bundledAssetHash(key, load)) !== pin.sha256) {
       return refuse(`its file '${key}' is not the one this version of the app carries`);
     }
   }

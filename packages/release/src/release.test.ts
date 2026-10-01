@@ -29,15 +29,20 @@ const registries: Registries = {
  * It also replaces the secret code with the home address (D-52), checked
  * against a West Yorkshire postcode list the release pins by hash.
  *
+ * r9.0.0 (D-53): consent that moves on by itself, optional linkage consent,
+ * ethnic origins in West Yorkshire order, the Sleep Quality Scale, new
+ * handedness pictures, checks on social-media answers, and a street search
+ * for someone who doesn't know their postcode. MAJOR: all participant-visible.
+ *
  * r7.3.0 (D-50) froze the published RCADS-25 key; r7.2.0 (D-49) named the
  * SWEMWBS and STAI-5 items by their real keys.
  */
 const meta = {
-  version: "8.0.0",
-  publishedAt: "2026-09-29T18:46:00.000Z",
+  version: "9.0.0",
+  publishedAt: "2026-09-29T23:02:00.000Z",
   publishedBy: "faisalmushtaq",
-  engineVersion: "0.2.0",
-  decisionRefs: ["D-51", "D-52"],
+  engineVersion: "0.3.0",
+  decisionRefs: ["D-53"],
 };
 
 describe("canonical JSON", () => {
@@ -50,12 +55,12 @@ describe("canonical JSON", () => {
   });
 });
 
-describe("YBM release r8.0.0", () => {
+describe("YBM release r9.0.0", () => {
   it("passes the publish gate and produces a verifiable manifest", () => {
     const manifest = buildRelease(ybmComposition, registries, meta);
     expect(manifest.hash).toMatch(/^sha256:[0-9a-f]{64}$/);
     expect(verifyManifestHash(manifest)).toBe(true);
-    expect(manifest.release.key).toBe("ybm_nd2026_standard_r8_0_0");
+    expect(manifest.release.key).toBe("ybm_nd2026_standard_r9_0_0");
   });
 
   it("is deterministic: identical inputs give an identical hash", () => {
@@ -67,8 +72,9 @@ describe("YBM release r8.0.0", () => {
   it("freezes every component of the composition and its scales/scoring", () => {
     const manifest = buildRelease(ybmComposition, registries, meta);
     // 18 from r6.0.0, when the two sleep-priority questions were dropped (D-31);
-    // 19 from r8.0.0, when the SDQ became one form for under-18s and one for 18+ (D-51).
-    expect(Object.keys(manifest.instruments)).toHaveLength(19);
+    // 19 from r8.0.0, when the SDQ became one form for under-18s and one for 18+ (D-51);
+    // 20 from r9.0.0, with the Sleep Quality Scale (D-53).
+    expect(Object.keys(manifest.instruments)).toHaveLength(20);
     expect(Object.keys(manifest.instruments).some((k) => k.includes("sleep_priorities"))).toBe(false);
     // canonical (variant-less) forms only (D-08)
     for (const key of Object.keys(manifest.instruments)) expect(key).not.toContain("+ybm-asadmin");
@@ -82,7 +88,7 @@ describe("YBM release r8.0.0", () => {
     // The frozen file is what devices actually run. If someone edits an item,
     // a scale or the composition without republishing, this fails: the release
     // on disk would no longer be the release the sources describe.
-    const path = fileURLToPath(new URL("../../../releases/ybm_nd2026_standard_r8.0.0.manifest.json", import.meta.url));
+    const path = fileURLToPath(new URL("../../../releases/candidates/ybm_nd2026_standard_r9.0.0.manifest.json", import.meta.url));
     const committed = JSON.parse(readFileSync(path, "utf8")) as {
       hash: string;
       release: { version: string; publishedAt: string; publishedBy: string; engineVersion: string; decisionRefs: string[] };
@@ -248,7 +254,8 @@ describe("the home address instead of a secret code (D-52)", () => {
     const file = readFileSync(fileURLToPath(new URL(`../../../${pinned.path}`, import.meta.url)));
     expect(pinned.bytes).toBe(file.length);
     expect(pinned.sha256).toBe(`sha256:${createHash("sha256").update(file).digest("hex")}`);
-    expect(Object.keys(manifest.assets)).toEqual(["postcodes_west_yorkshire"]);
+    // and, from r9.0.0, the street list (D-53)
+    expect(Object.keys(manifest.assets).sort()).toEqual(["postcodes_west_yorkshire", "streets_west_yorkshire"]);
   });
 
   it("refuses to publish an address question whose postcode list it does not have", () => {
@@ -263,6 +270,75 @@ describe("the home address instead of a secret code (D-52)", () => {
     expect(text).not.toContain("SECRET CODE");
     expect(text).toContain("name, date of birth and home address");
     expect(text).toContain("my name, date of birth and address will be kept separately from my answers");
+  });
+});
+
+describe("shorter consent, sleep quality and sanity checks (D-53)", () => {
+  const manifest = buildRelease(ybmComposition, registries, meta);
+  type Item = { key: string; responseType: string; [k: string]: unknown };
+  const itemsOf = (key: string) => (manifest.instruments[key] as { forms: { items: Item[] }[] }).forms[0]!.items;
+  const consent = itemsOf("ybm_intro_consent@1.0/en-GB/self/standard");
+
+  it("consent moves on by itself, then asks about linkage on its own", () => {
+    expect(consent.map((i) => i.key)).toEqual(["intro", "consent", "linkage_consent", "why_it_matters"]);
+    expect(consent.find((i) => i.key === "consent")).toMatchObject({ autoAdvance: true });
+    expect(consent.find((i) => i.key === "linkage_consent")).toMatchObject({
+      responseType: "single_choice",
+      scale: "scale.linkage_consent",
+      required: "hard",
+    });
+    expect(consent.find((i) => i.key === "why_it_matters")).toMatchObject({ advanceLabel: "I understand" });
+    expect(JSON.stringify(manifest)).not.toContain("m.faizah@");
+  });
+
+  it("asks sleep quality before sleepiness", () => {
+    const sleep = manifest.composition.sections.find((x) => x.key === "sleep")!;
+    expect(sleep.components.map((c) => (c.kind === "instrument" ? c.ref.instrument : c.kind))).toEqual(["sqs", "kss"]);
+    const scale = manifest.scales["scale.sqs_0_10"] as { bands: { label: string }[] };
+    expect(scale.bands.map((b) => b.label)).toEqual(["Terrible", "Poor", "Fair", "Good", "Excellent"]);
+  });
+
+  it("freezes the ethnicity list in its new order with its old codes", () => {
+    const eth = manifest.scales["scale.ethnicity_uk20"] as { version: string; options: { code: number }[] };
+    expect(eth.version).toBe("2.0.0");
+    expect(eth.options.slice(0, 2).map((o) => o.code)).toEqual([13, 2]);
+  });
+
+  it("pins the street list it searches, by hash", () => {
+    const pinned = manifest.assets["streets_west_yorkshire"]!;
+    const file = readFileSync(fileURLToPath(new URL(`../../../${pinned.path}`, import.meta.url)));
+    expect(pinned.path).toMatch(/streets-west-yorkshire-\d{4}-\d{2}\.txt$/);
+    expect(pinned.bytes).toBe(file.length);
+    expect(pinned.sha256).toBe(`sha256:${createHash("sha256").update(file).digest("hex")}`);
+  });
+
+  it("refuses a street search whose list, field or postcode check is missing", () => {
+    expect(() =>
+      buildRelease(ybmComposition, { ...registries, assets: { postcodes_west_yorkshire: registries.assets!["postcodes_west_yorkshire"]! } }, meta),
+    ).toThrow(/home_address: street list 'streets_west_yorkshire' is not among the release's assets/);
+    const bad = structuredClone(registries);
+    const address = bad.modules.find((m) => m.instrument === "ybm_identity")!.forms[0]!.items.find((i) => i.key === "home_address")!;
+    if (address.responseType !== "form_fields") throw new Error("wrong type");
+    address.streetCheck = { ...address.streetCheck!, areaKey: "house" };
+    delete address.postcodeCheck;
+    expect(() => buildRelease(ybmComposition, bad, meta)).toThrow(/a street check needs a postcode check beside it/);
+    expect(() => buildRelease(ybmComposition, bad, meta)).toThrow(/street check records 'house', which is already a field/);
+  });
+
+  it("refuses bands that group numbers the scale does not have", () => {
+    const bad = structuredClone(registries);
+    const sqs = bad.scales.find((x) => x.key === "scale.sqs_0_10")!;
+    sqs.bands = [...sqs.bands!, { label: "Off the scale", from: 10, to: 11 }];
+    expect(() => buildRelease(ybmComposition, bad, meta)).toThrow(/band 'Off the scale' covers 11, which is not an option/);
+    expect(() => buildRelease(ybmComposition, bad, meta)).toThrow(/10 is in more than one band/);
+  });
+
+  it("refuses a confirmation threshold outside the question's range", () => {
+    const bad = structuredClone(registries);
+    const days = bad.modules.find((m) => m.instrument === "ybm_social_media")!.forms[0]!.items.find((i) => i.key === "abstain_days")!;
+    if (days.responseType !== "numeric") throw new Error("wrong type");
+    days.confirmAbove = 5000;
+    expect(() => buildRelease(ybmComposition, bad, meta)).toThrow(/confirmAbove 5000 is outside the item's range/);
   });
 });
 

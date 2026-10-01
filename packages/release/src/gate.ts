@@ -77,13 +77,15 @@ export class PublishGateError extends Error {
  * The renderer capability a composition needs (D-49).
  *
  * 0.1.0 is every release up to r7.1.0. 0.2.0 adds component `items` subsets,
- * `age_gte` conditions (D-51) and postcode-checked address fields (D-52) — the
- * first build that loads releases at runtime renders all three.
+ * `age_gte` conditions (D-51) and postcode-checked address fields (D-52). 0.3.0
+ * adds what D-53 needs: a street search beside the postcode check, numbered
+ * rows with bands, consent that moves on by itself, an "I understand" label on
+ * an information screen, and a confirmation for a number above a threshold.
  * The participant app refuses a release that needs more than it can render and
  * keeps running the one it has, so a feature can never reach a device that
  * would show it as a blank screen.
  */
-export const ENGINE_VERSIONS = ["0.1.0", "0.2.0"] as const;
+export const ENGINE_VERSIONS = ["0.1.0", "0.2.0", "0.3.0"] as const;
 
 export function requiredEngineVersion(
   composition: { sections: { components: { kind: string; items?: unknown }[] }[] },
@@ -93,9 +95,41 @@ export function requiredEngineVersion(
     s.components.some((c) => (c.kind === "instrument" || c.kind === "module") && Array.isArray(c.items)),
   );
   const definitions = JSON.stringify([composition, registries?.instruments ?? null, registries?.modules ?? null]);
+  if (itemsOf(registries?.instruments).some(needsD53) || itemsOf(registries?.modules).some(needsD53)) return "0.3.0";
   const usesAge = definitions.includes('"op":"age_gte"');
   const usesPostcodes = Object.keys(registries?.assets ?? {}).length > 0 || definitions.includes('"postcodeCheck":');
   return usesSubsets || usesAge || usesPostcodes ? "0.2.0" : "0.1.0";
+}
+
+/** Every question in a registry of definitions, given as a list or keyed by reference. */
+function itemsOf(defs: unknown): Record<string, unknown>[] {
+  const list = Array.isArray(defs) ? defs : defs && typeof defs === "object" ? Object.values(defs) : [];
+  return list.flatMap((def) =>
+    ((def as { forms?: { items?: unknown[] }[] } | null)?.forms ?? []).flatMap((form) =>
+      (form.items ?? []).filter((item): item is Record<string, unknown> => !!item && typeof item === "object"),
+    ),
+  );
+}
+
+/**
+ * A question using what engine 0.3.0 added (D-53). By type: `autoAdvance` on a
+ * single choice is older than D-53; on a checkbox list it is new.
+ */
+function needsD53(item: Record<string, unknown>): boolean {
+  switch (item["responseType"]) {
+    case "form_fields":
+      return item["streetCheck"] !== undefined;
+    case "single_choice":
+      return item["presentation"] === "numbered";
+    case "checkbox_set":
+      return item["autoAdvance"] !== undefined;
+    case "info":
+      return item["advanceLabel"] !== undefined;
+    case "numeric":
+      return item["confirmAbove"] !== undefined;
+    default:
+      return false;
+  }
 }
 
 /** -1 / 0 / 1, numerically by MAJOR.MINOR.PATCH. */
@@ -484,6 +518,20 @@ export function freezeRelease(
             failures.push(`unresolved scale '${item.scale}' on ${ref.instrument}/${item.key}`);
           } else {
             frozenScales[item.scale] = scale;
+            // Bands drawn under a numbered row must each cover real options and
+            // not overlap, or the picture would group numbers that don't exist.
+            const codes = new Set(scale.options.map((o) => o.code));
+            const banded = new Set<number>();
+            for (const band of scale.bands ?? []) {
+              for (let c = band.from; c <= band.to; c += 1) {
+                if (!codes.has(c)) failures.push(`${item.scale}: band '${band.label}' covers ${c}, which is not an option`);
+                if (banded.has(c)) failures.push(`${item.scale}: ${c} is in more than one band`);
+                banded.add(c);
+              }
+            }
+            if (item.responseType === "single_choice" && item.presentation === "numbered" && !scale.bands?.length) {
+              failures.push(`${ref.instrument}/${item.key}: a numbered row needs its scale's bands`);
+            }
           }
         }
         if (item.responseType === "form_fields" && item.postcodeCheck) {
@@ -493,6 +541,30 @@ export function freezeRelease(
           else frozenAssets[check.asset] = asset;
           if (!item.fields.some((f) => f.key === check.field)) {
             failures.push(`${ref.instrument}/${item.key}: postcode check names field '${check.field}', which the item does not have`);
+          }
+        }
+        if (item.responseType === "form_fields" && item.streetCheck) {
+          const check = item.streetCheck;
+          const asset = registries.assets?.[check.asset];
+          if (!asset) failures.push(`${ref.instrument}/${item.key}: street list '${check.asset}' is not among the release's assets`);
+          else frozenAssets[check.asset] = asset;
+          if (!item.fields.some((f) => f.key === check.field)) {
+            failures.push(`${ref.instrument}/${item.key}: street check names field '${check.field}', which the item does not have`);
+          }
+          // Offered to someone who says they don't know their postcode, so it
+          // only makes sense beside a postcode check (D-53).
+          if (!item.postcodeCheck) failures.push(`${ref.instrument}/${item.key}: a street check needs a postcode check beside it`);
+          for (const k of [check.areaKey, check.districtKey]) {
+            if (item.fields.some((f) => f.key === k)) {
+              failures.push(`${ref.instrument}/${item.key}: street check records '${k}', which is already a field`);
+            }
+          }
+          if (check.areaKey === check.districtKey) failures.push(`${ref.instrument}/${item.key}: street check records area and district under one key`);
+        }
+        if (item.responseType === "numeric" && item.confirmAbove !== undefined) {
+          const { confirmAbove: above, min, max } = item;
+          if ((min !== undefined && above < min) || (max !== undefined && above >= max)) {
+            failures.push(`${ref.instrument}/${item.key}: confirmAbove ${above} is outside the item's range`);
           }
         }
         const pipes = item.stem.pipes ?? {};

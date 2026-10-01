@@ -1,3 +1,4 @@
+import { defuseFormula } from "@myself/store";
 import type { WideTable } from "@myself/store";
 
 /**
@@ -121,8 +122,9 @@ export function sortRows(rows: Row[], sort: Sort | null): Row[] {
 export function toCsv(columns: { key: string; label: string }[], rows: Row[]): string {
   const escape = (value: Cell): string => {
     if (value === null) return "";
-    const text = String(value);
-    return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+    // Free text a participant typed is opened in a spreadsheet: defused, never run.
+    const text = typeof value === "number" ? String(value) : defuseFormula(String(value));
+    return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
   };
   const lines = [columns.map((c) => escape(c.key)).join(",")];
   for (const row of rows) lines.push(columns.map((c) => escape(row[c.key] ?? null)).join(","));

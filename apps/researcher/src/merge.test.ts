@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { supersedes } from "./lib/db.js";
+import { DEMONSTRATION, sourceOf, supersedes } from "./lib/db.js";
 
 /**
  * Which copy of a sitting wins.
@@ -28,5 +28,22 @@ describe("a sitting pulled from the study", () => {
 
   it("does not treat an empty pull as superseding anything", () => {
     expect(supersedes(withEvents(0), withEvents(1))).toBe(false);
+  });
+});
+
+describe("where a stored sitting came from", () => {
+  // The dashboard counts what the study's database holds. A sitting that only ever
+  // arrived here in a file is invisible to it, so the Overview says how many there are.
+  it("is the study when it was pulled, or when a pull found the study holds it too", () => {
+    expect(sourceOf({ source: "study" })).toBe("study");
+    expect(sourceOf({ source: "ipad-3.json", receivedAt: "2026-09-02T08:00:00.000Z" })).toBe("study");
+  });
+
+  it("is a file when only a file ever brought it", () => {
+    expect(sourceOf({ source: "ipad-3.json" })).toBe("file");
+  });
+
+  it("is demonstration data when it was made up", () => {
+    expect(sourceOf({ source: DEMONSTRATION })).toBe("demonstration");
   });
 });

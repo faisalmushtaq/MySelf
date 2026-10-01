@@ -114,8 +114,18 @@ export function watchUser(listener: (user: StudyUser | null) => void): () => voi
   });
 }
 
+/**
+ * A sitting as pulled, with the time the study last received it.
+ *
+ * `receivedAt` is the server's clock, written on every upload. It is what decides
+ * whether an unfinished sitting is still in progress or has been abandoned, in the
+ * dashboard and here alike (`lifecycleOf` in @myself/store), and a device's own clock
+ * can be hours out — so it is kept rather than dropped at the door.
+ */
+export type PulledSitting = DeviceSession & { receivedAt?: string };
+
 export interface StudyPull {
-  sessions: DeviceSession[];
+  sessions: PulledSitting[];
   /** Sittings the study is holding back for review, and so left out of here. */
   quarantined: number;
   /** Sittings that could not be reassembled, named so somebody can go and look. */
@@ -160,7 +170,7 @@ export async function assemblePull(
   documents: readonly SessionDoc[],
   chunksFor: (sessionId: string) => Promise<ChunkDoc[]>,
 ): Promise<StudyPull> {
-  const sessions: DeviceSession[] = [];
+  const sessions: PulledSitting[] = [];
   const unreadable: string[] = [];
   let quarantined = 0;
 
@@ -174,7 +184,7 @@ export async function assemblePull(
       // and reading a collection that does not exist for every one of them would double
       // the cost of a pull for nothing.
       const chunks = data.chunkCount > 0 ? await chunksFor(data.sessionId) : [];
-      sessions.push(joinSession(data, chunks));
+      sessions.push({ ...joinSession(data, chunks), ...(data.receivedAt ? { receivedAt: data.receivedAt } : {}) });
     } catch {
       /**
        * Named, not dropped, and not allowed to fail the whole pull.
@@ -217,16 +227,17 @@ export async function fetchPublicRelease(hash: string): Promise<unknown> {
  * Stop one device filing anything more.
  *
  * NOTHING IS ENROLLED ANY MORE — a participant opens the URL on any iPad and takes
- * part, and the device signs itself in. So there is no enrolment panel here, and
- * `enrolDevice` in the functions is kept only for a study that wants named
- * devices; it is not part of fielding one.
+ * part, and the device registers itself on its first upload. So there is no
+ * enrolment panel here, and no `enrolDevice` in the functions: `revokeDevice` is
+ * what took its place.
  *
  * Revoking still matters, and arguably more: the way to deal with a device posting
  * something it should not — a stray iPad, a duplicate, an obvious test run from
  * outside the room — is to take its identity away. The device id is on every
- * sitting in the table, so it can be read off the row and pasted here. It disables
- * the account and revokes the refresh token, so the session the device already
- * holds stops working too.
+ * sitting in the table, so it can be read off the row and pasted here. The device
+ * is marked revoked, which `registerDevice` checks on every upload, and an older
+ * device that was given an account of its own has that account disabled and its
+ * refresh token revoked as well.
  */
 export async function revokeDevice(deviceId: string): Promise<void> {
   const call = httpsCallable<{ deviceId: string }, unknown>(firebase().fns, "revokeDevice");

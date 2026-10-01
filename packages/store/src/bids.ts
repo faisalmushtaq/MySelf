@@ -166,11 +166,26 @@ function narrativeFiles(runs: StoredNarrativeRun[], data: Dataset): BidsFile[] {
   return files;
 }
 
-/** A TSV cell: `n/a` for missing, tabs and newlines stripped from text. */
+/**
+ * Text as a spreadsheet will show it rather than run it.
+ *
+ * Exports are opened in Excel, and a cell beginning with =, +, - or @ (or their
+ * full-width forms, or any of them after leading spaces) is evaluated as a
+ * formula — so a participant who types "=HYPERLINK(…)" into a free-text box
+ * could put a live link or worse in front of the researcher. A leading
+ * apostrophe makes it plain text; the words are otherwise untouched. Numbers
+ * never pass through here, so a negative number stays a number.
+ */
+export function defuseFormula(text: string): string {
+  return /^\s*[=+\-@\uFF1D\uFF0B\uFF0D\uFF20]/.test(text) ? `'${text}` : text;
+}
+
+/** A TSV cell: `n/a` for missing, tabs and newlines stripped from text, formulas defused. */
 function cell(value: unknown): string {
   if (value === null || value === undefined || value === "") return NA;
   if (typeof value === "boolean") return value ? "1" : "0";
-  return String(value).replace(/[\t\r\n]+/g, " ").trim() || NA;
+  if (typeof value === "number") return String(value);
+  return defuseFormula(String(value).replace(/[\t\r\n]+/g, " ").trim()) || NA;
 }
 
 function tsv(columns: string[], rows: Record<string, unknown>[]): string {

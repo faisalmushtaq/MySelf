@@ -46,38 +46,191 @@ export const gender4: ResponseScale = {
   ],
 };
 
-/** UK-census-style 20-option ethnicity list, codes identical to Qualtrics. */
+/**
+ * UK-census-style 20-option ethnicity list, codes identical to Qualtrics.
+ *
+ * 2.0.0 (D-53): listed most common first in West Yorkshire, so most people find
+ * theirs at the top. Order from usual residents of Bradford, Calderdale,
+ * Kirklees, Leeds and Wakefield in the 2021 Census (ONS table TS021, Open
+ * Government Licence), share of 2,351,579 in brackets. Codes are exactly those
+ * of 1.0.0 — only the order on screen changed — so answers compare across
+ * releases. "Prefer not to say" stays last.
+ */
+const ethnicityLabels: Record<number, string> = {
+  1: "Indian",
+  2: "Pakistani",
+  3: "Bangladeshi",
+  4: "Chinese",
+  5: "Any other Asian background",
+  6: "Caribbean",
+  7: "African",
+  8: "Any other Black, Black British, or Caribbean background",
+  9: "White and Black Caribbean",
+  10: "White and Black African",
+  11: "White and Asian",
+  12: "Any other Mixed or multiple ethnic backgrounds",
+  13: "English, Welsh, Scottish, Northern Irish or British",
+  14: "Irish",
+  15: "Gypsy or Irish Traveller",
+  16: "Roma",
+  17: "Any other White background",
+  18: "Any other ethnic group",
+  19: "Arab",
+};
+const ethnicityByWestYorkshire2021 = [
+  13, // White: English, Welsh, Scottish, Northern Irish or British (72.0%)
+  2, // Pakistani (10.7%)
+  17, // Other White (3.7%)
+  1, // Indian (2.7%)
+  7, // African (2.0%)
+  18, // Any other ethnic group (1.2%)
+  5, // Other Asian (1.2%)
+  9, // White and Black Caribbean (1.0%)
+  11, // White and Asian (0.9%)
+  3, // Bangladeshi (0.9%)
+  6, // Caribbean (0.7%)
+  14, // Irish (0.6%)
+  12, // Other Mixed (0.5%)
+  4, // Chinese (0.5%)
+  19, // Arab (0.5%)
+  8, // Other Black (0.4%)
+  10, // White and Black African (0.3%)
+  16, // Roma (0.2%)
+  15, // Gypsy or Irish Traveller (0.1%)
+];
+
 export const ethnicityUk20: ResponseScale = {
   key: "scale.ethnicity_uk20",
-  version: "1.0.0",
-  name: "Ethnic origin (UK, 20 options, as administered)",
+  version: "2.0.0",
+  name: "Ethnic origin (UK, 20 options; most common in West Yorkshire first)",
   direction: "unordered",
   options: [
-    ...opts(
-      [
-        "Indian",
-        "Pakistani",
-        "Bangladeshi",
-        "Chinese",
-        "Any other Asian background",
-        "Caribbean",
-        "African",
-        "Any other Black, Black British, or Caribbean background",
-        "White and Black Caribbean",
-        "White and Black African",
-        "White and Asian",
-        "Any other Mixed or multiple ethnic backgrounds",
-        "English, Welsh, Scottish, Northern Irish or British",
-        "Irish",
-        "Gypsy or Irish Traveller",
-        "Roma",
-        "Any other White background",
-        "Any other ethnic group",
-        "Arab",
-      ],
-      1,
-    ),
+    ...ethnicityByWestYorkshire2021.map((code) => opt(code, ethnicityLabels[code]!, code)),
     opt(20, "Prefer not to say", 20, "decline"),
+  ],
+};
+
+/** Whether English was the first language spoken (D-53). */
+export const firstLanguageEnglish: ResponseScale = {
+  key: "scale.first_language_english",
+  version: "1.0.0",
+  name: "English as first language (yes / no / alongside another)",
+  direction: "unordered",
+  options: [
+    opt(1, "Yes"),
+    opt(2, "No"),
+    opt(3, "I learned English and another language at the same time"),
+  ],
+};
+
+/**
+ * Languages other than English (D-53), most common first in West Yorkshire:
+ * the languages the 2021 Census names individually (table TS024, main
+ * language, usual residents of Bradford, Calderdale, Kirklees, Leeds and
+ * Wakefield, ONS, Open Government Licence), in order of how many people there
+ * gave each as their main language. Anything else is "Another language",
+ * named in a box.
+ */
+export const LANGUAGES: { code: number; label: string; key: string }[] = [
+  { code: 1, label: "Urdu", key: "urdu" }, // 29,077
+  { code: 2, label: "Punjabi", key: "punjabi" }, // 27,309
+  { code: 3, label: "Polish", key: "polish" }, // 26,929
+  { code: 4, label: "Arabic", key: "arabic" }, // 9,443
+  { code: 5, label: "Chinese (Mandarin or Cantonese)", key: "chinese" }, // 6,633
+  { code: 6, label: "Gujarati", key: "gujarati" }, // 5,998
+  { code: 7, label: "Bengali (including Sylheti)", key: "bengali" }, // 5,488
+  { code: 8, label: "Portuguese", key: "portuguese" }, // 4,610
+  { code: 9, label: "Spanish", key: "spanish" }, // 3,799
+  { code: 10, label: "Russian", key: "russian" }, // 2,865
+  { code: 11, label: "French", key: "french" }, // 2,273
+  { code: 12, label: "Tamil", key: "tamil" }, // 1,254
+  { code: 13, label: "British Sign Language", key: "bsl" }, // 1,106
+  { code: 14, label: "Turkish", key: "turkish" }, // 739
+];
+export const ANOTHER_LANGUAGE_CODE = 15;
+
+export const otherLanguages: ResponseScale = {
+  key: "scale.other_languages",
+  version: "1.0.0",
+  name: "Languages other than English (most common in West Yorkshire first; select all)",
+  direction: "unordered",
+  options: [
+    ...LANGUAGES.map((l) => opt(l.code, l.label)),
+    opt(ANOTHER_LANGUAGE_CODE, "Another language", undefined, "other_specify"),
+  ],
+};
+
+/**
+ * How well a language is understood (D-53). Worded after the Census question
+ * on English ("very well / well / not well / not at all"), ending at "only a
+ * few words" because anyone asked has said they understand some of it.
+ */
+export const languageUnderstanding4: ResponseScale = {
+  key: "scale.language_understanding_4",
+  version: "1.0.0",
+  name: "How well a language is understood (very well to only a few words)",
+  direction: "descending",
+  options: [opt(1, "Very well"), opt(2, "Well"), opt(3, "Not very well"), opt(4, "Only a few words")],
+  scoringNote: "1 = very well … 4 = only a few words. Descending understanding.",
+};
+
+/**
+ * Consent to linkage through Connected Yorkshire (D-53). Worded as an
+ * agreement, so either answer is a complete one.
+ */
+export const linkageConsent: ResponseScale = {
+  key: "scale.linkage_consent",
+  version: "1.0.0",
+  name: "Linkage consent (Yes, I agree / No, I don't agree)",
+  direction: "unordered",
+  options: [opt(1, "Yes, I agree"), opt(2, "No, I don't agree")],
+};
+
+/**
+ * Sleep Quality Scale (Snyder et al., 2018): 0-10, with the published
+ * groupings drawn beneath the numbers (D-53). The number is the answer and
+ * the score; the band is shown, never stored.
+ */
+export const sqs11: ResponseScale = {
+  key: "scale.sqs_0_10",
+  version: "1.0.0",
+  name: "Sleep Quality Scale, 0 (Terrible) to 10 (Excellent)",
+  direction: "ascending",
+  options: Array.from({ length: 11 }, (_, n) => ({
+    code: n,
+    label: String(n),
+    value: n,
+    kind: "substantive" as const,
+    textEntry: false,
+  })),
+  bands: [
+    { label: "Terrible", from: 0, to: 0 },
+    { label: "Poor", from: 1, to: 3 },
+    { label: "Fair", from: 4, to: 6 },
+    { label: "Good", from: 7, to: 9 },
+    { label: "Excellent", from: 10, to: 10 },
+  ],
+  scoringNote: "Score = the number chosen, 0-10. Bands (Snyder et al., 2018): 0 terrible, 1-3 poor, 4-6 fair, 7-9 good, 10 excellent.",
+};
+
+/**
+ * How family manage social media (D-53). The study's own options, not a
+ * published measure; asked only of those who said their family does.
+ */
+export const smFamilyControlHow: ResponseScale = {
+  key: "scale.sm_family_control_how",
+  version: "1.0.0",
+  name: "How family manage social media use (select all)",
+  direction: "unordered",
+  options: [
+    opt(1, "They set time limits or times when I can't use it"),
+    opt(2, "They use parental controls or a monitoring app"),
+    opt(3, "They decide which apps or sites I can use"),
+    opt(4, "They check my messages, posts or who I follow"),
+    opt(5, "They know my passwords or can get into my accounts"),
+    opt(6, "They take my phone or device away at certain times"),
+    opt(7, "They have to agree before I get a new app or account"),
+    opt(8, "Something else", undefined, "other_specify"),
   ],
 };
 
@@ -633,6 +786,12 @@ export const allScales: ResponseScale[] = [
   yesNoSometimes,
   gender4,
   ethnicityUk20,
+  firstLanguageEnglish,
+  otherLanguages,
+  languageUnderstanding4,
+  linkageConsent,
+  sqs11,
+  smFamilyControlHow,
   hairType12,
   month12,
   kss9Canonical,

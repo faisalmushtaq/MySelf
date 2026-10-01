@@ -42,10 +42,12 @@ interface FrozenItem {
   responseType: string;
   scale?: string;
   rungs?: number;
+  lowestValue?: number;
   min?: number;
   max?: number;
   fields?: { key: string }[];
   statements?: { key: string }[];
+  groups?: { key: string }[];
 }
 
 const FIRST_NAMES = ["Amara", "Ben", "Chloe", "Dev", "Esme", "Finlay", "Gracie", "Hamza", "Isla", "Jonah", "Kaya", "Louis"];
@@ -280,8 +282,11 @@ function answerFor(item: FrozenItem, ctx: AnswerContext): unknown {
       return { kind: "multi", codes: codes.length ? codes : [options[0]?.code ?? 1] };
     }
     case "ladder": {
+      // A rung is recorded as a number, as the device records it. It used to be
+      // written as a choice, which no device ever sends, and which the shared
+      // completeness rules rightly call invalid (counting.ts).
       const rungs = item.rungs ?? 10;
-      return { kind: "choice", code: 1 + Math.floor(random() * rungs) };
+      return { kind: "number", value: (item.lowestValue ?? 1) + Math.floor(random() * rungs) };
     }
     case "slider": {
       const min = item.min ?? 0;
@@ -314,9 +319,13 @@ function answerFor(item: FrozenItem, ctx: AnswerContext): unknown {
     case "rank_group": {
       const scale = item.scale ? ctx.scales.get(item.scale) : undefined;
       const assignments: Record<number, { group: string; rank?: number }> = {};
+      // The item's own groups ("have" and "dont_have" for the apps question); a
+      // group it does not define is an answer the device could never record.
+      const [ranked = "owned", other] = (item.groups ?? []).map((g) => g.key);
       let rank = 1;
       for (const option of scale?.options ?? []) {
-        if (random() < 0.5) assignments[option.code] = { group: "owned", rank: rank++ };
+        if (random() < 0.5) assignments[option.code] = { group: ranked, rank: rank++ };
+        else if (other) assignments[option.code] = { group: other };
       }
       return { kind: "group_rank", assignments };
     }

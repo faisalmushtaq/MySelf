@@ -82,3 +82,6 @@ export async function readStoredRelease(
   const manifest = parsed.data;
   return { release: { hash, key: manifest.release.key, version: manifest.release.version, manifest } };
 }
+
+/** Each release's manifest by hash, as the shared counting rules take them (@myself/store counting.ts). */
+export const manifestsByHash = new Map(releases.map((r) => [r.hash, r.manifest]));

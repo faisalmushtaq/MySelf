@@ -48,6 +48,12 @@ import { buildRuntime, type Runtime } from "./lib/runtime.js";
 import { sittingToResume } from "./lib/resume.js";
 import { ReviewScreen } from "./components/ReviewScreen.js";
 import { SurveyScreen } from "./components/SurveyScreen.js";
+import { CheckInScreen } from "./screens/CheckInScreen.js";
+import { FinishScreen } from "./screens/FinishScreen.js";
+import { HandoverPanel } from "./screens/HandoverPanel.js";
+import { PaceScreen } from "./screens/PaceScreen.js";
+import { SaveFailedScreen } from "./screens/SaveFailedScreen.js";
+import { StartScreen } from "./screens/StartScreen.js";
 
 /**
  * MySelf Go — participant application (preview build).
@@ -865,303 +871,65 @@ export default function App({ initialRuntime }: { initialRuntime: Runtime }) {
       </div>
 
       {phase.kind === "start" && (
-        <div className="screen start">
-          <h1 className="brand">MySelf</h1>
-          <p className="subbrand">MyThoughts</p>
-          {manifest.composition.studyLabel && (
-            <p className="study-title">{manifest.composition.studyLabel}</p>
-          )}
-          {/* The code the research team issued, entered once before anything
-              else. It used to be asked again mid-survey; now it is captured
-              here and carried through, so nobody types it twice. */}
-          {codeRule?.instructions && <p className="start-instructions">{codeRule.instructions}</p>}
-          <label className="field code-field">
-            <span className="field-label">{codeRule?.label ?? "Your participant code"}</span>
-            <input
-              className="text-input code"
-              value={code}
-              placeholder={codeRule?.placeholder ?? "NDC0000"}
-              autoCapitalize="characters"
-              autoComplete="off"
-              aria-invalid={codeError !== null}
-              maxLength={16}
-              onChange={(e) => {
-                // Codes are letters and digits only; punctuation and spaces
-                // are dropped as they are typed rather than rejected later.
-                setCode(e.target.value.replace(/[^A-Za-z0-9]/g, "").toUpperCase().slice(0, 16));
-                if (codeError) setCodeError(null);
-              }}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") void start();
-              }}
-            />
-            {codeError && (
-              <span className="error" role="alert">
-                {codeError}
-              </span>
-            )}
-          </label>
-          <button type="button" className="next big" disabled={code.trim().length < 2 || busy} onClick={() => void start()}>
-            Start
-          </button>
-          <details className="reading-settings">
-            <summary>Reading settings</summary>
-            <p className="reading-settings-intro">Choose the display that feels clearest. These preferences stay on this device and are never included in study data.</p>
-            <div className="reading-settings-row">
-              <span className="reading-settings-label">Text size</span>
-              <div className="reading-settings-options" role="group" aria-label="Text size">
-                {(["default", "large", "extra_large"] as const).map((size) => (
-                  <button
-                    key={size}
-                    type="button"
-                    className={`reading-settings-choice ${accessibility.textSize === size ? "selected" : ""}`}
-                    aria-pressed={accessibility.textSize === size}
-                    onClick={() => updateAccessibility({ textSize: size })}
-                  >
-                    {size === "default" ? "Default" : size === "large" ? "Large" : "Extra large"}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div className="reading-settings-row">
-              <span className="reading-settings-label">Contrast</span>
-              <div className="reading-settings-options" role="group" aria-label="Contrast">
-                {(["standard", "high", "dark"] as const).map((contrast) => (
-                  <button
-                    key={contrast}
-                    type="button"
-                    className={`reading-settings-choice ${accessibility.contrast === contrast ? "selected" : ""}`}
-                    aria-pressed={accessibility.contrast === contrast}
-                    onClick={() => updateAccessibility({ contrast })}
-                  >
-                    {contrast === "standard" ? "Standard" : contrast === "high" ? "High" : "Dark"}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <label className="reading-settings-toggle">
-              <input
-                type="checkbox"
-                checked={accessibility.dyslexiaFriendly}
-                onChange={(event) => updateAccessibility({ dyslexiaFriendly: event.target.checked })}
-              />
-              <span>Dyslexia-friendly reading mode</span>
-            </label>
-          </details>
-          {/*
-            Addressed to whoever set this iPad up, on the screen they are looking at
-            when they do it — because the one action that prevents the loss has to be
-            taken before any data exists, and the panel that explains it is behind a
-            five-tap gesture only a researcher knows. It sits with the build line,
-            which is already staff-facing text on this screen, and it disappears the
-            moment either protection is in place.
-          */}
-          {durability?.atRisk && (
-            <p className="hint warn setup-note">
-              Before using this iPad for real sittings: tap Share, then <strong>Add to Home Screen</strong>, and open MySelf from there. Safari deletes a website's saved data after {EVICTION_CAP_DAYS} days of not being opened; an app on the Home Screen keeps it.
-            </p>
-          )}
-          <p
-            className="hint demo-note"
-            onClick={() => {
-              handoverTaps.current += 1;
-              if (handoverTaps.current >= 5) {
-                handoverTaps.current = 0;
-                setHandoverOpen((v) => !v);
-              }
-            }}
-          >
-            Preview build · release {manifest.release.version} ({runtime.source === "built-in" ? "built in" : "downloaded"}) ·{" "}
-            {manifest.hash?.slice(7, 19)} ·{" "}
-            {counts.awaitingSync + counts.syncFailed} session{counts.awaitingSync + counts.syncFailed === 1 ? "" : "s"} awaiting sync · {counts.syncedVerified} verified · build{" "}
-            {__BUILD_STAMP__}
-          </p>
+        <StartScreen
+          studyLabel={manifest.composition.studyLabel}
+          codeRule={codeRule}
+          contact={contact}
+          releaseVersion={manifest.release.version}
+          releaseHash={manifest.hash}
+          releaseBuiltIn={runtime.source === "built-in"}
+          code={code}
+          codeError={codeError}
+          onCodeChange={setCode}
+          onCodeErrorClear={() => setCodeError(null)}
+          busy={busy}
+          onStart={start}
+          accessibility={accessibility}
+          onAccessibilityChange={updateAccessibility}
+          durability={durability}
+          counts={counts}
+          onBuildLineTap={() => {
+            handoverTaps.current += 1;
+            if (handoverTaps.current >= 5) {
+              handoverTaps.current = 0;
+              setHandoverOpen((v) => !v);
+            }
+          }}
+        >
           {handoverOpen && (
-            <div className="handover">
-              <h2>Handover</h2>
-              {/*
-                Room left, before a write fails rather than after.
-                A failed write is handled — the survey stops and asks for staff — but
-                that is a recovery, and swapping an iPad between participants costs
-                nothing. Advisory, because Safari's numbers are.
-              */}
-              {space?.known && (
-                <p className={space.low ? "hint warn" : "hint"}>
-                  {space.low
-                    ? `Only about ${readableBytes(space.remaining)} of room left on this iPad — use another one for the next participant if you can. Nothing already answered is at risk.`
-                    : `About ${readableBytes(space.remaining)} of room left, holding ${readableBytes(space.used)}.`}
-                </p>
-              )}
-              {/*
-                The eviction risk, stated plainly, on the panel a researcher opens
-                when deciding whether a device can go back in the cupboard. See
-                `lib/durability.ts` for why this is not a theoretical concern on an
-                iPad. The held-for line is the part that turns it into a decision:
-                "holding Monday's data since Monday" is actionable, a count is not.
-              */}
-              {durability && (durability.atRisk || (heldDays !== null && heldDays >= HELD_TOO_LONG_DAYS)) && (
-                <p className="hint warn">
-                  {durability.atRisk
-                    ? `This iPad is running MySelf as a Safari tab, so its saved data will be deleted after ${EVICTION_CAP_DAYS} days without the site being opened. Add MySelf to the Home Screen and open it from there, and that stops applying.`
-                    : "This iPad's storage is protected from being cleared by the browser."}
-                  {heldDays !== null && heldDays >= HELD_TOO_LONG_DAYS
-                    ? ` It has been holding data the study has not confirmed for ${heldDays} day${heldDays === 1 ? "" : "s"} — sync it today.`
-                    : ""}
-                </p>
-              )}
-              <p className="hint">
-                {counts.awaitingSync + counts.syncFailed} completed session{counts.awaitingSync + counts.syncFailed === 1 ? "" : "s"} awaiting upload, {counts.syncedVerified} confirmed by the study, {counts.quarantined} needing review, and {counts.inProgress} unfinished on this device. A sitting stays here until the study has confirmed it stored every event this device sent.
-              </p>
-              {/*
-                Which survey a new sitting gets, and why — the question somebody asks
-                when a change was published this morning and this iPad is still
-                showing yesterday's. An unfinished sitting keeps the version it
-                started with whatever this says.
-              */}
-              <p className="hint release-note">
-                New sittings use release {manifest.release.version} ({manifest.hash?.slice(7, 19)}),{" "}
-                {runtime.source === "built-in"
+            <HandoverPanel
+              counts={counts}
+              space={space}
+              durability={durability}
+              heldDays={heldDays}
+              online={online}
+              syncBusy={syncBusy}
+              onSync={() => void runSync(true)}
+              device={device}
+              passphrase={passphrase}
+              onPassphraseChange={setPassphrase}
+              onNote={setHandoverNote}
+              onCleared={refreshDeviceStatus}
+              onSittingsErased={async () => {
+                await pruneReleases([runtimeRef.current.hash, activeRuntime.current.hash]);
+              }}
+              releaseNote={
+                `New sittings use release ${manifest.release.version} (${manifest.hash?.slice(7, 19)}), ` +
+                (runtime.source === "built-in"
                   ? "the version built into this app."
                   : runtime.source === "live"
                     ? "downloaded from the study and verified since the app was opened."
-                    : "downloaded from the study earlier and verified on this device."}{" "}
-                {releaseCheck
+                    : "downloaded from the study earlier and verified on this device.") +
+                " " +
+                (releaseCheck
                   ? `Last checked ${new Date(releaseCheck.at).toLocaleTimeString()}: ${describeCheck(releaseCheck.outcome)}`
-                  : "Not yet checked for a newer version."}
-              </p>
-              <div className="handover-actions">
-                <button
-                  type="button"
-                  className="secondary"
-                  disabled={!online || syncBusy || counts.awaitingSync + counts.syncFailed === 0}
-                  onClick={() => void runSync(true)}
-                >
-                  {syncBusy ? "Synchronising…" : "Sync completed sessions"}
-                </button>
-              </div>
-              {device && (
-                <p className="hint">
-                  This iPad is <strong>{device.deviceId}</strong>, since {device.firstSyncedAt.slice(0, 10)}. It chose
-                  that itself on first launch, so it works with no network from the start.{" "}
-                  {syncAvailable
-                    ? "Sittings upload by themselves whenever it has a connection; nothing needs setting up."
-                    : "This build has no study configured, so everything stays on this device."}
-                </p>
-              )}
-              {/*
-                The passphrase is the STUDY's, not this device's, so a researcher
-                with six iPads on a table types one phrase six times rather than
-                keeping six secrets — and the researcher view needs one phrase to
-                read whatever arrives. Never stored here.
-              */}
-              <label className="field">
-                <span className="field-label">Study passphrase, to encrypt the file</span>
-                <input
-                  className="text-input"
-                  type="password"
-                  value={passphrase}
-                  autoComplete="off"
-                  onChange={(event) => setPassphrase(event.target.value)}
-                />
-              </label>
-              <div className="handover-actions">
-                <button
-                  type="button"
-                  className="secondary"
-                  disabled={counts.completed === 0 || passphraseComplaint(passphrase) !== null}
-                  title={passphraseComplaint(passphrase) ?? undefined}
-                  onClick={() => {
-                    void (async () => {
-                      try {
-                        const { envelope } = await buildSealedExport(passphrase);
-                        downloadExport(envelope);
-                        setHandoverNote(
-                          `${envelope.sittings} session${envelope.sittings === 1 ? "" : "s"} written, encrypted. Keep the sitting${envelope.sittings === 1 ? "" : "s"} on this device until the file is stored and checked.`,
-                        );
-                      } catch (error) {
-                        setHandoverNote(error instanceof Error ? error.message : "Could not write the file.");
-                      }
-                    })();
-                  }}
-                >
-                  Export completed sessions
-                </button>
-                <button
-                  type="button"
-                  className="secondary"
-                  disabled={counts.completed + counts.inProgress === 0 || passphraseComplaint(passphrase) !== null}
-                  title={passphraseComplaint(passphrase) ?? undefined}
-                  onClick={() => {
-                    void (async () => {
-                      try {
-                        const { envelope } = await buildSealedExport(passphrase, { includeInProgress: true });
-                        downloadExport(envelope, "device-all");
-                        setHandoverNote(
-                          `${envelope.sittings} session${envelope.sittings === 1 ? "" : "s"} written, encrypted, unfinished included.`,
-                        );
-                      } catch (error) {
-                        setHandoverNote(error instanceof Error ? error.message : "Could not write the file.");
-                      }
-                    })();
-                  }}
-                >
-                  Include unfinished
-                </button>
-              </div>
-              {passphrase.length > 0 && passphraseComplaint(passphrase) && (
-                <p className="hint">{passphraseComplaint(passphrase)}</p>
-              )}
-              <div className="handover-actions">
-                {/*
-                  The only delete in the app, and it cannot reach an unconfirmed
-                  sitting. `forgetConfirmedSessions` selects on a stored receipt
-                  whose event count matches what is on the device, so there is no
-                  version of this button that loses data — which is why it can sit
-                  next to the export rather than behind a second confirmation
-                  nobody reads.
-
-                  It matters because the alternative is deleting the app or
-                  clearing Safari's data, and that destroys the device key along
-                  with it: every sitting not yet handed over becomes permanently
-                  unreadable.
-                */}
-                <button
-                  type="button"
-                  className="secondary"
-                  disabled={counts.syncedVerified === 0}
-                  onClick={() => {
-                    void (async () => {
-                      const erased = await forgetConfirmedSessions();
-                      // A downloaded release is kept while any sitting on this
-                      // device was started under it; clearing sittings is when
-                      // one can stop being needed.
-                      if (erased.sessions > 0) {
-                        await pruneReleases([runtimeRef.current.hash, activeRuntime.current.hash]);
-                      }
-                      setHandoverNote(
-                        erased.sessions === 0
-                          ? "Nothing to clear — no sitting on this device has been confirmed by the study yet."
-                          : `${erased.sessions} confirmed sitting${erased.sessions === 1 ? "" : "s"} cleared from this device. ${counts.awaitingSync + counts.syncFailed + counts.quarantined + counts.inProgress} still held here.`,
-                      );
-                      await refreshDeviceStatus();
-                    })();
-                  }}
-                >
-                  Clear {counts.syncedVerified} confirmed sitting{counts.syncedVerified === 1 ? "" : "s"}
-                </button>
-              </div>
-              {syncNote && <p className="hint">{syncNote}</p>}
-              {handoverNote && <p className="hint">{handoverNote}</p>}
-            </div>
+                  : "Not yet checked for a newer version.")
+              }
+              syncNote={syncNote}
+              handoverNote={handoverNote}
+            />
           )}
-          {contact && (
-            <p className="start-footer">
-              {contact.ethicsReference && <>Ethics reference {contact.ethicsReference}. </>}
-              Any questions, email <a href={`mailto:${contact.email}`}>{contact.email}</a>.
-              {contact.note && <> {contact.note}</>}
-            </p>
-          )}
-        </div>
+        </StartScreen>
       )}
 
       {/*
@@ -1170,22 +938,7 @@ export default function App({ initialRuntime }: { initialRuntime: Runtime }) {
         one thing that must not happen is carrying on as though the answer was saved.
         `advance` refuses while this is up, so the survey cannot be walked past it.
       */}
-      {saveError && (
-        <div className="screen save-failed" role="alertdialog" aria-label="Answers are not being saved">
-          <h1>Let&apos;s pause a moment</h1>
-          <p>{saveError} Nothing you have already answered is lost.</p>
-          <p>Please put your hand up so somebody from the team can help.</p>
-          <div className="checkin-actions">
-            <button type="button" className="next big" onClick={retrySave}>
-              Try again
-            </button>
-          </div>
-          <p className="hint">
-            For the team: this iPad refused a write to its own storage, so the survey has stopped rather than carry on
-            without recording answers. Free space on the device, or hand over what is on it and use another iPad.
-          </p>
-        </div>
-      )}
+      {saveError && <SaveFailedScreen message={saveError} onRetry={retrySave} />}
 
       {phase.kind === "running" && !saveError && (
         <SurveyScreen
@@ -1216,58 +969,26 @@ export default function App({ initialRuntime }: { initialRuntime: Runtime }) {
       )}
 
       {phase.kind === "pace" && (
-        <div className="screen checkin">
-          <h1>No rush</h1>
-          <p>
-            The last few answers came in very quickly. There&apos;s no time limit here, and no right answers — take
-            as long as you like reading each one.
-          </p>
-          <div className="checkin-actions">
-            <button
-              type="button"
-              className="next big"
-              onClick={() => {
-                enterItem(phase.index);
-                setPhase({ kind: "running", session: phase.session, index: phase.index });
-              }}
-            >
-              Carry on
-            </button>
-          </div>
-        </div>
+        <PaceScreen
+          onCarryOn={() => {
+            enterItem(phase.index);
+            setPhase({ kind: "running", session: phase.session, index: phase.index });
+          }}
+        />
       )}
 
       {phase.kind === "checkin" && (
-        <div className="screen checkin">
-          <h1>Just checking in</h1>
-          <p>
-            You&apos;ve left the last few questions blank. That&apos;s completely allowed — but if any of them
-            were skipped by accident, you can go back to them now.
-          </p>
-          <div className="checkin-actions">
-            <button
-              type="button"
-              className="next big"
-              onClick={() => {
-                void appendEvent(phase.session, "effort.checkin_returned", undefined, { to: phase.firstSkipped }, phase.firstSkipped, tMono());
-                enterItem(phase.firstSkipped);
-                setPhase({ kind: "running", session: phase.session, index: phase.firstSkipped });
-              }}
-            >
-              Go back to them
-            </button>
-            <button
-              type="button"
-              className="decline"
-              onClick={() => {
-                enterItem(phase.index);
-                setPhase({ kind: "running", session: phase.session, index: phase.index });
-              }}
-            >
-              Keep going
-            </button>
-          </div>
-        </div>
+        <CheckInScreen
+          onGoBack={() => {
+            void appendEvent(phase.session, "effort.checkin_returned", undefined, { to: phase.firstSkipped }, phase.firstSkipped, tMono());
+            enterItem(phase.firstSkipped);
+            setPhase({ kind: "running", session: phase.session, index: phase.firstSkipped });
+          }}
+          onKeepGoing={() => {
+            enterItem(phase.index);
+            setPhase({ kind: "running", session: phase.session, index: phase.index });
+          }}
+        />
       )}
 
       {phase.kind === "review" && reviewScreen && (
@@ -1305,47 +1026,30 @@ export default function App({ initialRuntime }: { initialRuntime: Runtime }) {
       )}
 
       {phase.kind === "finished" && (
-        <div className="screen finish">
-          {/* The name given at the very start, used at the very end. Both the
-              title and the body are piped like any other participant text, so
-              this is a release decision rather than something coded here. */}
-          <h1>
-            {finishScreen?.title
+        <FinishScreen
+          // The name given at the very start, used at the very end. Both the
+          // title and the body are piped like any other participant text, so
+          // this is a release decision rather than something coded here.
+          title={
+            finishScreen?.title
               ? resolveText(finishScreen.title.text, finishScreen.title.pipes, storeRef.current, new Date(phase.session.startedAt))
-              : "Thank you!"}{" "}
-            🎉
-          </h1>
-          <p>
-            {finishScreen
+              : "Thank you!"
+          }
+          body={
+            finishScreen
               ? resolveText(finishScreen.body.text, finishScreen.body.pipes, storeRef.current, new Date(phase.session.startedAt))
-              : "You've finished — thank you."}
-          </p>
-          <p className="hint">Your answers are saved safely on this device.</p>
-
-          {/* Offered, not imposed. Most people are done when they are done;
-              the list is there for the minority who know they got something
-              wrong, and it sits below the finish message rather than in front
-              of it (D-31). */}
-          {reviewScreen && (
-            <div className="finish-amend">
-              <p className="finish-amend-q">Need to change anything?</p>
-              <button
-                type="button"
-                className="finish-amend-go"
-                onClick={() => {
+              : "You've finished — thank you."
+          }
+          onReview={
+            reviewScreen
+              ? () => {
                   void appendEvent(phase.session, "review.opened", undefined, { from: "finish" }, 0, tMono());
                   setPhase({ kind: "review", session: phase.session });
-                }}
-              >
-                Go back to my answers
-              </button>
-            </div>
-          )}
-
-          <button type="button" className="next big" onClick={handover}>
-            Hand back to the researcher
-          </button>
-        </div>
+                }
+              : undefined
+          }
+          onHandBack={handover}
+        />
       )}
     </div>
   );

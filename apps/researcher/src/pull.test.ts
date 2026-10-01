@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { splitSession, type ChunkDoc, type SessionDoc } from "@myself/firebase";
+import { splitSession, type SessionDoc } from "@myself/firebase";
 import type { DeviceEvent, DeviceSession } from "@myself/store";
 import { assemblePull } from "./lib/study.js";
 
@@ -114,6 +114,14 @@ describe("assembling a pull", () => {
     });
     expect(pull.unreadable).toEqual(["ses_big"]);
     expect(pull.sessions).toEqual([]);
+  });
+
+  it("keeps the time the study last received each sitting", async () => {
+    // The server's clock decides whether an unfinished sitting is in progress or
+    // abandoned, here as in the dashboard; a device clock can be hours out.
+    const stored = asStored("ses_1", 10).doc;
+    const pull = await assemblePull([{ ...stored, receivedAt: "2026-09-02T08:00:00.000Z" }], never);
+    expect(pull.sessions[0]!.receivedAt).toBe("2026-09-02T08:00:00.000Z");
   });
 
   it("returns nothing, calmly, from an empty study", async () => {

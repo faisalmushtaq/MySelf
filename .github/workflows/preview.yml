@@ -1,0 +1,69 @@
+name: Preview the survey
+
+# The participant app from the working branch, published to a Firebase Hosting
+# PREVIEW CHANNEL: its own URL, which expires, beside the live survey rather
+# than instead of it. The live survey is GitHub Pages from main and is never
+# touched from here.
+#
+# BUILT WITH NO FIREBASE CONFIG, deliberately. A device with no study configured
+# keeps every answer on the device and sends nothing anywhere, so trying the
+# preview — as often as anyone likes — never adds a sitting to the study's data.
+# The price is that a preview sitting never reaches the dashboard; the survey's
+# own finish screen and the encrypted export still work.
+
+# Run by hand from the Actions tab, on the branch to preview. Not on every push:
+# Actions minutes are limited.
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: survey-preview
+  cancel-in-progress: true
+
+jobs:
+  preview:
+    runs-on: ubuntu-latest
+    if: github.repository == 'faisalmushtaq/MySelf'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # Built and tested exactly as for Pages first, so the preview passes the
+      # same suite; then the participant app is rebuilt to be served from the
+      # root of the channel's domain rather than from /MySelf/.
+      - run: pnpm -r build
+      - run: pnpm -r test
+      - run: pnpm --filter @myself/participant build
+        env:
+          MYSELF_BASE: /
+
+      - name: Authenticate
+        env:
+          SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          if [ -z "$SERVICE_ACCOUNT" ]; then echo "::error::No FIREBASE_SERVICE_ACCOUNT secret (docs/13-firebase.md 5.2.1)."; exit 1; fi
+          printf '%s' "$SERVICE_ACCOUNT" > "$RUNNER_TEMP/sa.json"
+          echo "GOOGLE_APPLICATION_CREDENTIALS=$RUNNER_TEMP/sa.json" >> "$GITHUB_ENV"
+
+      - run: npm i -g firebase-tools@15
+
+      - name: Publish to the preview channel
+        working-directory: infra/firebase
+        run: |
+          rm -rf preview-public && cp -R ../../apps/participant/dist preview-public
+          firebase hosting:channel:deploy survey-preview --config firebase.preview.json \
+            --expires 30d --project myself-research --non-interactive | tee channel.log
+          url=$(grep -oE 'https://[a-z0-9-]+--survey-preview-[a-z0-9]+\.web\.app' channel.log | head -1)
+          if [ -z "$url" ]; then echo "::error::Deployed, but no channel URL found in the output above."; exit 1; fi
+          echo "Survey preview: $url"
+          echo "### Survey preview: $url" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Shred the credential
+        if: always()
+        run: rm -f "$RUNNER_TEMP/sa.json"

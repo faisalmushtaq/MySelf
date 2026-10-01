@@ -25,12 +25,14 @@ describe("a release opened in the Studio", () => {
     expect(rebuilt.hash).toBe(r730.hash);
   });
 
-  it("does the same for every release from r7.2.0, including r8.0.0's age conditions and postcode list", () => {
+  it("does the same for every release from r7.2.0, including r8.0.0's age conditions and the r9.0.0 candidate's street list", () => {
     // Earlier releases carry the SWEMWBS and STAI-5 scoring r7.2.0 fixed, which the gate now refuses.
-    for (const version of ["7.2.0", "7.3.0", "8.0.0"]) {
-      const raw = JSON.parse(
-        readFileSync(resolve(__dirname, `../../../releases/ybm_nd2026_standard_r${version}.manifest.json`), "utf8"),
-      ) as typeof r730;
+    // r9.0.0 is a candidate (releases/candidates/): the Studio must open it as cleanly once it is approved.
+    for (const version of ["7.2.0", "7.3.0", "8.0.0", "candidates/9.0.0"]) {
+      const file = version.startsWith("candidates/")
+        ? `candidates/ybm_nd2026_standard_r${version.slice("candidates/".length)}.manifest.json`
+        : `ybm_nd2026_standard_r${version}.manifest.json`;
+      const raw = JSON.parse(readFileSync(resolve(__dirname, `../../../releases/${file}`), "utf8")) as typeof r730;
       const draft = parseDraft(serialiseDraft(extractDraft(raw)));
       const { composition, registries } = compileDraft(draft);
       const rebuilt = buildRelease(composition, registries, {
