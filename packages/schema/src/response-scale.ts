@@ -56,6 +56,15 @@ export const responseScale = z.object({
   direction: z.enum(["ascending", "descending", "unordered"]),
   /** What the codes mean when scored (documented, not inferred). */
   scoringNote: z.string().optional(),
+  /**
+   * Named ranges of codes, as the published form groups them — the SQS's
+   * 0 Terrible, 1–3 Poor, 4–6 Fair, 7–9 Good, 10 Excellent (D-53). Shown
+   * beneath a `numbered` presentation; each option's accessible name carries
+   * its band. Descriptive only: the code is the answer.
+   */
+  bands: z
+    .array(z.object({ label: z.string().min(1), from: z.number().int(), to: z.number().int() }))
+    .optional(),
 });
 
 export type ScaleOption = z.infer<typeof scaleOption>;

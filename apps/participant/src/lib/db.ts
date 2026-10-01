@@ -505,7 +505,7 @@ export async function recordCheckpoint(sessionId: string, events: number, at: st
 export async function markSessionSyncing(sessionId: string): Promise<void> {
   const now = new Date().toISOString();
   await db.transaction("rw", db.sessions, db.sync_state, async () => {
-    const session = await requiredSession(sessionId);
+    await requiredSession(sessionId);
     const previous = await db.sync_state.get(sessionId);
     await db.sessions.update(sessionId, { state: "syncing", updatedAt: now });
     await db.sync_state.put({

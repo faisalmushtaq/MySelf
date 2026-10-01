@@ -116,7 +116,7 @@ const frame = importGraph(join(here, "frame.tsx"));
 
 describe("the preview frame's reach", () => {
   it("runs the participant's own screens (so this check is not vacuous)", () => {
-    for (const file of ["components/SurveyScreen.tsx", "components/ReviewScreen.tsx", "components/controls.tsx", "lib/flatten.ts", "lib/pipes.ts"]) {
+    for (const file of ["components/SurveyScreen.tsx", "components/ReviewScreen.tsx", "components/controls/index.ts", "lib/flatten.ts", "lib/pipes.ts"]) {
       expect(frame.files).toContain(join(participantSrc, file));
     }
     expect(frame.files).toContain(join(repo, "packages/engine/src/walker.ts"));

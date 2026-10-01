@@ -1,5 +1,6 @@
 import type { z } from "zod";
 import type { itemDefinition, moduleDefinition } from "@myself/schema";
+import { ANOTHER_LANGUAGE_CODE, LANGUAGES } from "./scales.js";
 
 /**
  * Bespoke YBM modules encoded from the QSF with decisions applied:
@@ -85,11 +86,29 @@ The research team. When we publish or share the data, your name and address are 
 YOUR ADDRESS
 We ask for the address you live at most of the time. With your name and date of birth, it helps us keep your answers together if you take part more than once. It is never published or shared.
 
+LINKING WITH OTHER RECORDS
+Only if you say yes. Connected Yorkshire uses your name, date of birth and address to join your answers to your health and education records, then takes them off and replaces them with a code before any researcher sees the data. You can stop this at any time.
+
 CHANGING YOUR MIND
 You can stop at any time, and you don't have to give a reason. If you want your answers taken out afterwards, contact the research team within 24 hours of finishing and tell them your name and date of birth.
 
 QUESTIONS
-Email the research team at m.faizah@leeds.ac.uk. Ethics reference PSCETHS-1449.`;
+Email the research team at brainpop@leeds.ac.uk. Ethics reference PSCETHS-1449.`;
+
+/**
+ * Linkage with Connected Yorkshire (D-53). A draft in plain words for the team
+ * to check against the approved documents (PSCETHS-1449) before fielding: what
+ * is linked, how it avoids identifying anyone, how long it lasts, how to stop.
+ */
+const linkageText = `Connected Yorkshire is a secure research service that brings together information from the NHS, schools and councils in Yorkshire, so researchers can study what helps young people's health and learning.
+
+If you agree, we will send your name, date of birth and address to Connected Yorkshire. They use them only to find your health records (like GP and hospital visits) and education records (like attendance and exam results) and join them to your answers.
+
+Before any researcher sees the joined-up information, your name, date of birth and address are taken off and replaced with a code. Researchers only ever see the code, so they cannot tell who you are.
+
+The link continues for as long as the research goes on, unless you ask us to stop. You can stop it at any time by emailing brainpop@leeds.ac.uk — you don't have to give a reason.
+
+Saying no is completely fine. It doesn't change anything else about taking part.`;
 
 
 export const ybmIntroConsent: ModuleInput = {
@@ -121,7 +140,13 @@ export const ybmIntroConsent: ModuleInput = {
           required: "hard", // D-06: all statements required, no in-app decline path
           // "click" was a desktop-Qualtrics word; this is a tablet. Interaction
           // verbs must describe the interaction that exists (D-29).
-          stem: { text: "Please tap each statement to indicate you understand and agree to them, and that you consent to take part." },
+          // The screen moves on by itself once every statement is ticked (D-53),
+          // and says so first: a change of screen on input must be announced
+          // beforehand (WCAG 3.2.2).
+          stem: {
+            text: "Please tap each statement to show you understand and agree to it, and that you consent to take part. We'll move on once they're all ticked.",
+          },
+          autoAdvance: true,
           statements: [
             {
               key: "dissemination",
@@ -151,11 +176,26 @@ export const ybmIntroConsent: ModuleInput = {
             {
               key: "information_read",
               text: {
-                text: "I have read and understood the information about the study shown at the start of this survey and have been offered the opportunity to ask the research team questions via email (m.faizah@leeds.ac.uk)",
+                text: "I have read and understood the information about the study shown at the start of this survey and have been offered the opportunity to ask the research team questions via email (brainpop@leeds.ac.uk)",
               },
             },
             { key: "agree", text: { text: "I agree to take part in this study" } },
           ],
+        },
+        // Its own question, not a seventh tick box: taking part does not depend
+        // on it, so it cannot sit in a list where every box must be ticked (D-53).
+        {
+          responseType: "single_choice",
+          key: "linkage_consent",
+          revision: 1,
+          variable: "linkage_consent",
+          required: "hard",
+          stem: { text: "Can we link your answers with your health and education records?" },
+          lede: { text: linkageText },
+          scale: "scale.linkage_consent",
+          scaleVersion: "1.0.0",
+          researcherNote:
+            "Optional consent to pseudonymised linkage through the Connected Yorkshire research data platform (D-53). 1 = agrees, 2 = does not. Must be checked before any record is sent for linkage; an unanswered or 'No' sitting is never linked. Draft wording — to be checked against the approved documents (PSCETHS-1449) before fielding.",
         },
         // Placed after consent and before the first question: the last thing
         // read before answering starts (D-30). Deliberately short — a wall of
@@ -167,6 +207,8 @@ export const ybmIntroConsent: ModuleInput = {
           variable: "why_accurate",
           required: "optional",
           stem: { text: "Why your answers matter" },
+          // Answered, in effect, by taking it in: the button says so (D-53).
+          advanceLabel: "I understand",
           lede: {
             text: "There are no right or wrong answers here — only true ones.\n\nWhat you tell us goes into research on how sleep, screens and feelings fit together for people your age, and on what actually helps. That only works if the answers are really yours, including the ones that aren't flattering.\n\nA rushed or made-up answer doesn't just lose one number. It makes the whole picture slightly less true — for everyone the research is meant to help.\n\nSo take your time. And if you'd rather not answer something, leave it blank — that's always allowed.",
           },
@@ -179,7 +221,8 @@ export const ybmIntroConsent: ModuleInput = {
   timeEstimates: est(120, 90),
   changelog:
     "1.0: encoded from QSF. Legacy consent choice codes were 2-7. Withdrawal date piped as session start + 2 days. " +
-    "2.0 (D-23): one consent statement said the study information was 'presented above' — on a paper form it was, but here it is a previous screen, so the statement was literally untrue at the moment of signing. Changed to 'shown at the start of this survey'. Meaning unchanged; ETHICS COMMITTEE MUST BE NOTIFIED before this release is administered.",
+    "2.0 (D-23): one consent statement said the study information was 'presented above' — on a paper form it was, but here it is a previous screen, so the statement was literally untrue at the moment of signing. Changed to 'shown at the start of this survey'. Meaning unchanged; ETHICS COMMITTEE MUST BE NOTIFIED before this release is administered. " +
+    "D-53: the consent screen moves on once every statement is ticked, and says so; the contact address is the study's (brainpop@leeds.ac.uk), not a team member's; an optional question asks for consent to pseudonymised linkage through Connected Yorkshire; the why-it-matters screen is answered 'I understand'.",
   researcherNotes:
     "The intro's 'about 10 minutes' estimate is superseded by computed per-release estimates (A-38). " +
     "OUTSTANDING: the consent wording change in 2.0 is a factual correction, not a substantive one, but approved consent text was altered — confirm with PSCETHS-1449 before fielding.",
@@ -269,8 +312,16 @@ export const ybmIdentity: ModuleInput = {
             { key: "street", label: "Street", maxChars: 100 },
           ],
           postcodeCheck: { field: "postcode", asset: "postcodes_west_yorkshire", areaName: "West Yorkshire" },
+          // For someone who doesn't know their postcode (D-53).
+          streetCheck: {
+            field: "street",
+            asset: "streets_west_yorkshire",
+            areaKey: "area",
+            districtKey: "postcode_district",
+          },
           researcherNote:
-            "Direct identifier — identity-schema routed (D-09, D-52). Stored as given, as {postcode, house, street}. The postcode is checked on the device against the release's West Yorkshire list; one not in the list is questioned once and then kept. The participant ID is derived from name and date of birth, not from the address.",
+            "Direct identifier — identity-schema routed (D-09, D-52). Stored as given, as {postcode, house, street}. The postcode is checked on the device against the release's West Yorkshire list; one not in the list is questioned once and then kept. The participant ID is derived from name and date of birth, not from the address. " +
+            "From r9.0.0 (D-53) someone who doesn't know their postcode can say so; the street they type is matched against West Yorkshire's named roads, and a match they choose adds {area, postcode_district}.",
         },
       ],
     },
@@ -285,7 +336,8 @@ export const ybmIdentity: ModuleInput = {
     "the session's participant code — the crosswalk records both derivations rather than recoding silently." +
     " D-52: the secret code (its introduction and four components) is replaced by the home address, one form_fields " +
     "screen with the postcode checked against the release's West Yorkshire list; the participant ID is derived from " +
-    "first name, last name and date of birth at ingest.",
+    "first name, last name and date of birth at ingest. " +
+    "D-53: someone who doesn't know their postcode can say so and find their street in a list of West Yorkshire's named roads.",
   researcherNotes:
     "Legacy crosswalk (r1.0.0–r7.3.0): ps_id = initials + house digit + zero-padded month number + postcode letters (e.g. JA101CD); " +
     "val_id = the participant code captured at the opening screen. Both are derived, never re-asked. From r8.0.0 (D-52) " +
@@ -294,11 +346,90 @@ export const ybmIdentity: ModuleInput = {
 
 // ---------------------------------------------------------------------------
 
+/**
+ * Languages (D-53): English as a first language, any other languages, and how
+ * well each is understood. One "how well" question per language ticked, each
+ * shown only if that language was — so a child who speaks three languages is
+ * asked about all three, and the data has one column per language.
+ */
+const demographicsRef = (item: string) => ({ instrument: "ybm_demographics", item, revision: 1 });
+const languageItems: ItemInput[] = [
+  single(
+    "first_language_english",
+    "first_language_english",
+    "",
+    "Was English the first language you learned to speak?",
+    "scale.first_language_english",
+    { required: "hard" },
+  ),
+  single(
+    "speaks_other_language",
+    "speaks_other_language",
+    "",
+    "Do you speak or understand any language other than English?",
+    "scale.yes_no",
+    {
+      required: "hard",
+      lede: { text: "Count any language you use at home, with family or friends, or have learned at school." },
+    },
+  ),
+  {
+    responseType: "multi_choice",
+    key: "other_languages",
+    revision: 1,
+    variable: "other_languages",
+    displayIf: { op: "selected", target: { item: demographicsRef("speaks_other_language") }, code: 1 },
+    stem: { text: "Which other languages do you speak or understand?" },
+    lede: { text: "Choose all that apply." },
+    scale: "scale.other_languages",
+    scaleVersion: "1.0.0",
+    minSelections: 1,
+    researcherNote:
+      "Options in West Yorkshire 2021 Census main-language order (TS024), most common first; 15 = another language, named in other_language_named.",
+  },
+  {
+    responseType: "text_short",
+    key: "other_language_named",
+    revision: 1,
+    variable: "other_language_named",
+    displayIf: { op: "selected", target: { item: demographicsRef("other_languages") }, code: ANOTHER_LANGUAGE_CODE },
+    stem: { text: "Which other language?" },
+    lede: { text: "If there is more than one, name the one you use most." },
+    maxChars: 60,
+  },
+  ...LANGUAGES.map(
+    (l): ItemInput =>
+      single(`understand_${l.key}`, `understand_${l.key}`, "", `How well do you understand ${l.label}?`, "scale.language_understanding_4", {
+        displayIf: { op: "selected", target: { item: demographicsRef("other_languages") }, code: l.code },
+      }),
+  ),
+  single(
+    "understand_other_language",
+    "understand_other_language",
+    "",
+    "How well do you understand {language}?",
+    "scale.language_understanding_4",
+    {
+      displayIf: { op: "selected", target: { item: demographicsRef("other_languages") }, code: ANOTHER_LANGUAGE_CODE },
+      stem: {
+        text: "How well do you understand {language}?",
+        pipes: {
+          language: {
+            kind: "item_text_entry",
+            item: demographicsRef("other_language_named"),
+            fallback: "the other language you speak",
+          },
+        },
+      },
+    },
+  ),
+];
+
 export const ybmDemographics: ModuleInput = {
   ...moduleBase,
   instrument: "ybm_demographics",
   name: "YBM demographics",
-  construct: "Ethnicity, gender, mental-health medication",
+  construct: "Ethnicity, languages, gender, mental-health medication",
   forms: [
     {
       language: "en-GB",
@@ -311,14 +442,17 @@ export const ybmDemographics: ModuleInput = {
           "What best describes your ethnic origin?",
           "scale.ethnicity_uk20",
           {
+            // 2.0.0 lists the options most common in West Yorkshire first (D-53).
+            scaleVersion: "2.0.0",
             required: "hard",
             lede: {
               text: "Ethnic origin refers to your cultural background or where your family comes from, including your ancestors, country of origin, and cultural traditions you identify with.",
             },
             researcherNote:
-              "'Ethic origin' typo fixed per D-07. Presented as a full tappable list rather than a menu (D-23): the census categories are long enough to need reading, and a menu hides them behind an extra tap.",
+              "'Ethic origin' typo fixed per D-07. Presented as a full tappable list rather than a menu (D-23): the census categories are long enough to need reading, and a menu hides them behind an extra tap. From r9.0.0 the options are in West Yorkshire 2021 Census order, most common first (D-53); codes unchanged.",
           },
         ),
+        ...languageItems,
         single("gender", "gender", "Gender", "Gender", "scale.gender_4", { required: "hard" }),
         single(
           "medication",
@@ -338,7 +472,10 @@ export const ybmDemographics: ModuleInput = {
     },
   ],
   timeEstimates: est(90, 70),
-  changelog: "1.0: encoded from QSF; full 20-option ethnicity list recovered (docs/10 §3).",
+  changelog:
+    "1.0: encoded from QSF; full 20-option ethnicity list recovered (docs/10 §3). " +
+    "D-53: ethnicity options shown most common in West Yorkshire first (scale 2.0.0, codes unchanged); " +
+    "questions on English as a first language, other languages spoken, and how well each is understood.",
 };
 
 // ---------------------------------------------------------------------------
@@ -642,15 +779,53 @@ export const ybmSocialMedia: ModuleInput = {
           min: 0,
           max: 3650,
           unitLabel: "days",
-          researcherNote: "Legacy field was free text with no numeric validation (docs/10 §4); numeric control is a PRESENT-disposition modernisation.",
+          // Over three months is possible, but also what a slipped digit looks
+          // like: it is read back in months and days and confirmed (D-53).
+          confirmAbove: 90,
+          researcherNote:
+            "Legacy field was free text with no numeric validation (docs/10 §4); numeric control is a PRESENT-disposition modernisation. From r9.0.0 an answer over 90 days is read back in months and days and confirmed before moving on (D-53); nothing up to 3650 is refused.",
         },
         single("family_control", "sm_family_control", "SM_family_control", "Does your family manage or control your social media use?", "scale.yes_no"),
+        // How, for those who said they do (D-53). The study's own options.
+        {
+          responseType: "multi_choice",
+          key: "family_control_how",
+          revision: 1,
+          variable: "sm_family_control_how",
+          displayIf: {
+            op: "selected",
+            target: { item: { instrument: "ybm_social_media", item: "family_control", revision: 1 } },
+            code: 1,
+          },
+          stem: { text: "How does your family manage or control your social media use?" },
+          lede: { text: "Choose all that apply." },
+          scale: "scale.sm_family_control_how",
+          scaleVersion: "1.0.0",
+          minSelections: 1,
+          researcherNote:
+            "Asked only if sm_family_control = Yes (D-53). Study-defined options, not a published measure; 8 = something else, described in sm_family_control_other.",
+        },
+        {
+          responseType: "text_short",
+          key: "family_control_other",
+          revision: 1,
+          variable: "sm_family_control_other",
+          displayIf: {
+            op: "selected",
+            target: { item: { instrument: "ybm_social_media", item: "family_control_how", revision: 1 } },
+            code: 8,
+          },
+          stem: { text: "What else does your family do?" },
+          maxChars: 200,
+          researcherNote: "Free text, asked only when 'Something else' is chosen in sm_family_control_how (D-53).",
+        },
       ],
     },
   ],
   timeEstimates: est(420, 330),
   changelog:
-    "1.0: encoded from QSF. TimeSpent matrix stepped into per-platform items with corrected Twitch condition (D-02); abstain-effect wording restored (D-01); platform canonical codes 1-11 with legacy codes skipping 7 preserved in the scale.",
+    "1.0: encoded from QSF. TimeSpent matrix stepped into per-platform items with corrected Twitch condition (D-02); abstain-effect wording restored (D-01); platform canonical codes 1-11 with legacy codes skipping 7 preserved in the scale. " +
+    "D-53: days without social media over 90 are read back in months and days and confirmed; a 'how' follow-up (and a describe box for 'something else') for those whose family manages their use.",
 };
 
 // ---------------------------------------------------------------------------

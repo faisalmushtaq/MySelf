@@ -17,8 +17,8 @@ const everything = [...parsedInstruments, ...parsedModules];
 const scaleKeys = new Set(parsedScales.map((s) => s.key));
 
 describe("scales", () => {
-  it("all 35 scales parse", () => {
-    expect(parsedScales).toHaveLength(35);
+  it("all 41 scales parse", () => {
+    expect(parsedScales).toHaveLength(41);
   });
 
   it("scale keys are unique", () => {
@@ -259,8 +259,8 @@ describe("date of birth bounds", () => {
 });
 
 describe("instruments and modules", () => {
-  it("10 instruments and 10 modules parse", () => {
-    expect(parsedInstruments).toHaveLength(10);
+  it("11 instruments and 10 modules parse", () => {
+    expect(parsedInstruments).toHaveLength(11);
     expect(parsedModules).toHaveLength(10);
   });
 
@@ -407,5 +407,139 @@ describe("instruments and modules", () => {
       expect(inst.timeEstimates.length, inst.instrument).toBeGreaterThan(0);
       for (const t of inst.timeEstimates) expect(t.provenance).toBe("estimated-heuristic");
     }
+  });
+});
+
+describe("D-53: shorter consent, sleep quality and sanity checks", () => {
+  const moduleItems = (instrument: string) => parsedModules.find((m) => m.instrument === instrument)!.forms[0]!.items;
+  const consentItems = moduleItems("ybm_intro_consent");
+
+  it("the consent screen moves on by itself, and says so before it does", () => {
+    const consent = consentItems.find((i) => i.key === "consent")!;
+    if (consent.responseType !== "checkbox_set") throw new Error("wrong type");
+    expect(consent.autoAdvance).toBe(true);
+    expect(consent.stem.text).toMatch(/move on once they're all ticked/);
+  });
+
+  it("gives the study's address, never a team member's", () => {
+    const text = JSON.stringify(everything);
+    expect(text).not.toContain("m.faizah@");
+    expect(text).toContain("brainpop@leeds.ac.uk");
+  });
+
+  it("asks for linkage consent on its own, straight after the consent statements", () => {
+    const keys = consentItems.map((i) => i.key);
+    expect(keys.indexOf("linkage_consent")).toBe(keys.indexOf("consent") + 1);
+    const linkage = consentItems.find((i) => i.key === "linkage_consent")!;
+    if (linkage.responseType !== "single_choice") throw new Error("wrong type");
+    expect(linkage.scale).toBe("scale.linkage_consent");
+    expect(linkage.lede?.text).toMatch(/Connected Yorkshire/);
+    expect(linkage.lede?.text).toMatch(/replaced with a code/);
+    expect(linkage.lede?.text).toMatch(/brainpop@leeds\.ac\.uk/);
+    expect(linkage.identifying).toBe(false);
+  });
+
+  it("the why-it-matters screen is answered 'I understand'", () => {
+    const why = consentItems.find((i) => i.key === "why_it_matters")!;
+    if (why.responseType !== "info") throw new Error("wrong type");
+    expect(why.advanceLabel).toBe("I understand");
+  });
+
+  it("lists ethnic origins most common in West Yorkshire first, with every code unchanged", () => {
+    const eth = parsedScales.find((s) => s.key === "scale.ethnicity_uk20")!;
+    expect(eth.version).toBe("2.0.0");
+    expect(eth.options.slice(0, 4).map((o) => o.label)).toEqual([
+      "English, Welsh, Scottish, Northern Irish or British",
+      "Pakistani",
+      "Any other White background",
+      "Indian",
+    ]);
+    expect(eth.options.at(-1)).toMatchObject({ code: 20, label: "Prefer not to say", kind: "decline" });
+    // The code for each label is the one Qualtrics used, whatever its position.
+    const codeOf = Object.fromEntries(eth.options.map((o) => [o.label, o.code]));
+    expect(codeOf["Indian"]).toBe(1);
+    expect(codeOf["Pakistani"]).toBe(2);
+    expect(codeOf["English, Welsh, Scottish, Northern Irish or British"]).toBe(13);
+    expect(codeOf["Arab"]).toBe(19);
+    expect([...eth.options.map((o) => o.code)].sort((a, b) => a - b)).toEqual(Array.from({ length: 20 }, (_, i) => i + 1));
+    for (const o of eth.options) expect(o.legacyCode).toBe(o.code);
+    const item = moduleItems("ybm_demographics").find((i) => i.key === "ethnicity")!;
+    if (item.responseType !== "single_choice") throw new Error("wrong type");
+    expect(item.scaleVersion).toBe("2.0.0");
+  });
+
+  it("the SQS is 0-10 with the published bands, shown as one numbered row", () => {
+    const sqs = parsedInstruments.find((i) => i.instrument === "sqs")!;
+    const q1 = sqs.forms[0]!.items[0]!;
+    if (q1.responseType !== "single_choice") throw new Error("wrong type");
+    expect(q1.stem.text).toBe("During the past 7 days, how would you rate your sleep quality overall?");
+    expect(q1.presentation).toBe("numbered");
+    expect(q1.legacyVariable).toBeUndefined();
+    const scale = parsedScales.find((s) => s.key === q1.scale)!;
+    expect(scale.options.map((o) => o.code)).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+    expect(scale.bands).toEqual([
+      { label: "Terrible", from: 0, to: 0 },
+      { label: "Poor", from: 1, to: 3 },
+      { label: "Fair", from: 4, to: 6 },
+      { label: "Good", from: 7, to: 9 },
+      { label: "Excellent", from: 10, to: 10 },
+    ]);
+    expect(sqs.licence.verified).toBe(false);
+  });
+
+  it("checks a long time without social media, and asks how family manage it", () => {
+    const items = moduleItems("ybm_social_media");
+    const days = items.find((i) => i.key === "abstain_days")!;
+    if (days.responseType !== "numeric") throw new Error("wrong type");
+    expect(days.confirmAbove).toBe(90);
+    expect(days.max).toBe(3650);
+    const keys = items.map((i) => i.key);
+    expect(keys.slice(keys.indexOf("family_control"))).toEqual(["family_control", "family_control_how", "family_control_other"]);
+    const how = items.find((i) => i.key === "family_control_how")!;
+    expect(how.displayIf).toMatchObject({ op: "selected", code: 1 });
+    const other = items.find((i) => i.key === "family_control_other")!;
+    const scale = parsedScales.find((s) => s.key === "scale.sm_family_control_how")!;
+    const something = scale.options.find((o) => o.kind === "other_specify")!;
+    expect(other.displayIf).toMatchObject({ op: "selected", code: something.code });
+  });
+
+  it("asks about English as a first language, other languages, and how well each is understood", () => {
+    const items = moduleItems("ybm_demographics");
+    const keys = items.map((i) => i.key);
+    expect(keys.slice(keys.indexOf("ethnicity") + 1, keys.indexOf("ethnicity") + 5)).toEqual([
+      "first_language_english",
+      "speaks_other_language",
+      "other_languages",
+      "other_language_named",
+    ]);
+    const languages = parsedScales.find((s) => s.key === "scale.other_languages")!;
+    expect(languages.options.slice(0, 3).map((o) => o.label)).toEqual(["Urdu", "Punjabi", "Polish"]);
+    expect(languages.options.at(-1)).toMatchObject({ label: "Another language", kind: "other_specify" });
+    // One "how well" question per language, shown only when that language is ticked.
+    for (const o of languages.options) {
+      const asked = items.filter(
+        (i) =>
+          i.displayIf?.op === "selected" &&
+          i.displayIf.target.item.item === "other_languages" &&
+          i.displayIf.code === o.code &&
+          i.responseType === "single_choice",
+      );
+      expect(asked, o.label).toHaveLength(1);
+      if (o.kind !== "other_specify") expect(asked[0]!.stem.text).toBe(`How well do you understand ${o.label}?`);
+    }
+    const other = items.find((i) => i.key === "understand_other_language")!;
+    expect(other.stem.pipes?.["language"]).toMatchObject({ kind: "item_text_entry", fallback: "the other language you speak" });
+  });
+
+  it("the address question can find a street for someone who doesn't know their postcode", () => {
+    const address = moduleItems("ybm_identity").find((i) => i.key === "home_address")!;
+    if (address.responseType !== "form_fields") throw new Error("wrong type");
+    expect(address.streetCheck).toEqual({
+      field: "street",
+      asset: "streets_west_yorkshire",
+      areaKey: "area",
+      districtKey: "postcode_district",
+    });
+    expect(address.fields.map((f) => f.key)).toEqual(["postcode", "house", "street"]);
   });
 });

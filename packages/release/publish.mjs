@@ -12,7 +12,7 @@ import { buildRelease, releaseAssets, ybmComposition } from "./dist/index.js";
  * a rebuild against the committed manifest failed, and the only obvious way out of
  * that failure is to weaken the test.
  *
- * Adapted semver, per docs/06 §44-49 — and the rule that matters is the one that
+ * Adapted semver, per docs/06 §3 — and the rule that matters is the one that
  * is NOT the software instinct. Participant-visible wording is never PATCH: a
  * one-character typo fix is MAJOR on the form it touches, because two versions
  * whose data cannot be pooled without a comparability argument are a MAJOR apart.
@@ -39,7 +39,7 @@ const meta = {
   version,
   publishedAt: flag("at") ?? new Date().toISOString(),
   publishedBy: flag("by") ?? "unknown",
-  engineVersion: "0.2.0",
+  engineVersion: "0.3.0",
   decisionRefs: decisions.length > 0 ? decisions : ["D-10"],
 };
 

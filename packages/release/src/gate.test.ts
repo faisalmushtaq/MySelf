@@ -40,7 +40,7 @@ type Placement = Extract<Composition["sections"][number]["components"][number], 
 function freeze(change: (c: Composition) => void, regs: Registries = registries, engine?: string) {
   const composition = structuredClone(ybmComposition);
   change(composition);
-  return freezeRelease(composition, regs, meta(engine ?? requiredEngineVersion(composition)));
+  return freezeRelease(composition, regs, meta(engine ?? requiredEngineVersion(composition, regs)));
 }
 
 function section(c: Composition, key: string) {
@@ -125,7 +125,7 @@ describe("subset membership", () => {
       section(c, "social_media").components.unshift({ ...structuredClone(smartphone(c)), items: ["age_sm"] });
     });
     expect(failures).toEqual([]);
-    expect(body.release.engineVersion).toBe("0.2.0");
+    expect(body.release.engineVersion).toBe("0.3.0"); // the live library composition uses D-53 features
   });
 });
 
@@ -145,15 +145,30 @@ describe("engine version", () => {
     expect(requiredEngineVersion(plain, { instruments: [{ forms: [{ items: [{ postcodeCheck: {} }] }] }] })).toBe("0.2.0");
     // The live composition uses both.
     expect(requiredEngineVersion(ybmComposition)).toBe("0.2.0");
+    // 0.3.0 (D-53): a street search, a numbered row, auto-advance, an "I understand" label, a confirmation threshold.
+    const d53 = [
+      { responseType: "form_fields", streetCheck: {} },
+      { responseType: "single_choice", presentation: "numbered" },
+      { responseType: "checkbox_set", autoAdvance: true },
+      { responseType: "info", advanceLabel: "I understand" },
+      { responseType: "numeric", confirmAbove: 90 },
+    ];
+    for (const item of d53) {
+      expect(requiredEngineVersion(plain, { instruments: [{ forms: [{ items: [item] }] }] }), JSON.stringify(item)).toBe("0.3.0");
+    }
+    // A single choice that moves on by itself is older than D-53.
+    expect(requiredEngineVersion(plain, { instruments: [{ forms: [{ items: [{ responseType: "single_choice", autoAdvance: true }] }] }] })).toBe("0.1.0");
   });
 
-  it("refuses a subset-using release that declares the older engine", () => {
+  it("refuses a release that declares an older engine than it needs", () => {
     const subset = (c: Composition) => {
       smartphone(c).items = SMARTPHONE;
     };
-    expect(freeze(subset, registries, "0.1.0").failures).toEqual([
-      "this composition needs engine 0.2.0, but the release declares engine 0.1.0",
+    // The library's composition uses D-53's street search, which needs 0.3.0.
+    expect(requiredEngineVersion(ybmComposition, registries)).toBe("0.3.0");
+    expect(freeze(subset, registries, "0.2.0").failures).toEqual([
+      "this composition needs engine 0.3.0, but the release declares engine 0.2.0",
     ]);
-    expect(freeze(subset, registries, "0.2.0").failures).toEqual([]);
+    expect(freeze(subset, registries, "0.3.0").failures).toEqual([]);
   });
 });

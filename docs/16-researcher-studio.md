@@ -88,7 +88,7 @@ already give every response a stable version, question ID and option value.
   - Hosting (MyStory lab only) on every push.
   - Rules when the rules files change.
   - Functions (`--force`) when function-related paths change.
-- **`ci.yml`** runs on every branch:
+- **`ci.yml`** runs on pull requests and on `main` (not on every push to a working branch, to save Actions minutes):
   - build, typecheck and unit tests;
   - Playwright e2e against the participant app;
   - the Functions integration suite on the Firestore emulator;

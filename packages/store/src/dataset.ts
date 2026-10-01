@@ -204,3 +204,43 @@ export const emptyDataset = (): Dataset => ({
   responses: [],
   scores: [],
 });
+
+/**
+ * The dataset restricted to some sittings. Wave numbers stay as derived from
+ * the whole study — a filtered view may hold a child's wave 2 without their
+ * wave 1, and that is the truth — while each participant's summary row is
+ * recomputed from the sittings actually included.
+ *
+ * The researcher view uses it to leave out test sittings, and the research
+ * dashboard (which vendors this file) to restrict an export or a summary to the
+ * sittings a filter chose. One function, so "followed up" means the same in both.
+ */
+export function subsetDataset(d: Dataset, sessionIds: ReadonlySet<string>): Dataset {
+  const sessions = d.sessions.filter((s) => sessionIds.has(s.sessionId));
+  const byParticipant = new Map<string, typeof sessions>();
+  for (const s of sessions) {
+    const list = byParticipant.get(s.participantId);
+    if (list) list.push(s);
+    else byParticipant.set(s.participantId, [s]);
+  }
+  const participants: ParticipantRow[] = d.participants
+    .filter((p) => byParticipant.has(p.participantId))
+    .map((p) => {
+      const mine = [...byParticipant.get(p.participantId)!].sort((a, b) => a.startedAt.localeCompare(b.startedAt));
+      return {
+        ...p,
+        sessionCount: mine.length,
+        firstSeen: mine[0]!.startedAt,
+        lastSeen: mine[mine.length - 1]!.startedAt,
+        sites: [...new Set(mine.map((s) => s.site).filter((x): x is string => !!x))],
+      };
+    });
+  return {
+    generatedAt: d.generatedAt,
+    releaseHashes: [...new Set(sessions.map((s) => s.releaseHash))],
+    participants,
+    sessions,
+    responses: d.responses.filter((r) => sessionIds.has(r.sessionId)),
+    scores: d.scores.filter((r) => sessionIds.has(r.sessionId)),
+  };
+}

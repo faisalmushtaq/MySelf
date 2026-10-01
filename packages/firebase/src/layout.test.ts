@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { DeviceSession, DeviceEvent } from "@myself/store";
 import {
-  EVENTS_PER_CHUNK,
   MAX_DOCUMENT_BYTES,
   chunksComplete,
   conflictWith,

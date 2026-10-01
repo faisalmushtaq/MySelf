@@ -10,6 +10,8 @@ import type { Registries } from "./builder.js";
  */
 export const ASSET_FILES: Record<string, string> = {
   postcodes_west_yorkshire: "releases/assets/postcodes-west-yorkshire-2026-09-07.txt",
+  // OS Open Names, July 2026 edition (D-53); built by scripts/build-streets.mjs.
+  streets_west_yorkshire: "releases/assets/streets-west-yorkshire-2026-07.txt",
 };
 
 /** The assets as a release pins them: path, content hash and size. Node only. */
