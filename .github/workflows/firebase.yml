@@ -19,6 +19,10 @@ on:
         description: "Deploy the functions as well"
         type: boolean
         default: false
+      rules:
+        description: "Test and deploy the Firestore and Storage rules as well"
+        type: boolean
+        default: false
 
 concurrency:
   group: firebase-deploy
@@ -72,7 +76,14 @@ jobs:
           # file that is not deployed is a security control that exists only in
           # the repository, and the gap is invisible precisely because the run
           # passes.
-          if git diff --name-only HEAD^ HEAD | grep -qE '^infra/firebase/(firestore\.rules|firestore\.indexes\.json|storage\.rules)'; then
+          #
+          # Deciding from the last commit alone also misses a rules change whose
+          # own deploy failed (PR #99's, when the Actions minutes ran out): the
+          # next push no longer changes the rules, so they are never sent. Run
+          # this workflow by hand with "rules" ticked to send them.
+          if [ "${{ inputs.rules }}" = "true" ]; then
+            echo "rules=true" >> "$GITHUB_OUTPUT"
+          elif git diff --name-only HEAD^ HEAD | grep -qE '^infra/firebase/(firestore\.rules|firestore\.indexes\.json|storage\.rules)'; then
             echo "rules=true" >> "$GITHUB_OUTPUT"
           else
             echo "rules=false" >> "$GITHUB_OUTPUT"
