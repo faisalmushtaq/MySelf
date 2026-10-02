@@ -27,7 +27,7 @@ what is not, and what is deliberately left undone. Read §8 first.
 
 ## Development
 
-New to the code? **[docs/16-maintainers-guide.md](docs/16-maintainers-guide.md)** —
+New to the code? **[docs/17-maintainers-guide.md](docs/17-maintainers-guide.md)** —
 what is where, how a question becomes data, and how to change a question, cut a
 release, run each test suite and deploy.
 

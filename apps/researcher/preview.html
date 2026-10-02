@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en-GB">
+  <head>
+    <meta charset="UTF-8" />
+    <!--
+      The Studio's participant preview (docs/16 §5.6, risk R7).
+
+      This policy is the second lock on the door. The first is that nothing the
+      frame loads contains code that stores or sends an answer (the isolation
+      test and the build guard check that). This one means that even if some
+      did, the browser would refuse to send it: fetch, XHR, beacons and sockets
+      are all "connect"; no service worker can be registered; no page can be
+      framed (the participant's narrative step opens the MyStory module in an
+      iframe, which from here would be a real run); and images and media load
+      only from this site, so a URL cannot be used to carry an answer out.
+      Scripts, styles and fonts are left open because the Vite dev server
+      injects inline ones. In development connect-src also refuses Vite's
+      hot-reload socket, so reload the Studio to pick up a change to the
+      frame's own code. isolation.test.ts pins these directives.
+    -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="connect-src 'none'; worker-src 'none'; frame-src 'none'; img-src 'self' data:; media-src 'none'; form-action 'none'; object-src 'none'; base-uri 'none'"
+    />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#fcfcfb" />
+    <meta name="robots" content="noindex" />
+    <meta name="referrer" content="no-referrer" />
+    <title>MySelf Studio — participant preview</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/studio/preview/frame.tsx"></script>
+  </body>
+</html>

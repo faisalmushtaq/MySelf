@@ -32,6 +32,13 @@ export interface HandoverPanelProps {
   onNote: (note: string) => void;
   /** Re-read what the device holds, once confirmed sittings are cleared. */
   onCleared: () => Promise<void>;
+  /** Some confirmed sittings were cleared, so a downloaded release may no longer be needed. */
+  onSittingsErased: () => Promise<void>;
+  /**
+   * Which survey a new sitting gets, and why — the question somebody asks when a
+   * change was published this morning and this iPad is still showing yesterday's.
+   */
+  releaseNote: string;
   syncNote: string | null;
   handoverNote: string | null;
 }
@@ -49,6 +56,8 @@ export function HandoverPanel({
   onPassphraseChange,
   onNote,
   onCleared,
+  onSittingsErased,
+  releaseNote,
   syncNote,
   handoverNote,
 }: HandoverPanelProps) {
@@ -88,6 +97,8 @@ export function HandoverPanel({
       <p className="hint">
         {counts.awaitingSync + counts.syncFailed} completed session{counts.awaitingSync + counts.syncFailed === 1 ? "" : "s"} awaiting upload, {counts.syncedVerified} confirmed by the study, {counts.quarantined} needing review, and {counts.inProgress} unfinished on this device. A sitting stays here until the study has confirmed it stored every event this device sent.
       </p>
+      {/* An unfinished sitting keeps the version it started with, whatever this says. */}
+      <p className="hint release-note">{releaseNote}</p>
       <div className="handover-actions">
         <button
           type="button"
@@ -191,6 +202,9 @@ export function HandoverPanel({
           onClick={() => {
             void (async () => {
               const erased = await forgetConfirmedSessions();
+              // A downloaded release is kept while any sitting on this device was
+              // started under it; clearing sittings is when one can stop being needed.
+              if (erased.sessions > 0) await onSittingsErased();
               onNote(
                 erased.sessions === 0
                   ? "Nothing to clear — no sitting on this device has been confirmed by the study yet."

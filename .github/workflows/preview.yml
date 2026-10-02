@@ -11,9 +11,9 @@ name: Preview the survey
 # The price is that a preview sitting never reaches the dashboard; the survey's
 # own finish screen and the encrypted export still work.
 
+# Run by hand from the Actions tab, on the branch to preview. Not on every push:
+# Actions minutes are limited.
 on:
-  push:
-    branches: [claude/laughing-lovelace-9qt0j6]
   workflow_dispatch:
 
 concurrency:

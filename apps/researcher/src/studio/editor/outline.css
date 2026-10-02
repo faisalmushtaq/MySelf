@@ -1,0 +1,735 @@
+/*
+ * The outline (DESIGN.md "Outline rows"). Dense, because a 150-question
+ * survey has to fit: 32px rows, one line of text, 16px type icons, and what
+ * a row carries (required, a condition, identifying, problems) as 14px icons
+ * at its end, named on hover and in the row's description. Sections are quiet
+ * headers with their rows flush beneath; a licensed or protected block is a
+ * group row with a lock.
+ *
+ * Selection is a filled row AND a bar at its edge; problems are an icon AND
+ * a count; the drop line is a line AND, when refused, dashed with the reason
+ * written above the tree. The focus ring is drawn on the row, not on the
+ * whole subtree the row's element contains.
+ */
+
+.sto-outline {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+}
+
+/* ── Header: search, filters, add ─────────────────────────────────────── */
+.sto-head {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: grid;
+  gap: 8px;
+  padding: 12px 12px 8px;
+  background: var(--st-bg-subtle);
+  border-bottom: 1px solid var(--st-border);
+}
+.sto-search {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+}
+.sto-search > .st-icon {
+  position: absolute;
+  left: 9px;
+  width: 14px;
+  height: 14px;
+  color: var(--st-text-tertiary);
+  pointer-events: none;
+}
+.studio .sto-search .sto-search-input {
+  height: 32px;
+  min-height: 32px;
+  padding: 0 30px 0 29px;
+  font-size: 13px;
+  background: var(--st-bg);
+  border-color: var(--st-border);
+}
+.studio .sto-search .sto-search-input:hover {
+  border-color: var(--st-border-strong);
+}
+.studio .sto-search .sto-search-input:focus-visible {
+  border-color: var(--st-accent);
+}
+.sto-search-input::-webkit-search-cancel-button {
+  display: none;
+}
+.sto-search > .st-tip-anchor,
+.sto-search-key {
+  position: absolute;
+  right: 4px;
+}
+.sto-search-key {
+  right: 7px;
+  display: inline-flex;
+  pointer-events: none;
+}
+.sto-search-key .st-kbd {
+  min-width: 16px;
+  height: 16px;
+  justify-content: center;
+  padding: 0 3px;
+  font-size: 10.5px;
+  color: var(--st-text-tertiary);
+  background: var(--st-bg-subtle);
+}
+
+.sto-tools {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+}
+.sto-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  min-width: 0;
+}
+/* Small toggles. On: filled, with a tick in place of the icon — not colour alone. */
+.sto-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 24px;
+  padding: 0 7px 0 6px;
+  border: 1px solid var(--st-border);
+  border-radius: var(--st-radius-sm);
+  background: var(--st-bg);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 16px;
+  color: var(--st-text-secondary);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.sto-chip .st-icon {
+  width: 12px;
+  height: 12px;
+  color: var(--st-text-tertiary);
+}
+.sto-chip:hover {
+  border-color: var(--st-border-strong);
+  color: var(--st-text);
+}
+.sto-chip[aria-pressed="true"] {
+  background: var(--st-text);
+  border-color: var(--st-text);
+  color: #ffffff;
+}
+.sto-chip[aria-pressed="true"] .st-icon {
+  color: #ffffff;
+}
+.sto-chip-count {
+  font-variant-numeric: tabular-nums;
+  color: var(--st-text-tertiary);
+  font-weight: 500;
+}
+.sto-chip[aria-pressed="true"] .sto-chip-count {
+  color: #d4d4d8;
+}
+.sto-tools-end {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+  gap: 2px;
+}
+.sto-tools-end .st-iconbtn {
+  color: var(--st-text-tertiary);
+}
+.sto-tools-end .st-iconbtn:hover:not(:disabled),
+.sto-tools-end .st-iconbtn[aria-expanded="true"] {
+  background: var(--st-bg-emphasis);
+  color: var(--st-text);
+}
+.studio .sto-tools-end .st-iconbtn .st-icon {
+  width: 16px;
+  height: 16px;
+}
+
+/* Floats under the header rather than pushing the tree down: the rows must
+   not move under the pointer mid-drag. */
+.sto-dragnote {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 12px;
+  right: 12px;
+  display: flex;
+  gap: 6px;
+  align-items: flex-start;
+  margin: 0;
+  padding: 8px 10px;
+  border: 1px solid #fde68a;
+  border-radius: var(--st-radius-lg);
+  background: var(--st-warn-subtle);
+  box-shadow: var(--st-shadow-md);
+  color: var(--st-warn);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 16px;
+}
+.sto-dragnote > .st-icon {
+  flex: none;
+  margin-top: 1px;
+}
+
+.sto-empty {
+  display: grid;
+  justify-items: start;
+  gap: 12px;
+  padding: 20px 16px;
+  color: var(--st-text-secondary);
+}
+.sto-empty p {
+  margin: 0;
+}
+
+/* ── The tree ─────────────────────────────────────────────────────────── */
+.sto-tree,
+.sto-group {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.sto-tree {
+  padding: 8px 0 32px;
+}
+
+/* The treeitem element holds its subtree, so its own focus ring would wrap
+   every child: the ring is drawn on the row instead, inside it, so it never
+   runs under the rows either side. */
+.studio .sto-item:focus,
+.studio .sto-item:focus-visible {
+  box-shadow: none;
+  outline: none;
+}
+.studio .sto-item:focus-visible > .sto-row {
+  box-shadow: inset 0 0 0 2px var(--st-accent);
+}
+
+.sto-row {
+  --sto-indent: 0px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: var(--st-row);
+  margin: 0 8px;
+  padding: 0 4px 0 calc(8px + var(--sto-indent));
+  border-radius: var(--st-radius);
+  color: var(--st-text);
+  cursor: pointer;
+  user-select: none;
+}
+.sto-row:hover {
+  background: var(--st-bg-muted);
+}
+/* Selected: filled, heavier, and a 2px accent bar inset at the left edge. */
+.sto-row.is-selected {
+  background-color: var(--st-bg-muted);
+  background-image: linear-gradient(var(--st-accent), var(--st-accent));
+  background-size: 2px 16px;
+  background-position: 0 center;
+  background-repeat: no-repeat;
+}
+.sto-row.is-selected .sto-text {
+  font-weight: 500;
+}
+
+/* Sections (and the archive) are headers: 12px, secondary, 8px of air above. */
+.sto-item-section,
+.sto-item-archive {
+  margin-top: 8px;
+}
+.sto-row.is-header {
+  height: 28px;
+  color: var(--st-text-secondary);
+}
+.sto-row.is-header .sto-text,
+.sto-row.is-header.is-selected .sto-text {
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 16px;
+}
+.sto-row.is-header:hover,
+.sto-row.is-header.is-selected {
+  color: var(--st-text);
+}
+
+.sto-grip {
+  position: absolute;
+  left: calc(var(--sto-indent) - 7px);
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  color: var(--st-text-tertiary);
+  opacity: 0;
+  cursor: grab;
+}
+.sto-row.is-draggable:hover .sto-grip,
+.sto-item:focus-visible > .sto-row .sto-grip {
+  opacity: 1;
+}
+
+.sto-icon {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  color: var(--st-text-tertiary);
+}
+.sto-row.is-selected .sto-icon {
+  color: var(--st-text-secondary);
+}
+
+/*
+ * REVIEW FIX: text hidden for screen readers (.st-sr, position: absolute)
+ * inside a clipped, nowrap row label sat at its static position — past the end
+ * of a long block name — and, positioned against the row rather than the
+ * clipping label, widened the outline: the left column scrolled sideways at
+ * every width (457px of content in a 320px column) and, on a phone, so did
+ * the whole page. Pinned to the row's corner it takes up no width.
+ */
+.sto-row .st-sr {
+  top: 0;
+  left: 0;
+}
+
+.sto-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.sto-text {
+  flex: 0 1 auto;
+  min-width: 0;
+  font-size: 13px;
+  line-height: 20px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sto-text em {
+  font-style: normal;
+  color: var(--st-text-tertiary);
+}
+.sto-row-block .sto-text {
+  font-weight: 500;
+}
+.sto-row-archived .sto-text {
+  color: var(--st-text-secondary);
+}
+
+.sto-chev {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: var(--st-radius-sm);
+  color: var(--st-text-tertiary);
+}
+.sto-chev:hover {
+  background: var(--st-bg-emphasis);
+  color: var(--st-text);
+}
+
+/* "+ Add question": a quiet ghost row, 28px, that comes forward on hover or focus. */
+.sto-row-add-question,
+.sto-row-add-section {
+  height: 28px;
+  color: var(--st-text-tertiary);
+}
+.sto-row-add-question .sto-icon,
+.sto-row-add-section .sto-icon {
+  color: inherit;
+}
+.sto-text-add {
+  font-weight: 400;
+}
+.sto-row-add-question:hover,
+.sto-row-add-section:hover,
+.sto-item:focus-visible > .sto-row-add-question,
+.sto-item:focus-visible > .sto-row-add-section {
+  color: var(--st-text);
+}
+.sto-item-add-section {
+  margin-top: 8px;
+}
+
+/* ── The row's end: meta on hover, then 14px indicators ───────────────── */
+.sto-trail {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  max-width: 55%;
+  color: var(--st-text-tertiary);
+}
+.sto-ind {
+  position: relative;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+.sto-ind .st-icon {
+  width: 14px;
+  height: 14px;
+}
+.sto-count {
+  flex: none;
+  min-width: 16px;
+  text-align: right;
+  font-size: 12px;
+  line-height: 16px;
+  font-variant-numeric: tabular-nums;
+  color: var(--st-text-tertiary);
+}
+.sto-row.is-header .sto-count {
+  font-weight: 400;
+}
+
+.sto-issue {
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 16px;
+  font-variant-numeric: tabular-nums;
+}
+.sto-issue-warn {
+  color: var(--st-warn);
+}
+.sto-issue-error {
+  color: var(--st-danger);
+}
+
+/* A question's number and ID: tertiary meta, only on hover, selection and focus
+   (and while the search matched its ID, so the match can be seen). */
+.sto-qmeta {
+  display: none;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--st-text-tertiary);
+}
+.sto-row:hover .sto-qmeta,
+.sto-row.is-selected .sto-qmeta,
+.sto-row.has-id-match .sto-qmeta,
+.sto-item:focus-visible > .sto-row .sto-qmeta {
+  display: inline-flex;
+}
+.sto-row.has-id-match .sto-trail {
+  max-width: 70%;
+}
+.studio .sto-row.has-id-match .sto-id {
+  max-width: none;
+}
+.sto-outline.is-dragging .sto-row:hover:not(.is-selected) .sto-qmeta {
+  display: none;
+}
+.sto-num {
+  flex: none;
+  font-variant-numeric: tabular-nums;
+}
+.studio .sto-id {
+  min-width: 0;
+  max-width: 104px;
+  padding: 0;
+  background: none;
+  font-family: var(--st-mono);
+  font-size: 11.5px;
+  color: var(--st-text-tertiary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Tooltips for indicators and block locks: pure CSS, since 150 rows would
+   otherwise each carry tooltip state. Shown after a moment, like the kit's. */
+.sto-ind[data-tip]::after,
+.sto-icon[data-tip]::after {
+  content: attr(data-tip);
+  position: absolute;
+  top: calc(100% + 8px);
+  z-index: 20;
+  width: max-content;
+  max-width: 220px;
+  padding: 6px 8px;
+  border-radius: var(--st-radius);
+  background: #18181b;
+  color: #fafafa;
+  box-shadow: var(--st-shadow-md);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 16px;
+  white-space: normal;
+  text-align: left;
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+}
+.sto-ind[data-tip]::after {
+  right: -6px;
+}
+.sto-icon {
+  position: relative;
+}
+.sto-icon[data-tip]::after {
+  left: -6px;
+}
+.sto-ind[data-tip]:hover::after,
+.sto-icon[data-tip]:hover::after {
+  opacity: 1;
+  visibility: visible;
+  transition: opacity 120ms ease-out 300ms, visibility 0s linear 300ms;
+}
+.sto-outline.is-dragging [data-tip]::after {
+  display: none;
+}
+
+.sto-mark {
+  background: rgba(6, 120, 67, 0.16);
+  color: inherit;
+  border-radius: 2px;
+  box-shadow: 0 1px 0 var(--st-accent);
+}
+.sto-pipe {
+  font-family: var(--st-mono);
+  font-size: 0.92em;
+  padding: 0 2px;
+  border-radius: 3px;
+  background: var(--st-bg-emphasis);
+}
+
+.sto-more,
+.sto-more-space {
+  flex: none;
+  width: 24px;
+  height: 24px;
+}
+.sto-more {
+  opacity: 0;
+}
+.sto-row:hover .sto-more,
+.sto-row.is-selected .sto-more,
+.sto-item:focus-visible > .sto-row .sto-more,
+.sto-more[aria-expanded="true"] {
+  opacity: 1;
+}
+.sto-row .sto-more:hover {
+  background: var(--st-bg-emphasis);
+}
+@media (hover: none) {
+  .sto-more,
+  .sto-grip {
+    opacity: 1;
+  }
+}
+
+/* A licensed or protected block's own questions step in under its name,
+   with a hairline down from the lock. */
+.sto-group-block {
+  position: relative;
+}
+.sto-group-block::before {
+  content: "";
+  position: absolute;
+  left: 24px;
+  top: 0;
+  bottom: 6px;
+  width: 1px;
+  background: var(--st-border);
+  pointer-events: none;
+}
+
+/* ── Dragging ─────────────────────────────────────────────────────────── */
+.sto-outline.is-dragging .sto-row:hover {
+  background: transparent;
+}
+.sto-outline.is-dragging .sto-row.is-selected:hover {
+  background-color: var(--st-bg-muted);
+}
+.sto-row.drop-before::before,
+.sto-row.drop-after::after {
+  content: "";
+  position: absolute;
+  left: calc(8px + var(--sto-indent));
+  right: 8px;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--st-accent);
+  pointer-events: none;
+}
+.sto-row.drop-before::before {
+  top: -1px;
+}
+.sto-row.drop-after::after {
+  bottom: -1px;
+}
+.sto-row.drop-inside {
+  box-shadow: inset 0 0 0 2px var(--st-accent);
+  background-color: var(--st-accent-subtle);
+}
+.sto-row.drop-refused::before,
+.sto-row.drop-refused::after {
+  background: repeating-linear-gradient(90deg, var(--st-warn) 0 6px, transparent 6px 10px);
+}
+.sto-row.drop-refused.drop-inside {
+  box-shadow: inset 0 0 0 2px var(--st-warn);
+  background-color: var(--st-warn-subtle);
+}
+
+/* ── The shared row menu ──────────────────────────────────────────────── */
+.st-menu-list.sto-rowmenu {
+  position: fixed;
+  max-width: min(320px, calc(100vw - 16px));
+  max-height: min(70vh, 520px);
+  overflow-y: auto;
+}
+.sto-rowmenu .st-menu-item[aria-disabled="true"] {
+  opacity: 1;
+  color: var(--st-text-tertiary);
+  cursor: default;
+}
+.sto-rowmenu .st-menu-item[aria-disabled="true"]:hover {
+  background: transparent;
+}
+.sto-rowmenu .st-menu-item[aria-disabled="true"]:focus-visible {
+  background: var(--st-bg-muted);
+}
+.sto-rowmenu .st-menu-item {
+  align-items: flex-start;
+}
+.sto-rowmenu .st-menu-item > .st-icon {
+  margin-top: 2px;
+}
+.sto-rowmenu .st-menu-text small {
+  white-space: normal;
+  line-height: 16px;
+  margin-top: 2px;
+}
+
+/* ── Type picker ──────────────────────────────────────────────────────── */
+.sto-types {
+  display: grid;
+  gap: 16px;
+}
+.sto-type-group h3 {
+  display: flex;
+  align-items: center;
+  margin: 0 0 4px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 16px;
+  color: var(--st-text-secondary);
+}
+.sto-type-grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 2px 8px;
+}
+.sto-type-option {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  width: 100%;
+  min-height: 48px;
+  padding: 8px;
+  border: 0;
+  border-radius: var(--st-radius);
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  color: var(--st-text);
+  cursor: pointer;
+}
+button.sto-type-option:hover {
+  background: var(--st-bg-muted);
+}
+.sto-type-icon {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--st-radius);
+  border: 1px solid var(--st-border);
+  background: var(--st-bg);
+  color: var(--st-text-secondary);
+}
+.sto-type-icon .st-icon {
+  width: 16px;
+  height: 16px;
+}
+.sto-type-text {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.sto-type-text strong {
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 18px;
+}
+.sto-type-text small {
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--st-text-tertiary);
+}
+.sto-type-option.is-disabled {
+  cursor: default;
+  min-height: 0;
+  padding: 6px 8px;
+}
+.sto-type-option.is-disabled .sto-type-icon {
+  width: 20px;
+  height: 20px;
+  border: 0;
+  background: transparent;
+  color: var(--st-text-tertiary);
+}
+.sto-type-option.is-disabled .sto-type-icon .st-icon {
+  width: 14px;
+  height: 14px;
+}
+.sto-type-option.is-disabled strong {
+  color: var(--st-text-secondary);
+  font-weight: 400;
+}
+.sto-type-unavailable {
+  margin-top: 4px;
+}
+
+.sto-move-list {
+  margin-top: 12px;
+  max-height: 50vh;
+  overflow-y: auto;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sto-grip,
+  .sto-more,
+  .sto-ind[data-tip]:hover::after,
+  .sto-icon[data-tip]:hover::after {
+    transition: none;
+  }
+}

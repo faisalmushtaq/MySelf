@@ -8,10 +8,10 @@ import {
   type Auth,
   type User,
 } from "firebase/auth";
-import { collection, getDocs, getFirestore, type Firestore } from "firebase/firestore";
+import { collection, doc, getDoc, getDocs, getFirestore, type Firestore } from "firebase/firestore";
 import { getFunctions, httpsCallable, type Functions } from "firebase/functions";
 import { joinSession, paths, type ChunkDoc, type SessionDoc } from "@myself/firebase";
-import { publishedPaths } from "@myself/schema";
+import { hashHex } from "@myself/schema";
 import type { DeviceSession } from "@myself/store";
 
 /**
@@ -201,21 +201,25 @@ export async function assemblePull(
   return { sessions, quarantined, unreadable };
 }
 
-// ── Versions published from the dashboard (D-54) ──────────────────────────────
-
 /**
- * The versions published from the dashboard, as the database holds them.
+ * The release store's document for a hash, or null when there is none.
  *
- * Readable by anyone (`firestore.rules`), so this needs no role; it is read on
- * signing in because that is when this view starts reading the study. The
- * documents are checked against their hashes by `addPublishedReleases` in
- * releases.ts, not here.
+ * A release published from the Studio is not compiled into this view, so a
+ * sitting collected under one can only be read if its manifest is fetched
+ * (docs/16 §5.4). The rules allow anyone a `get` of a single release — the
+ * same manifest a participant's device downloads — so this works before
+ * anybody signs in. What comes back is unverified: `readStoredRelease` checks
+ * it before anything reads a sitting through it.
+ *
+ * Null, not an error, for a build with no study configured: there is nowhere
+ * to look, and the hash is simply unknown here.
  */
-export async function readPublishedReleases(): Promise<{ id: string; data: unknown }[]> {
-  const { db } = firebase();
-  const snapshot = await getDocs(collection(db, publishedPaths.releases(STUDY)));
-  return snapshot.docs.map((document) => ({ id: document.id, data: document.data() }));
+export async function fetchPublicRelease(hash: string): Promise<unknown> {
+  if (!config) return null;
+  const snapshot = await getDoc(doc(firebase().db, paths.publicRelease(STUDY, hashHex(hash))));
+  return snapshot.exists() ? snapshot.data() : null;
 }
+
 
 // ── Devices ────────────────────────────────────────────────────────────────
 

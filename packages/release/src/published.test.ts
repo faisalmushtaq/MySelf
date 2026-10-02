@@ -40,8 +40,9 @@ const fielded = manifestFiles.filter((f) => {
 });
 
 describe("every fielded release in releases/", () => {
-  it("is found: r5.0.0 to r9.0.0 at least, and no manifest file the naming rule misses", () => {
-    expect(fielded.length).toBeGreaterThanOrEqual(9);
+  it("is found: r5.0.0 to r8.0.0 at least, and no manifest file the naming rule misses", () => {
+    // A release cut but not yet approved for fielding waits in releases/candidates/.
+    expect(fielded.length).toBeGreaterThanOrEqual(8);
     // A manifest named some other way would be skipped by every check below.
     const unaccounted = manifestFiles.filter((f) => versionOf(f) === null && !PRE_FIELDING.includes(f));
     expect(unaccounted).toEqual([]);

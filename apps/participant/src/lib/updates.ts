@@ -32,6 +32,16 @@
  * The policy is a pure function and the wiring around it is four lines, because
  * "when may this page reload itself" is a rule worth being able to read and test
  * without a browser.
+ *
+ * AND THE GATE DECIDES WHEN A NEW BUILD TAKES OVER, not only when the page
+ * reloads onto one (docs/16 R11). The rules above were being applied after the
+ * fact: in vite-plugin-pwa's "autoUpdate" mode a new worker took control the
+ * moment it installed, and the plugin's own registration code then reloaded the
+ * page itself — unconditionally, without asking this gate — so a deploy could
+ * still reload a child mid-sitting. Now the worker is built to wait ("prompt"
+ * mode), main.tsx reports a waiting build here, and it is told to take over only
+ * when no sitting is in progress. Taking over then leads to `tookOver`, and so
+ * to the reload, through the same rules as before.
  */
 
 export interface UpdateSituation {
@@ -55,11 +65,27 @@ export function shouldReloadOnto(situation: UpdateSituation): boolean {
   return !situation.sittingInProgress;
 }
 
+/**
+ * Whether a downloaded build may be told to take over now.
+ *
+ * Only when nobody is part-way through a sitting: taking over is what leads to
+ * the reload, so it is held back by exactly the rule the reload is.
+ */
+export function mayActivateWaitingBuild(situation: Pick<UpdateSituation, "sittingInProgress">): boolean {
+  return !situation.sittingInProgress;
+}
+
 export interface UpdateGate {
   /** A participant has started or resumed a sitting. */
   hold(): void;
   /** The app is back at a screen where reloading costs nobody anything. */
   release(): void;
+  /**
+   * A new build is installed and waiting. `activate` tells it to take over; it
+   * is called now if that is safe, otherwise at the next `release`. Reporting
+   * again replaces the earlier `activate`, so only the newest build is applied.
+   */
+  buildWaiting(activate: () => void): void;
   /** A new build has taken control of this page. */
   tookOver(): void;
   /** Whether a build is waiting for the current sitting to finish. */
@@ -74,6 +100,7 @@ export function updateGate(options: { hadControllerAtLoad: boolean; reload: () =
   let newBuildTookOver = false;
   let sittingInProgress = false;
   let reloaded = false;
+  let pendingActivation: (() => void) | null = null;
 
   const apply = () => {
     if (reloaded) return;
@@ -82,20 +109,32 @@ export function updateGate(options: { hadControllerAtLoad: boolean; reload: () =
     options.reload();
   };
 
+  const activate = () => {
+    if (!pendingActivation || !mayActivateWaitingBuild({ sittingInProgress })) return;
+    const go = pendingActivation;
+    pendingActivation = null;
+    go();
+  };
+
   return {
     hold() {
       sittingInProgress = true;
     },
     release() {
       sittingInProgress = false;
+      activate();
       apply();
+    },
+    buildWaiting(next) {
+      pendingActivation = next;
+      activate();
     },
     tookOver() {
       newBuildTookOver = true;
       apply();
     },
     waiting() {
-      return newBuildTookOver && !reloaded;
+      return pendingActivation !== null || (newBuildTookOver && !reloaded);
     },
   };
 }

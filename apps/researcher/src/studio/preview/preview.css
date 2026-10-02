@@ -1,0 +1,652 @@
+/*
+ * The Studio's preview page (DESIGN.md).
+ *
+ * The participant's screen is the loudest thing here: it sits on a quiet
+ * stage at its real proportions, with a thin border and nothing else. The
+ * chrome around it — a 44px toolbar, one slim line saying nothing is kept,
+ * and the path — is small neutral type on hairlines. State in the path is
+ * carried by an icon's shape and by words for screen readers, so nothing
+ * depends on seeing green.
+ *
+ * Scoped under .st-pv, inside .studio: the --st-* tokens and the kit's classes.
+ * The participant screens inside the frame keep their own look (frame.css).
+ */
+
+.st-pv {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 560px;
+  background: var(--st-bg);
+  color: var(--st-text);
+  font-size: 13px;
+  line-height: 20px;
+}
+
+/* ── Toolbar ──────────────────────────────────────────────────────────── */
+.st-pv-toolbar {
+  flex: none;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  min-height: var(--st-toolbar, 44px);
+  padding: 6px 16px;
+  background: var(--st-bg);
+  border-bottom: 1px solid var(--st-border);
+}
+
+.st-pv-divider {
+  flex: none;
+  width: 1px;
+  height: 16px;
+  background: var(--st-border);
+}
+.st-pv-toolbar .st-btn-ghost {
+  margin-left: -4px;
+}
+/* The kit's `.st-seg-item.on` shadow outranks its focus ring, so the chosen
+   segment — the one that takes focus — showed none. Put the ring back. */
+.st-pv .st-seg-item:focus-visible {
+  box-shadow: var(--st-focus);
+}
+
+.st-pv-startfrom {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 1 320px;
+  min-width: 200px;
+}
+.st-pv-startfrom label {
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 500;
+  color: var(--st-text-secondary);
+  white-space: nowrap;
+}
+.st-pv-startfrom .st-select {
+  height: 28px;
+  min-height: 28px;
+  min-width: 0;
+  padding: 0 28px 0 8px;
+  font-size: 13px;
+  line-height: 26px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  background-position: right 6px center;
+}
+
+/* The run's news (empty, it takes no room), then the promise and the size,
+   together at the right: when the toolbar wraps they go down as one. */
+.st-pv-toolbar > .st-pv-announce {
+  margin: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 500;
+  color: var(--st-text);
+}
+.st-pv-end {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  margin-left: auto;
+  white-space: nowrap;
+}
+.st-pv-promise {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--st-text-tertiary);
+  white-space: nowrap;
+}
+.st-pv-promise .st-infotip {
+  margin-left: 0;
+}
+.st-pv-scale {
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--st-text-tertiary);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* ── The promise, always in view ─────────────────────────────────────── */
+.st-pv-banner {
+  flex: none;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  min-height: 36px;
+  padding: 10px 16px;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--st-text-secondary);
+}
+.st-pv-banner > .st-icon {
+  color: var(--st-text-tertiary);
+}
+.st-pv-banner p {
+  margin: 0;
+}
+/* On its own (loading, or nothing to run) it is a line across the page. */
+.st-pv > .st-pv-banner {
+  background: var(--st-bg-subtle);
+  border-bottom: 1px solid var(--st-border);
+}
+/* Never `display: none`, even while empty: a live region that is not in the
+   accessibility tree when its words arrive is not announced by screen readers
+   (Chrome drops the change), and announce() empties it before each message.
+   Empty, it takes no room. */
+.st-pv-banner .st-pv-announce {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--st-text);
+  font-weight: 500;
+}
+.st-pv-announce .st-icon {
+  color: var(--st-text-tertiary);
+}
+
+/* ── One-line notices: gate failures, a run that stopped ─────────────── */
+.st-pv-notices {
+  flex: none;
+}
+.st-pv-line {
+  border-bottom: 1px solid var(--st-border);
+  color: var(--st-text);
+}
+.st-pv-line-warn {
+  background: var(--st-warn-subtle);
+}
+.st-pv-line-error {
+  background: var(--st-danger-subtle);
+}
+.st-pv-line-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  margin: 0;
+  padding: 8px 16px;
+}
+.st-pv-line-head strong {
+  flex: none;
+  font-weight: 500;
+}
+.st-pv-line-warn .st-pv-line-head > .st-icon,
+.st-pv-line-warn .st-pv-line-head strong {
+  color: var(--st-warn);
+}
+.st-pv-line-error .st-pv-line-head > .st-icon,
+.st-pv-line-error .st-pv-line-head strong {
+  color: var(--st-danger);
+}
+summary.st-pv-line-head {
+  list-style: none;
+  cursor: pointer;
+  user-select: none;
+}
+summary.st-pv-line-head::-webkit-details-marker {
+  display: none;
+}
+/* Full width, so the ring sits inside the line rather than off the page. */
+.studio summary.st-pv-line-head:focus-visible {
+  border-radius: 0;
+  box-shadow: inset 0 0 0 2px var(--st-accent);
+}
+.st-pv-line-first {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--st-text-secondary);
+}
+details[open] .st-pv-line-first {
+  visibility: hidden;
+}
+.st-pv-line-chev {
+  flex: none;
+  display: inline-flex;
+  margin-left: auto;
+  color: var(--st-text-tertiary);
+}
+details[open] .st-pv-line-chev {
+  transform: rotate(180deg);
+}
+.st-pv-line-body {
+  max-height: 40vh;
+  overflow-y: auto;
+  padding: 0 16px 12px 40px;
+}
+.st-pv-line-hint {
+  margin: 0 0 4px;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--st-text-secondary);
+}
+.st-pv-line .st-pv-problems li {
+  color: var(--st-text);
+}
+
+/* ── Problem lists ───────────────────────────────────────────────────── */
+.st-pv-problems {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.st-pv-problems li {
+  position: relative;
+  padding: 4px 0 4px 12px;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--st-text-secondary);
+}
+.st-pv-problems li::before {
+  content: "";
+  position: absolute;
+  left: 2px;
+  top: 11px;
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: currentColor;
+}
+/* A field path: the Studio's code tag, at the meta size. */
+.st-pv .st-pv-path-code {
+  font-family: var(--st-mono);
+  font-size: 12px;
+  color: var(--st-text);
+  overflow-wrap: anywhere;
+}
+.st-pv-more {
+  margin-top: 4px;
+  font-size: 12px;
+  line-height: 16px;
+}
+.st-pv-more summary {
+  width: fit-content;
+  cursor: pointer;
+  font-weight: 500;
+  color: var(--st-text-secondary);
+  border-radius: var(--st-radius-sm);
+}
+.st-pv-more summary:hover {
+  color: var(--st-text);
+}
+
+/* ── Loading, nothing loaded, nothing that can run ───────────────────── */
+.st-pv-blocked {
+  flex: 1;
+  width: 100%;
+  max-width: 560px;
+  margin: 0 auto;
+  padding: 48px 16px;
+}
+.st-pv-blocked .st-empty {
+  padding: 16px 0 24px;
+}
+.st-pv-blocked .st-pv-problems {
+  border-top: 1px solid var(--st-border);
+}
+/* Each problem a row: the field, then what is wrong with it. */
+.st-pv-blocked .st-pv-problems li {
+  display: grid;
+  justify-items: start;
+  gap: 2px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--st-border);
+  font-size: 13px;
+  line-height: 20px;
+}
+.st-pv-blocked .st-pv-problems li::before {
+  display: none;
+}
+.st-pv-blocked .st-pv-more {
+  margin-top: 8px;
+}
+
+/* ── Stage and device ────────────────────────────────────────────────── */
+.st-pv-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+
+.st-pv-stage {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--st-bg-subtle);
+}
+
+/* The canvas's size never depends on what is in it (the device is placed
+   absolutely), so measuring it to scale the device cannot feed back. */
+.st-pv-canvas {
+  position: relative;
+  flex: 1;
+  min-height: 420px;
+  overflow: hidden;
+}
+
+.st-pv-device {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* A thin ring rather than a border, so it takes no room from the frame. */
+.st-pv-screen {
+  position: relative;
+  flex: none;
+  overflow: hidden;
+  background: var(--st-bg);
+  border-radius: var(--st-radius-lg);
+  box-shadow:
+    0 0 0 1px var(--st-border),
+    var(--st-shadow-sm);
+}
+.st-pv-device-tablet .st-pv-screen {
+  border-radius: var(--st-radius-xl);
+}
+.st-pv-device-phone .st-pv-screen {
+  border-radius: 16px;
+}
+
+/* The frame keeps the device's real CSS size, so the participant's own
+   breakpoints apply, and is scaled down as a picture of it. */
+.st-pv-screen iframe {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: block;
+  border: 0;
+  transform-origin: 0 0;
+  background: var(--st-bg);
+}
+
+/* ── Path ────────────────────────────────────────────────────────────── */
+.st-pv-path {
+  flex: none;
+  width: var(--st-right, 320px);
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--st-bg-subtle);
+  border-left: 1px solid var(--st-border);
+}
+
+.st-pv-path-head {
+  flex: none;
+  padding: 8px 16px 10px;
+  border-bottom: 1px solid var(--st-border);
+}
+.st-pv-path-top {
+  display: flex;
+  align-items: center;
+  min-height: 36px;
+}
+.st-pv-path-top h2 {
+  margin: 0;
+  font-size: 13px;
+  line-height: 20px;
+  font-weight: 600;
+}
+/* The kit's ⓘ rules target `.st-infotip > button`, but Tooltip wraps the
+   button in its anchor span, so they miss it; the same rules, reaching it. */
+.st-pv .st-infotip button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--st-text-tertiary);
+  cursor: help;
+}
+.st-pv .st-infotip button:hover {
+  color: var(--st-text);
+}
+.st-pv-path-top .st-seg {
+  margin-left: auto;
+}
+.st-pv-path-top .st-seg-item {
+  font-variant-numeric: tabular-nums;
+}
+.st-pv-path-sum {
+  display: grid;
+  margin: 0;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--st-text-tertiary);
+  font-variant-numeric: tabular-nums;
+}
+.st-pv-where {
+  color: var(--st-text-secondary);
+  font-weight: 500;
+}
+
+.st-pv-path-list {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-bottom: 12px;
+}
+.st-pv-path-none {
+  margin: 0;
+  padding: 16px;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--st-text-tertiary);
+}
+
+.st-pv-section h3 {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  margin: 0;
+  padding: 12px 16px 4px;
+  background: var(--st-bg-subtle);
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 600;
+  color: var(--st-text-secondary);
+}
+.st-pv-section ol {
+  list-style: none;
+  margin: 0;
+  padding: 0 8px;
+}
+
+/* A row is its button, and a hidden row's reason sits inside the button's
+   box (drawn over it, clicks passing through), so hover, the selection bar
+   and the focus ring take in both. */
+.st-pv-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: var(--st-row, 32px) auto;
+}
+.st-pv-row-btn {
+  grid-area: 1 / 1 / 3 / 2;
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  width: 100%;
+  min-height: var(--st-row, 32px);
+  padding: 6px 8px;
+  border: 0;
+  border-radius: var(--st-radius);
+  background: transparent;
+  color: var(--st-text);
+  font: inherit;
+  font-size: 13px;
+  line-height: 20px;
+  text-align: left;
+  cursor: pointer;
+}
+.st-pv-row-btn:hover {
+  background: var(--st-bg-muted);
+}
+
+.st-pv-mark {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  margin-top: 2px;
+  color: var(--st-text-tertiary);
+}
+/* Not reached: an empty ring, drawn rather than an icon. */
+.st-pv-row-not_reached .st-pv-mark::before {
+  content: "";
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  border: 1.5px solid var(--st-text-tertiary);
+}
+
+.st-pv-row-q {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.st-pv-row-meta {
+  flex: 0 1 auto;
+  max-width: 42%;
+  margin-top: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--st-text-tertiary);
+}
+/* Tertiary is below AA on the muted hover background; secondary is not. */
+.st-pv-row-btn:hover .st-pv-row-meta {
+  color: var(--st-text-secondary);
+}
+
+/* States. Each has its own icon and words; colour only reinforces them. */
+.st-pv-row-current .st-pv-row-btn {
+  background: var(--st-bg-muted);
+  font-weight: 500;
+}
+.st-pv-row-current .st-pv-row-btn::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 6px;
+  bottom: 6px;
+  width: 2px;
+  border-radius: 2px;
+  background: var(--st-accent);
+}
+.st-pv-row-current .st-pv-mark,
+.st-pv-row-current .st-pv-row-meta {
+  color: var(--st-accent-text);
+}
+.st-pv-row-current .st-pv-row-meta {
+  font-weight: 500;
+}
+.st-pv-row-answered .st-pv-mark {
+  color: var(--st-text-secondary);
+}
+.st-pv-row-hidden .st-pv-row-q {
+  color: var(--st-text-secondary);
+}
+
+/* Why a hidden row is hidden, under its question: the condition in full (the
+   part that tells two rows apart is often at its end), and where its answers
+   stand. "Waiting on …" repeats the condition's questions, so it keeps to one
+   line at rest; all of it on keyboard focus, and for a screen reader (it is
+   the button's description). */
+.st-pv-why {
+  grid-area: 2 / 1 / 3 / 2;
+  position: relative;
+  margin: -4px 8px 0 32px;
+  padding-bottom: 8px;
+  pointer-events: none;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--st-text-tertiary);
+}
+/* Tertiary is below AA on the muted hover background; secondary is not. */
+.st-pv-row:hover .st-pv-why {
+  color: var(--st-text-secondary);
+}
+.st-pv-why p {
+  margin: 0;
+}
+.st-pv-why .st-pv-why-brief {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.st-pv-row:has(.st-pv-row-btn:focus-visible) .st-pv-why-brief {
+  white-space: normal;
+}
+
+/* ── Narrow windows: the path goes under the device ──────────────────── */
+@media (max-width: 960px) {
+  .st-pv-body {
+    flex-direction: column;
+  }
+  .st-pv-stage {
+    flex: none;
+    height: min(72vh, 760px);
+  }
+  .st-pv-canvas {
+    min-height: 0;
+  }
+  .st-pv-path {
+    width: auto;
+    max-height: 60vh;
+    border-left: 0;
+    border-top: 1px solid var(--st-border);
+  }
+}
+
+/* Phone width: device icons only (the names stay for screen readers), and
+   "Start from" on a line of its own. */
+@media (max-width: 640px) {
+  .st-pv-toolbar .st-seg-item > span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+  }
+  .st-pv-toolbar .st-seg-item {
+    padding: 0 8px;
+  }
+  .st-pv-startfrom {
+    order: 1;
+    flex: 1 1 100%;
+  }
+  .st-pv-line-first {
+    display: none;
+  }
+}

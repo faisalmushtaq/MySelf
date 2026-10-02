@@ -1,6 +1,7 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { expect, test, type Page } from "@playwright/test";
+import { CANDIDATE, openOnCandidate } from "./support/candidate.js";
 
 /**
  * Whole sittings through the real app, down different paths, handed over and read
@@ -21,7 +22,14 @@ import { expect, test, type Page } from "@playwright/test";
  */
 
 const PASSPHRASE = "six brown otters reading";
-const MANIFEST = resolve("releases/ybm_nd2026_standard_r9.0.0.manifest.json");
+/**
+ * The scenarios are the r9.0.0 survey's (linkage, street search, D-53), and r9.0.0
+ * is a candidate until it is approved — so each sitting is on it as a release
+ * downloaded from the study (see support/candidate.ts), with the service worker
+ * out of the way so the download reaches the stand-in study.
+ */
+const MANIFEST = CANDIDATE;
+test.use({ serviceWorkers: "block" });
 const OUT = resolve("test-results/scenarios");
 const storeTools = () => import("@myself/store");
 
@@ -40,11 +48,18 @@ interface Scenario {
 
 const heading = (page: Page) =>
   page.evaluate(() => document.querySelector(".survey-body h1")?.textContent?.trim() ?? "");
+// Each leaves an option that is already chosen as it is: a second tap on a
+// checkbox would untick it, and a chosen radio may be on a screen that is
+// already moving on by itself.
 const choose = (label: string): Act => async (page) => {
-  await page.getByRole("radio", { name: label, exact: true }).click();
+  const radio = page.getByRole("radio", { name: label, exact: true });
+  if ((await radio.getAttribute("aria-checked")) !== "true") await radio.click();
 };
 const tick = (...labels: string[]): Act => async (page) => {
-  for (const label of labels) await page.getByRole("checkbox", { name: label, exact: true }).click();
+  for (const label of labels) {
+    const box = page.getByRole("checkbox", { name: label, exact: true });
+    if ((await box.getAttribute("aria-checked")) !== "true") await box.click();
+  }
 };
 const type = (text: string): Act => async (page) => {
   await page.locator(".survey-body input.text-input:visible, .survey-body textarea:visible").first().fill(text);
@@ -220,9 +235,16 @@ async function advance(page: Page): Promise<void> {
 async function sit(page: Page, s: Scenario): Promise<Set<string>> {
   const used = new Set<string>();
   const rules = [...common(s), ...s.rules];
-  await page.goto("./");
+  await openOnCandidate(page);
   await page.locator("input.code").fill(s.code);
   await page.locator("button.next.big").click();
+  /**
+   * The screen a rule last answered. A screen that moves on by itself can still
+   * be showing for a moment after the walk has seen something change (on a slow
+   * WebKit run, often), and answering it a second time then waits on an option
+   * that is leaving the page — so a screen is answered once, then only moved on.
+   */
+  let answered = "";
   for (let screens = 0; screens < 400; screens += 1) {
     const before = await position(page);
     if (before === "finished") return used;
@@ -236,10 +258,14 @@ async function sit(page: Page, s: Scenario): Promise<Set<string>> {
       continue;
     }
     const h = await heading(page);
+    const screen = `${before.split("|")[0]}|${h}`;
     const rule = rules.find(([when]) => when.test(h));
-    if (rule) {
+    if (rule && screen === answered) {
+      // Already answered; fall through to waiting for it to move, or moving it.
+    } else if (rule) {
       used.add(rule[0].source);
       await rule[1](page);
+      answered = screen;
     } else if (s.skipOptional && !h.includes("Please tap each statement") && (await page.locator(".survey-body .lede-body").count()) === 0) {
       // An information screen (lede-body) is not a question to leave blank.
       if (await skip(page)) {

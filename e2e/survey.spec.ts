@@ -335,6 +335,22 @@ test.describe("a sitting on a device with no study configured", () => {
     expect(envelope.data.length).toBeGreaterThan(2_000);
   });
 
+  /**
+   * The worker that lets the survey open in a hall with no signal is registered
+   * by the app's own code, not the build plugin's (docs/16 R11: the plugin's
+   * registration reloaded the page by itself). A registration that silently
+   * stopped happening would look fine online and fail the first offline morning.
+   */
+  test("registers the service worker that keeps it working offline", async ({ page }) => {
+    await page.goto("./");
+    const registration = await page.evaluate(async () => {
+      const ready = await navigator.serviceWorker.ready;
+      return { scope: ready.scope, script: ready.active?.scriptURL ?? "" };
+    });
+    expect(registration.scope).toMatch(/\/MySelf\/$/);
+    expect(registration.script).toMatch(/\/MySelf\/sw\.js$/);
+  });
+
   test("asks the operator to set nothing up, and says where the data stays", async ({ page }) => {
     // Nothing is registered: an iPad with the URL collects and files sittings by
     // itself. So the handover panel must not present a setup step, and on a build

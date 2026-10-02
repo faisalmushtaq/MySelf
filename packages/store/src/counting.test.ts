@@ -17,7 +17,7 @@ import { ingest, type DeviceSession } from "./ingest.js";
 
 const manifest: ReleaseManifest = releaseManifest.parse(
   JSON.parse(
-    readFileSync(fileURLToPath(new URL("../../../releases/ybm_nd2026_standard_r9.0.0.manifest.json", import.meta.url)), "utf8"),
+    readFileSync(fileURLToPath(new URL("../../../releases/candidates/ybm_nd2026_standard_r9.0.0.manifest.json", import.meta.url)), "utf8"),
   ),
 );
 const manifests = new Map([[manifest.hash!, manifest]]);

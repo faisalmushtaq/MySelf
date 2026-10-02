@@ -35,18 +35,7 @@ studies/{study}/
   assignments/{sessionId}       twin splits
   devices/{deviceId}            enrolled iPads
   audit/{id}                    who did what
-  releases/{hash}               versions published from the dashboard (D-54)
-  config/activeRelease          which of them new sittings use
 ```
-
-**Published versions** are written only by the dashboard's functions, with the
-Admin SDK, when an owner publishes a version or makes one active. A version's
-document holds its whole manifest as JSON (`manifestJson`, about 275 kB for
-r9.0.0), keyed by its content hash. They hold the questionnaire, which is public
-in the app's bundle anyway, and nothing about any participant, so anyone may read
-them: an iPad reads `activeRelease` at start-up before it has any credential.
-Every reader checks a manifest against its hash before using it
-([16-maintainers-guide.md](16-maintainers-guide.md) §3.6).
 
 **One document per sitting** is the decision that keeps this in the free tier. A
 whole event log is ~54 kB against a 1 MiB limit, so deriving the dataset costs
@@ -77,17 +66,12 @@ Roles are Firebase Auth custom claims, set by an owner through `setRole`.
 A signed-in account with **no role** can do nothing and is told so plainly —
 silence looks like a bug and invites a workaround.
 
-An iPad can post sittings and **read nothing** of the study's data. A stolen
-device is a device that can write, not a window into the cohort.
-
-The published versions and `config/activeRelease` are the exception to "nothing
-for anybody else": **anyone may read them, and no client may write them**,
-owners included. They are the questionnaire, not data, and only the dashboard's
-functions write them. Any other document under `config/` stays closed.
+An iPad can post sittings and **read nothing**. A stolen device is a device that
+can write, not a window into the cohort.
 
 ### The rules are tested
 
-`infra/firebase/test/` runs 23 tests against the real Firestore emulator,
+`infra/firebase/test/` runs 20 tests against the real Firestore emulator,
 exercising each rule from **both sides** — the caller who should pass and the
 caller who should not. A rules suite that only checks the happy path proves
 nothing; the value of a rule is what it refuses.

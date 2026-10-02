@@ -1,4 +1,5 @@
-import { openPublishedRelease, releaseManifest, type ReleaseManifest } from "@myself/schema";
+import { releaseManifest, verifyRawManifestHash, type ReleaseManifest } from "@myself/schema";
+import type { PublicReleaseDoc } from "@myself/studio";
 
 /**
  * Every published release, indexed by content hash.
@@ -9,13 +10,6 @@ import { openPublishedRelease, releaseManifest, type ReleaseManifest } from "@my
  * was actually collected under, which is what its hash identifies. Reading a
  * 2026 session through a 2028 manifest is how a renamed option code turns into
  * a silently wrong answer.
- *
- * Two sources. The files in `releases/` are built in. Versions published from
- * the dashboard (D-54) are read from the study once somebody signs in
- * (`addPublishedReleases`), each only if its manifest hashes to the hash it is
- * filed under, and join the same list. The exports below stay synchronous for
- * the code that reads them; they grow when a published version is added, and
- * the app rebuilds the dataset when that happens.
  */
 
 const modules = import.meta.glob("../../../../releases/*.manifest.json", { eager: true }) as Record<
@@ -30,67 +24,64 @@ export interface KnownRelease {
   manifest: ReleaseManifest;
 }
 
-const known = (manifest: ReleaseManifest): KnownRelease => ({
-  hash: manifest.hash ?? "",
-  key: manifest.release.key,
-  version: manifest.release.version,
-  manifest,
-});
-
-const byVersion = (a: KnownRelease, b: KnownRelease) => a.version.localeCompare(b.version, undefined, { numeric: true });
-
-export const releases: KnownRelease[] = Object.values(modules)
-  .map((mod) => {
+export const releases: KnownRelease[] = Object.entries(modules)
+  .map(([path, mod]) => {
     const parsed = releaseManifest.safeParse(mod.default);
-    if (!parsed.success || !parsed.data.hash) return null;
-    return known(parsed.data);
+    if (!parsed.success) return null;
+    const manifest = parsed.data;
+    if (!manifest.hash) return null;
+    void path;
+    return { hash: manifest.hash, key: manifest.release.key, version: manifest.release.version, manifest };
   })
   .filter((r): r is KnownRelease => r !== null)
-  .sort(byVersion);
+  .sort((a, b) => a.version.localeCompare(b.version, undefined, { numeric: true }));
 
 export const releasesByHash = new Map(releases.map((r) => [r.hash, r]));
 
-/** The most recent published release, by version number. */
-export let latestRelease: KnownRelease | undefined = releases[releases.length - 1];
+/** The most recent published release — what a new sitting will be collected under. */
+export const latestRelease = releases[releases.length - 1];
 
 /**
- * Each release's manifest by hash, as the shared counting rules take them
- * (@myself/store counting.ts). Kept in step with `releasesByHash`, published
- * versions included.
- */
-export const manifestsByHash = new Map(releases.map((r) => [r.hash, r.manifest]));
-
-export interface PublishedReport {
-  /** Versions this view had not known, now added. */
-  added: KnownRelease[];
-  /** Documents that did not check out, and why. None of these is used. */
-  refused: { hash: string; problem: string }[];
-}
-
-/**
- * Add versions published from the dashboard, as read from
- * `studies/{study}/releases` (`readPublishedReleases` in study.ts).
+ * A release-store document (`publicReleases/{hashHex}`), checked, or why it
+ * cannot be used.
  *
- * A document whose manifest does not hash to the id it is filed under is
- * refused and reported, never used: a sitting read through the wrong
- * instrument is worse than one not read at all.
+ * Releases published from the Studio are not compiled into this view; the
+ * store is where they are found (docs/16 §5.4). The hash is re-verified over
+ * the RAW parsed JSON before the schema sees it — zod drops keys it does not
+ * know, so a tidied copy could pass for a manifest whose unknown fields were
+ * altered — and the manifest must carry the hash it was asked for, because an
+ * intact release filed under another's hash is still the wrong release.
+ * Never throws: what a document holds is data, and bad data is a refusal.
  */
-export async function addPublishedReleases(documents: { id: string; data: unknown }[]): Promise<PublishedReport> {
-  const report: PublishedReport = { added: [], refused: [] };
-  for (const document of documents) {
-    if (releasesByHash.has(document.id)) continue;
-    const opened = await openPublishedRelease(document.data, { expectedHash: document.id });
-    if (!opened.ok) {
-      report.refused.push({ hash: document.id, problem: opened.problem });
-      continue;
-    }
-    const release = known(opened.manifest);
-    releases.push(release);
-    releasesByHash.set(release.hash, release);
-    manifestsByHash.set(release.hash, release.manifest);
-    report.added.push(release);
+export async function readStoredRelease(
+  data: unknown,
+  hash: string,
+): Promise<{ release: KnownRelease } | { refused: string }> {
+  const doc = (data ?? {}) as Partial<Record<keyof PublicReleaseDoc, unknown>>;
+  if (typeof doc.manifest !== "string") return { refused: "the document holds no manifest" };
+  if (doc.hash !== undefined && doc.hash !== hash) return { refused: "the document says it holds a different release" };
+  let raw: unknown;
+  try {
+    raw = JSON.parse(doc.manifest);
+  } catch {
+    return { refused: "the manifest is not valid JSON" };
   }
-  releases.sort(byVersion);
-  latestRelease = releases[releases.length - 1];
-  return report;
+  if (!raw || typeof raw !== "object" || (raw as { hash?: unknown }).hash !== hash) {
+    return { refused: "the manifest carries a different hash from the one it is filed under" };
+  }
+  try {
+    if (!(await verifyRawManifestHash(raw))) {
+      return { refused: "the manifest's content does not hash to the hash it carries" };
+    }
+  } catch {
+    // No WebCrypto (an insecure origin, say): unverifiable is not verified.
+    return { refused: "this browser cannot verify a release" };
+  }
+  const parsed = releaseManifest.safeParse(raw);
+  if (!parsed.success) return { refused: "the manifest is not a release this view can read" };
+  const manifest = parsed.data;
+  return { release: { hash, key: manifest.release.key, version: manifest.release.version, manifest } };
 }
+
+/** Each release's manifest by hash, as the shared counting rules take them (@myself/store counting.ts). */
+export const manifestsByHash = new Map(releases.map((r) => [r.hash, r.manifest]));

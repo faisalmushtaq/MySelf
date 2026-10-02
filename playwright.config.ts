@@ -73,6 +73,13 @@ export default defineConfig({
    * `dist` from a previous change. Deliberately built with NO study configured:
    * these tests are about the survey and the device's own storage, and a build
    * that could reach a real project is not what should be driven by a robot.
+   *
+   * The one exception is where the survey is READ from (docs/16 §5.3), and it
+   * points back at this same preview server, never at a project. Nothing answers
+   * there — the preview returns 404, which the app reads as "nothing published"
+   * and so runs its built-in release, exactly as a build with no source does —
+   * unless a spec stands a fake study up with `page.route`, as
+   * `live-release.spec.ts` does to publish, tamper with and roll releases.
    */
   webServer: {
     // `--host 127.0.0.1` so preview binds the same address the health check below
@@ -90,9 +97,8 @@ export default defineConfig({
       MYSELF_FIREBASE_CONFIG: "",
       MYSELF_SITTINGS_URL: "",
       MYSELF_MYSTORY_URL: "",
-      // The stand-in dashboard `preview.spec.ts` serves, allowed to send this
-      // build a draft to preview. A deployed build allows only the dashboard's own.
-      MYSELF_PREVIEW_ORIGINS: `http://127.0.0.1:${PORT + 10}`,
+      MYSELF_SURVEY_SOURCE: `http://127.0.0.1:${PORT}/__survey`,
+      MYSELF_SURVEY_ID: "ybm_nd2026_standard",
     },
   },
 });

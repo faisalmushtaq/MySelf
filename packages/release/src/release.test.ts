@@ -88,7 +88,7 @@ describe("YBM release r9.0.0", () => {
     // The frozen file is what devices actually run. If someone edits an item,
     // a scale or the composition without republishing, this fails: the release
     // on disk would no longer be the release the sources describe.
-    const path = fileURLToPath(new URL("../../../releases/ybm_nd2026_standard_r9.0.0.manifest.json", import.meta.url));
+    const path = fileURLToPath(new URL("../../../releases/candidates/ybm_nd2026_standard_r9.0.0.manifest.json", import.meta.url));
     const committed = JSON.parse(readFileSync(path, "utf8")) as {
       hash: string;
       release: { version: string; publishedAt: string; publishedBy: string; engineVersion: string; decisionRefs: string[] };

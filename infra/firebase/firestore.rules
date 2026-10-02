@@ -24,6 +24,12 @@ rules_version = '2';
  *   - people, who carry a `role` claim of owner, researcher or analyst.
  *   - everybody else, who gets nothing.
  *
+ * MySelf Studio adds one more, and one exception to the last line. People on
+ * the Studio list are recognised by their verified Google address, not by a
+ * claim (see "MySelf Studio" below). And two Studio documents are public by
+ * `get`: the pointer to the live release and the release it points at, which
+ * is what a participant's iPad used to receive compiled into the app.
+ *
  * Participants never authenticate at all: the iPad is the authenticated party,
  * not the child using it.
  */
@@ -59,6 +65,99 @@ service cloud.firestore {
     // The device's own study, so one site's iPad cannot post into another's.
     function deviceStudy() {
       return request.auth.token.get('study', '');
+    }
+
+    // ── MySelf Studio: who is on the list (docs/16 §5.7) ───────────────────
+    //
+    // The Studio does not use the role claim, with one exception below. A claim
+    // outlives its revocation for as long as the token lasts, up to an hour,
+    // and granting one is the owner's job. The Studio's list is run by its own
+    // admins and has to bite on the very next request, so a person's Studio
+    // role is read from server-written documents every time, keyed by the
+    // address Google verified. No client can write those documents, so no
+    // client can grant itself anything.
+    //
+    // A `researcher` or `analyst` claim therefore gives no Studio access on its
+    // own: reading sittings and changing the survey children see are different
+    // trusts, and the second is given by name.
+
+    // Someone Google has vouched for. The address is the key to the list, so it
+    // has to be one the person signing in has proved is theirs, through the one
+    // sign-in the Studio offers. A token from any other provider is refused
+    // whatever it says about an address: an iPad signs in anonymously, and
+    // providers differ in whether, and how, they check that an address belongs
+    // to whoever is using it. The provider is also a field no server-minted
+    // custom token can set, so a custom token carrying somebody's address
+    // cannot pass for them.
+    function verifiedGoogle() {
+      return signedIn()
+        && !isDevice()
+        && request.auth.token.get('email_verified', false) == true
+        && request.auth.token.get('firebase', {}).get('sign_in_provider', '') == 'google.com'
+        && request.auth.token.get('email', null) is string;
+    }
+
+    // The list is keyed by lower-cased address (`paths.studioMember`), so one
+    // person is not a member under one spelling and a stranger under another.
+    // Anything the Studio stamps with "who" (`updatedByEmail` on the draft,
+    // `email` on presence) is this same key, so it can be matched to the list.
+    function emailKey() {
+      return request.auth.token.email.lower();
+    }
+
+    // MUST MATCH `ROLE_LEVEL` in packages/studio/src/contract.ts, which this
+    // file cannot import; the Studio rules tests hold the two together. Each
+    // role includes everything below it. A value that is not a known role (a
+    // typo, a missing field) is 0, not an error that could deny something the
+    // person's other route to the Studio grants.
+    function roleLevel(r) {
+      return r == 'admin' ? 4
+        : r == 'publisher' ? 3
+        : r == 'editor' ? 2
+        : r == 'viewer' ? 1
+        : 0;
+    }
+
+    // The person's own entry on the list, if there is one.
+    function memberPath(study) {
+      return /databases/$(database)/documents/studies/$(study)/studioMembers/$(emailKey());
+    }
+
+    function memberLevel(study) {
+      return exists(memberPath(study)) ? roleLevel(get(memberPath(study)).data.get('role', '')) : 0;
+    }
+
+    // A domain rule admits every verified account at a managed Workspace
+    // domain. Matched on the whole domain and nothing else: an address with
+    // more than one "@" is not split at a convenient one, and
+    // "brainpop.com.example.net" is not "brainpop.com". A config with no rules,
+    // or a malformed one, admits nobody rather than failing the request.
+    function domainLevel(study) {
+      let parts = emailKey().split('@');
+      let config = /databases/$(database)/documents/studies/$(study)/studioAccess/config;
+      let domains = exists(config) ? get(config).data.get('domains', {}) : {};
+      return parts.size() == 2 && domains is map ? roleLevel(domains.get(parts[1], '')) : 0;
+    }
+
+    // 0 (nothing) to 4 (admin). An iPad is always 0, whatever else its token
+    // carries. The existing owner is an admin, so there is somebody who can add
+    // the first member from Settings (docs/16 §5.7).
+    //
+    // A PERSONAL ENTRY DECIDES, when there is one; the domain rule is only the
+    // default for people nobody has listed. That is what lets an admin give one
+    // person at an admitted domain less than the domain's role — a student at a
+    // domain of editors, say — instead of having to choose between the domain
+    // rule and listing everyone by hand.
+    //
+    // At most two documents are read, and the rules read each once however
+    // often a request asks, so every Studio rule stays far inside the ten-read
+    // limit. Each read is billed, which is the price of a revocation that takes
+    // effect at once.
+    function studioLevel(study) {
+      return isDevice() ? 0
+        : isOwner() ? 4
+        : verifiedGoogle() ? (exists(memberPath(study)) ? memberLevel(study) : domainLevel(study))
+        : 0;
     }
 
     match /studies/{study} {
@@ -168,30 +267,142 @@ service cloud.firestore {
       }
 
       /**
-       * Versions published from the dashboard, and which one is live (D-54).
+       * MySelf Studio — docs/16 §5.2.
        *
-       * READABLE BY ANYONE, signed in or not. An iPad reads them at start-up,
-       * before it has any credential, and a device must be able to pick up the
-       * live version whether or not it can reach the study. They hold the
-       * questionnaire, which is already public in the participant app's bundle,
-       * and nothing about any participant.
+       * Everything here is about the survey, not about anybody's answers: a
+       * sitting keeps pointing at the release it was collected under by hash,
+       * and nothing below can change a sitting or what it points at.
        *
-       * WRITABLE BY NO CLIENT. The dashboard's functions write them with the
-       * Admin SDK, after an owner publishes, and are audited there. A version a
-       * browser could write is a questionnaire anybody could put in front of a
-       * child. Every reader also checks a manifest against its content hash
-       * before using it, so a changed document is refused as well as blocked.
-       *
-       * Only `activeRelease` is opened under `config`. Anything else put there
-       * later stays closed until it is written down here.
+       * A BROWSER WRITES TWO THINGS HERE AND NOTHING ELSE: the working draft,
+       * one revision at a time, and its own presence marker. Publishing,
+       * restoring, rolling back and managing the list go through functions,
+       * which check the list again themselves and write the audit row in the
+       * same transaction as the change, so none of it can happen without a
+       * record.
        */
-      match /releases/{hash} {
-        allow read: if true;
+
+      // ── Studio: surveys and their drafts ───────────────────────────────
+      match /surveys/{surveyId} {
+        // The survey's summary: its title, which version is live, who has
+        // edited since. Written only by functions, as a side effect of the
+        // actions they audit.
+        allow read: if studioLevel(study) >= 1;
+        allow write: if false;
+
+        // The draft is one document, `current`, and it only ever moves
+        // forward by one revision. That is the whole of the concurrency
+        // control (docs/16 R10): a save made against the revision somebody
+        // else has already replaced asks for the same next number they took,
+        // is refused, and the editor shows both versions instead of quietly
+        // overwriting one of them.
+        //
+        // Who and when are the caller's own uid, the caller's list key (the
+        // lower-cased address, see emailKey) and the server's clock, never
+        // values the client chose. Where the draft came from (`basedOn`), what
+        // it is (`surveyId`) and when it began are the functions' to set, so
+        // an editor can change the content and nothing about its provenance.
+        //
+        // No client creates or deletes a draft: a survey is created, and a
+        // version restored into it, by functions that audit it. The 900,000
+        // character ceiling (MAX_DRAFT_CHARS) leaves room under Firestore's
+        // 1 MiB document limit for the rest of the document.
+        match /draft/{docId} {
+          allow read: if studioLevel(study) >= 1;
+          allow update: if studioLevel(study) >= 2
+            && docId == 'current'
+            && request.resource.data.diff(resource.data).affectedKeys()
+                 .hasOnly(['content', 'revision', 'updatedAt', 'updatedBy', 'updatedByEmail'])
+            && request.resource.data.revision is int
+            && request.resource.data.revision == resource.data.revision + 1
+            && request.resource.data.updatedBy == request.auth.uid
+            && request.resource.data.updatedByEmail == emailKey()
+            && request.resource.data.updatedAt == request.time
+            && request.resource.data.content is string
+            && request.resource.data.content.size() <= 900000;
+          allow create, delete: if false;
+        }
+
+        // Published versions are immutable. Only functions write one: the
+        // publish, after running on the server the same validation and gate
+        // the editor shows, and the one-time import of the releases already
+        // in the repository.
+        match /versions/{version} {
+          allow read: if studioLevel(study) >= 1;
+          allow write: if false;
+        }
+
+        // Who else has the editor open, so two people know before they
+        // collide rather than after. Each person writes only their own marker,
+        // stamped with their own uid, address and the server's clock, so one
+        // editor cannot make it look as if somebody else is at work. Taking
+        // your own marker down needs only that it is yours: somebody removed
+        // from the list while the editor was open can still clear their name
+        // from it, and it can only ever remove what that account wrote.
+        match /presence/{uid} {
+          allow read: if studioLevel(study) >= 1;
+          allow create, update: if studioLevel(study) >= 2
+            && uid == request.auth.uid
+            && request.resource.data.keys().hasOnly(['uid', 'email', 'at', 'focus'])
+            && request.resource.data.uid == request.auth.uid
+            && request.resource.data.email == emailKey()
+            && request.resource.data.at == request.time
+            && (request.resource.data.get('focus', null) == null
+                || request.resource.data.focus is string);
+          allow delete: if signedIn() && uid == request.auth.uid;
+        }
+      }
+
+      // ── Studio: what participants load (PUBLIC) ────────────────────────
+      // The only documents in the project that anyone may read signed out.
+      // The pointer says which release is live (hash, version, generation);
+      // a public release is the manifest itself, immutable and keyed by the
+      // hex of its own hash, which the device recomputes before running it.
+      // That manifest is exactly what every participant already downloads
+      // inside the app today, so making it readable discloses nothing new.
+      //
+      // `get` only, never `list`. A device asks for the one survey it runs and
+      // the one hash that pointer names; nobody needs to enumerate what else
+      // exists, so nobody can. Written only by the publish, rollback and
+      // import functions, in the transaction that audits them.
+      match /published/{surveyId} {
+        allow get: if true;
+        allow list: if false;
         allow write: if false;
       }
 
-      match /config/activeRelease {
-        allow read: if true;
+      match /publicReleases/{hashHex} {
+        allow get: if true;
+        allow list: if false;
+        allow write: if false;
+      }
+
+      // ── Studio: the list itself ────────────────────────────────────────
+      // Admins see everyone. Anyone else Google has verified may read their
+      // own entry, and only their own, so the Studio can tell them what role
+      // they have, and nobody learns who else has access by guessing
+      // addresses.
+      // Nobody writes here from a browser, not even an admin: a change of
+      // access goes through a function that audits it, or the studio-access
+      // command for the very first admin.
+      match /studioMembers/{email} {
+        allow get: if (verifiedGoogle() && email == emailKey()) || studioLevel(study) >= 4;
+        allow list: if studioLevel(study) >= 4;
+        allow write: if false;
+      }
+
+      // The domain rule, e.g. { "brainpop.com": "editor" }. Admins only: it
+      // is part of the list.
+      match /studioAccess/{doc} {
+        allow read: if studioLevel(study) >= 4;
+        allow write: if false;
+      }
+
+      // The Studio's audit trail, separate from `audit` above because that one
+      // any signed-in account may append to (docs/16 R9). Every row here is
+      // written by a function in the same transaction as the action it
+      // records, and never changed or removed afterwards, by anyone.
+      match /studioAudit/{entry} {
+        allow read: if studioLevel(study) >= 1;
         allow write: if false;
       }
     }

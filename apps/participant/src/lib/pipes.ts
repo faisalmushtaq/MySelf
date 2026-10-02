@@ -9,9 +9,14 @@ import { executeScoring, scoringItemKeys } from "@myself/scoring";
 
 /**
  * Scoring definitions frozen into the running release, so a `score` pipe can
- * tell a participant something about what they have just answered. Set once at
- * start-up from the manifest; without it, score pipes fall back rather than
- * inventing a number.
+ * tell a participant something about what they have just answered. Without it,
+ * score pipes fall back rather than inventing a number.
+ *
+ * Set by App every time the release on screen changes — a new release at the
+ * start screen, or a resumed sitting's own release — and before that release is
+ * rendered, so a pipe is never resolved against another release's scoring. Only
+ * one release is on screen at a time, which is why one module-level map is
+ * still enough.
  */
 let scoringByKey = new Map<string, ScoringDefinition>();
 export function useScoringDefinitions(defs: Map<string, ScoringDefinition>): void {

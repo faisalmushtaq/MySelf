@@ -2,18 +2,22 @@ import { onSchedule } from "firebase-functions/v2/scheduler";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import * as logger from "firebase-functions/logger";
 import { getStorage } from "firebase-admin/storage";
+import type { Firestore } from "firebase-admin/firestore";
 import { joinSession, paths, type ChunkDoc, type SessionDoc } from "@myself/firebase";
+import { compareVersions } from "@myself/release/gate";
+import type { ReleaseManifest } from "@myself/schema";
 import {
   buildBidsExport,
   buildZip,
   emptyDataset,
   ingest,
+  type BidsFile,
   type Dataset,
   type DeviceSession,
   type StoredNarrativeRun,
 } from "@myself/store";
 import { STUDY, research } from "./apps.js";
-import { knownReleases, releaseFor } from "./releases.js";
+import { latestRelease, resolveRelease, type ReleaseResolverFn } from "./releases.js";
 
 /**
  * The archival copy, written nightly.
@@ -29,7 +33,6 @@ import { knownReleases, releaseFor } from "./releases.js";
  * folders, so what lands is browsable exactly like a directory tree.
  */
 
-/** Read every sitting and derive the dataset, the same way the browser does. */
 /**
  * Every narrative run stored for this study.
  *
@@ -43,8 +46,33 @@ export async function readNarratives(study: string): Promise<StoredNarrativeRun[
   return snap.docs.map((d) => d.data() as StoredNarrativeRun);
 }
 
-export async function buildStudyDataset(study: string): Promise<{ dataset: Dataset; sittings: number }> {
-  const db = research();
+/** A sitting left out because nothing could say which release it was collected under. */
+export interface UnreadableSitting {
+  sessionId: string;
+  releaseHash: string;
+}
+
+export interface StudyDataset {
+  dataset: Dataset;
+  /** Sittings read from the database, before any were found unreadable. */
+  sittings: number;
+  /** Left out of the dataset, and named, because their release is unknown. */
+  unreadable: UnreadableSitting[];
+  /** The releases the dataset was actually read through, one per hash. */
+  releases: ReleaseManifest[];
+}
+
+/**
+ * Read every sitting and derive the dataset, the same way the browser does.
+ *
+ * The db and the resolver are parameters so a test can hand in a stand-in
+ * Firestore and a cold resolver; the scheduled export takes the defaults.
+ */
+export async function buildStudyDataset(
+  study: string,
+  db: Firestore = research(),
+  resolve: ReleaseResolverFn = resolveRelease,
+): Promise<StudyDataset> {
   // Every sitting, filtered in code rather than in the query.
   //
   // Firestore's `!=` operator excludes documents that do not have the field at
@@ -105,18 +133,32 @@ export async function buildStudyDataset(study: string): Promise<{ dataset: Datas
     else groups.set(s.releaseHash, [s]);
   }
 
-  // Bundled and published from the dashboard alike (D-54), each checked
-  // against its hash before it is used to read anything.
-  const known = await knownReleases();
   let dataset = emptyDataset();
+  const unreadable: UnreadableSitting[] = [];
+  const releases: ReleaseManifest[] = [];
   for (const [hash, group] of [...groups.entries()].sort((a, b) => {
     const earliest = (rows: DeviceSession[]) => rows.reduce((m, r) => (r.startedAt < m ? r.startedAt : m), rows[0]!.startedAt);
     return earliest(a[1]).localeCompare(earliest(b[1]));
   })) {
-    const manifest = (await releaseFor(hash)) ?? known.latest;
-    if (!manifest) continue;
-    const result = ingest([...group].sort((a, b) => a.startedAt.localeCompare(b.startedAt)), {
-      manifest,
+    const ordered = [...group].sort((a, b) => a.startedAt.localeCompare(b.startedAt));
+    // By hash, from the bundle or the release store — never "the latest
+    // release" in its place. That fallback used to be here, and it read a
+    // sitting through questions it was not asked, codes and all, into a file
+    // that looked complete (D-35). A release nobody can find leaves its
+    // sittings out, logged and listed in the export, and they stay in the
+    // database to be read once the release is found.
+    const resolved = await resolve(db, study, hash);
+    if (!resolved) {
+      logger.error("sittings under an unknown release were left out of the export", {
+        releaseHash: hash,
+        sittings: ordered.length,
+      });
+      unreadable.push(...ordered.map((s) => ({ sessionId: s.sessionId, releaseHash: hash })));
+      continue;
+    }
+    releases.push(resolved.manifest);
+    const result = ingest(ordered, {
+      manifest: resolved.manifest,
       study,
       existing: dataset,
       aliases,
@@ -134,13 +176,87 @@ export async function buildStudyDataset(study: string): Promise<{ dataset: Datas
   if (quarantinedCount > 0) {
     logger.warn("quarantined sittings left out of the export", { quarantinedCount });
   }
-  return { dataset, sittings: sessions.length };
+  return { dataset, sittings: sessions.length, unreadable, releases };
+}
+
+/**
+ * The release the dataset-level files describe: the newest, by version, of
+ * those the export was read through — and never older than the one compiled
+ * in, so an export whose releases are all bundled describes exactly what it
+ * described before the release store existed. On a tie the compiled-in one is
+ * kept, for the same reason.
+ *
+ * A LIMITATION THIS DOES NOT REMOVE. `buildBidsExport` takes one manifest, so
+ * `dataset_description.json` names one release and every
+ * `phenotype/<instrument>.json` dictionary is written from it. The data files
+ * are right whatever this picks — each sitting was ingested through its own
+ * release above — but a question reworded between releases is described in
+ * its newest wording, and a variable only an older release asked has no
+ * description at all, only its `_status` column. Choosing the newest release
+ * present, rather than the compiled-in one, at least means questions added
+ * from the Studio are described. Per-release dictionaries need a change to
+ * the BIDS builder in @myself/store.
+ */
+export function datasetManifest(
+  present: readonly ReleaseManifest[],
+  compiledIn: ReleaseManifest | undefined = latestRelease,
+): ReleaseManifest | undefined {
+  let newest = compiledIn;
+  for (const manifest of present) {
+    if (!newest || compareVersions(manifest.release.version, newest.release.version) > 0) newest = manifest;
+  }
+  return newest;
+}
+
+/**
+ * Every file the export writes, before any of it is written.
+ *
+ * `unreadable.json` is added only when some sitting was left out, so an
+ * export with nothing missing is unchanged. When it is there it sits at the
+ * top of the tree and in the zip, because a log line at two in the morning is
+ * not where anybody analysing the data will look for what is missing from it.
+ */
+export function exportFiles(
+  built: StudyDataset,
+  study: string,
+  narratives: StoredNarrativeRun[],
+  compiledIn: ReleaseManifest | undefined = latestRelease,
+): BidsFile[] {
+  const manifest = datasetManifest(built.releases, compiledIn);
+  if (!manifest) throw new Error("no release manifest available");
+
+  const files = buildBidsExport(built.dataset, {
+    manifest,
+    datasetName: `MySelf ${study}`,
+    narratives,
+  });
+  if (built.unreadable.length > 0) {
+    files.push({
+      path: "unreadable.json",
+      content: `${JSON.stringify(
+        {
+          Description:
+            "Sittings left out of this export because the release they were collected under could not be found or did not verify. They are still in the database, untouched; none of their answers is in any file here. Each will be read once its release is available — do not analyse this export as if it were complete.",
+          sittings: built.unreadable,
+        },
+        null,
+        2,
+      )}\n`,
+    });
+    // A top-level file BIDS does not define is an error to a validator, and
+    // the archived export should validate whether or not something was left
+    // out; `.bidsignore` is how this dataset already names what BIDS will not
+    // recognise (review fix). Kept in path order, as `buildBidsExport` leaves it.
+    const ignore = files.find((f) => f.path === ".bidsignore");
+    if (ignore) ignore.content = `${ignore.content.replace(/\n?$/, "\n")}unreadable.json\n`;
+    else files.push({ path: ".bidsignore", content: "unreadable.json\n" });
+    files.sort((a, b) => a.path.localeCompare(b.path));
+  }
+  return files;
 }
 
 async function writeExport(study: string, prefix: string): Promise<{ files: number; bytes: number }> {
-  const { dataset, sittings } = await buildStudyDataset(study);
-  const { latest: latestRelease } = await knownReleases();
-  if (!latestRelease) throw new Error("no release manifest available");
+  const built = await buildStudyDataset(study);
 
   /**
    * The narratives, joined to the sittings they belong to.
@@ -151,11 +267,7 @@ async function writeExport(study: string, prefix: string): Promise<{ files: numb
    */
   const narratives = await readNarratives(study);
 
-  const files = buildBidsExport(dataset, {
-    manifest: latestRelease,
-    datasetName: `MySelf ${study}`,
-    narratives,
-  });
+  const files = exportFiles(built, study, narratives);
   const bucket = getStorage().bucket();
 
   for (const file of files) {
@@ -169,7 +281,13 @@ async function writeExport(study: string, prefix: string): Promise<{ files: numb
   const zip = buildZip(files);
   await bucket.file(`${prefix}/bids.zip`).save(Buffer.from(zip), { contentType: "application/zip" });
 
-  logger.info("export written", { prefix, files: files.length, sittings, narratives: narratives.length });
+  logger.info("export written", {
+    prefix,
+    files: files.length,
+    sittings: built.sittings,
+    unreadable: built.unreadable.length,
+    narratives: narratives.length,
+  });
   return { files: files.length, bytes: zip.length };
 }
 

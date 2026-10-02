@@ -1,0 +1,206 @@
+/*
+ * The checks panel: a slide-over at the right, under the toolbar, over the
+ * inspector — a bottom sheet on a phone. Not modal (the editor stays live
+ * beside it), so it has a clear edge and shadow rather than a backdrop.
+ * Inside: a header with the counts, then hairline-separated rows.
+ */
+
+.sto-vp {
+  position: fixed;
+  top: var(--sto-vp-top, 0px);
+  right: 0;
+  bottom: 0;
+  z-index: 40;
+  /* Exactly over the settings panel, so none of the survey itself is hidden
+     at any width where the panel is a column of its own. */
+  width: var(--st-right, 320px);
+  display: flex;
+  flex-direction: column;
+  background: var(--st-bg);
+  border-left: 1px solid var(--st-border);
+  box-shadow: var(--st-shadow-lg);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .sto-vp {
+    animation: sto-vp-in 160ms ease-out;
+  }
+}
+@keyframes sto-vp-in {
+  from {
+    opacity: 0;
+    transform: translateX(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.sto-vp-head {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 48px;
+  padding: 8px 8px 8px 16px;
+  border-bottom: 1px solid var(--st-border);
+}
+.sto-vp-title {
+  display: inline-flex;
+  align-items: center;
+}
+.sto-vp-head h2 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 20px;
+}
+/* The kit's ⓘ, whose button sits inside the tooltip's anchor. */
+.sto-vp-title .st-infotip button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--st-text-tertiary);
+  cursor: help;
+}
+.sto-vp-title .st-infotip button:hover {
+  color: var(--st-text);
+}
+.studio .sto-vp-head h2:focus,
+.studio .sto-vp-head h2:focus-visible {
+  box-shadow: none;
+}
+.sto-vp-summary {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  margin: 0;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--st-text-tertiary);
+  font-variant-numeric: tabular-nums;
+}
+.sto-vp-sum-err {
+  color: var(--st-danger);
+  font-weight: 500;
+}
+.sto-vp-sum-warn {
+  color: var(--st-warn);
+  font-weight: 500;
+}
+.sto-vp-sum-sep {
+  color: var(--st-text-tertiary);
+}
+
+.sto-vp-body {
+  flex: 1;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 4px 0 32px;
+}
+
+/* Errors, then warnings: a small heading with the count. */
+.sto-vp-sev {
+  padding-top: 12px;
+}
+.sto-vp-sev + .sto-vp-sev {
+  margin-top: 8px;
+  border-top: 1px solid var(--st-border);
+}
+.sto-vp-sev > h3 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  padding: 0 16px 4px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 16px;
+  color: var(--st-text-secondary);
+}
+.sto-vp-count {
+  font-weight: 400;
+  color: var(--st-text-tertiary);
+  font-variant-numeric: tabular-nums;
+}
+
+/* A place, then its issues. */
+.sto-vp-group {
+  padding: 8px 0 4px;
+}
+.sto-vp-group + .sto-vp-group {
+  border-top: 1px solid var(--st-border);
+}
+.sto-vp-group h4 {
+  margin: 0;
+  padding: 0 16px 2px 42px;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 16px;
+  color: var(--st-text-secondary);
+  overflow-wrap: anywhere;
+}
+.sto-vp-context {
+  font-weight: 400;
+  color: var(--st-text-tertiary);
+}
+.sto-vp-group ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.sto-vp-group li {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: start;
+  padding: 4px 8px 4px 16px;
+  font-size: 13px;
+  line-height: 20px;
+}
+.sto-vp-group li > .st-icon {
+  margin-top: 2px;
+}
+.sto-vp-error li > .st-icon {
+  color: var(--st-danger);
+}
+.sto-vp-warning li > .st-icon {
+  color: var(--st-warn);
+}
+.sto-vp-message {
+  color: var(--st-text);
+  overflow-wrap: anywhere;
+}
+.sto-vp-group li .st-btn {
+  margin-top: -4px;
+}
+
+.sto-vp-body .st-empty {
+  padding-top: 64px;
+}
+
+/* Narrower windows put the settings panel under the editor: a wider sheet. */
+@media (max-width: 1180px) {
+  .sto-vp {
+    width: min(400px, 100vw);
+  }
+}
+@media (max-width: 760px) {
+  .sto-vp {
+    top: auto;
+    left: 0;
+    width: auto;
+    max-height: 75vh;
+    border-left: 0;
+    border-top: 1px solid var(--st-border);
+    border-radius: var(--st-radius-xl) var(--st-radius-xl) 0 0;
+  }
+}

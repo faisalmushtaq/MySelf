@@ -5,7 +5,7 @@ import { FieldValue, type Firestore } from "firebase-admin/firestore";
 import { joinSession, paths, type SessionDoc } from "@myself/firebase";
 import { ingest, parseHomeAddress, type HomeAddress } from "@myself/store";
 import { STUDY, identity, research } from "./apps.js";
-import { releaseFor } from "./releases.js";
+import { resolveRelease } from "./releases.js";
 
 /**
  * The identity side: names in, names out, both under control.
@@ -139,19 +139,22 @@ export const captureIdentity = onDocumentWritten("studies/{study}/sessions/{sess
   const after = event.data?.after?.data() as SessionDoc | undefined;
   if (!after) return;
 
-  // Bundled, or published from the dashboard (D-54): looked for in the
-  // database too, since a version can go live minutes before its first sitting.
-  const manifest = await releaseFor(after.releaseHash);
-  if (!manifest) {
+  // Bundled or from the release store, by hash: a sitting collected under a
+  // release published from the Studio is not in the bundle, and before the
+  // store was consulted its name was never filed at all.
+  const resolved = await resolveRelease(research(), after.study, after.releaseHash);
+  if (!resolved) {
     // Better to leave the identity record absent and say so than to read the
     // answers through the wrong instrument and file a name against the wrong
-    // variable.
-    logger.warn("no manifest for release; identity not captured", {
+    // variable. An error rather than a warning: a sitting whose name was never
+    // filed cannot be linked to the child's other waves until somebody acts.
+    logger.error("no manifest for release; identity not captured", {
       sessionId: after.sessionId,
       releaseHash: after.releaseHash,
     });
     return;
   }
+  const manifest = resolved.manifest;
 
   const chunks =
     after.chunkCount > 0

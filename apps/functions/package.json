@@ -13,14 +13,17 @@
     "test": "vitest run",
     "package": "node build-deploy.mjs",
     "grant": "node grant-role.mjs",
+    "studio-access": "node studio-access.mjs",
     "test:integration": "firebase emulators:exec --only firestore --project demo-myself --config ../../infra/firebase/firebase.test.json \"vitest run --config vitest.integration.config.ts\""
   },
   "dependencies": {
     "@myself/firebase": "workspace:*",
     "@myself/llm": "workspace:*",
     "@myself/narrative": "workspace:*",
+    "@myself/release": "workspace:*",
     "@myself/schema": "workspace:*",
     "@myself/store": "workspace:*",
+    "@myself/studio": "workspace:*",
     "firebase-admin": "^13.0.0",
     "firebase-functions": "^6.1.0",
     "zod": "^3.23.8"

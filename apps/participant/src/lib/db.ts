@@ -98,31 +98,33 @@ interface AccessibilityRow extends AccessibilityPreferences {
 }
 
 /**
- * A version of the survey this device has run or checked (D-54), kept so a
- * sitting can always be finished under the version it started with.
+ * A published release this device has downloaded and verified (docs/16 §5.3).
  *
- * Not sealed: a manifest is the questionnaire, which is public in the app's own
- * bundle, and holds nothing about anybody. It is checked against its hash again
- * each time it is read (`versions.ts`).
+ * `json` is the manifest EXACTLY as the study stored it, not a re-serialisation:
+ * its hash is computed over the raw parsed JSON, so keeping the string is what
+ * lets the release be verified again every time it is read back.
  */
-interface ReleaseRow {
+export interface CachedReleaseRow {
   hash: string;
+  releaseKey: string;
   version: string;
-  key: string;
   json: string;
-  storedAt: string;
+  cachedAt: string;
 }
 
 /**
- * Which version this device last found active, and a sitting waiting to be
- * picked up under its own version after the app reloads into it.
+ * Which release the start screen runs, and what the last look at the study found.
+ *
+ * One keyed row rather than a table of history: the handover panel needs the
+ * latest answer, and the active pointer is a single value by definition.
+ * `lastResult` is whatever `lib/releases.ts` recorded, stored as it was given.
  */
-interface ReleaseStateRow {
-  id: "active" | "resume";
-  hash: string;
-  /** Only on `resume`: whose sitting to pick up. */
-  code?: string;
-  at: string;
+export interface ReleaseStateRow {
+  id: "active";
+  /** The release a new sitting starts under. Null means the built-in one. */
+  activeHash: string | null;
+  checkedAt: string | null;
+  lastResult: unknown;
 }
 
 /** How the handover panel names this device. */
@@ -164,7 +166,7 @@ class MySelfDb extends Dexie {
   receipts!: EntityTable<SyncReceiptRow, "sessionId">;
   checkpoints!: EntityTable<CheckpointRow, "sessionId">;
   accessibility!: EntityTable<AccessibilityRow, "id">;
-  releases!: EntityTable<ReleaseRow, "hash">;
+  releases!: EntityTable<CachedReleaseRow, "hash">;
   release_state!: EntityTable<ReleaseStateRow, "id">;
 
   constructor() {
@@ -229,8 +231,14 @@ class MySelfDb extends Dexie {
       accessibility: "id, updatedAt",
     });
     /**
-     * Version 5: the versions this device has run (D-54). Two new tables and
-     * nothing else touched, which is the one kind of upgrade Dexie always does.
+     * Version 5: releases downloaded from the study, and which one is active.
+     *
+     * ONLY ADDS TABLES, for the reason version 4 spells out: Dexie refuses a
+     * primary-key change before any upgrade code can run, and a database that
+     * will not open on a device holding sittings has no way back in. Every
+     * existing table is restated unchanged, so an iPad upgraded mid-study keeps
+     * every sitting exactly as it was; the two new tables start empty, which
+     * means "run the release built into this app" — today's behaviour.
      */
     this.version(5).stores({
       sessions: "sessionId, participantCode, state, updatedAt",
@@ -241,7 +249,7 @@ class MySelfDb extends Dexie {
       receipts: "sessionId, verifiedAt",
       checkpoints: "sessionId, at",
       accessibility: "id, updatedAt",
-      releases: "hash",
+      releases: "hash, cachedAt",
       release_state: "id",
     });
   }
@@ -297,66 +305,32 @@ export async function createSession(participantCode: string, releaseKey: string,
   return row;
 }
 
-export async function findResumableSession(participantCode: string, releaseHash: string): Promise<SessionRow | undefined> {
-  const rows = await db.sessions
-    .where("participantCode")
-    .equals(participantCode)
-    .filter((session) => session.state === "in_progress" && session.releaseHash === releaseHash)
-    .toArray();
-  return rows.sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1))[0];
-}
+/**
+ * Which releases a resume may pick up.
+ *
+ * `anyRelease` is the rule once releases can change under a device (docs/16
+ * §5.3): a sitting started yesterday under r7.1.0 is still that participant's
+ * sitting after r8.0.0 arrives, and is resumed under r7.1.0. `releaseHash` is the
+ * older rule — only sittings of the release running now — which is what the app
+ * falls back to when a sitting's own release cannot be loaded.
+ */
+export type ResumeScope = { anyRelease: true } | { releaseHash: string };
 
 /**
- * The most recent unfinished sitting for this code, under whichever version.
- *
- * A version published from the dashboard can become active between a child
- * stopping and coming back. Their sitting is still finished under the version
- * it was started with (D-54), so the start screen looks under every version.
+ * The sitting a code resumes, chosen from that code's rows: the most recently
+ * touched one still in progress, within the scope asked for. Pure, so the rule
+ * can be tested without a database.
  */
-export async function latestResumableSession(participantCode: string): Promise<SessionRow | undefined> {
-  const rows = await db.sessions
-    .where("participantCode")
-    .equals(participantCode)
+export function pickResumable(rows: readonly SessionRow[], scope: ResumeScope): SessionRow | undefined {
+  return rows
     .filter((session) => session.state === "in_progress")
-    .toArray();
-  return rows.sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1))[0];
+    .filter((session) => "anyRelease" in scope || session.releaseHash === scope.releaseHash)
+    .sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1))[0];
 }
 
-// ── Versions this device has run (D-54) ──────────────────────────────────────
-
-export async function storedReleaseJson(hash: string): Promise<string | null> {
-  return (await db.releases.get(hash))?.json ?? null;
-}
-
-export async function storeRelease(hash: string, version: string, key: string, json: string): Promise<void> {
-  await db.releases.put({ hash, version, key, json, storedAt: new Date().toISOString() });
-}
-
-export async function lastActiveRelease(): Promise<string | null> {
-  return (await db.release_state.get("active"))?.hash ?? null;
-}
-
-export async function setLastActiveRelease(hash: string): Promise<void> {
-  await db.release_state.put({ id: "active", hash, at: new Date().toISOString() });
-}
-
-/**
- * Ask the next start-up to open under `hash` and pick up `code`'s sitting.
- *
- * Short-lived on purpose: it is read by the reload that follows at once, and a
- * marker found much later is somebody else's moment, so it is ignored.
- */
-export async function markResume(hash: string, code: string): Promise<void> {
-  await db.release_state.put({ id: "resume", hash, code, at: new Date().toISOString() });
-}
-
-export const RESUME_MARKER_MS = 2 * 60_000;
-
-export async function takeResume(now = Date.now()): Promise<{ hash: string; code: string } | null> {
-  const row = await db.release_state.get("resume");
-  if (!row?.code) return null;
-  await db.release_state.delete("resume");
-  return now - Date.parse(row.at) < RESUME_MARKER_MS ? { hash: row.hash, code: row.code } : null;
+export async function findResumableSession(participantCode: string, scope: ResumeScope): Promise<SessionRow | undefined> {
+  const rows = await db.sessions.where("participantCode").equals(participantCode).toArray();
+  return pickResumable(rows, scope);
 }
 
 // Serialise writes so rapid successive answers can never race on sequence.
@@ -684,6 +658,65 @@ export async function forgetConfirmedSessions(): Promise<Erasure> {
     }
   });
   return { sessions: confirmed.length, events };
+}
+
+export async function getCachedRelease(hash: string): Promise<CachedReleaseRow | undefined> {
+  return db.releases.get(hash);
+}
+
+export async function putCachedRelease(row: CachedReleaseRow): Promise<void> {
+  await db.releases.put(row);
+}
+
+export async function getReleaseState(): Promise<ReleaseStateRow | undefined> {
+  return db.release_state.get("active");
+}
+
+/** Change some of the release state, leaving the rest as it was. */
+export async function saveReleaseState(patch: Partial<Omit<ReleaseStateRow, "id">>): Promise<void> {
+  await db.transaction("rw", db.release_state, async () => {
+    const previous = await db.release_state.get("active");
+    await db.release_state.put({
+      id: "active",
+      activeHash: previous?.activeHash ?? null,
+      checkedAt: previous?.checkedAt ?? null,
+      lastResult: previous?.lastResult ?? null,
+      ...patch,
+    });
+  });
+}
+
+/**
+ * Cached releases nothing needs any more. Pure, so the rule is testable.
+ *
+ * A release is needed while any sitting on this device was started under it —
+ * that sitting may yet be resumed, and is rendered only through its own release —
+ * and while it is the active one or the one on screen.
+ */
+export function releasesToPrune(cached: readonly string[], needed: ReadonlySet<string>): string[] {
+  return cached.filter((hash) => !needed.has(hash));
+}
+
+/**
+ * Drop downloaded releases that no sitting and no screen can use.
+ *
+ * ONE TRANSACTION OVER THE SESSIONS AS WELL, so a sitting created while this runs
+ * is either seen here — and its release kept — or created after the deletion, by
+ * which time it can only be using a release in `keep` or the active one. `keep`
+ * is the caller's release in use: at the start screen that can briefly differ
+ * from the active one, and a sitting started from it must still be resumable.
+ */
+export async function pruneCachedReleases(keep: readonly string[]): Promise<string[]> {
+  return db.transaction("rw", db.sessions, db.releases, db.release_state, async () => {
+    const needed = new Set<string>(keep);
+    for (const session of await db.sessions.toArray()) needed.add(session.releaseHash);
+    const state = await db.release_state.get("active");
+    if (state?.activeHash) needed.add(state.activeHash);
+    const cached = (await db.releases.toCollection().primaryKeys()) as string[];
+    const drop = releasesToPrune(cached, needed);
+    if (drop.length > 0) await db.releases.bulkDelete(drop);
+    return drop;
+  });
 }
 
 async function requiredSession(sessionId: string): Promise<SessionRow> {

@@ -1,155 +1,256 @@
-import { readdirSync, readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Firestore } from "firebase-admin/firestore";
-import { manifestContentHash } from "@myself/schema";
-import {
-  MISS_RETRY_MS,
-  PUBLISHED_CACHE_MS,
-  bundledReleases,
-  forgetPublishedForTests,
-  knownReleases,
-  releaseFor,
-  releasesByHash,
-} from "./releases.js";
-
-// Refusals are logged as errors, which is right in production and noise here.
-vi.mock("firebase-functions/logger", () => ({ error: vi.fn(), warn: vi.fn(), info: vi.fn() }));
+import * as logger from "firebase-functions/logger";
+import { paths } from "@myself/firebase";
+import { contentHashAsync, hashHex, verifyRawManifestHash } from "@myself/schema";
+import { bundledManifests, latestRelease, readStoredRelease, releaseResolver, releasesByHash } from "./releases.js";
 
 /**
- * The functions read a sitting through the release it was collected under, and
- * skip a bundled manifest that does not parse. So every fielded release (r5.0.0
- * on; packages/release/src/published.test.ts) must be bundled in releases.ts
- * AND survive parsing — otherwise its sittings cannot be ingested or exported.
+ * Finding the release a sitting was collected under (docs/16 §5.4).
+ *
+ * Every reader in the functions — the nightly export, identity capture — goes
+ * through this, so what it refuses is what nobody downstream can misread. The
+ * store is stood in for by a map: what is worth proving is the order of the
+ * lookup and what a document has to be before it is believed, not Firestore.
  */
 
-const DIR = fileURLToPath(new URL("../../../releases/", import.meta.url));
+vi.mock("firebase-functions/logger", () => ({
+  error: vi.fn(),
+  warn: vi.fn(),
+  info: vi.fn(),
+  debug: vi.fn(),
+  log: vi.fn(),
+  write: vi.fn(),
+}));
 
-function fieldedHashes(): Map<string, string> {
-  const out = new Map<string, string>();
-  for (const file of readdirSync(DIR)) {
-    const m = /^ybm_nd2026_standard_r(\d+)\.\d+\.\d+\.manifest\.json$/.exec(file);
-    if (!m || Number(m[1]) < 5) continue;
-    const { hash } = JSON.parse(readFileSync(`${DIR}${file}`, "utf8")) as { hash: string };
-    out.set(hash, file);
-  }
-  return out;
+const STUDY = "ybm";
+
+type Raw = Record<string, unknown> & { release: Record<string, unknown>; hash?: string };
+
+/** The live release, republished under a new version: a release only the store holds. */
+async function studioRelease(version = "9.0.0"): Promise<{ raw: Raw; hash: string }> {
+  const live = bundledManifests.find((b) => b.manifest.release.version === "8.0.0");
+  if (!live) throw new Error("r8.0.0 is not bundled");
+  const body = structuredClone(live.raw) as Raw;
+  delete body.hash;
+  body.release = {
+    ...body.release,
+    version,
+    key: `ybm_nd2026_standard_r${version.replaceAll(".", "_")}`,
+    publishedAt: "2026-10-01T09:00:00.000Z",
+  };
+  const hash = await contentHashAsync(body);
+  return { raw: { ...body, hash }, hash };
 }
 
-describe("the releases the functions bundle", () => {
-  it("are every fielded release in releases/, none dropped for failing to parse", () => {
-    const expected = fieldedHashes();
-    const missing = [...expected].filter(([hash]) => !releasesByHash.has(hash)).map(([, file]) => file);
-    expect(missing, "add each to `published` in releases.ts, and keep it parsing").toEqual([]);
+/** What `studioPublish` writes to `publicReleases/{hashHex}`. */
+const storeDoc = (raw: Raw, hash: string) => ({
+  surveyId: "ybm_nd2026_standard",
+  study: STUDY,
+  hash,
+  version: String(raw.release["version"]),
+  releaseKey: String(raw.release["key"]),
+  engineVersion: String(raw.release["engineVersion"]),
+  manifest: JSON.stringify(raw),
+  bytes: JSON.stringify(raw).length,
+  publishedAt: "2026-10-01T09:00:01.000Z",
+});
+
+/** Enough Firestore to be read by path, counting the reads. */
+function fakeStore() {
+  const docs = new Map<string, unknown>();
+  const reads: string[] = [];
+  const db = {
+    doc: (path: string) => ({
+      get: async () => {
+        reads.push(path);
+        return { exists: docs.has(path), data: () => docs.get(path) };
+      },
+    }),
+  } as unknown as Firestore;
+  const put = (hash: string, value: unknown, study = STUDY) => docs.set(paths.publicRelease(study, hashHex(hash)), value);
+  return { db, reads, put };
+}
+
+beforeEach(() => {
+  vi.mocked(logger.error).mockClear();
+});
+
+describe("the bundled releases", () => {
+  it("are kept raw beside the parsed copy, and the raw copy verifies", async () => {
+    // The import of the live survey writes the raw JSON into the store; a
+    // reader re-verifies exactly that, so it has to hash to what it says.
+    expect(bundledManifests.length).toBe(releasesByHash.size);
+    for (const { raw, manifest } of bundledManifests) {
+      expect(await verifyRawManifestHash(raw)).toBe(true);
+      expect(releasesByHash.get(manifest.hash!)).toBe(manifest);
+    }
+    expect(latestRelease?.release.version).toBe("8.0.0");
   });
 });
 
-/**
- * Versions published from the dashboard (D-54), read from the database with a
- * stand-in for Firestore. The same thing against the real emulator is in
- * integration/releases.integration.test.ts.
- */
-describe("versions published from the dashboard", () => {
-  const r9 = JSON.parse(readFileSync(`${DIR}ybm_nd2026_standard_r9.0.0.manifest.json`, "utf8")) as Record<string, unknown> & {
-    release: Record<string, unknown>;
-  };
+describe("resolving a release by hash", () => {
+  it("finds a bundled release without reading the store", async () => {
+    const { db, reads } = fakeStore();
+    const resolve = releaseResolver();
+    const found = await resolve(db, STUDY, latestRelease!.hash!);
+    expect(found?.source).toBe("bundled");
+    expect(found?.manifest).toBe(latestRelease);
+    expect(reads).toEqual([]);
+  });
 
-  /** r9.0.0 republished as `version`, hashed again as the dashboard's builder would. */
-  async function version(v: string): Promise<{ hash: string; doc: Record<string, unknown> }> {
-    const { hash: _old, ...body } = structuredClone(r9);
-    body.release["version"] = v;
-    body.release["key"] = `ybm_nd2026_standard_r${v.replaceAll(".", "_")}`;
-    const hash = await manifestContentHash(body);
-    return {
-      hash,
-      doc: { hash, version: v, key: body.release["key"], engineVersion: "0.3.0", manifestJson: JSON.stringify({ ...body, hash }) },
-    };
-  }
+  it("reads a release only the store holds, once its hash verifies", async () => {
+    const { raw, hash } = await studioRelease();
+    const { db, put } = fakeStore();
+    put(hash, storeDoc(raw, hash));
 
-  /** The survey's database, holding `docs` under `studies/ybm/releases`. */
-  function database(docs: () => Record<string, Record<string, unknown>>, fail = false) {
-    const reads: string[] = [];
+    const found = await releaseResolver()(db, STUDY, hash);
+    expect(found?.source).toBe("store");
+    expect(found?.manifest.hash).toBe(hash);
+    expect(found?.manifest.release.version).toBe("9.0.0");
+    expect(logger.error).not.toHaveBeenCalled();
+  });
+
+  it("refuses a stored manifest whose content was altered, and says so", async () => {
+    const { raw, hash } = await studioRelease();
+    // One option label changed, the hash left as it was: the answers would be
+    // read against a label nobody was shown.
+    const scale = Object.values(raw["scales"] as Record<string, { options: { label: string }[] }>)[0]!;
+    scale.options[0]!.label = "Something else entirely";
+    const { db, put } = fakeStore();
+    put(hash, storeDoc(raw, hash));
+
+    expect(await releaseResolver()(db, STUDY, hash)).toBeNull();
+    expect(logger.error).toHaveBeenCalledWith(
+      expect.stringMatching(/failed verification/),
+      expect.objectContaining({ releaseHash: hash, reason: expect.stringMatching(/does not hash/) }),
+    );
+  });
+
+  it("refuses an intact release filed under another release's hash", async () => {
+    // Every byte of it verifies — against its own hash. Read under the one it
+    // is filed as, it would be exactly the silent misread D-35 forbids.
+    const nine = await studioRelease("9.0.0");
+    const ten = await studioRelease("10.0.0");
+    const { db, put } = fakeStore();
+    put(ten.hash, { ...storeDoc(nine.raw, nine.hash), hash: ten.hash });
+
+    expect(await releaseResolver()(db, STUDY, ten.hash)).toBeNull();
+    expect(logger.error).toHaveBeenCalledWith(
+      expect.stringMatching(/failed verification/),
+      expect.objectContaining({ reason: expect.stringMatching(/different hash/) }),
+    );
+  });
+
+  it("refuses a document whose manifest is not a JSON string", async () => {
+    const { raw, hash } = await studioRelease();
+    const { db, put } = fakeStore();
+    put(hash, { ...storeDoc(raw, hash), manifest: raw });
+    expect(await releaseResolver()(db, STUDY, hash)).toBeNull();
+
+    put(hash, { ...storeDoc(raw, hash), manifest: "{not json" });
+    expect(await releaseResolver()(db, STUDY, hash)).toBeNull();
+    expect(logger.error).toHaveBeenCalledTimes(2);
+  });
+
+  it("returns null for a hash neither the bundle nor the store knows", async () => {
+    const { hash } = await studioRelease();
+    const { db, reads } = fakeStore();
+    expect(await releaseResolver()(db, STUDY, hash)).toBeNull();
+    expect(reads).toEqual([paths.publicRelease(STUDY, hashHex(hash))]);
+  });
+
+  it("does not build a document path out of a malformed hash", async () => {
+    const { db, reads } = fakeStore();
+    const resolve = releaseResolver();
+    expect(await resolve(db, STUDY, "sha256-abc")).toBeNull();
+    expect(await resolve(db, STUDY, "sha256:../../sessions/x")).toBeNull();
+    expect(reads).toEqual([]);
+  });
+
+  it("keeps a verified release, and reads the store once for it", async () => {
+    const { raw, hash } = await studioRelease();
+    const { db, reads, put } = fakeStore();
+    put(hash, storeDoc(raw, hash));
+    const resolve = releaseResolver();
+
+    const first = await resolve(db, STUDY, hash);
+    const second = await resolve(db, STUDY, hash);
+    expect(second?.manifest).toBe(first?.manifest);
+    expect(second?.source).toBe("store");
+    expect(reads).toHaveLength(1);
+  });
+
+  it("does not remember a miss, so a release stored later is found", async () => {
+    const { raw, hash } = await studioRelease();
+    const { db, reads, put } = fakeStore();
+    const resolve = releaseResolver();
+
+    expect(await resolve(db, STUDY, hash)).toBeNull();
+    put(hash, storeDoc(raw, hash));
+    expect((await resolve(db, STUDY, hash))?.source).toBe("store");
+    expect(reads).toHaveLength(2);
+  });
+
+  it("remembers a verified release for the study whose store held it, not for every study", async () => {
+    // Review fix: the cache was keyed by hash alone, so once study A's store
+    // had verified a release, study B resolved it too without B's store ever
+    // being read — and only on a warm instance.
+    const { raw, hash } = await studioRelease();
+    const { db, reads, put } = fakeStore();
+    put(hash, storeDoc(raw, hash), "study_a");
+    const resolve = releaseResolver();
+
+    expect((await resolve(db, "study_a", hash))?.source).toBe("store");
+    expect(await resolve(db, "study_b", hash)).toBeNull();
+    expect(reads).toEqual([paths.publicRelease("study_a", hashHex(hash)), paths.publicRelease("study_b", hashHex(hash))]);
+  });
+
+  it("refuses, and does not throw on, a document nested deeply enough to overflow the hash", async () => {
+    // Review fix: canonical JSON and the schema both recurse, so a few
+    // hundred kB of nesting is a RangeError. Thrown, it would take the whole
+    // nightly export down over one document; it must be a refusal instead.
+    const { hash } = await studioRelease();
+    const depth = 200_000;
+    const manifest = `{"hash":"${hash}","deep":${"[".repeat(depth)}${"]".repeat(depth)}}`;
+    const { db, put } = fakeStore();
+    put(hash, { hash, manifest });
+
+    expect(await readStoredRelease({ hash, manifest }, hash)).toEqual({ refused: expect.stringMatching(/could not be checked/) });
+    expect(await releaseResolver()(db, STUDY, hash)).toBeNull();
+    expect(logger.error).toHaveBeenCalledWith(
+      expect.stringMatching(/failed verification/),
+      expect.objectContaining({ releaseHash: hash, reason: expect.stringMatching(/could not be checked/) }),
+    );
+  });
+
+  it("lets a failing read throw rather than report the release as unknown", async () => {
+    // An export that left a release out because the database hiccuped would
+    // look complete; one that fails is retried and noticed.
+    const { hash } = await studioRelease();
     const db = {
-      collection: (path: string) => ({
+      doc: () => ({
         get: async () => {
-          reads.push(path);
-          if (fail) throw new Error("UNAVAILABLE");
-          return { docs: Object.entries(docs()).map(([id, data]) => ({ id, data: () => data })) };
+          throw new Error("unavailable");
         },
       }),
     } as unknown as Firestore;
-    return { db, reads };
-  }
+    await expect(releaseResolver()(db, STUDY, hash)).rejects.toThrow("unavailable");
+  });
+});
 
-  beforeEach(() => forgetPublishedForTests());
-
-  it("are read from the study's releases collection and used alongside the bundled ones", async () => {
-    const v10 = await version("10.0.0");
-    const { db, reads } = database(() => ({ [v10.hash]: v10.doc }));
-    const known = await knownReleases({ db, study: "ybm" });
-    expect(reads).toEqual(["studies/ybm/releases"]);
-    expect(known.byHash.get(v10.hash)?.release.version).toBe("10.0.0");
-    for (const hash of bundledReleases.keys()) expect(known.byHash.has(hash)).toBe(true);
-    expect(known.latest?.release.version).toBe("10.0.0");
-    // The synchronous view the older callers use has learned it too.
-    expect(releasesByHash.has(v10.hash)).toBe(true);
+describe("reading a stored release", () => {
+  it("refuses a document that disagrees with itself about its hash", async () => {
+    const { raw, hash } = await studioRelease();
+    const other = `sha256:${"0".repeat(64)}`;
+    expect(await readStoredRelease({ ...storeDoc(raw, hash), hash: other }, hash)).toEqual({
+      refused: expect.stringMatching(/says it holds/),
+    });
   });
 
-  it("are refused when the manifest does not match the hash it is filed under", async () => {
-    const v10 = await version("10.0.0");
-    const v11 = await version("11.0.0");
-    const tampered = { ...v10.doc, manifestJson: String(v10.doc["manifestJson"]).replace("brainpop@leeds.ac.uk", "x@example.com") };
-    const { db } = database(() => ({
-      [v10.hash]: tampered,
-      // Filed under another version's hash.
-      [v11.hash]: v10.doc,
-    }));
-    const known = await knownReleases({ db, study: "ybm" });
-    expect(known.byHash.has(v10.hash)).toBe(false);
-    expect(known.byHash.has(v11.hash)).toBe(false);
-    expect(known.latest?.release.version).toBe("9.0.0");
-  });
-
-  it("are read at most once a minute", async () => {
-    const v10 = await version("10.0.0");
-    const { db, reads } = database(() => ({ [v10.hash]: v10.doc }));
-    let now = 1_000_000;
-    await knownReleases({ db, now: () => now });
-    now += PUBLISHED_CACHE_MS - 1;
-    await knownReleases({ db, now: () => now });
-    expect(reads).toHaveLength(1);
-    now += 1;
-    await knownReleases({ db, now: () => now });
-    expect(reads).toHaveLength(2);
-  });
-
-  it("are looked for again, sooner, when a sitting names one not yet read", async () => {
-    // Published a moment after this instance last looked.
-    const v10 = await version("10.0.0");
-    let docs: Record<string, Record<string, unknown>> = {};
-    const { db, reads } = database(() => docs);
-    let now = 1_000_000;
-    await knownReleases({ db, now: () => now });
-    docs = { [v10.hash]: v10.doc };
-
-    now += MISS_RETRY_MS - 1;
-    expect(await releaseFor(v10.hash, { db, now: () => now })).toBeUndefined();
-    now += 1;
-    expect((await releaseFor(v10.hash, { db, now: () => now }))?.release.version).toBe("10.0.0");
-    expect(reads).toHaveLength(2);
-  });
-
-  it("leave the known releases usable when the database cannot be read", async () => {
-    const { db } = database(() => ({}), true);
-    const known = await knownReleases({ db });
-    expect(known.byHash.size).toBe(bundledReleases.size);
-    expect(known.latest?.release.version).toBe("9.0.0");
-  });
-
-  it("find a bundled release without asking the database twice", async () => {
-    const { db, reads } = database(() => ({}));
-    const [hash] = [...bundledReleases.keys()];
-    expect(await releaseFor(hash!, { db })).toBe(bundledReleases.get(hash!));
-    expect(reads).toHaveLength(1);
+  it("refuses a missing document body without throwing", async () => {
+    const { hash } = await studioRelease();
+    expect(await readStoredRelease(undefined, hash)).toEqual({ refused: expect.any(String) });
+    expect(await readStoredRelease({ manifest: "null" }, hash)).toEqual({ refused: expect.any(String) });
   });
 });

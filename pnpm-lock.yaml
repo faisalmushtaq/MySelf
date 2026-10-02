@@ -84,12 +84,18 @@ importers:
       '@myself/narrative':
         specifier: workspace:*
         version: link:../../packages/narrative
+      '@myself/release':
+        specifier: workspace:*
+        version: link:../../packages/release
       '@myself/schema':
         specifier: workspace:*
         version: link:../../packages/schema
       '@myself/store':
         specifier: workspace:*
         version: link:../../packages/store
+      '@myself/studio':
+        specifier: workspace:*
+        version: link:../../packages/studio
       firebase-admin:
         specifier: ^13.0.0
         version: 13.10.0(@firebase/app-compat@0.4.2)(@firebase/app@0.13.2)
@@ -180,6 +186,9 @@ importers:
         specifier: ^3.23.8
         version: 3.25.76
     devDependencies:
+      '@myself/release':
+        specifier: workspace:*
+        version: link:../../packages/release
       '@types/react':
         specifier: ^18.3.5
         version: 18.3.31
@@ -207,18 +216,30 @@ importers:
       '@fontsource/inter':
         specifier: ^5.3.0
         version: 5.3.0
+      '@myself/engine':
+        specifier: workspace:*
+        version: link:../../packages/engine
       '@myself/firebase':
         specifier: workspace:*
         version: link:../../packages/firebase
       '@myself/narrative':
         specifier: workspace:*
         version: link:../../packages/narrative
+      '@myself/release':
+        specifier: workspace:*
+        version: link:../../packages/release
       '@myself/schema':
         specifier: workspace:*
         version: link:../../packages/schema
+      '@myself/scoring':
+        specifier: workspace:*
+        version: link:../../packages/scoring
       '@myself/store':
         specifier: workspace:*
         version: link:../../packages/store
+      '@myself/studio':
+        specifier: workspace:*
+        version: link:../../packages/studio
       dexie:
         specifier: ^4.0.8
         version: 4.4.4
@@ -402,6 +423,25 @@ importers:
       '@myself/scoring':
         specifier: workspace:*
         version: link:../scoring
+      zod:
+        specifier: ^3.23.8
+        version: 3.25.76
+    devDependencies:
+      typescript:
+        specifier: ^5.6.0
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.0
+        version: 2.1.9(@types/node@22.20.1)(terser@5.49.0)
+
+  packages/studio:
+    dependencies:
+      '@myself/release':
+        specifier: workspace:*
+        version: link:../release
+      '@myself/schema':
+        specifier: workspace:*
+        version: link:../schema
       zod:
         specifier: ^3.23.8
         version: 3.25.76

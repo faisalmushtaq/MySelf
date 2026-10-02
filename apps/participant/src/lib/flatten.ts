@@ -34,6 +34,21 @@ export function reminderOf(instructions: string): string {
   return sentences[sentences.length - 1] ?? instructions;
 }
 
+/**
+ * The questions a placement lists, looked up by key. A key the form does not
+ * have is a manifest inconsistency — the publish gate refuses one — so it
+ * throws, like the other inconsistencies here, rather than silently dropping a
+ * question from every sitting.
+ */
+function pick(form: InstrumentForm, keys: string[], refKey: string): ItemDefinition[] {
+  const byKey = new Map(form.items.map((i) => [i.key, i]));
+  return keys.map((key) => {
+    const item = byKey.get(key);
+    if (!item) throw new Error(`manifest inconsistency: '${refKey}' has no question '${key}'`);
+    return item;
+  });
+}
+
 export interface FlattenedRelease {
   units: PresentableUnit[];
   /** Unit index -> the instrument instructions that framed it, so a
@@ -50,6 +65,7 @@ export function flattenManifest(manifest: ReleaseManifest): FlattenedRelease {
   const transitions = new Map<string, string>();
   const sectionTitles = new Map<string, string>();
 
+  const placements = new Map<string, number>();
   const byRef = new Map<string, FrozenInstrument>();
   for (const [refKey, def] of Object.entries(manifest.instruments)) {
     byRef.set(refKey, def as FrozenInstrument);
@@ -98,14 +114,22 @@ export function flattenManifest(manifest: ReleaseManifest): FlattenedRelease {
       if (!form) throw new Error(`manifest inconsistency: '${refKey}' has no form`);
 
       const componentCondition = and(section.displayIf, component.displayIf);
+      // A placement may show only some of the form's questions, in its own
+      // order (D-49). Absent, it is the whole form — every release to r7.1.0.
+      const items = component.items ? pick(form, component.items, refKey) : form.items;
+      // The same instrument can be placed more than once when its questions
+      // are split across sections. The first placement keeps the key every
+      // earlier release used; later ones are numbered, so no two units share one.
+      const placement = (placements.get(ref.instrument) ?? 0) + 1;
+      placements.set(ref.instrument, placement);
       let instructionsEmitted = false;
-      for (const item of form.items) {
+      for (const item of items) {
         // Instrument instructions become an info unit before the first item,
         // preserving validated administration text verbatim (docs/07 §3).
         if (!instructionsEmitted && form.instructions) {
           const instructionItem: ItemDefinition = {
             responseType: "info",
-            key: `__instructions_${ref.instrument}`,
+            key: placement === 1 ? `__instructions_${ref.instrument}` : `__instructions_${ref.instrument}_${placement}`,
             revision: 1,
             variable: `meta_instr_${ref.instrument.slice(0, 20)}`,
             stem: { text: form.instructions },

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { buildBidsExport, buildDemoSessions, buildZip, wideTable, type Dataset } from "@myself/store";
 import { DataTable, downloadCsv } from "./components/DataTable.js";
 import { Linkage } from "./components/Linkage.js";
@@ -6,7 +6,7 @@ import { ParticipantPanel } from "./components/ParticipantPanel.js";
 import { Protocols } from "./components/Protocols.js";
 import { Scope } from "./components/Scope.js";
 import { Summary } from "./components/Summary.js";
-import { buildDataset, countStudy } from "./lib/build.js";
+import { buildDatasetWithStore, countStudy } from "./lib/build.js";
 import {
   addSessions,
   aliases,
@@ -27,7 +27,6 @@ import {
 } from "./lib/db.js";
 import {
   pullSittings,
-  readPublishedReleases,
   revokeDevice,
   signIn,
   signOutOfStudy,
@@ -36,7 +35,7 @@ import {
   type StudyUser,
 } from "./lib/study.js";
 import { defaultColumns } from "./lib/filter.js";
-import { addPublishedReleases, latestRelease } from "./lib/releases.js";
+import { latestRelease } from "./lib/releases.js";
 
 /**
  * MySelf — researcher view.
@@ -57,9 +56,45 @@ const STUDY = "YBM-ND2026";
 
 const plural = (n: number, noun: string): string => `${n} ${noun}${n === 1 ? "" : "s"}`;
 
+/** The newest `reload` started; an older one that finishes after it is dropped. */
+let reloadGeneration = 0;
+
 type Tab = "overview" | "table" | "linkage" | "mystory" | "data";
 
+/**
+ * MySelf Studio (docs/16) lives at `#/…` addresses on the same page, loaded as
+ * its own chunk only when one is opened. Any other address is this view,
+ * exactly as before.
+ */
+const StudioRoot = lazy(() => import("./studio/StudioRoot.js"));
+
+function subscribeToHash(listener: () => void): () => void {
+  window.addEventListener("hashchange", listener);
+  // The Studio's router also announces address changes it makes without one.
+  window.addEventListener("studio:navigate", listener);
+  return () => {
+    window.removeEventListener("hashchange", listener);
+    window.removeEventListener("studio:navigate", listener);
+  };
+}
+
 export default function App() {
+  const inStudio = useSyncExternalStore(
+    subscribeToHash,
+    () => window.location.hash.startsWith("#/"),
+    () => false,
+  );
+  if (inStudio) {
+    return (
+      <Suspense fallback={<p className="working">Opening MySelf Studio…</p>}>
+        <StudioRoot />
+      </Suspense>
+    );
+  }
+  return <ResearcherView />;
+}
+
+function ResearcherView() {
   // Every stored sitting and the dataset ingest built from all of them. What the view
   // shows is `counted` below: the same, with test sittings left out unless asked for.
   const [built, setBuilt] = useState<{ stored: StoredSession[]; dataset: Dataset } | null>(null);
@@ -78,7 +113,6 @@ export default function App() {
   const [user, setUser] = useState<StudyUser | null>(null);
   const [pulling, setPulling] = useState(false);
   const [pullNote, setPullNote] = useState<string | null>(null);
-  const [releaseNote, setReleaseNote] = useState<string | null>(null);
   const [revoking, setRevoking] = useState("");
   const [deviceNote, setDeviceNote] = useState<string | null>(null);
   // The study passphrase the iPads encrypted their handover files with. Held in
@@ -86,11 +120,18 @@ export default function App() {
   const [passphrase, setPassphrase] = useState("");
 
   const reload = useCallback(async () => {
+    const generation = ++reloadGeneration;
     setBusy(true);
     const sessions = await storedSessions();
     // Corrections are applied here, at derivation, so a repaired code joins a
     // participant's waves without anything being rewritten (D-37).
-    const built = buildDataset(sessions, STUDY, await aliases(), await assignments());
+    const built = await buildDatasetWithStore(sessions, STUDY, await aliases(), await assignments());
+    // Asking the release store can take seconds (up to its timeout when
+    // offline), so reloads now overlap: the page-load build can still be
+    // waiting when a pull or an import starts another. Only the newest may set
+    // what is shown — an older one finishing late would put back a dataset
+    // missing the sittings just added. The newest also clears `busy`.
+    if (generation !== reloadGeneration) return;
     setBuilt({ stored: sessions, dataset: built.dataset });
     setPullRecord(await lastPull());
     // Names go to their own table, never into the dataset the rest of this
@@ -107,38 +148,10 @@ export default function App() {
 
   useEffect(() => watchUser(setUser), []);
 
-  /**
-   * Learn the versions published from the dashboard (D-54), so a sitting
-   * collected under one is read through it rather than through the latest
-   * built-in release with a warning. Each is checked against its hash first;
-   * one that fails is named here and never used. Returns how many were new.
-   */
-  const learnPublished = useCallback(async (): Promise<number> => {
-    try {
-      const { added, refused } = await addPublishedReleases(await readPublishedReleases());
-      setReleaseNote(
-        refused.length > 0
-          ? `${plural(refused.length, "published version")} did not match ${refused.length === 1 ? "its" : "their"} hash and ${refused.length === 1 ? "is" : "are"} not used: ${refused.map((r) => `${r.hash.slice(0, 19)}… (${r.problem})`).join("; ")}`
-          : null,
-      );
-      return added.length;
-    } catch (error) {
-      setReleaseNote(`Could not read the versions published from the dashboard: ${error instanceof Error ? error.message : "no reason given"}`);
-      return 0;
-    }
-  }, []);
-
-  useEffect(() => {
-    if (!user) return;
-    void learnPublished().then((added) => (added > 0 ? reload() : undefined));
-  }, [user, learnPublished, reload]);
-
   const pull = useCallback(async () => {
     setPulling(true);
     setPullNote(null);
     try {
-      // First, so sittings under a version published since signing in are read through it.
-      await learnPublished();
       const { sessions, quarantined, unreadable } = await pullSittings();
       const merged = await mergeFromStudy(sessions, "study");
       await recordPull({ at: new Date().toISOString(), sittings: sessions.length, quarantined, unreadable });
@@ -160,7 +173,7 @@ export default function App() {
     } finally {
       setPulling(false);
     }
-  }, [reload, learnPublished]);
+  }, [reload]);
 
   // Counted by the rules the research dashboard counts by (@myself/store counting.ts).
   const counted = useMemo(() => (built ? countStudy(built.stored, built.dataset, includeTest) : null), [built, includeTest]);
@@ -249,6 +262,13 @@ export default function App() {
                       : "Data in and out"}
             </button>
           ))}
+          <a
+            className="tab"
+            href="#/surveys"
+            style={{ display: "inline-flex", alignItems: "center", textDecoration: "none", color: "var(--accent)" }}
+          >
+            Survey Studio&nbsp;<span aria-hidden="true">→</span>
+          </a>
         </nav>
       </header>
 
@@ -412,7 +432,6 @@ export default function App() {
                 </>
               )}
               {pullNote && <p className="note">{pullNote}</p>}
-              {releaseNote && <p className="note warn">{releaseNote}</p>}
             </div>
           )}
 

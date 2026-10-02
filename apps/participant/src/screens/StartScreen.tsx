@@ -3,20 +3,6 @@ import type { ReleaseManifest } from "@myself/schema";
 import type { AccessibilityPreferences } from "../lib/accessibility.js";
 import type { StoredSessionCounts } from "../lib/db.js";
 import { EVICTION_CAP_DAYS, type Durability } from "../lib/durability.js";
-import type { ReleaseOrigin } from "../lib/versions.js";
-
-/**
- * Where the running version came from, in a word or two for the build line.
- * Staff read it before handing the iPad over, to see which version a sitting
- * will be collected under (D-54).
- */
-const ORIGIN_LABEL: Record<ReleaseOrigin, string> = {
-  active: "live",
-  stored: "live when last checked",
-  bundled: "built in",
-  resumed: "finishing a sitting",
-  preview: "draft",
-};
 
 /**
  * The neutral screen an iPad sits on between participants: the study code,
@@ -35,10 +21,8 @@ export interface StartScreenProps {
   contact: ReleaseManifest["composition"]["contact"];
   releaseVersion: string;
   releaseHash: string | undefined;
-  /** How this device came to be running this version. */
-  releaseOrigin: ReleaseOrigin;
-  /** Why the live version is not the one running, when that is the case. */
-  releaseNote: string | undefined;
+  /** Whether that release is the one built into the app or one downloaded from the study. */
+  releaseBuiltIn: boolean;
   code: string;
   codeError: string | null;
   onCodeChange: (code: string) => void;
@@ -62,8 +46,7 @@ export function StartScreen({
   contact,
   releaseVersion,
   releaseHash,
-  releaseOrigin,
-  releaseNote,
+  releaseBuiltIn,
   code,
   codeError,
   onCodeChange,
@@ -173,8 +156,7 @@ export function StartScreen({
         </p>
       )}
       <p className="hint demo-note" onClick={() => onBuildLineTap()}>
-        Preview build · release {releaseVersion} ({ORIGIN_LABEL[releaseOrigin]}) · {releaseHash?.slice(7, 19)} ·{" "}
-        {releaseNote && <>{releaseNote} · </>}
+        Preview build · release {releaseVersion} ({releaseBuiltIn ? "built in" : "downloaded"}) · {releaseHash?.slice(7, 19)} ·{" "}
         {counts.awaitingSync + counts.syncFailed} session{counts.awaitingSync + counts.syncFailed === 1 ? "" : "s"} awaiting sync · {counts.syncedVerified} verified · build{" "}
         {__BUILD_STAMP__}
       </p>

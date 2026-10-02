@@ -1,36 +1,51 @@
-import { useCallback, useEffect, useReducer, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { AnswerStore, Walker, type AnswerValue, type PresentableUnit } from "@myself/engine";
-import { responseScale, scoringDefinition, type ReleaseManifest, type ResponseScale } from "@myself/schema";
-import { flattenManifest } from "./lib/flatten.js";
 import { resolveText, useScoringDefinitions } from "./lib/pipes.js";
-import * as onDevice from "./lib/db.js";
 import {
   accessibilityPreferences,
+  appendEvent,
+  completeSession,
   clearBackoff,
   countStoredSessions,
-  latestResumableSession,
-  markResume,
+  createSession,
+  findResumableSession,
+  loadAnswers,
   saveAccessibilityPreferences,
   deviceSummary,
+  forgetConfirmedSessions,
   type Enrolment,
   type SessionRow,
   type StoredSessionCounts,
 } from "./lib/db.js";
-import { choiceOptions } from "./lib/choice.js";
-import { previewSittings } from "./lib/preview.js";
-import { runningRelease } from "./lib/running.js";
-import { canResumeUnder, chooseForNewSittings } from "./lib/versions.js";
+import { buildSealedExport, downloadExport } from "./lib/export.js";
+import { passphraseComplaint } from "@myself/store";
 import {
   applyAccessibilityPreferences,
   DEFAULT_ACCESSIBILITY_PREFERENCES,
   type AccessibilityPreferences,
 } from "./lib/accessibility.js";
 import { checkpointRunningSessions, synchroniseCompletedSessions } from "./lib/sync.js";
-import { currentDevice } from "./lib/device.js";
+import { currentDevice, syncAvailable } from "./lib/device.js";
 import { updates } from "./lib/updates.js";
-import { deviceSpace, type Space } from "./lib/space.js";
-import { heldForDays, storageDurability, type Durability } from "./lib/durability.js";
-import { SessionTiming, wordCount } from "./lib/timing.js";
+import { deviceSpace, readableBytes, type Space } from "./lib/space.js";
+import {
+  EVICTION_CAP_DAYS,
+  HELD_TOO_LONG_DAYS,
+  heldForDays,
+  storageDurability,
+  type Durability,
+} from "./lib/durability.js";
+import { SessionTiming } from "./lib/timing.js";
+import {
+  activeState,
+  describeCheck,
+  pruneReleases,
+  refreshActiveRelease,
+  releaseForHash,
+  type CheckRecord,
+} from "./lib/releases.js";
+import { buildRuntime, type Runtime } from "./lib/runtime.js";
+import { sittingToResume } from "./lib/resume.js";
 import { ReviewScreen } from "./components/ReviewScreen.js";
 import { SurveyScreen } from "./components/SurveyScreen.js";
 import { CheckInScreen } from "./screens/CheckInScreen.js";
@@ -42,33 +57,22 @@ import { StartScreen } from "./screens/StartScreen.js";
 
 /**
  * MySelf Go — participant application (preview build).
- * Renders the version chosen at start-up (lib/versions.ts, D-54) entirely from
- * its manifest, saves every response to encrypted IndexedDB before advancing,
- * works offline via the service worker, and returns to a neutral start screen
- * on handover.
+ * Renders a frozen release entirely from its manifest — the one the study has
+ * published, once this device has downloaded and verified it, and the built-in
+ * YBM r8.0.0 until then (lib/releases.ts) — saves every response to encrypted
+ * IndexedDB before advancing, works offline via the service worker, and returns
+ * to a neutral start screen on handover.
  */
 
-// Chosen in main.tsx before this module is loaded, which is what lets the
-// screens below be built once, here, as they always were.
-const release = runningRelease();
-const manifest: ReleaseManifest = release.manifest;
-/** A draft from the dashboard's editor: nothing is stored, sent or kept (lib/preview.ts). */
-const preview = release.origin === "preview";
-// A preview keeps its sitting in memory, in the same shape the device keeps one.
-const { appendEvent, completeSession, createSession, findResumableSession, loadAnswers } = preview
-  ? previewSittings
-  : onDevice;
-const flattened = flattenManifest(manifest);
-const scaleMap = new Map<string, ResponseScale>(
-  Object.entries(manifest.scales).map(([k, v]) => [k, responseScale.parse(v)]),
-);
-
-// Scoring frozen into this release, so a `score` pipe can tell a participant
-// something about what they just answered (D-33). Same definitions the server
-// will recompute from, so a screen and an export can never disagree.
-useScoringDefinitions(
-  new Map(Object.entries(manifest.scoring).map(([k, v]) => [k, scoringDefinition.parse(v)])),
-);
+/**
+ * How often the start screen asks the study whether a new version is live.
+ *
+ * Slow on purpose. The check that matters is the one made every time the device
+ * comes back to the start screen, which is between participants; this timer only
+ * covers an iPad left idle on a table, and thirty of them asking every minute is
+ * traffic a hall's single access point does not need.
+ */
+const RELEASE_CHECK_MS = 5 * 60_000;
 
 type Phase =
   | { kind: "start" }
@@ -81,56 +85,45 @@ type Phase =
   | { kind: "review"; session: SessionRow }
   | { kind: "finished"; session: SessionRow };
 
-const unitKeyOf = (i: number) => {
-  const u = flattened.units[i];
-  return u ? `${u.instrument}.${u.item.key}` : "";
-};
-
 /**
- * How much reading a screen actually puts in front of someone — stem, lede,
- * and any consent statements. The too-fast threshold scales with it, so a
- * four-word battery item is not held to the same clock as a paragraph.
+ * Which sitting a code resumes, and the release to render it with — pinned to
+ * the sitting's own release. The rule, and its fallback, is `lib/resume.ts`.
  */
-const wordsAt = (i: number): number => {
-  const item = flattened.units[i]?.item;
-  if (!item) return 0;
-  const statements = item.responseType === "checkbox_set" ? item.statements.map((st) => st.text.text) : [];
-  return wordCount(item.stem.text, item.lede?.text, ...statements);
-};
+const resumeLookup = { find: findResumableSession, releaseForHash };
 
-/**
- * A sitting this code left unfinished under another version is finished under
- * that version, never this one (D-54, rule 1). Returns true when the page is
- * reloading into it; `main.tsx` then opens that version and App carries on
- * with the code.
- *
- * It can only be done when the device still has that version and can still run
- * it. A sitting from before versions were kept on the device may not qualify,
- * and then a new sitting starts under this version, as it always did.
- */
-async function reopenUnderItsVersion(code: string): Promise<boolean> {
-  try {
-    const unfinished = await latestResumableSession(code);
-    if (!unfinished || unfinished.releaseHash === manifest.hash) return false;
-    if (!(await canResumeUnder(choiceOptions, unfinished.releaseHash))) return false;
-    await markResume(unfinished.releaseHash, code);
-  } catch {
-    return false;
-  }
-  location.reload();
-  return true;
-}
+export default function App({ initialRuntime }: { initialRuntime: Runtime }) {
+  /**
+   * The release on screen. At the start screen it is the active one; during a
+   * resumed sitting it is that sitting's own. Every value below that used to be
+   * computed once at module load from the one manifest compiled in is read off
+   * it, under the same names.
+   *
+   * `useScoringDefinitions` is given the scoring of whatever is on screen before
+   * it is rendered, here and in `showRuntime`.
+   */
+  const [runtime, setRuntime] = useState<Runtime>(() => {
+    useScoringDefinitions(initialRuntime.scoring);
+    return initialRuntime;
+  });
+  const { manifest, flattened, scaleMap, effort, codeRule, contact, finishScreen, reviewScreen, unitKeyOf, wordsAt } =
+    runtime;
+  const runtimeRef = useRef(initialRuntime);
+  /** The release a new sitting starts under — what the start screen returns to. */
+  const activeRuntime = useRef(initialRuntime);
+  const showRuntime = useCallback((next: Runtime) => {
+    useScoringDefinitions(next.scoring);
+    runtimeRef.current = next;
+    setRuntime(next);
+  }, []);
+  /** The last look at the study for a newer release, for the handover panel. */
+  const [releaseCheck, setReleaseCheck] = useState<CheckRecord | null>(null);
+  /** Set while Start is being handled, so a release arriving then cannot swap under it. */
+  const starting = useRef(false);
 
-const effort = manifest.composition.effort;
-const codeRule = manifest.composition.participantCode;
-const contact = manifest.composition.contact;
-const finishScreen = manifest.composition.screens["finish"];
-const reviewScreen = manifest.composition.screens["review"];
-
-export default function App() {
   const [phase, setPhase] = useState<Phase>({ kind: "start" });
-  // Opened to finish a sitting under its own version, the code comes with it.
-  const [code, setCode] = useState(release.resumeCode ?? "");
+  const phaseRef = useRef(phase);
+  phaseRef.current = phase;
+  const [code, setCode] = useState("");
   const [online, setOnline] = useState(navigator.onLine);
   const [savedAt, setSavedAt] = useState<string | null>(null);
   const [counts, setCounts] = useState<StoredSessionCounts>({
@@ -210,11 +203,10 @@ export default function App() {
     const next = { ...accessibility, ...patch };
     setAccessibility(next);
     applyAccessibilityPreferences(next);
-    if (!preview) void saveAccessibilityPreferences(next);
+    void saveAccessibilityPreferences(next);
   }, [accessibility]);
 
   useEffect(() => {
-    if (preview) return;
     let active = true;
     void accessibilityPreferences().then((stored) => {
       if (!active) return;
@@ -227,9 +219,6 @@ export default function App() {
   }, []);
 
   const refreshDeviceStatus = useCallback(async () => {
-    // A preview is not a device: it issues itself no identity and asks the
-    // browser for nothing, not even to keep storage.
-    if (preview) return;
     /**
      * The device knows who it is from its own storage, with no network involved.
      * `currentDevice` creates the credential if this is a first launch, so the
@@ -245,7 +234,7 @@ export default function App() {
 
   const runSync = useCallback(
     async (force = false) => {
-      if (preview || syncBusyRef.current) return;
+      if (syncBusyRef.current) return;
       syncBusyRef.current = true;
       setSyncBusy(true);
       try {
@@ -288,7 +277,7 @@ export default function App() {
      */
     const on = () => {
       setOnline(true);
-      if (!preview) void clearBackoff().then(() => runSync(true));
+      void clearBackoff().then(() => runSync(true));
     };
     const off = () => setOnline(false);
     addEventListener("online", on);
@@ -324,6 +313,55 @@ export default function App() {
     if (phase.kind === "start") updates.release();
     else updates.hold();
   }, [phase.kind]);
+
+  useEffect(() => {
+    let live = true;
+    void activeState().then((state) => {
+      if (live && state.lastResult) setReleaseCheck((shown) => shown ?? state.lastResult);
+    });
+    return () => {
+      live = false;
+    };
+  }, []);
+
+  /**
+   * Look for a newer published release, and show it — at the start screen only.
+   *
+   * Nothing here can hold a participant up: the screen is already showing a
+   * release when this runs, the check has its own timeout, and whatever it finds
+   * only replaces what is on screen if the device is still at the start screen
+   * and nobody is pressing Start. A sitting in progress keeps its release to the
+   * end, and a new release takes effect for the next participant.
+   */
+  const checkRelease = useCallback(async () => {
+    const result = await refreshActiveRelease();
+    setReleaseCheck(result.record);
+    if (result.activeHash !== activeRuntime.current.hash) {
+      const loaded = await releaseForHash(result.activeHash);
+      if (loaded) {
+        try {
+          activeRuntime.current = buildRuntime(loaded.manifest, loaded.source);
+        } catch {
+          // Verification lays a release out before accepting it, so this cannot
+          // happen; if it did, the release already running simply carries on.
+        }
+      }
+    }
+    if (phaseRef.current.kind !== "start" || starting.current) return;
+    if (runtimeRef.current !== activeRuntime.current) showRuntime(activeRuntime.current);
+    if (result.record.outcome.kind === "activated") {
+      void pruneReleases([runtimeRef.current.hash, activeRuntime.current.hash]);
+    }
+  }, [showRuntime]);
+
+  // On arriving at the start screen (which includes launch and every handover),
+  // when the network comes back, and every few minutes while a device waits.
+  useEffect(() => {
+    if (phase.kind !== "start") return;
+    void checkRelease();
+    const timer = window.setInterval(() => void checkRelease(), RELEASE_CHECK_MS);
+    return () => window.clearInterval(timer);
+  }, [phase.kind, online, checkRelease]);
 
   useEffect(() => {
     if (online && (phase.kind === "start" || phase.kind === "finished")) void runSync();
@@ -401,26 +439,43 @@ export default function App() {
     void checkpointRunningSessions().catch(() => undefined);
   }, [online, device, phase.kind]);
 
+  const runningSession = phase.kind === "running" ? (phase as { session: SessionRow }).session : null;
+  const walker = useMemo(
+    () =>
+      new Walker(
+        flattened.units,
+        storeRef.current,
+        manifest.composition.allowBackNavigation,
+        runningSession ? new Date(runningSession.startedAt) : undefined,
+      ),
+    [runningSession?.sessionId ?? "", runtime],
+  );
+
   const tMono = () => Math.round(performance.now() - monoStart.current);
 
   const start = useCallback(async () => {
     const trimmed = code.trim();
     if (trimmed.length < 2 || busy) return;
+    /**
+     * The code's format is the ACTIVE release's rule — the one on the start
+     * screen, whose instructions and hint the participant is reading — as it
+     * always was. A sitting resumed under an older release is found only after
+     * this, so a code valid only under an older rule cannot resume; the rule is a
+     * study decision, and changing it is expected to be rare.
+     */
     if (codeRule && !new RegExp(codeRule.pattern).test(trimmed)) {
       setCodeError(codeRule.hint);
       return;
     }
     setCodeError(null);
     setBusy(true);
+    starting.current = true;
     try {
-      const existing = await findResumableSession(trimmed, manifest.hash ?? "");
-      if (!existing && !preview && (await reopenUnderItsVersion(trimmed))) return;
-      if (!existing && release.origin === "resumed") {
-        // This version was opened only to finish a sitting. A new one starts
-        // under the version the study has made active, which a fresh start picks.
-        location.reload();
-        return;
-      }
+      // `rt` is the release this sitting is rendered and stamped under: the
+      // active one for a new sitting, the sitting's own for a resumed one. Read
+      // from here down instead of the names above, which are still the start
+      // screen's until the next render.
+      const { session: existing, runtime: rt } = await sittingToResume(trimmed, runtime, resumeLookup);
       const store = new AnswerStore();
       let session: SessionRow;
       if (existing) {
@@ -431,14 +486,14 @@ export default function App() {
         }
         session = existing;
       } else {
-        session = await createSession(trimmed, manifest.release.key, manifest.hash ?? "");
+        session = await createSession(trimmed, rt.manifest.release.key, rt.manifest.hash ?? "");
         await appendEvent(
           session,
           "session.started",
           undefined,
           // The study code is captured here and stored against its variable, so
           // the survey never has to ask for it a second time (D-23).
-          { releaseHash: manifest.hash, ...(codeRule?.variable ? { [codeRule.variable]: trimmed } : {}) },
+          { releaseHash: rt.manifest.hash, ...(rt.codeRule?.variable ? { [rt.codeRule.variable]: trimmed } : {}) },
           0,
           tMono(),
         );
@@ -446,32 +501,30 @@ export default function App() {
       storeRef.current = store;
       skipRun.current = { count: 0, firstIndex: null };
       fastRun.current = 0;
-      timing.current = new SessionTiming(effort);
-      const w = new Walker(flattened.units, store, manifest.composition.allowBackNavigation, new Date(session.startedAt));
-      const index = existing ? Math.min(session.currentIndex, flattened.units.length - 1) : (w.first() ?? 0);
+      timing.current = new SessionTiming(rt.effort);
+      const w = new Walker(rt.flattened.units, store, rt.manifest.composition.allowBackNavigation, new Date(session.startedAt));
+      // A saved position is an index into the sitting's own release, and `rt` is
+      // that release: `sittingToResume` only pairs a sitting with its own hash.
+      const index = existing ? Math.min(session.currentIndex, rt.flattened.units.length - 1) : (w.first() ?? 0);
       if (existing) {
         await appendEvent(session, "session.resumed", undefined, { resumedAtIndex: index }, index, tMono());
       }
-      const firstKey = unitKeyOf(index);
+      const firstKey = rt.unitKeyOf(index);
       if (firstKey) {
-        const { visit, returning, tooFastMs } = timing.current.enter(firstKey, wordsAt(index));
+        const { visit, returning, tooFastMs } = timing.current.enter(firstKey, rt.wordsAt(index));
         void appendEvent(session, "item.presented", firstKey, { visit, returning, tooFastMs }, index, tMono());
       }
-      setPhase({ kind: "running", session, index });
+      if (rt !== runtimeRef.current) showRuntime(rt);
+      // Recorded before the render as well, so a release check finishing in
+      // between cannot read a stale "start" and swap this sitting's release.
+      const running: Phase = { kind: "running", session, index };
+      phaseRef.current = running;
+      setPhase(running);
     } finally {
+      starting.current = false;
       setBusy(false);
     }
-  }, [code, busy]);
-
-  // Reloaded into a sitting's own version to finish it (see
-  // `reopenUnderItsVersion`): carry straight on, rather than ask for the code
-  // the participant typed a moment ago.
-  const resumedOnLoad = useRef(false);
-  useEffect(() => {
-    if (!release.resumeCode || resumedOnLoad.current) return;
-    resumedOnLoad.current = true;
-    void start();
-  }, [start]);
+  }, [code, busy, runtime, codeRule, showRuntime]);
 
   /**
    * Do a write, and stop the survey if it fails.
@@ -603,7 +656,7 @@ export default function App() {
         tMono(),
       );
     },
-    [phase],
+    [phase, runtime],
   );
 
   /** Open a viewing of an item: `item.presented` carries the visit number, so
@@ -616,7 +669,7 @@ export default function App() {
       const { visit, returning, tooFastMs } = timing.current.enter(key, wordsAt(index));
       void appendEvent(phase.session, "item.presented", key, { visit, returning, tooFastMs }, index, tMono());
     },
-    [phase],
+    [phase, runtime],
   );
 
   /** Close a viewing of an item, recording how long it was on screen. */
@@ -628,7 +681,7 @@ export default function App() {
       const payload = timing.current.leave(key, answered);
       if (payload) await appendEvent(phase.session, "item.left", key, payload, index, tMono());
     },
-    [phase],
+    [phase, runtime],
   );
 
   const advance = useCallback(
@@ -734,7 +787,7 @@ export default function App() {
         setPhase({ kind: "running", session: phase.session, index: next });
       }
     },
-    [phase, persist, saveError],
+    [phase, persist, saveError, runtime],
   );
 
   const goBack = useCallback(
@@ -771,7 +824,7 @@ export default function App() {
         setPhase({ kind: "running", session: phase.session, index: prev });
       }
     },
-    [phase],
+    [phase, runtime],
   );
 
   /**
@@ -796,51 +849,26 @@ export default function App() {
     return () => document.removeEventListener("visibilitychange", onVisibility);
   }, [phase.kind, phase.kind === "running" ? phase.index : -1]);
 
-  /**
-   * A different version made active while this device was open (D-54, rule 5).
-   *
-   * Asked after every handover, and taken up by reloading, because the screens
-   * are built from the manifest once, when the app loads. Only at the start
-   * screen, with no code typed and the staff panel closed: never in the middle
-   * of a sitting, and never under somebody who has started to use the screen.
-   */
-  const [versionDue, setVersionDue] = useState(false);
-  useEffect(() => {
-    if (versionDue && phase.kind === "start" && code === "" && !handoverOpen && !busy) location.reload();
-  }, [versionDue, phase.kind, code, handoverOpen, busy]);
-
   const handover = useCallback(() => {
     storeRef.current = new AnswerStore();
     timing.current = new SessionTiming(effort);
     fastRun.current = 0;
     setCode("");
     setSavedAt(null);
+    // Back to the release new sittings start under, straight away and from what
+    // this device already holds — a resumed sitting may have been shown under an
+    // older one. The start screen then asks the study whether anything is newer.
+    if (runtimeRef.current !== activeRuntime.current) showRuntime(activeRuntime.current);
     setPhase({ kind: "start" });
-    if (!preview) {
-      // Stored on the way, so the reload finds it even if the network has gone.
-      void chooseForNewSittings(choiceOptions)
-        .then((next) => {
-          if (next.manifest.hash !== manifest.hash) setVersionDue(true);
-        })
-        .catch(() => undefined);
-    }
-  }, []);
+  }, [effort, showRuntime]);
 
   return (
     <div className="app">
-      {/* In a preview the strip's "Saved ✓" and "everything is saved on this
-          device" would both be untrue, so the banner takes its place. */}
-      {preview ? (
-        <p className="preview-banner" role="status">
-          Preview — nothing is saved
-        </p>
-      ) : (
-        <div className="status-strip" aria-live="polite">
-          <span className={`dot ${online ? "online" : "offline"}`} />
-          <span className="status-text">{online ? "Online" : "Offline — everything is saved on this device"}</span>
-          {savedAt && phase.kind === "running" && <span className="saved">Saved ✓</span>}
-        </div>
-      )}
+      <div className="status-strip" aria-live="polite">
+        <span className={`dot ${online ? "online" : "offline"}`} />
+        <span className="status-text">{online ? "Online" : "Offline — everything is saved on this device"}</span>
+        {savedAt && phase.kind === "running" && <span className="saved">Saved ✓</span>}
+      </div>
 
       {phase.kind === "start" && (
         <StartScreen
@@ -849,8 +877,7 @@ export default function App() {
           contact={contact}
           releaseVersion={manifest.release.version}
           releaseHash={manifest.hash}
-          releaseOrigin={release.origin}
-          releaseNote={release.note}
+          releaseBuiltIn={runtime.source === "built-in"}
           code={code}
           codeError={codeError}
           onCodeChange={setCode}
@@ -862,9 +889,6 @@ export default function App() {
           durability={durability}
           counts={counts}
           onBuildLineTap={() => {
-            // The staff panel exports, syncs and clears this device's sittings.
-            // A preview has none, and must not reach the ones a device holds.
-            if (preview) return;
             handoverTaps.current += 1;
             if (handoverTaps.current >= 5) {
               handoverTaps.current = 0;
@@ -872,7 +896,7 @@ export default function App() {
             }
           }}
         >
-          {handoverOpen && !preview && (
+          {handoverOpen && (
             <HandoverPanel
               counts={counts}
               space={space}
@@ -886,6 +910,21 @@ export default function App() {
               onPassphraseChange={setPassphrase}
               onNote={setHandoverNote}
               onCleared={refreshDeviceStatus}
+              onSittingsErased={async () => {
+                await pruneReleases([runtimeRef.current.hash, activeRuntime.current.hash]);
+              }}
+              releaseNote={
+                `New sittings use release ${manifest.release.version} (${manifest.hash?.slice(7, 19)}), ` +
+                (runtime.source === "built-in"
+                  ? "the version built into this app."
+                  : runtime.source === "live"
+                    ? "downloaded from the study and verified since the app was opened."
+                    : "downloaded from the study earlier and verified on this device.") +
+                " " +
+                (releaseCheck
+                  ? `Last checked ${new Date(releaseCheck.at).toLocaleTimeString()}: ${describeCheck(releaseCheck.outcome)}`
+                  : "Not yet checked for a newer version.")
+              }
               syncNote={syncNote}
               handoverNote={handoverNote}
             />
@@ -920,10 +959,6 @@ export default function App() {
             moduleUrl: __MYSTORY_URL__ || null,
             sessionId: phase.session.sessionId,
             releaseHash: manifest.hash ?? "",
-            // The frozen protocols, sent to the module so it runs exactly
-            // what this version published (D-54).
-            protocols: manifest.narrativeProtocols,
-            preview,
           }}
           onRecord={(u, v) => void record(u, v)}
           onAdvance={(f, k) => void advance(f, k)}

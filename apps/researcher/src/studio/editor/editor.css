@@ -1,0 +1,160 @@
+/*
+ * The editor's frame (DESIGN.md §4): a toolbar, then three columns that each
+ * scroll on their own, filling the window under the Studio header — the
+ * outline (288px) and the inspector (320px) on the near-white side surface,
+ * the survey itself on white in the middle. The outline and the inspector
+ * stay put while a long question is edited, and the middle stays put while a
+ * 150-question outline is scrolled — which is what makes a long survey
+ * workable.
+ *
+ * Panel-specific styles live beside the panels (outline.css, node.css and so
+ * on); this file only lays out the frame.
+ */
+
+.ste-state {
+  padding: 32px 24px;
+  max-width: 760px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.ste-workspace {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--st-bg);
+}
+
+.ste-columns {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: var(--st-left, 288px) minmax(0, 1fr) var(--st-right, 320px);
+}
+
+.ste-left,
+.ste-centre,
+.ste-right {
+  /* Positioned, so absolutely placed text inside (visually hidden labels, at
+     their static place deep in a long form) is held by the column that
+     scrolls it, rather than stretching the page past the window. */
+  position: relative;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.ste-left {
+  background: var(--st-bg-subtle);
+  border-right: 1px solid var(--st-border);
+  /* A tooltip near the edge must never make the outline scroll sideways.
+     No scroll-padding to clear the sticky search header: the header is inside
+     this scroller, so focusing its own controls would scroll the list. The
+     outline keeps rows clear of it by hand (Outline.tsx `revealRow`). */
+  overflow-x: hidden;
+}
+.ste-right {
+  background: var(--st-bg-subtle);
+  border-left: 1px solid var(--st-border);
+}
+.ste-centre {
+  background: var(--st-bg);
+  padding: 40px clamp(16px, 3vw, 40px) 96px;
+}
+
+/* Narrower windows: the inspector moves under the editor (each still scrolls
+   on its own), then everything stacks. Placed explicitly: an item given only
+   a column is placed before the auto-placed ones, which put the inspector
+   above the editor. */
+@media (max-width: 1180px) {
+  .ste-columns {
+    grid-template-columns: var(--st-left, 288px) minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) minmax(160px, 40%);
+  }
+  .ste-left {
+    grid-column: 1;
+    grid-row: 1 / span 2;
+  }
+  .ste-centre {
+    grid-column: 2;
+    grid-row: 1;
+  }
+  .ste-right {
+    grid-column: 2;
+    grid-row: 2;
+    border-left: 0;
+    border-top: 1px solid var(--st-border);
+  }
+}
+/* Only a phone folds the outline away (EditorPage.tsx `Columns`). */
+.ste-outline-toggle {
+  display: none;
+}
+@media (max-width: 760px) {
+  .stp-app:has(> .stp-main-wide) {
+    height: auto;
+  }
+  /* The page grows with what is on it. Held to the window's height, the
+     workspace ended a window down while the question ran on past it, and the
+     toolbar, sticky only within the workspace, scrolled away with it. */
+  .stp-app:has(> .stp-main-wide) > .stp-main-wide:has(> .ste-workspace),
+  .ste-workspace {
+    flex: none;
+  }
+  .ste-columns {
+    display: block;
+  }
+  .ste-left,
+  .ste-centre,
+  .ste-right {
+    overflow: visible;
+    border: 0;
+  }
+  .ste-outline-toggle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    height: 44px;
+    padding: 0 16px;
+    border: 0;
+    border-bottom: 1px solid var(--st-border);
+    background: var(--st-bg-subtle);
+    color: var(--st-text);
+    font: inherit;
+    font-size: 13px;
+    font-weight: 500;
+    text-align: left;
+    cursor: pointer;
+  }
+  .ste-outline-toggle > .st-icon {
+    color: var(--st-text-tertiary);
+  }
+  .ste-outline-toggle > .st-icon:last-child {
+    margin-left: auto;
+  }
+  .ste-outline-toggle[aria-expanded="true"] > .st-icon:last-child {
+    transform: rotate(180deg);
+  }
+  .ste-columns:not(.is-outline-open) > .ste-left {
+    display: none;
+  }
+  /* Open, it scrolls on its own, so the list never pushes the editor a
+     hundred rows down the page. */
+  .ste-columns.is-outline-open > .ste-left {
+    max-height: 60vh;
+    overflow-y: auto;
+    border-bottom: 1px solid var(--st-border);
+  }
+  .ste-centre {
+    padding: 24px 16px 48px;
+  }
+  .ste-right {
+    border-top: 1px solid var(--st-border);
+  }
+}
+
+.ste-placeholder {
+  padding: 16px;
+  color: var(--st-text-secondary);
+}
