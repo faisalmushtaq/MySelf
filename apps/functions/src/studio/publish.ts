@@ -9,6 +9,7 @@ import {
   diffDrafts,
   manifestIndex,
   parseDraft,
+  publishedProtocols,
   publishedScaleCodes,
   reservedFrom,
   suggestBump,
@@ -129,6 +130,7 @@ export function placeOfIssue(issue: Issue, draft?: StudioDraft): string | null {
     const name = (draft?.instruments[at.refKey] as { name?: unknown } | undefined)?.name;
     return `block “${typeof name === "string" && name ? name : at.refKey}”`;
   }
+  if (at.kind === "mystory") return "MyStory";
   if (at.sectionKey) {
     const title = draft?.composition.sections.find((s) => s.key === at.sectionKey)?.title;
     return title ? `section “${title}”` : `section ${at.sectionKey}`;
@@ -197,8 +199,8 @@ export async function publish(db: Firestore, args: PublishArgs): Promise<Publish
     }
 
     // The same validation the editor runs, with the same context — the live
-    // version as the baseline, every ID and code ever published — plus the
-    // checks only the server can be trusted with.
+    // version as the baseline, every ID, code and MyStory protocol ever
+    // published — plus the checks only the server can be trusted with.
     const baseline = activeRelease ? draftOf(activeRelease) : null;
     const versions = [...state.versions.values()];
     const published = [...releases.values()].map((r) => r.raw);
@@ -209,6 +211,9 @@ export async function publish(db: Firestore, args: PublishArgs): Promise<Publish
         reserved: reservedFrom(versions),
         baseline: baseline ?? lockBaseline(origin ? draftOf(origin) : null, draft),
         publishedScaleCodes: publishedScaleCodes(published),
+        // A survey copied from another's version may republish the protocol
+        // that version froze, exactly as it froze it.
+        publishedProtocols: publishedProtocols(origin ? [origin.raw, ...published] : published),
       }),
     ];
     if (issues.some((i) => i.severity === "error")) throw refuse.invalid(describeRefusedDraft(issues, draft), issues);

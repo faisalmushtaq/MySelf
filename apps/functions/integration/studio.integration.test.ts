@@ -3,6 +3,7 @@ import { FieldValue, getFirestore, Timestamp, type CollectionReference, type Fir
 import { HttpsError } from "firebase-functions/v2/https";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { paths } from "@myself/firebase";
+import { phoneWellbeing, type NarrativeProtocol } from "@myself/narrative";
 import { hashHex, verifyRawManifestHash } from "@myself/schema";
 import {
   addQuestion,
@@ -13,6 +14,7 @@ import {
   manifestIndex,
   parseDraft,
   serialiseDraft,
+  setMyStory,
   unlockModule,
   updateScreen,
   type AuditDoc,
@@ -452,6 +454,67 @@ describe("publishing", () => {
 });
 
 // ── Going back ──────────────────────────────────────────────────────────────
+
+describe("publishing with MyStory (docs/16 §10.1)", () => {
+  // A built-in protocol as a team would field it: approved, which changes it, so a new version.
+  const approved: NarrativeProtocol = { ...phoneWellbeing, approvalStatus: "approved", version: "0.1.1" };
+  const id = `${approved.key}@${approved.version}`;
+
+  it("freezes MyStory last with its protocol, on engine 0.4.0, as a MAJOR version that says so", async () => {
+    await setUp();
+    const edited = setMyStory((await currentDraft()).draft, approved).draft;
+    const revision = await save(edited);
+    const result = await publishAs(revision, "9.0.0", "Adds MyStory at the end.");
+
+    const stored = await data<PublicReleaseDoc>(ref.release(result.hash));
+    const raw = JSON.parse(stored.manifest) as {
+      release: { engineVersion: string };
+      composition: { sections: { key: string; components: unknown[] }[] };
+      narrativeProtocols: Record<string, unknown>;
+      modelConfigs: Record<string, unknown>;
+    };
+    expect(await verifyRawManifestHash(raw)).toBe(true);
+    expect(stored.engineVersion).toBe("0.4.0");
+    expect(raw.composition.sections.at(-1)).toMatchObject({ key: "mystory", components: [{ kind: "narrative", protocol: approved.key, protocolVersion: "0.1.1" }] });
+    expect(raw.narrativeProtocols[id]).toEqual(edited.narrativeProtocols![id]);
+    expect(Object.keys(raw.modelConfigs)).toEqual(approved.models.map((m) => m.key));
+    // Opened again, it is the draft that was published, protocol and all.
+    expect(diffDrafts(extractDraft(raw), edited).entries).toEqual([]);
+
+    const version = await data<VersionDoc>(ref.version("9.0.0"));
+    expect(version.bump).toBe("major");
+    expect(version.changeSummary?.entries.map((e) => [e.kind, e.message])).toEqual([["mystory.added", `MyStory added (${id}).`]]);
+    expect(await data<PublishedPointerDoc>(ref.pointer())).toMatchObject({ hash: result.hash, engineVersion: "0.4.0" });
+  });
+
+  it("refuses a protocol edited under a key@version already published, writing nothing; switching it off is MAJOR", async () => {
+    await setUp();
+    await publishAs(await save(setMyStory((await currentDraft()).draft, approved).draft), "9.0.0", "Adds MyStory.");
+
+    const reworded = structuredClone((await currentDraft()).draft);
+    reworded.narrativeProtocols![id]!.name = "Phones and wellbeing, reworded";
+    const rewordedAt = await save(reworded);
+    const error = await refusedCleanly(() => publishAs(rewordedAt, "10.0.0", "Rewords MyStory."));
+    expect(error.details).toMatchObject({ kind: "invalid" });
+    expect((error.details as { issues: { code: string }[] }).issues.map((i) => i.code)).toContain("mystory.version_published");
+    expect(error.message).toBe(`This draft can't be published: ${id} was published with different content (MyStory)`);
+
+    const off = setMyStory((await currentDraft()).draft, null).draft;
+    await publishAs(await save(off), "10.0.0", "Takes MyStory out.");
+    const version = await data<VersionDoc>(ref.version("10.0.0"));
+    expect(version.bump).toBe("major");
+    expect(version.changeSummary?.entries.map((e) => e.message)).toEqual([`MyStory removed (${id}).`]);
+    expect(version.engineVersion).not.toBe("0.4.0");
+  });
+
+  it("refuses a protocol not yet approved, writing nothing", async () => {
+    await setUp();
+    const revision = await save(setMyStory((await currentDraft()).draft, phoneWellbeing).draft);
+    const error = await refusedCleanly(() => publishAs(revision, "9.0.0", "Tries MyStory."));
+    const codes = (error.details as { issues: { code: string }[] }).issues.map((i) => i.code);
+    expect(codes).toEqual(expect.arrayContaining(["mystory.not_approved", "gate.narrative"]));
+  });
+});
 
 describe("making an earlier version live again", () => {
   it("repoints the live pointer, moves the generation on, and records why", async () => {

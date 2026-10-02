@@ -6,13 +6,14 @@ import { onRequest } from "firebase-functions/v2/https";
 import { Gateway, OpenAiAdapter, type ModelCall } from "@myself/llm";
 import { paths } from "@myself/firebase";
 import { STUDY, auth, research } from "./apps.js";
+import { resolveRelease } from "./releases.js";
 import {
   ALLOWED_ORIGIN,
   CALLS_PER_CALLER_PER_DAY,
   linkRefusal,
   type LinkRecord,
   RelayError,
-  configFor,
+  configForCall,
   mayCall,
   relayRequest,
   type Caller,
@@ -28,8 +29,10 @@ import {
  *
  * That is not the only thing being held server-side. THE CALLER SENDS A MODEL
  * CONFIG KEY, NOT MODEL PARAMETERS. The provider, the model, the temperature
- * and the token ceiling are read from the frozen release manifest, which is
- * bundled into this function. A tampered page cannot raise the temperature,
+ * and the token ceiling are read from the frozen release manifest: bundled into
+ * this function, or — for a version published from the Studio, which the
+ * caller names by hash — read from the release store and verified. A tampered
+ * page cannot raise the temperature,
  * point the study at a different model, or ask for ten thousand tokens — and a
  * study's published parameters remain the parameters it actually ran on, which
  * is the whole reason for freezing them.
@@ -379,9 +382,16 @@ export const llmRelay = onRequest(
       if (!parsed.success) {
         throw new RelayError(400, "unknown", `that is not a request this relay understands: ${parsed.error.message}`);
       }
-      const { prompt, modelConfigKey, protocolKey, schema } = parsed.data;
+      const { prompt, modelConfigKey, protocolKey, schema, releaseHash } = parsed.data;
 
-      const config = configFor(modelConfigKey, caller);
+      // From the release the sitting is running, when it says which: exactly
+      // what that version froze, Studio-published ones included (docs/16 §10.1).
+      const config = await configForCall(
+        modelConfigKey,
+        caller,
+        releaseHash,
+        async (hash) => (await resolveRelease(research(), STUDY, hash))?.manifest ?? null,
+      );
       if (config.provider !== "openai") {
         throw new RelayError(400, "unknown", `this relay serves OpenAI; '${modelConfigKey}' asks for ${config.provider}`);
       }

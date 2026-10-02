@@ -69,6 +69,12 @@ const linkKey = new URL(window.location.href).searchParams.get("k");
 const embedded = new URL(window.location.href).searchParams.get("embed") === "1";
 const hostSessionId = new URL(window.location.href).searchParams.get("sessionId");
 const hostReleaseHash = new URL(window.location.href).searchParams.get("releaseHash");
+/**
+ * The same hash, sent with every model call, so the relay runs the settings
+ * that release froze — a version published from the Studio is in no bundle the
+ * relay carries (docs/16 §10.1). Nothing when the lab is used on its own.
+ */
+const relayRelease = hostReleaseHash ? { releaseHash: hostReleaseHash } : {};
 
 /**
  * The protocol itself, sent by the survey (see host-protocol.ts).
@@ -2568,7 +2574,7 @@ async function restore(): Promise<boolean> {
 
   const calls: ModelCall[] = [...saved.calls];
   const gateway = new Gateway({
-    adapters: [new RelayAdapter({ url: relayUrl, ...(linkKey ? { linkKey } : { token: token! }) })],
+    adapters: [new RelayAdapter({ url: relayUrl, ...(linkKey ? { linkKey } : { token: token! }), ...relayRelease })],
     onCall: (call) => {
       const at = calls.findIndex((c) => c.callId === call.callId);
       if (at >= 0) calls[at] = call;
@@ -2848,7 +2854,7 @@ $("start").addEventListener("click", () => {
 
     localCalls = [];
     const gateway = new Gateway({
-      adapters: [new RelayAdapter({ url: relay, ...(linkKey ? { linkKey } : { token: token! }) })],
+      adapters: [new RelayAdapter({ url: relay, ...(linkKey ? { linkKey } : { token: token! }), ...relayRelease })],
       onCall: (call) => {
         const at = localCalls.findIndex((c) => c.callId === call.callId);
         if (at >= 0) localCalls[at] = call;
