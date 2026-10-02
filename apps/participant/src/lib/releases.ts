@@ -52,12 +52,14 @@ import { STREET_LISTS } from "./streets.js";
 /**
  * The renderer capabilities this build has (D-49): 0.1.0 is every release to
  * r7.1.0, 0.2.0 adds placements that show a subset of a form's questions, which
- * `flattenManifest` follows. Declared here rather than imported from
+ * `flattenManifest` follows. 0.4.0 is MyStory run from the protocol frozen into
+ * the release, which this build sends the module (lib/narrative.ts, docs/16
+ * §10.1). Declared here rather than imported from
  * `@myself/release/gate` because this is a statement about THIS build — a test
  * holds the two lists equal, so the gate can never stamp a version the app
  * does not know.
  */
-export const SUPPORTED_ENGINE_VERSIONS = ["0.1.0", "0.2.0", "0.3.0"] as const;
+export const SUPPORTED_ENGINE_VERSIONS = ["0.1.0", "0.2.0", "0.3.0", "0.4.0"] as const;
 
 /**
  * Where a release came from:

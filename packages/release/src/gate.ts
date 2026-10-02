@@ -18,6 +18,7 @@ import {
   INTERVIEWER_SYSTEM,
   keyQuestions,
   keysString,
+  narrativeProtocol,
   numberedQuestions,
   oneShot,
   SCENARIO_SYSTEM,
@@ -81,16 +82,21 @@ export class PublishGateError extends Error {
  * adds what D-53 needs: a street search beside the postcode check, numbered
  * rows with bands, consent that moves on by itself, an "I understand" label on
  * an information screen, and a confirmation for a number above a threshold.
+ * 0.4.0 adds MyStory run from the protocol frozen into the release: the survey
+ * sends the module that exact protocol (docs/16 §10.1). A build before it would
+ * open the module with only a protocol key, and the module would run its own
+ * bundled copy of that protocol — or nothing, for one edited in the Studio.
  * The participant app refuses a release that needs more than it can render and
  * keeps running the one it has, so a feature can never reach a device that
  * would show it as a blank screen.
  */
-export const ENGINE_VERSIONS = ["0.1.0", "0.2.0", "0.3.0"] as const;
+export const ENGINE_VERSIONS = ["0.1.0", "0.2.0", "0.3.0", "0.4.0"] as const;
 
 export function requiredEngineVersion(
   composition: { sections: { components: { kind: string; items?: unknown }[] }[] },
   registries?: { instruments?: unknown; modules?: unknown; assets?: Record<string, unknown> },
 ): string {
+  if (composition.sections.some((s) => s.components.some((c) => c.kind === "narrative"))) return "0.4.0";
   const usesSubsets = composition.sections.some((s) =>
     s.components.some((c) => (c.kind === "instrument" || c.kind === "module") && Array.isArray(c.items)),
   );
@@ -428,15 +434,30 @@ export function freezeRelease(
   for (const section of draft.sections) {
     for (const component of section.components) {
       if (component.kind === "narrative") {
-        const protocol = protocolRegistry.find(
+        const supplied = protocolRegistry.find(
           (p) => p.key === component.protocol && p.version === component.protocolVersion,
         );
-        if (!protocol) {
+        if (!supplied) {
           failures.push(
             `unresolved narrative protocol '${component.protocol}@${component.protocolVersion}' in section '${section.key}'`,
           );
           continue;
         }
+        // Checked against the schema first, and frozen as the schema reads it.
+        // A protocol edited in the Studio arrives as data, not as one of the
+        // module's own constants, and a malformed one must be a refusal here —
+        // not an exception from deep inside the checks below. The module parses
+        // what it is sent with the same schema, so the release holds exactly
+        // what will run, every default spelled out.
+        const parsed = narrativeProtocol.safeParse(supplied);
+        if (!parsed.success) {
+          const issue = parsed.error.issues[0];
+          failures.push(
+            `narrative protocol '${component.protocol}@${component.protocolVersion}' does not match the protocol format (${issue?.path.join(".") || "protocol"}: ${issue?.message ?? "invalid"})`,
+          );
+          continue;
+        }
+        const protocol = parsed.data;
         // The protocol's own publish gate, run here rather than trusted: a
         // release is the last point at which a prompt that leaks a name, or a
         // stage that would show a child a blank screen, can still be stopped.

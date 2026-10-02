@@ -25,9 +25,12 @@ const VERSION = "1.0.0";
 /** r8.0.0 with a MyStory section, the shape Studio publishes when MyStory is switched on. */
 function withMyStory(where: "last" | "middle"): ReleaseManifest {
   const draft = structuredClone(r8) as unknown as {
+    release: { engineVersion: string };
     composition: { sections: unknown[] };
     narrativeProtocols: Record<string, unknown>;
   };
+  // The engine that sends the module the frozen protocol (docs/16 §10.1).
+  draft.release.engineVersion = "0.4.0";
   const section = {
     key: "mystory",
     title: "MyStory",
