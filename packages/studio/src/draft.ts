@@ -38,6 +38,11 @@ export function extractDraft(raw: unknown): StudioDraft {
     unlocked: {},
     notes: {},
     ...(Object.keys(manifest.assets).length > 0 ? { assets: structuredClone(manifest.assets) } : {}),
+    // MyStory's protocol, as the release froze it (docs/16 §10.1), so the
+    // draft republishes exactly what ran rather than whatever the module ships.
+    ...(Object.keys(manifest.narrativeProtocols).length > 0
+      ? { narrativeProtocols: structuredClone(manifest.narrativeProtocols) as NonNullable<StudioDraft["narrativeProtocols"]> }
+      : {}),
   };
 }
 
@@ -64,6 +69,7 @@ export function compileDraft(draft: StudioDraft): { composition: CompositionInpu
       scales: Object.values(draft.scales),
       scoring: Object.values(draft.scoring),
       ...(draft.assets ? { assets: draft.assets } : {}),
+      ...(draft.narrativeProtocols ? { narrativeProtocols: Object.values(draft.narrativeProtocols) } : {}),
     },
   };
 }
@@ -154,6 +160,7 @@ export function parseDraft(json: string): StudioDraft {
     unlocked: d.unlocked ?? {},
     notes: d.notes ?? {},
     ...(d.assets ? { assets: d.assets } : {}),
+    ...(d.narrativeProtocols ? { narrativeProtocols: d.narrativeProtocols } : {}),
   };
 }
 

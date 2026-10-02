@@ -1,3 +1,4 @@
+import { narrativeProtocol, type NarrativeProtocol } from "@myself/narrative";
 import { refKeyOf } from "@myself/release/gate";
 import type { ReservedIds } from "./history.js";
 import { canonicalJson, type ItemDefinition, type LogicExpr } from "@myself/schema";
@@ -14,6 +15,16 @@ import {
   uniqueSlug,
 } from "./keys.js";
 import { toLogic } from "./logic.js";
+import {
+  isMyStorySection,
+  myStoryMisplaced,
+  myStoryOf,
+  MYSTORY_SECTION_KEY,
+  MYSTORY_TITLE,
+  protocolId,
+  protocolProblems,
+  type MyStoryMisplacement,
+} from "./mystory.js";
 import {
   allItemKeys,
   allVariables,
@@ -376,6 +387,28 @@ function keepConsentFirst(before: StudioDraft, after: StudioDraft, action: strin
   );
 }
 
+const MISPLACED: Record<MyStoryMisplacement, string> = {
+  not_last: "MyStory is the last part of the survey, so nothing can come after it. Put it before MyStory instead.",
+  not_alone: "MyStory's section holds only the MyStory conversation. Put it in another section instead.",
+  more_than_one: "A survey has one MyStory, at the end.",
+};
+
+/**
+ * Refuse an edit that would put anything after MyStory, or in its section.
+ *
+ * MyStory always comes last: the survey, then MyStory, then the finish screen,
+ * and only then is the device handed back to the researcher (docs/16 §10.1).
+ * Adding a section at the end, dragging one below MyStory, or moving a question
+ * or block into its section would each break that. As with the consent, only a
+ * change that newly does so is refused, so a draft already in that state can
+ * still be edited back out of it.
+ */
+function keepMyStoryLast(before: StudioDraft, after: StudioDraft, action: string): void {
+  const problem = myStoryMisplaced(after);
+  if (!problem || myStoryMisplaced(before) === problem) return;
+  throw new StudioOpError(`You can't ${action}: ${MISPLACED[problem]}`, "invalid");
+}
+
 /**
  * The tier an archived question's instrument has: its live definition's if the
  * draft still has one, otherwise that of the definition the record carries.
@@ -407,16 +440,22 @@ function archivedUsers(d: StudioDraft, scaleKey: string): ArchivedQuestion[] {
 /**
  * A new, empty section. It has no blocks, so the draft does not validate until
  * a question is added to it — which validation says, in those words.
+ *
+ * At the end means at the end of the questions: when MyStory is on, the new
+ * section goes in just before it, since MyStory always comes last.
  */
 export function addSection(draft: StudioDraft, req: { title: string; index?: number }): { draft: StudioDraft; sectionKey: string } {
   const title = req.title.trim();
   if (!title) throw new StudioOpError("A section needs a title.", "invalid");
   const d = clone(draft);
   const sections = d.composition.sections;
-  const index = req.index ?? sections.length;
+  const story = myStoryOf(d);
+  const end = story && !myStoryMisplaced(d) ? story.sectionIndex : sections.length;
+  const index = req.index ?? end;
   checkIndex(index, sections.length, "for a section");
   const sectionKey = generateSectionKey(title, new Set(sections.map((s) => s.key)));
   sections.splice(index, 0, { key: sectionKey, title, components: [] });
+  keepMyStoryLast(draft, d, "add a section there");
   return { draft: d, sectionKey };
 }
 
@@ -453,6 +492,7 @@ export function moveSection(draft: StudioDraft, sectionKey: string, toIndex: num
   const [section] = sections.splice(from, 1);
   sections.splice(toIndex, 0, section!);
   keepConsentFirst(draft, d, "move this section there");
+  keepMyStoryLast(draft, d, "move this section there");
   return { draft: d };
 }
 
@@ -462,6 +502,9 @@ export function removeSection(draft: StudioDraft, sectionKey: string): { draft: 
   const sections = d.composition.sections;
   const index = sectionIndexOf(d, sectionKey);
   const section = sections[index]!;
+  if (isMyStorySection(section)) {
+    throw new StudioOpError("This is MyStory's section. To take MyStory out of the survey, switch it off instead.", "invalid");
+  }
   if (section.components.length > 0) {
     throw new StudioOpError(
       `“${section.title}” still has questions in it. Move them to another section or archive them first, then remove the section.`,
@@ -499,6 +542,7 @@ export function moveBlock(
   checkIndex(to.index, target.components.length, "in that section");
   target.components.splice(to.index, 0, component);
   keepConsentFirst(draft, d, "move this block there");
+  keepMyStoryLast(draft, d, "move this block there");
   return { draft: d };
 }
 
@@ -650,6 +694,7 @@ export function addQuestion(draft: StudioDraft, req: AddQuestionRequest): { draf
   if (scale) d.scales[scale.key] = scale;
   placeNewItem(d, target.refKey, item, target.component, target.where);
   keepConsentFirst(draft, d, "add a question there");
+  keepMyStoryLast(draft, d, "add a question there");
   return { draft: d, itemKey: `${target.instrument}.${key}` };
 }
 
@@ -1089,6 +1134,7 @@ export function moveQuestion(draft: StudioDraft, itemKey: string, to: { sectionK
     if (source.items) source.items = keys;
     else orderForm(d, q.refKey, keys);
     keepConsentFirst(draft, d, "move this question there");
+    keepMyStoryLast(draft, d, "move this question there");
     return { draft: d };
   }
 
@@ -1110,6 +1156,7 @@ export function moveQuestion(draft: StudioDraft, itemKey: string, to: { sectionK
     comps.splice(at, 0, component);
   }
   keepConsentFirst(draft, d, "move this question there");
+  keepMyStoryLast(draft, d, "move this question there");
   return { draft: d };
 }
 
@@ -1293,6 +1340,7 @@ export function restoreQuestion(
     const keys = !locked && was && !was.wholeForm ? [record.item.key] : null;
     comps.splice(was ? Math.min(was.componentIndex, comps.length) : comps.length, 0, newPlacement(def, null, keys));
     keepConsentFirst(draft, d, "restore this question there");
+    keepMyStoryLast(draft, d, "restore this question there");
     return { draft: d, itemKey, restored: take(records) };
   }
 
@@ -1310,6 +1358,7 @@ export function restoreQuestion(
   }
   // A whole-form placement shows the form in order, so the form position is its position.
   keepConsentFirst(draft, d, "restore this question there");
+  keepMyStoryLast(draft, d, "restore this question there");
   return { draft: d, itemKey, restored: take([record]) };
 }
 
@@ -1719,6 +1768,74 @@ export function updateSettings(draft: StudioDraft, patch: SettingsPatch): { draf
     if (patch.notes === null || !patch.notes.trim()) delete c.notes;
     else c.notes = patch.notes;
   }
+  return { draft: d };
+}
+
+// ---------------------------------------------------------------------------
+// MyStory
+// ---------------------------------------------------------------------------
+
+/**
+ * Switch MyStory on with a protocol, or (null) off (docs/16 §10.1).
+ *
+ * On, MyStory is the survey's last section, holding only the conversation, and
+ * the protocol's whole definition is frozen into the draft by `key@version` —
+ * the definition the release will freeze and the survey will send the module.
+ * Choosing another protocol replaces it; the section keeps its title and stays
+ * last. On also says the conversation needs the network, when nothing says
+ * otherwise yet: its model stages do.
+ *
+ * Off removes MyStory's section, its protocol and that connectivity setting,
+ * which mean nothing without it. Nothing else in the survey moves.
+ *
+ * The protocol must read as one by the schema the module reads it with, and
+ * pass its own checks: one that could not run is never worth putting in a
+ * survey, and refusing it here says why at once. Whether it is approved, and
+ * whether its key and version already name different content, are left to
+ * validation, which knows what has been published: a draft may carry a
+ * protocol still being approved, and the preview shows where it would run.
+ */
+export function setMyStory(draft: StudioDraft, protocol: NarrativeProtocol | null): { draft: StudioDraft } {
+  const d = clone(draft);
+  const c = d.composition;
+  const was = myStoryOf(d);
+  const old = was && isMyStorySection(c.sections[was.sectionIndex]) ? c.sections[was.sectionIndex]! : null;
+
+  // Every conversation comes out, wherever it was; MyStory's own section with it.
+  c.sections = c.sections
+    .filter((s) => !isMyStorySection(s))
+    .map((s) => (s.components.some((x) => x.kind === "narrative") ? { ...s, components: s.components.filter((x) => x.kind !== "narrative") } : s));
+  delete d.narrativeProtocols;
+
+  if (!protocol) {
+    if (c.offline) delete c.offline.narrativeConnectivity;
+    return { draft: d };
+  }
+
+  const parsed = narrativeProtocol.safeParse(protocol);
+  if (!parsed.success) {
+    const issue = parsed.error.issues[0];
+    throw new StudioOpError(
+      `That protocol can't be used: it isn't in the protocol format (${issue?.path.join(".") || "protocol"}: ${issue?.message ?? "invalid"}).`,
+      "invalid",
+    );
+  }
+  const p = parsed.data;
+  const problems = protocolProblems(p);
+  if (problems.length > 0) {
+    const more = problems.length > 1 ? ` There ${problems.length === 2 ? "is 1 more problem" : `are ${problems.length - 1} more problems`} to fix.` : "";
+    throw new StudioOpError(`That protocol can't be used: ${problems[0]}.${more}`, "invalid");
+  }
+
+  const taken = new Set(c.sections.map((s) => s.key));
+  const section: CompositionInput["sections"][number] = {
+    ...(old ? structuredClone(old) : { title: MYSTORY_TITLE }),
+    key: old && !taken.has(old.key) ? old.key : generateSectionKey(MYSTORY_SECTION_KEY, taken),
+    components: [{ kind: "narrative", protocol: p.key, protocolVersion: p.version }],
+  };
+  c.sections.push(section);
+  d.narrativeProtocols = { [protocolId(p)]: p };
+  c.offline = { ...c.offline, surveyOfflineCapable: true, narrativeConnectivity: c.offline?.narrativeConnectivity ?? "online_required" };
   return { draft: d };
 }
 

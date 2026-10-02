@@ -1,3 +1,4 @@
+import type { NarrativeProtocol } from "@myself/narrative";
 import type {
   assessmentDraft,
   instrumentVersion,
@@ -73,6 +74,14 @@ export interface StudioDraft {
    * before releases carried assets.
    */
   assets?: Record<string, { path: string; sha256: string; bytes: number }>;
+  /**
+   * MyStory's protocol, frozen (docs/16 §10.1): its whole definition, keyed
+   * `key@version`, exactly as the release's `narrativeProtocols` will hold it.
+   * The MyStory section names it; publishing freezes it with its prompts and
+   * model settings, and the survey sends the module this very definition. Absent
+   * when the survey has no MyStory, and in drafts saved before it could have one.
+   */
+  narrativeProtocols?: Record<string, NarrativeProtocol>;
 }
 
 export interface ArchivedQuestion {
@@ -139,7 +148,7 @@ export type Severity = "error" | "warning";
 
 /** Where a problem is, precisely enough for the editor to jump to it. */
 export interface IssueLocation {
-  kind: "survey" | "welcome" | "completion" | "section" | "block" | "question" | "option";
+  kind: "survey" | "welcome" | "completion" | "section" | "block" | "question" | "option" | "mystory";
   sectionKey?: string;
   /** `<instrument>.<key>`. */
   itemKey?: string;
@@ -180,7 +189,10 @@ export type ChangeKind =
   | "section.reordered"
   | "welcome.changed"
   | "completion.changed"
-  | "settings.changed";
+  | "settings.changed"
+  | "mystory.added"
+  | "mystory.removed"
+  | "mystory.changed";
 
 export interface ChangeEntry {
   kind: ChangeKind;
