@@ -3,14 +3,18 @@ import {
   collection,
   deleteDoc,
   doc,
+  getDocs,
   limit,
   onSnapshot,
   orderBy,
   query,
   serverTimestamp,
   setDoc,
+  startAfter,
   where,
   type DocumentData,
+  type QueryDocumentSnapshot,
+  type QuerySnapshot,
 } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
 import { paths } from "@myself/firebase";
@@ -89,6 +93,30 @@ export function useAudit(surveyId: string | null, max = 100): Loadable<AuditDoc[
     asAudit,
     "the activity log",
   );
+}
+
+const AUDIT_PAGE = 500;
+
+/**
+ * A survey's whole audit trail, read once (for the provenance download).
+ *
+ * Page by page, newest first, through the same index the Activity tab uses.
+ * Every row is read — the edits as well as the publishes — because the trail
+ * has no other index to filter on, and a download asked for now and then is
+ * worth that rather than a new index to deploy.
+ */
+export async function loadAudit(surveyId: string): Promise<AuditDoc[]> {
+  const fb = studioFirebase();
+  if (!fb) throw new Error(NOT_CONNECTED);
+  const out: AuditDoc[] = [];
+  let after: QueryDocumentSnapshot | null = null;
+  for (;;) {
+    const base = query(collection(fb.db, paths.studioAudit(STUDY)), where("surveyId", "==", surveyId), orderBy("at", "desc"), limit(AUDIT_PAGE));
+    const page: QuerySnapshot = await getDocs(after ? query(base, startAfter(after)) : base);
+    for (const d of page.docs) out.push(asAudit(d.data()));
+    if (page.docs.length < AUDIT_PAGE) return out;
+    after = page.docs[page.docs.length - 1]!;
+  }
 }
 
 /** Admins only (the rules refuse anyone else the list). */
