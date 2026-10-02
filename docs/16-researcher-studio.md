@@ -131,7 +131,8 @@ Each risk below is paired with how the design handles it.
 - **D-39.** Rules are the access control, tested against the emulator. Nobody
   edits a raw log.
 - **D-43.** The MyStory protocol editor still saves to a file. Narrative
-  components are out of Studio scope for now (§8).
+  components were out of Studio scope at first; §10 (2026-10-02) brings
+  MyStory into the Studio as a survey-level setting.
 
 ---
 
@@ -495,8 +496,8 @@ Each row carries: `at` (server time), `actor` (uid), `actorEmail`, `surveyId`,
 
 ## 8. Out of scope for this version (known limitations)
 
-- **Narrative (MyStory) components.** They can't be placed from the Studio
-  (D-43). Existing compositions don't use them.
+- **MyStory anywhere but last.** MyStory is one setting for the whole survey
+  and always comes last (§10). It can't be placed mid-survey or more than once.
 - **Features the renderer doesn't honour.**
   - Presentation: a matrix/grid on one screen, media, randomisation, and
     section transition text.
@@ -547,7 +548,9 @@ The pure model is `packages/studio`, shared by the browser and the functions:
 - `ops`: every editing operation;
 - `validate` and `locked`: validation, the licence locks and protected modules;
 - `diff`: the change summary and version rules;
-- `history`: IDs and variables reserved by earlier versions.
+- `history`: IDs, variables and MyStory protocols reserved by earlier versions;
+- `mystory`: whether MyStory is on, where it is, and reading and checking a
+  protocol file (§10.1).
 
 `packages/release/src/gate.ts` is the publish gate, split from hashing so a browser
 can run it. `packages/schema/src/canonical.ts` is the one hash implementation.
@@ -656,6 +659,17 @@ The deploy workflow runs the rules suite before it deploys the rules.
 - Offline, changes stay in the tab and save when the connection returns. Unsaved
   work also survives a crash in session storage.
 
+**MyStory** (the outline's "MyStory" item, between the last section and the
+completion screen; §10.1):
+- a switch puts MyStory at the end of the survey or takes it out;
+- "Start from" offers the survey's own protocol and the built-in ones;
+- the protocol is shown as its TOML file, editable, and checked on every
+  keystroke. Each problem is said in words. A `key@version` that already
+  names other content offers the next free version;
+- "Use this protocol" freezes it into the draft, as one undo step. The file
+  can also be opened from, and saved to, disk;
+- the title MyStory shows in the progress bar can be changed.
+
 **Validation** (`validateDraft`) runs as you type, with the same context the
 server uses. It checks:
 - text is present;
@@ -667,6 +681,9 @@ server uses. It checks:
 - licensed content is unchanged;
 - protected modules are unlocked before they change;
 - linkage and identity items are intact;
+- MyStory is last, alone in its section, and once; its protocol is carried
+  whole, reads, passes its own checks, is approved, and does not reuse a
+  `key@version` already published or built in with other content;
 - every publish-gate failure is reported.
 
 Errors block publishing and warnings don't. **Go to** jumps to the field.
@@ -676,6 +693,8 @@ Errors block publishing and warnings don't. **Go to** jumps to the field.
   desktop, tablet or phone size.
 - You can restart, start from any question, see why each question is shown or
   hidden, and view the completion and review screens.
+- Where MyStory would start is shown, with its protocol's `key@version`. It
+  is never run: nothing is sent to a model.
 - It uses an in-memory store behind a Content-Security-Policy that blocks the
   network. A build check fails if the preview can reach the participant app's
   storage or upload code.
@@ -713,6 +732,10 @@ From there you can:
 - **Make live again.** This is the emergency rollback. It repoints the live
   survey to an earlier published release, needs a reason, and is audited.
 - **Download** a version's manifest.
+- **Download provenance** (top of the page), as CSV or JSON: every version
+  with its authors, publisher, based-on and restored-from versions, release
+  note, change summary, bumps, MyStory protocol, sitting counts and the
+  periods it was live (§10.2).
 
 The **Activity** tab shows the audit trail. Draft edits are grouped per editor
 per 10 minutes.
@@ -805,11 +828,11 @@ performs this whole loop.
 
 | Command | What it covers |
 |---|---|
-| `pnpm -r test` | Unit tests. The Studio model alone has 268, including the exact round trip of r7.1.0 through the Studio. |
-| `pnpm --filter @myself/functions test:integration` | Publish atomicity, conflicts, concurrent publishes, idempotent retries, rollback, restore, access races (Firestore emulator). |
+| `pnpm -r test` | Unit tests. The Studio model alone has 302, including the exact round trip of r7.1.0 through the Studio and of a version with MyStory. |
+| `pnpm --filter @myself/functions test:integration` | Publish atomicity, conflicts, concurrent publishes, idempotent retries, rollback, restore, access races, and publishing with MyStory (Firestore emulator). |
 | `cd infra/firebase/test && npm test` | The rules (67 tests). |
 | `pnpm test:e2e` | The participant app, including runtime loading, pinning, a tampered release and the database upgrade (15 tests). |
-| `pnpm test:e2e:studio` | The whole Studio loop (§9.8) on the Auth, Firestore and Functions emulators. |
+| `pnpm test:e2e:studio` | The whole Studio loop (§9.8) on the Auth, Firestore and Functions emulators, and a second loop that switches MyStory on, publishes it and downloads the provenance. |
 
 ### 9.11 Decisions for the research team to confirm
 
@@ -826,12 +849,20 @@ performs this whole loop.
    control" reasoning for survey releases.
    - They are downloadable from Versions.
    - Committing them periodically to `releases/` keeps git as a second record.
+6. **MyStory (§10).**
+   - A protocol is fielded only once its file says `approval_status =
+     "approved"`. The Studio trusts whoever sets that: it records who
+     published, not who approved. Every built-in protocol ships as `draft`.
+   - An edited protocol must take a new version; a `key@version` is never
+     reused for different content.
+   - Switching MyStory on or off, or changing its protocol, is a MAJOR version.
+   - The relay runs exactly the model settings the sitting's release froze.
 
 ### 9.12 Known limitations
 
 - **Hidden settings.** The following aren't supported by the participant app, so
   the Studio doesn't offer them:
-  - narrative (MyStory) components;
+  - MyStory anywhere but at the end, or more than once;
   - a Likert grid on one screen;
   - minimum selections or characters;
   - media;
@@ -855,10 +886,20 @@ performs this whole loop.
   compared with a published version. Both are MAJOR, so this affects only the
   wording.
 - **WebKit** runs in CI only.
+- **MyStory in the preview.** The preview shows where MyStory starts but never
+  runs it. Try a protocol in the MyStory lab, or on a test device against a
+  published version.
+- **Two protocols can't be edited as files.** `np.micro_narrative` and
+  `np.future_self` have stages the TOML format can't express. They can be
+  chosen, but only as they are.
+- **Provenance.** Live periods come from the audit trail, so periods before
+  the Studio existed are not listed. Each download reads the survey's whole
+  audit trail, edits included, because the trail has no other index; this is
+  fine at the current scale.
 
 ---
 
-## 10. MyStory and version provenance (design, 2026-10-02)
+## 10. MyStory and version provenance (built 2026-10-02)
 
 The research team asked for two more things. In their words: MyStory should
 be "added on or not to the survey (sometimes we want it on and other times
@@ -867,9 +908,10 @@ always come afterwards — just that the hand back to researcher would be
 completed AFTER that completion part." And: "We want provenance of survey
 versions to be able to easily extract."
 
-This section is the design, written before the change is built. It
-supersedes the part of D-43 that kept narrative components out of the Studio
-(§3, §8). The protocol editor in the researcher view still saves to a file.
+This section was written as the design before the change was built, and
+then kept to what was built (§10.3 says where). It supersedes the part of
+D-43 that kept narrative components out of the Studio (§3, §8). The protocol
+editor in the researcher view still saves to a file.
 
 ### 10.1 MyStory in a draft and in a release
 
@@ -899,8 +941,11 @@ section and the completion screen):
 - See and edit it as TOML: the same file the MyStory lab and the protocol
   editor read and write (docs/08 §10.6).
 - It is checked on every keystroke with the protocol schema, `checkProtocol`
-  and the approval rule, and each problem is said in words.
-- "Use this protocol" freezes it into the draft, as one undo step.
+  and the approval rule, and each problem is said in words. A protocol not
+  yet approved can be used in the draft and previewed; publishing refuses it.
+- "Use this protocol" freezes it into the draft, as one undo step. The file
+  can be opened from, and saved to, disk.
+- The title MyStory shows in the progress bar can be changed.
 - `np.micro_narrative` and `np.future_self` have stages the file format
   cannot express. They are offered as they are, not as TOML.
 
@@ -921,7 +966,8 @@ section and the completion screen):
   that setting.
 - Every operation that adds or moves a section, block or question keeps
   MyStory last. A new section goes in before it. A change that would put
-  anything after it, or in it, is refused with a reason.
+  anything after it, or in it, is refused with a reason. Its section is
+  removed only by switching MyStory off.
 - Validation reports a draft where MyStory is not last, holds anything else,
   or appears twice. The server runs the same validation.
 
@@ -933,8 +979,9 @@ frozen one.
 
 **Version number.** Switching MyStory on or off, or changing its protocol,
 is participant-visible, so it is MAJOR. The change summary says so plainly:
-"MyStory added (np.phone_wellbeing@0.1.1)", "MyStory removed (…)", "MyStory
-protocol changed from … to …".
+"MyStory added (np.phone_wellbeing@0.1.1).", "MyStory removed (…)." or
+"MyStory protocol changed from A to B." The connectivity setting that comes
+with it is not listed separately.
 
 **Preview.** The preview shows where MyStory would start. It never runs it:
 nothing is sent to a model and nothing is saved.
@@ -943,14 +990,17 @@ nothing is sent to a model and nothing is saved.
 - The module now sends the sitting's release hash with each call.
 - The relay resolves that hash the way every reader does (`resolveRelease`:
   bundled, else the release store with the hash re-verified).
-- It runs exactly the config that release froze. A device naming a release
-  the study never published, or a config the release did not freeze, is
-  refused.
-- A call with no hash is treated as before.
+- It runs exactly the config that release froze, whoever is calling. A
+  release the study never published, or a config the release did not freeze,
+  is refused.
+- A release store that can't be read is a refusal the module may retry,
+  never a fall-back to some other release's settings.
+- A call with no hash (the MyStory lab on its own) is treated as before.
 
 **What changes on the survey side.** The release format does not change.
 There is a new engine version (`0.4.0`), the relay reads Studio-published
-releases, and the module sends the release hash to the relay.
+releases, and the module sends the release hash to the relay (the relay
+adapter in `@myself/llm` carries it).
 
 ### 10.2 Version provenance export
 
@@ -974,7 +1024,24 @@ releases, and the module sends the release hash to the relay.
 **Nothing new is stored.** It reads what the Studio already keeps: the version
 records, their releases, the audit trail and the sitting counts. It is read in
 the browser under the existing rules, which already let any Studio member read
-all four. There is no new collection and no new function.
+all four. There is no new collection, function, rule or index: the survey's
+whole audit trail is read page by page through the index the Activity tab
+uses.
+
+**The files.**
+- CSV columns: `version`, `release_key`, `hash`, `engine_version`, `status`,
+  `source`, `authors`, `publisher`, `published_at`, `based_on`,
+  `restored_from`, `release_note`, `change_summary`, `required_bump`,
+  `chosen_bump`, `mystory`, `mystory_protocol`, `sittings_complete`,
+  `sittings_partial`, `live_periods`.
+- Times are ISO 8601 (UTC). Authors are separated by `; `, change-summary
+  lines by ` | `, and live periods by `; `, each written as "from to to
+  (how)", with "now" for the one still live.
+- A column left empty is one that could not be read (a release that would not
+  load, sittings that could not be counted), never a guess.
+- JSON: `{ format: "myself-studio-provenance", formatVersion: 1, study,
+  surveyId, title, exportedAt, live, notes, versions }`, with the same rows
+  and each live period as `{ from, to, how, by }`.
 
 **Safe to open in a spreadsheet.** A cell that starts with `=`, `+`, `-`, `@`,
 a tab or a carriage return is prefixed with `'`, so it is shown, not run.
@@ -986,3 +1053,16 @@ and names are the research team's own.
 **Live periods come from the audit trail.** A version published before the
 Studio existed was live before the trail began, so its earlier periods are not
 in it.
+
+### 10.3 Where it is
+
+| What | Where |
+|---|---|
+| MyStory in the model: placement, protocol files, `setMyStory`, validation, diff | `packages/studio/src/{mystory,ops,validate,diff,draft,history,model}.ts`, tests in `mystory.test.ts` |
+| The gate: engine `0.4.0`, the protocol parsed before it is checked and frozen | `packages/release/src/gate.ts` |
+| The editor's MyStory item and its checks | `apps/researcher/src/studio/editor/node/MyStoryEditor.tsx`, `mystory.ts` |
+| The preview | `apps/researcher/src/studio/preview/runner.tsx` (`narrative.preview`) |
+| Publishing with the published protocols | `apps/functions/src/studio/publish.ts` |
+| The relay | `apps/functions/src/relay-policy.ts` (`configForCall`), `relay.ts`; `packages/llm/src/adapters/relay.ts`; `apps/mystory-lab/web/main.ts` |
+| The participant app | `apps/participant/src/lib/narrative.ts`, `components/NarrativeStep.tsx`, `SurveyScreen.tsx`, `lib/releases.ts` |
+| Provenance | `apps/researcher/src/studio/data/provenance.ts`, `screens/Versions.tsx` |
