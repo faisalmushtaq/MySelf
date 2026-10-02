@@ -34,6 +34,12 @@ export function Overview() {
   const go = (selection: Selection) => ctx.select(selection);
   const shortcuts: { icon: IconName; label: string; hint: string; selection: Selection }[] = [
     { icon: "welcome", label: "Start screen", hint: "The participant code and who to contact", selection: { kind: "welcome" } },
+    {
+      icon: "story",
+      label: "MyStory",
+      hint: o.mystory ? `On, at the end: ${o.mystory.id}` : "Off. A conversation at the end of the survey",
+      selection: { kind: "mystory" },
+    },
     { icon: "flag", label: "Completion screens", hint: "The thank-you and the review screen", selection: { kind: "completion" } },
     { icon: "settings", label: "Survey settings", hint: "Title and going back", selection: { kind: "settings" } },
   ];

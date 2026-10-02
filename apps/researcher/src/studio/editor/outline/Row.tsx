@@ -119,6 +119,8 @@ function rowIcon(node: TreeNode): IconName {
       return "welcome";
     case "completion":
       return "flag";
+    case "mystory":
+      return "story";
     case "settings":
       return "settings";
     case "section":

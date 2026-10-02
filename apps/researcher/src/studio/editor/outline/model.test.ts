@@ -26,16 +26,19 @@ const tree = (opts: Partial<TreeOptions> = {}) => buildTree(o, index, { ...base,
 const questionIds = (t: ReturnType<typeof tree>) => t.visible.filter((n) => n.kind === "question").map((n) => n.id);
 
 describe("the outline of the live survey", () => {
-  it("lists the start screen, every section, add rows, the completion screen and settings, in order", () => {
+  it("lists the start screen, every section, add rows, MyStory, the completion screen and settings, in order", () => {
     const t = tree();
     expect(t.roots.map((n) => n.id)).toEqual([
       "welcome",
       ...o.sections.map((s) => `section:${s.key}`),
       "add-section",
+      "mystory",
       "completion",
       "settings",
     ]);
     expect(t.filtering).toBe(false);
+    // Off, it is listed as the place to switch it on.
+    expect(t.byId.get("mystory")!.label).toBe("MyStory (off)");
   });
 
   it("shows licensed and protected blocks as labelled, folded groups, and study modules as plain questions", () => {

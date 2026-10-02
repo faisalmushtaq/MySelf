@@ -21,7 +21,7 @@ import { toMillis } from "../format.js";
 import { usePlaygroundMode } from "../mode.js";
 import { toStudioCallError } from "./errors.js";
 import { NOT_CONNECTED, useLiveDoc, useLiveQuery } from "./live.js";
-import { publishedScaleCodes, reservedFrom } from "./model-adapter.js";
+import { publishedProtocols, publishedScaleCodes, reservedFrom } from "./model-adapter.js";
 import { useRelease, useReleases, type LoadedRelease } from "./releases.js";
 import { onBeforeSignOut, ruleEmail, useStudioSession } from "./session.js";
 import type {
@@ -289,6 +289,7 @@ export function buildPublishedContext(
     reserved: reservedFrom([...versions]),
     publishedItemKeys,
     publishedScaleCodes: publishedScaleCodes(manifests),
+    publishedProtocols: publishedProtocols(manifests),
   };
 }
 

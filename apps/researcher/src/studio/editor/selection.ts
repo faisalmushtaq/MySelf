@@ -15,6 +15,7 @@ export type Selection =
   | { kind: "welcome" }
   | { kind: "completion" }
   | { kind: "settings" }
+  | { kind: "mystory" }
   | { kind: "section"; sectionKey: string }
   | { kind: "block"; sectionKey: string; componentIndex: number }
   | { kind: "question"; itemKey: string };
@@ -25,6 +26,7 @@ export function encodeSelection(selection: Selection | null): string | null {
     case "welcome":
     case "completion":
     case "settings":
+    case "mystory":
       return selection.kind;
     case "section":
       return `section:${selection.sectionKey}`;
@@ -37,7 +39,7 @@ export function encodeSelection(selection: Selection | null): string | null {
 
 export function decodeSelection(q: string | null | undefined): Selection | null {
   if (!q) return null;
-  if (q === "welcome" || q === "completion" || q === "settings") return { kind: q };
+  if (q === "welcome" || q === "completion" || q === "settings" || q === "mystory") return { kind: q };
   if (q.startsWith("section:")) {
     const sectionKey = q.slice("section:".length);
     return sectionKey ? { kind: "section", sectionKey } : null;

@@ -19,6 +19,10 @@ import type { Selection } from "../selection.js";
  */
 export function selectionFor(issue: Issue, outline?: Outline): Selection {
   const at = issue.location;
+  // MyStory's own section is edited as MyStory.
+  if (at.sectionKey && outline?.mystory?.sectionKey === at.sectionKey && at.kind !== "question" && at.kind !== "option") {
+    return { kind: "mystory" };
+  }
   switch (at.kind) {
     case "question":
     case "option":
@@ -35,6 +39,8 @@ export function selectionFor(issue: Issue, outline?: Outline): Selection {
       return { kind: "welcome" };
     case "completion":
       return { kind: "completion" };
+    case "mystory":
+      return { kind: "mystory" };
     case "survey":
       return { kind: "settings" };
   }
@@ -114,6 +120,10 @@ export function groupIssues(issues: readonly Issue[], outline: Outline, before?:
         context: null,
         order: end - 1,
       };
+    }
+    // MyStory and its own section, just before the completion screen: where a participant meets it.
+    if (at.kind === "mystory" || (at.sectionKey !== undefined && at.sectionKey === outline.mystory?.sectionKey)) {
+      return { id: "mystory", label: "MyStory", context: null, order: end - 0.5 };
     }
     if (at.kind === "block" && at.sectionKey && at.refKey) {
       const b = blockPlace.get(`${at.sectionKey}\u0000${at.refKey}`);

@@ -1,4 +1,4 @@
-import { findQuestion } from "@myself/studio";
+import { findQuestion, isMyStorySection } from "@myself/studio";
 import { useEditor } from "./context.js";
 import { BlockInspector } from "./inspector/BlockInspector.js";
 import { QuestionInspector } from "./inspector/QuestionInspector.js";
@@ -26,10 +26,13 @@ export function Inspector() {
       return <SurveyFacts tip="Participants reach the completion screens once every question they are shown has been answered or skipped." />;
     case "settings":
       return <SurveyFacts />;
-    case "section":
-      return draft.composition.sections.some((s) => s.key === selection.sectionKey) ? (
-        <SectionInspector key={selection.sectionKey} sectionKey={selection.sectionKey} />
-      ) : null;
+    case "mystory":
+      return <SurveyFacts tip={MYSTORY_TIP} />;
+    case "section": {
+      const section = draft.composition.sections.find((s) => s.key === selection.sectionKey);
+      if (section && isMyStorySection(section)) return <SurveyFacts tip={MYSTORY_TIP} />;
+      return section ? <SectionInspector key={selection.sectionKey} sectionKey={selection.sectionKey} /> : null;
+    }
     case "block":
       return findBlock(draft, selection) ? (
         <BlockInspector key={`${selection.sectionKey}:${selection.componentIndex}`} sectionKey={selection.sectionKey} componentIndex={selection.componentIndex} />
@@ -38,6 +41,9 @@ export function Inspector() {
       return <QuestionPanel itemKey={selection.itemKey} />;
   }
 }
+
+const MYSTORY_TIP =
+  "MyStory always comes last, so the finish screen and the hand-back to the researcher come after it. The preview shows where it would start, and never runs it.";
 
 function QuestionPanel({ itemKey }: { itemKey: string }) {
   const { draft } = useEditor();

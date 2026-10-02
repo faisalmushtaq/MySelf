@@ -62,6 +62,7 @@ function validationContext(published: PublishedContext | null): ValidationContex
     reserved: published.reserved,
     ...(published.baseline ? { baseline: published.baseline } : {}),
     publishedScaleCodes: published.publishedScaleCodes,
+    publishedProtocols: published.publishedProtocols,
   };
 }
 

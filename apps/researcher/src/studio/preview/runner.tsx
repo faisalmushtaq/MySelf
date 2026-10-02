@@ -339,10 +339,10 @@ export function PreviewRunner({ release, startAt, jump, accessibility, onAccessi
           sessionStart={sessionStart.current}
           effort={effort}
           context={flattened.context.get(phase.index)}
-          // No module URL: a narrative position says, as it does on a device
-          // with no module configured, that this part is not available — and
-          // never opens a conversation, which would be a real run.
-          narrative={{ moduleUrl: null, sessionId: "studio-preview", releaseHash: "" }}
+          // A preview: MyStory's place is shown, with the protocol it would
+          // run, and the conversation is never opened — that would be a real
+          // run, with model calls on the study's account (docs/16 §10.1).
+          narrative={{ moduleUrl: null, sessionId: "studio-preview", releaseHash: "", preview: true }}
           onRecord={record}
           onAdvance={advance}
           onBack={goBack}

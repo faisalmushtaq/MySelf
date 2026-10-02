@@ -37,7 +37,7 @@ export function SectionInspector({ sectionKey }: { sectionKey: string }) {
   const sections = draft.composition.sections;
   const index = sections.findIndex((s) => s.key === sectionKey);
   const signature = orderSignature(draft);
-  const o = useMemo(() => outline(draft).sections[index], [draft, index]);
+  const o = useMemo(() => outline(draft).sections.find((s) => s.key === sectionKey), [draft, sectionKey]);
   // Keyed by the order, not the draft, so typing a title doesn't re-ask the model on every keystroke.
   const moves = useMemo(
     () => ({

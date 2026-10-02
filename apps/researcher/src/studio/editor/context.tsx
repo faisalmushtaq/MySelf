@@ -290,7 +290,19 @@ function contextFor(published: PublishedContext | null, origin: StudioDraft | nu
     reserved: published.reserved,
     baseline: published.baseline ?? lockBaseline(origin, draft),
     publishedScaleCodes: published.publishedScaleCodes,
+    publishedProtocols: protocolsWithOrigin(published, origin),
   };
+}
+
+/**
+ * The MyStory protocols published, plus those of the release a never-published
+ * survey was copied from — which it may republish exactly as they were frozen,
+ * as `studioPublish` allows.
+ */
+export function protocolsWithOrigin(published: PublishedContext, origin: StudioDraft | null): ReadonlyMap<string, unknown> {
+  const extra = origin?.narrativeProtocols;
+  if (published.baseline || !extra || Object.keys(extra).length === 0) return published.publishedProtocols;
+  return new Map<string, unknown>([...Object.entries(extra), ...published.publishedProtocols]);
 }
 
 function refusalTitle(code: string): string {

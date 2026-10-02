@@ -1,10 +1,11 @@
 import { useEffect } from "react";
-import { findQuestion } from "@myself/studio";
+import { findQuestion, isMyStorySection } from "@myself/studio";
 import { Button, EmptyState } from "../ui/kit.js";
 import { useEditor } from "./context.js";
 import { ArchivedQuestion } from "./node/ArchivedQuestion.js";
 import { BlockEditor, findBlock } from "./node/BlockEditor.js";
 import { CompletionEditor } from "./node/CompletionEditor.js";
+import { MyStoryEditor } from "./node/MyStoryEditor.js";
 import { useFocusRescue, usePendingFocus } from "./node/focus.js";
 import { renameCandidates, useQuestionIdentity } from "./node/identity.js";
 import { Overview } from "./node/Overview.js";
@@ -38,12 +39,14 @@ export function NodeEditor() {
       return <CompletionEditor />;
     case "settings":
       return <SettingsEditor />;
-    case "section":
-      return draft.composition.sections.some((s) => s.key === selection.sectionKey) ? (
-        <SectionEditor key={selection.sectionKey} sectionKey={selection.sectionKey} />
-      ) : (
-        <Missing what="section" />
-      );
+    case "mystory":
+      return <MyStoryEditor />;
+    case "section": {
+      const section = draft.composition.sections.find((s) => s.key === selection.sectionKey);
+      // MyStory's own section is edited as MyStory.
+      if (section && isMyStorySection(section)) return <MyStoryEditor />;
+      return section ? <SectionEditor key={selection.sectionKey} sectionKey={selection.sectionKey} /> : <Missing what="section" />;
+    }
     case "block":
       return findBlock(draft, selection) ? (
         <BlockEditor key={`${selection.sectionKey}:${selection.componentIndex}`} sectionKey={selection.sectionKey} componentIndex={selection.componentIndex} />

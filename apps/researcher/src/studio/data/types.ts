@@ -110,6 +110,8 @@ export interface PublishedContext {
   publishedItemKeys: Set<string>;
   /** Option codes each scale has ever published, with their labels. */
   publishedScaleCodes: Map<string, Map<number, string>>;
+  /** Every MyStory protocol a version has published, by `key@version`, as it was frozen. */
+  publishedProtocols: Map<string, unknown>;
 }
 
 export type { AccessConfigDoc, AuditDoc, MemberDoc, PresenceDoc, ReleaseManifest, ResponseStatsResponse, SurveyDoc, VersionDoc };

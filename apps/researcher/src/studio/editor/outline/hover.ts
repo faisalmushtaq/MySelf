@@ -126,6 +126,7 @@ function sectionHover(node: TreeNode, edge: "before" | "after"): Hover | null {
     case "welcome":
       return { over: { kind: "start" }, indicator: { id: node.id, edge: "after" } };
     case "add-section":
+    case "mystory":
     case "completion":
     case "settings":
     case "archive":

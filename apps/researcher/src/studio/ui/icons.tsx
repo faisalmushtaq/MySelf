@@ -66,6 +66,7 @@ export type IconName =
   | "type-rank"
   | "welcome"
   | "flag"
+  | "story"
   | "external"
   | "compare"
   | "import"
@@ -154,6 +155,7 @@ const paths: Record<IconName, JSX.Element> = {
   "type-rank": <path d="M3 5h3M3 10h3M3 15h3M9 5h8M9 10h6M9 15h4" />,
   welcome: <path d="M3 17V8l7-5 7 5v9h-5v-5H8v5z" />,
   flag: <path d="M5 18V3M5 4h10l-2 3.5L15 11H5" />,
+  story: <path d="M3 4h14v9H9l-4 3.5V13H3zM6.5 7.5h7M6.5 10h4.5" />,
   external: <path d="M11 3h6v6M17 3l-8 8M14 12v5H3V6h5" />,
   compare: <path d="M7 3v14M13 3v14M3 7h4M13 13h4M3 13l4-3M17 7l-4 3" />,
   import: <path d="M10 3v9M6.5 8.5L10 12l3.5-3.5M3.5 13v3.5h13V13" />,

@@ -6,4 +6,4 @@
  * publish function uses to decide a version bump and which IDs are reserved.
  * Screens import them from here so that stays true in one place.
  */
-export { diffDrafts, manifestIndex, publishedScaleCodes, reservedFrom } from "@myself/studio";
+export { diffDrafts, manifestIndex, publishedProtocols, publishedScaleCodes, reservedFrom } from "@myself/studio";
