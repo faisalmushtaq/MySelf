@@ -106,6 +106,12 @@ export async function sittingsFor(db: Firestore, studyCode: string): Promise<{ s
   return snap.docs.map((d) => d.data() as { sessionId: string; releaseHash: string; releaseKey: string; complete: boolean });
 }
 
+/** A published release as the store holds it: the manifest, parsed. */
+export async function storedRelease(db: Firestore, hash: string): Promise<Record<string, unknown> | null> {
+  const snap = await db.doc(paths.publicRelease(STUDY, hash.replace(/^sha256:/, ""))).get();
+  return snap.exists ? (JSON.parse(String(snap.get("manifest"))) as Record<string, unknown>) : null;
+}
+
 export async function auditActions(db: Firestore): Promise<string[]> {
   const snap = await db.collection(paths.studioAudit(STUDY)).get();
   return snap.docs.map((d) => String(d.get("action")));

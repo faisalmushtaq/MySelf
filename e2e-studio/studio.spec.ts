@@ -1,3 +1,4 @@
+import { readFile } from "node:fs/promises";
 import { expect, test, type Page } from "@playwright/test";
 import {
   addMember,
@@ -8,6 +9,7 @@ import {
   seedHistoricalSitting,
   sittingJson,
   sittingsFor,
+  storedRelease,
   type Study,
 } from "./support/study.js";
 
@@ -162,4 +164,85 @@ test("a researcher publishes a change and the public survey runs it, with histor
   expect(actions).toEqual(expect.arrayContaining(["survey.imported", "draft.edited", "version.published"]));
 
   await participantContext.close();
+});
+
+/**
+ * MyStory, switched on in the Studio and published (docs/16 §10). Runs after
+ * the test above, on the survey it left live at 9.0.0.
+ */
+test("a researcher switches MyStory on, edits its protocol, publishes it, and downloads the provenance", async ({ page, browser }) => {
+  await signIn(page);
+  await page.goto("researcher/#/surveys/ybm_nd2026_standard/edit");
+  await expect(page.getByPlaceholder("Search questions by text or ID")).toBeVisible({ timeout: 60_000 });
+
+  // ── Switch it on, approve the built-in protocol as a new version, use it ───
+  await page.getByRole("treeitem", { name: "MyStory (off)" }).click();
+  await page.locator("label", { hasText: "End the survey with MyStory" }).click();
+  // On, with the built-in protocol as it ships: still a draft, so publishing is held back.
+  await expect(page.getByText("The protocol isn't approved yet").first()).toBeVisible({ timeout: 15_000 });
+  const file = page.getByLabel("Protocol file (TOML)");
+  await file.fill((await file.inputValue()).replace('approval_status = "draft"', 'approval_status = "approved"'));
+  await expect(page.getByText(/is a built-in protocol, and this differs from it/)).toBeVisible();
+  await page.getByRole("button", { name: "Use version 0.1.1" }).click();
+  await expect(page.getByText("np.phone_wellbeing@0.1.1 reads as a protocol and passes its checks.")).toBeVisible();
+  await page.getByRole("button", { name: "Use this protocol" }).click();
+  await expect(page.getByRole("button", { name: /error/ })).toHaveCount(0, { timeout: 15_000 });
+  await expect(page.getByText(/Saved/).first()).toBeVisible({ timeout: 30_000 });
+
+  // ── Publish: a MAJOR version whose summary says MyStory was added ─────────
+  await page.getByRole("button", { name: /^Publish/ }).first().click();
+  const publish = page.getByRole("dialog", { name: /Publish a new version/ });
+  await expect(publish).toBeVisible();
+  const reviewed = publish.getByLabel("I’ve reviewed these warnings");
+  if (await reviewed.count()) {
+    await reviewed.check();
+    await publish.getByRole("button", { name: "Continue" }).click();
+  }
+  await expect(publish.getByText("MyStory added (np.phone_wellbeing@0.1.1).")).toBeVisible();
+  await publish.getByRole("button", { name: "Continue" }).click();
+  await expect(publish.getByText("10.0.0").first()).toBeVisible();
+  await publish.getByRole("button", { name: "Continue" }).click();
+  await publish.getByLabel(/Release note for/).fill("End the survey with MyStory, on the approved phones-and-wellbeing protocol.");
+  await publish.getByRole("button", { name: "Continue" }).click();
+  await publish.getByRole("button", { name: /^Publish r?10\.0\.0/ }).click();
+  await expect(page.getByRole("dialog", { name: "Published" }).getByText(/10\.0\.0 is live/)).toBeVisible({ timeout: 60_000 });
+
+  // Frozen last, with its protocol, on the engine that sends it to MyStory.
+  const pointer = await livePointer(study.db);
+  expect(pointer?.version).toBe("10.0.0");
+  const release = (await storedRelease(study.db, pointer!.hash)) as {
+    release: { engineVersion: string };
+    composition: { sections: { key: string; components: { kind: string }[] }[] };
+    narrativeProtocols: Record<string, { approvalStatus: string }>;
+  };
+  expect(release.release.engineVersion).toBe("0.4.0");
+  expect(release.composition.sections.at(-1)).toMatchObject({ key: "mystory", components: [{ kind: "narrative" }] });
+  expect(release.narrativeProtocols["np.phone_wellbeing@0.1.1"]?.approvalStatus).toBe("approved");
+
+  // ── A participant build that sends MyStory its protocol takes the version ──
+  const participantContext = await browser.newContext({ viewport: { width: 820, height: 1180 }, hasTouch: true });
+  const participant = await participantContext.newPage();
+  await participant.goto("./");
+  await expect(participant.locator("p.demo-note")).toContainText("release 10.0.0 (downloaded)", { timeout: 30_000 });
+  await participantContext.close();
+
+  // ── The provenance, from the Versions screen ──────────────────────────────
+  await page.goto("researcher/#/surveys/ybm_nd2026_standard/versions");
+  await expect(page.getByRole("table", { name: /Published versions/ })).toBeVisible({ timeout: 60_000 });
+  await page.getByRole("button", { name: "Download provenance" }).click();
+  const [download] = await Promise.all([page.waitForEvent("download"), page.getByRole("menuitem", { name: "As a spreadsheet (CSV)" }).click()]);
+  expect(download.suggestedFilename()).toMatch(/^ybm_nd2026_standard-provenance-\d{4}-\d{2}-\d{2}\.csv$/);
+  const csv = await readFile((await download.path())!, "utf8");
+  const lines = csv.replace(/^\uFEFF/, "").split("\r\n");
+  expect(lines[0]).toMatch(/^version,release_key,hash,engine_version,status,source,authors,publisher,published_at,based_on,restored_from,/);
+  const ten = lines.find((l) => l.startsWith("10.0.0,"))!;
+  expect(ten).toContain(",live,studio,");
+  expect(ten).toContain(",on,np.phone_wellbeing@0.1.1,");
+  expect(ten).toContain("MyStory added (np.phone_wellbeing@0.1.1).");
+  expect(ten).toMatch(/to now \(published\)$/);
+  const nine = lines.find((l) => l.startsWith("9.0.0,"))!;
+  expect(nine).toContain(",previous,studio,");
+  expect(nine).toContain(",off,,");
+  // r8.0.0 was live from the set-up until 9.0.0 was published.
+  expect(lines.find((l) => l.startsWith("8.0.0,"))).toMatch(/ to \d{4}-[^ ]+ \(set up from the live survey\)$/);
 });
