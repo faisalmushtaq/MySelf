@@ -959,6 +959,9 @@ export default function App({ initialRuntime }: { initialRuntime: Runtime }) {
             moduleUrl: __MYSTORY_URL__ || null,
             sessionId: phase.session.sessionId,
             releaseHash: manifest.hash ?? "",
+            // The frozen protocols, sent to the module so it runs exactly what
+            // this version published, which Studio may have edited.
+            protocols: manifest.narrativeProtocols,
           }}
           onRecord={(u, v) => void record(u, v)}
           onAdvance={(f, k) => void advance(f, k)}
