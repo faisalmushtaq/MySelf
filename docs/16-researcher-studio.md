@@ -855,3 +855,134 @@ performs this whole loop.
   compared with a published version. Both are MAJOR, so this affects only the
   wording.
 - **WebKit** runs in CI only.
+
+---
+
+## 10. MyStory and version provenance (design, 2026-10-02)
+
+The research team asked for two more things. In their words: MyStory should
+be "added on or not to the survey (sometimes we want it on and other times
+not) and which Toml (and ability to edit that TOML etc). The MyStory would
+always come afterwards — just that the hand back to researcher would be
+completed AFTER that completion part." And: "We want provenance of survey
+versions to be able to easily extract."
+
+This section is the design, written before the change is built. It
+supersedes the part of D-43 that kept narrative components out of the Studio
+(§3, §8). The protocol editor in the researcher view still saves to a file.
+
+### 10.1 MyStory in a draft and in a release
+
+**One setting for the whole survey: on or off.**
+- On means the survey's **last** section is `mystory` ("MyStory"), holding
+  exactly one component: `{ kind: "narrative", protocol, protocolVersion }`.
+- So a participant meets the survey, then MyStory, then the finish screen,
+  then the hand-back to the researcher. The participant app already words
+  MyStory's way out as the end of the survey when it is last (2af8462).
+- Off means there is no such section.
+
+**The protocol is frozen, not referred to.**
+- The draft carries the protocol's full definition, by `key@version`, in a
+  new optional field, `draft.narrativeProtocols`.
+- Publishing freezes it into the release as releases always could:
+  `narrativeProtocols`, the assembled `prompts` and the `modelConfigs`.
+- The survey sends the module exactly that protocol (2af8462). A version
+  published from the Studio can therefore carry a protocol edited there.
+- `extractDraft` reads it back out of a release, so restoring or comparing a
+  version with MyStory keeps it.
+
+**Choosing and editing it** (the editor's "MyStory" item, between the last
+section and the completion screen):
+- Switch it on or off.
+- Start from a built-in protocol (`@myself/narrative`) or the one the draft
+  already has.
+- See and edit it as TOML: the same file the MyStory lab and the protocol
+  editor read and write (docs/08 §10.6).
+- It is checked on every keystroke with the protocol schema, `checkProtocol`
+  and the approval rule, and each problem is said in words.
+- "Use this protocol" freezes it into the draft, as one undo step.
+- `np.micro_narrative` and `np.future_self` have stages the file format
+  cannot express. They are offered as they are, not as TOML.
+
+**A `key@version` names one protocol for good.**
+- An edited protocol needs a new version.
+- Validation refuses a `key@version` that a published version of this survey,
+  or a built-in protocol, has with different content. The editor offers the
+  next patch number.
+- Only an approved protocol can be published (the gate, unchanged). Every
+  built-in protocol is `draft` today, so fielding one means setting
+  `approval_status = "approved"` once it has been approved, and so a new
+  version.
+
+**Where it sits is enforced, not hoped for.**
+- `setMyStory(draft, protocol | null)` is the one operation that switches it.
+- Switching it on sets `offline.narrativeConnectivity` to `online_required`
+  when that is unset. Switching it off removes the section, the protocol and
+  that setting.
+- Every operation that adds or moves a section, block or question keeps
+  MyStory last. A new section goes in before it. A change that would put
+  anything after it, or in it, is refused with a reason.
+- Validation reports a draft where MyStory is not last, holds anything else,
+  or appears twice. The server runs the same validation.
+
+**Engine version.** A release with a narrative component needs engine
+`0.4.0`: a participant build that sends the module the release's own
+protocol. An older build refuses such a release and keeps running the one it
+has, so it never runs a protocol bundled with the module in place of the
+frozen one.
+
+**Version number.** Switching MyStory on or off, or changing its protocol,
+is participant-visible, so it is MAJOR. The change summary says so plainly:
+"MyStory added (np.phone_wellbeing@0.1.1)", "MyStory removed (…)", "MyStory
+protocol changed from … to …".
+
+**Preview.** The preview shows where MyStory would start. It never runs it:
+nothing is sent to a model and nothing is saved.
+
+**Model calls.** The relay admits a model config only from a release.
+- The module now sends the sitting's release hash with each call.
+- The relay resolves that hash the way every reader does (`resolveRelease`:
+  bundled, else the release store with the hash re-verified).
+- It runs exactly the config that release froze. A device naming a release
+  the study never published, or a config the release did not freeze, is
+  refused.
+- A call with no hash is treated as before.
+
+**What changes on the survey side.** The release format does not change.
+There is a new engine version (`0.4.0`), the relay reads Studio-published
+releases, and the module sends the release hash to the relay.
+
+### 10.2 Version provenance export
+
+**Where.** Versions → "Download provenance", as CSV or JSON.
+
+**One row per version**, newest first:
+
+| Column | From |
+|---|---|
+| version, release key, hash, engine version | the version record |
+| status (live or previous) | the survey's live pointer |
+| source (studio or repository) | the version record |
+| authors, publisher, published at | the version record |
+| based on, restored from | the version record; the last restore before it in the audit trail |
+| release note, change summary | the version record |
+| required bump, chosen bump | the change summary's bump; the bump the number took |
+| MyStory (on or off) and its protocol `key@version` | the release itself |
+| sittings complete and partial | `studioResponseStats` (counts only) |
+| periods it was live | the audit trail: each publish, each "make live again", and the set-up from the live survey |
+
+**Nothing new is stored.** It reads what the Studio already keeps: the version
+records, their releases, the audit trail and the sitting counts. It is read in
+the browser under the existing rules, which already let any Studio member read
+all four. There is no new collection and no new function.
+
+**Safe to open in a spreadsheet.** A cell that starts with `=`, `+`, `-`, `@`,
+a tab or a carriage return is prefixed with `'`, so it is shown, not run.
+Quoting follows RFC 4180, and the file is UTF-8 with a byte-order mark.
+
+**No participant data.** Sittings are counts. The release note, change summary
+and names are the research team's own.
+
+**Live periods come from the audit trail.** A version published before the
+Studio existed was live before the trail began, so its earlier periods are not
+in it.
