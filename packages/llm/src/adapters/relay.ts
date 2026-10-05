@@ -40,6 +40,16 @@ export interface RelayOptions {
    * transport error with no provenance row to explain it.
    */
   serves?: "openai" | "anthropic" | undefined;
+  /**
+   * The release the sitting is running, when a survey opened the module.
+   *
+   * Sent with every call so the relay runs the model config THAT release froze
+   * — a version published from the Studio is in no bundle, and its protocol's
+   * settings may have been edited there. A device cannot choose parameters by
+   * naming a release: the relay finds it the way every reader does and refuses
+   * one the study never published.
+   */
+  releaseHash?: string | undefined;
 }
 
 interface RelayResponse {
@@ -98,6 +108,7 @@ export class RelayAdapter implements ModelAdapter {
           modelConfigKey: config.key,
           protocolKey: prompt.promptKey,
           ...(schema ? { schema } : {}),
+          ...(this.options.releaseHash ? { releaseHash: this.options.releaseHash } : {}),
         }),
         ...(signal ? { signal } : {}),
       });

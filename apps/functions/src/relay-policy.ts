@@ -1,5 +1,6 @@
 import { modelConfig, type ModelConfig } from "@myself/llm";
 import { protocols } from "@myself/narrative";
+import type { ReleaseManifest } from "@myself/schema";
 import { z } from "zod";
 import { releasesByHash } from "./releases.js";
 
@@ -73,8 +74,12 @@ export const relayRequest = z.object({
   modelConfigKey: z.string().min(1),
   protocolKey: z.string().min(1),
   schema: z.object({ name: z.string().min(1), schema: z.record(z.unknown()) }).optional(),
-  /** Which release this session is running, so the right parameters are used. */
-  releaseHash: z.string().optional(),
+  /**
+   * Which release this sitting is running, so the parameters used are exactly
+   * the ones it froze (`configForCall`). Sent by MyStory when a survey opened
+   * it; absent when the lab is used on its own.
+   */
+  releaseHash: z.string().min(1).max(200).optional(),
 });
 
 export type RelayRequest = z.infer<typeof relayRequest>;
@@ -125,6 +130,53 @@ export function configFor(key: string, caller: Caller): ModelConfig {
   const draft = draftConfigs.get(key);
   if (draft) return draft;
   throw new RelayError(400, "unknown", `no shipped protocol or published release declares '${key}'`);
+}
+
+/** Finds a release by its hash, the way every reader does (`resolveRelease`), or null when there is none. */
+export type ReleaseLookup = (hash: string) => Promise<ReleaseManifest | null>;
+
+/**
+ * The config a call runs on, given the release its sitting is running.
+ *
+ * A version published from the Studio is in no bundle: it exists only in the
+ * release store, and its MyStory protocol may have been edited there, so its
+ * model settings can differ from any shipped protocol's under the same key (a
+ * key names the provider, model and temperature, not the token ceiling). So a
+ * call that names its release runs exactly the config THAT release froze —
+ * found the way every reader finds a release, bundled first, then the store
+ * with the hash re-verified — and nothing else, whoever is calling. A release
+ * the study never published, or a key it did not freeze, is refused.
+ *
+ * A call that names no release is decided as before (`configFor`).
+ */
+export async function configForCall(
+  key: string,
+  caller: Caller,
+  releaseHash: string | undefined,
+  lookup: ReleaseLookup,
+): Promise<ModelConfig> {
+  if (releaseHash === undefined) return configFor(key, caller);
+  let release: ReleaseManifest | null;
+  try {
+    release = await lookup(releaseHash);
+  } catch {
+    // The store could not be read. Not the caller's fault, and worth a retry;
+    // never a reason to fall back on some other release's settings.
+    throw new RelayError(503, "transport", "the study's published versions could not be read just now", true);
+  }
+  if (!release) {
+    throw new RelayError(400, "unknown", "this sitting names a version of the survey that this study has not published");
+  }
+  const configs = release.modelConfigs ?? {};
+  const raw = Object.prototype.hasOwnProperty.call(configs, key) ? configs[key] : undefined;
+  if (raw === undefined) {
+    throw new RelayError(400, "unknown", `'${key}' is not a model configuration the version this sitting is running declares`);
+  }
+  const parsed = modelConfig.safeParse(raw);
+  if (!parsed.success) {
+    throw new RelayError(400, "unknown", `the version this sitting is running declares '${key}' in a form this relay cannot use`);
+  }
+  return parsed.data;
 }
 
 /**

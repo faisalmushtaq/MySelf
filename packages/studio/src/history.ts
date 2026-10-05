@@ -148,3 +148,22 @@ export function publishedScaleCodes(manifests: unknown[]): Map<string, Map<numbe
   }
   return out;
 }
+
+/**
+ * Every MyStory protocol a published version froze, by `key@version`, with the
+ * content it froze (later releases win, as above). What validation holds a
+ * draft's protocol to: a key and version a version published may not come to
+ * name different content (`protocolClash`, docs/16 §10.1).
+ */
+export function publishedProtocols(manifests: unknown[]): Map<string, unknown> {
+  const ordered = manifests
+    .filter(isObject)
+    .map((m) => ({ m, version: isObject(m["release"]) && typeof m["release"]["version"] === "string" ? m["release"]["version"] : "0.0.0" }))
+    .sort((a, b) => compareVersions(a.version, b.version));
+  const out = new Map<string, unknown>();
+  for (const { m } of ordered) {
+    const protocols = isObject(m["narrativeProtocols"]) ? m["narrativeProtocols"] : {};
+    for (const [id, protocol] of Object.entries(protocols)) out.set(id, protocol);
+  }
+  return out;
+}

@@ -1,6 +1,6 @@
 import { extractDraft, type StudioDraft } from "@myself/studio";
 import { releaseManifest, type ReleaseManifest } from "@myself/schema";
-import { manifestIndex, publishedScaleCodes, reservedFrom } from "./data/model-adapter.js";
+import { manifestIndex, publishedProtocols, publishedScaleCodes, reservedFrom } from "./data/model-adapter.js";
 import type { PublishedContext } from "./data/types.js";
 
 /**
@@ -58,6 +58,7 @@ export async function loadPlayground(): Promise<PlaygroundData> {
       reserved,
       publishedItemKeys: new Set(reserved.itemKeys),
       publishedScaleCodes: publishedScaleCodes(upToLive.map((r) => r.manifest)),
+      publishedProtocols: publishedProtocols(upToLive.map((r) => r.manifest)),
     },
   };
 }

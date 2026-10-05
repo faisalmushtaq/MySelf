@@ -103,7 +103,7 @@ export function blockIssues(issues: Issue[], sectionKey: string, refKey: string)
  * ("participantCode.pattern", "screens.finish.body"), which is exactly what
  * those editors name their inputs.
  */
-export function screenIssues(issues: Issue[], kind: "welcome" | "completion" | "survey"): FieldIssues {
+export function screenIssues(issues: Issue[], kind: "welcome" | "completion" | "mystory" | "survey"): FieldIssues {
   return group(
     issues.filter((i) => i.location.kind === kind),
     (l) => l.field ?? GENERAL,

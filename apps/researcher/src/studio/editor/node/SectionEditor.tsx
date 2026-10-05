@@ -30,7 +30,7 @@ export function SectionEditor({ sectionKey }: { sectionKey: string }) {
   const index = draft.composition.sections.findIndex((s) => s.key === sectionKey);
   const section = draft.composition.sections[index]!;
   const issues = useMemo(() => sectionIssues(ctx.issues, sectionKey), [ctx.issues, sectionKey]);
-  const blocks = useMemo(() => outline(draft).sections[index]?.blocks ?? [], [draft, index]);
+  const blocks = useMemo(() => outline(draft).sections.find((s) => s.key === sectionKey)?.blocks ?? [], [draft, sectionKey]);
   const [adding, setAdding] = useState(false);
   const guarded = protectedIn(draft, sectionKey);
   const validateTitle = useCallback((text: string) => (text.trim() ? null : "A section needs a title: participants see it in the progress bar."), []);

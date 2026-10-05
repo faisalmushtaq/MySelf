@@ -32,9 +32,22 @@ const GROUPS: { kinds: ChangeKind[]; title: string }[] = [
   { kinds: ["question.changed"], title: "Questions changed" },
   { kinds: ["question.moved", "question.reordered"], title: "Questions moved or reordered" },
   { kinds: ["section.added", "section.removed", "section.changed", "section.reordered"], title: "Sections" },
+  { kinds: ["mystory.added", "mystory.removed", "mystory.changed"], title: "MyStory" },
   { kinds: ["welcome.changed", "completion.changed"], title: "Start and finish screens" },
   { kinds: ["settings.changed"], title: "Survey settings" },
 ];
+
+/**
+ * A summary's entries under their headings, in survey order. A kind no heading
+ * names is listed under "Other changes" rather than left out: a change the
+ * publisher is never shown is a change nobody agreed to.
+ */
+export function changeGroups(summary: Pick<ChangeSummary, "entries">): { title: string; entries: ChangeEntry[] }[] {
+  const named = new Set<ChangeKind>(GROUPS.flatMap((g) => g.kinds));
+  const groups = GROUPS.map((g) => ({ title: g.title, entries: summary.entries.filter((e) => g.kinds.includes(e.kind)) }));
+  groups.push({ title: "Other changes", entries: summary.entries.filter((e) => !named.has(e.kind)) });
+  return groups.filter((g) => g.entries.length > 0);
+}
 
 const BUMP_WORDS = { major: "a major version", minor: "a minor version", patch: "a patch version" } as const;
 
@@ -64,22 +77,18 @@ export function ChangeList({ summary, empty = "Nothing changed." }: { summary: C
           <InfoTip label="breaking changes" text={BREAKING_HELP} />
         </p>
       ) : null}
-      {GROUPS.map((group) => {
-        const entries = summary.entries.filter((e) => group.kinds.includes(e.kind));
-        if (entries.length === 0) return null;
-        return (
-          <section key={group.title} className="stp-change-group">
-            <h4>
-              {group.title} <span className="stp-count">{entries.length}</span>
-            </h4>
-            <ul>
-              {entries.map((e, i) => (
-                <ChangeRow key={`${e.kind}:${e.itemKey ?? e.sectionKey ?? i}:${i}`} entry={e} />
-              ))}
-            </ul>
-          </section>
-        );
-      })}
+      {changeGroups(summary).map(({ title, entries }) => (
+        <section key={title} className="stp-change-group">
+          <h4>
+            {title} <span className="stp-count">{entries.length}</span>
+          </h4>
+          <ul>
+            {entries.map((e, i) => (
+              <ChangeRow key={`${e.kind}:${e.itemKey ?? e.sectionKey ?? i}:${i}`} entry={e} />
+            ))}
+          </ul>
+        </section>
+      ))}
     </div>
   );
 }

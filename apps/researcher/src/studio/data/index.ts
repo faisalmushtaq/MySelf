@@ -19,6 +19,7 @@ export { useMemoryDraftEditor } from "./memory.js";
 export { StudioCallError } from "./errors.js";
 export { StudioDataProvider, useStudioSession } from "./session.js";
 export {
+  loadAudit,
   useAccessConfig,
   useAudit,
   useMembers,

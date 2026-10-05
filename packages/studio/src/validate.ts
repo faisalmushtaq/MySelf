@@ -1,3 +1,4 @@
+import { narrativeProtocol } from "@myself/narrative";
 import {
   ABSOLUTE_MAX_AGE_YEARS,
   assessmentDraft,
@@ -32,6 +33,7 @@ import {
   type LockedDifference,
   type LockedOptions,
 } from "./locked.js";
+import { myStoryMisplaced, narrativePlacements, nextProtocolVersion, protocolClash, protocolProblems } from "./mystory.js";
 import { formOf, liveQuestions, placements, type LiveQuestion, type Placement } from "./walk.js";
 
 /**
@@ -71,6 +73,12 @@ export interface ValidationContext {
   referenceScales?: Record<string, ScaleInput>;
   /** The library's scoring rules by key (see `reference`). */
   referenceScoring?: Record<string, ScoringInput>;
+  /**
+   * Every MyStory protocol a published version of this survey froze, by
+   * `key@version` (`publishedProtocols`): a key and version already published
+   * may not come to name different content (docs/16 §10.1).
+   */
+  publishedProtocols?: ReadonlyMap<string, unknown>;
 }
 
 // ---------------------------------------------------------------------------
@@ -1445,6 +1453,95 @@ function checkCompletion(m: Model, c: Collector): void {
   }
 }
 
+/**
+ * MyStory (docs/16 §10.1): where it is, and the protocol it runs.
+ *
+ * Where it is: last, alone in its section, once. The operations keep it there,
+ * so this is for a draft that came some other way — restored from a store, or
+ * edited by hand. The protocol: carried whole, readable by the schema the
+ * module reads it with, passing its own checks, approved, and not reusing a
+ * `key@version` that already names different content. The publish gate checks
+ * the protocol too and its refusals are reported as well; these say the same
+ * things where the researcher will look, and what to do about them.
+ */
+function checkMyStory(m: Model, c: Collector): void {
+  const placed = narrativePlacements(m.draft);
+  const story = placed[0];
+  if (!story) return;
+  const place = at("mystory", { sectionKey: story.sectionKey, field: "placement" });
+  const misplaced = myStoryMisplaced(m.draft);
+  if (misplaced === "more_than_one") {
+    c.error(
+      "mystory.more_than_one",
+      "The survey has more than one MyStory conversation",
+      place,
+      "A survey has one MyStory, at the end. Switch MyStory off and on again to keep just one, last.",
+    );
+  } else if (misplaced === "not_alone") {
+    c.error(
+      "mystory.not_alone",
+      "Its section holds other questions too",
+      place,
+      "MyStory's section holds only the conversation. Move the other questions to another section.",
+    );
+  } else if (misplaced === "not_last") {
+    c.error(
+      "mystory.not_last",
+      "Not the last part of the survey",
+      place,
+      "MyStory always comes last, so the finish screen and the hand-back to the researcher come after it. Move the sections after it to before it, or switch MyStory off and on again to put it at the end.",
+    );
+  }
+
+  const where = at("mystory", { sectionKey: story.sectionKey, field: "protocol" });
+  const parsed = story.definition ? narrativeProtocol.safeParse(story.definition) : null;
+  if (!parsed || (parsed.success && `${parsed.data.key}@${parsed.data.version}` !== story.id)) {
+    c.error(
+      "mystory.protocol_missing",
+      "The survey doesn't carry the protocol it names",
+      where,
+      `It names ${story.id}, but the draft holds no definition of it, so there would be nothing to send to MyStory. Choose the protocol again.`,
+    );
+    return;
+  }
+  if (!parsed.success) {
+    const issue = parsed.error.issues[0];
+    c.error(
+      "mystory.protocol_invalid",
+      "The protocol isn't in the protocol format",
+      where,
+      `${issue?.path.join(".") || "protocol"}: ${issue?.message ?? "invalid"}. Choose the protocol again, or correct its file.`,
+    );
+    return;
+  }
+  const protocol = parsed.data;
+  for (const problem of protocolProblems(protocol)) {
+    c.error("mystory.protocol_check", capitalise(problem), where, "Correct the protocol and use it again, or choose another.");
+  }
+  if (protocol.approvalStatus !== "approved") {
+    c.error(
+      "mystory.not_approved",
+      "The protocol isn't approved yet",
+      where,
+      `${story.id} is marked “${protocol.approvalStatus.replace("_", " ")}”, and only an approved protocol can be published. Once it has been approved, set approval_status = "approved" in its file; that changes it, so give it a new version too.`,
+    );
+  }
+  const clash = protocolClash(protocol, m.ctx.publishedProtocols);
+  if (clash) {
+    const next = nextProtocolVersion(protocol, m.ctx.publishedProtocols);
+    c.error(
+      clash === "published" ? "mystory.version_published" : "mystory.version_built_in",
+      clash === "published" ? `${story.id} was published with different content` : `${story.id} is a built-in protocol, and this one differs from it`,
+      where,
+      `A protocol's key and version name one protocol for good: MyStory's records are read back by them. Give this one a new version, such as ${next}.`,
+    );
+  }
+}
+
+function capitalise(text: string): string {
+  return text ? `${text[0]!.toUpperCase()}${text.slice(1)}` : text;
+}
+
 function checkIdentity(m: Model, c: Collector): void {
   for (const q of m.firstList) {
     const item = q.item as unknown as Loose;
@@ -1601,6 +1698,11 @@ const GATE_RULES: { re: RegExp; code: string; plain: string }[] = [
 const DOTTED_ITEM = /^[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*$/;
 
 function gateLocation(m: Model, failure: string): IssueLocation {
+  // A narrative protocol's refusal is about MyStory (docs/16 §10.1).
+  if (/^(unresolved )?narrative protocol /.test(failure)) {
+    const story = narrativePlacements(m.draft)[0];
+    return at("mystory", { sectionKey: story?.sectionKey, field: "protocol" });
+  }
   // "duplicate variable 'v' (in 'a' and 'b')": the question in b is the newcomer.
   const variable = /^duplicate variable '([^']+)' \(in '[^']+' and '([^']+)'\)/.exec(failure);
   if (variable) {
@@ -1793,6 +1895,7 @@ export function validateDraft(draft: StudioDraft, ctx: ValidationContext = {}): 
     c.run("identifying questions", () => checkIdentity(model, c));
     c.run("published content", () => checkAgainstBaseline(model, c));
     c.run("finishing screen", () => checkCompletion(model, c));
+    c.run("MyStory", () => checkMyStory(model, c));
   }
   c.run("publish check", () => checkGate(model, c));
   c.run("schema", () => checkSchema(model, c));

@@ -64,9 +64,15 @@ describe("locking and unlocking", () => {
 describe("what is written to disk", () => {
   it("leaves nothing identifying in the sealed blob", async () => {
     const { key } = await createVault(PHRASE);
-    const sealed = JSON.stringify(await sealWith(key, person));
+    const blob = await sealWith(key, person);
+    // Only base64 is written, so no quote, brace or colon of the person's record
+    // survives in it. A bare "Ada" is three base64 characters and turns up in a
+    // random ciphertext now and then, so the name is looked for as a JSON value.
+    expect(Object.keys(blob).sort()).toEqual(["data", "iv"]);
+    for (const part of [blob.iv, blob.data]) expect(part).toMatch(/^[A-Za-z0-9+/]+=*$/);
+    const sealed = JSON.stringify(blob);
     expect(sealed).not.toContain("Lovelace");
-    expect(sealed).not.toContain("Ada");
+    expect(sealed).not.toContain('"Ada"');
     expect(sealed).not.toContain("2012-05-14");
     expect(sealed).not.toContain("4857773456");
   });

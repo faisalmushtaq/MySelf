@@ -5,6 +5,7 @@ export * from "./model.js";
 export * from "./catalogue.js";
 export * from "./keys.js";
 export * from "./logic.js";
+export * from "./mystory.js";
 export * from "./ops.js";
 export { hasBlockingIssues, issuesFor, summariseIssues, validateDraft, type ValidationContext } from "./validate.js";
 export {
@@ -17,4 +18,4 @@ export {
   type LockedOptions,
 } from "./locked.js";
 export { checkChosenVersion, diffDrafts, minimumVersion, nextVersion, suggestBump, type VersionCheck } from "./diff.js";
-export { manifestIndex, publishedScaleCodes, reservedFrom, type ManifestIndex, type ReservedIds } from "./history.js";
+export { manifestIndex, publishedProtocols, publishedScaleCodes, reservedFrom, type ManifestIndex, type ReservedIds } from "./history.js";

@@ -436,6 +436,9 @@ importers:
 
   packages/studio:
     dependencies:
+      '@myself/narrative':
+        specifier: workspace:*
+        version: link:../narrative
       '@myself/release':
         specifier: workspace:*
         version: link:../release

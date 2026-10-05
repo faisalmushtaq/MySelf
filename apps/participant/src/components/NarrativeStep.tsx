@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { PROTOCOL_MESSAGE, handoverUrl, readModuleMessage } from "../lib/narrative.js";
 
 /**
  * MyStory, inside MyThoughts.
@@ -28,6 +29,10 @@ import { useEffect, useRef, useState } from "react";
  * leaving it unfinished are all events in the sitting's log. The narrative
  * document may never arrive — no connectivity, a refused relay — and the
  * survey still has to be able to say what happened at this position.
+ *
+ * THE PROTOCOL ITSELF IS SENT TOO, once the module says it is ready: the
+ * one frozen into this release, which may have been edited in Studio and
+ * so be in no list the module carries. See `lib/narrative.ts`.
  */
 
 export interface NarrativeStepProps {
@@ -35,6 +40,10 @@ export interface NarrativeStepProps {
   moduleUrl: string;
   protocol: string;
   protocolVersion: string;
+  /** The protocol as frozen into this release, `narrativeProtocols["key@version"]`. */
+  definition: unknown;
+  /** Nothing follows this position: the finish screen is next. */
+  last: boolean;
   sessionId: string;
   releaseHash: string;
   /** Shown to the participant by the module, when the study collects one. */
@@ -54,25 +63,23 @@ export interface NarrativeStepProps {
 const PATIENCE_MS = 20_000;
 
 export function NarrativeStep(props: NarrativeStepProps) {
-  const { moduleUrl, protocol, protocolVersion, sessionId, releaseHash, firstName, onEvent, onDone } = props;
+  const { moduleUrl, protocol, protocolVersion, definition, last, sessionId, releaseHash, firstName, onEvent, onDone } =
+    props;
   const [loaded, setLoaded] = useState(false);
   const [patient, setPatient] = useState(true);
   const [finished, setFinished] = useState(false);
+  const [refused, setRefused] = useState(false);
   const started = useRef(false);
+  const frame = useRef<HTMLIFrameElement | null>(null);
 
-  const source = (() => {
-    const url = new URL(`${moduleUrl.replace(/\/$/, "")}/`);
-    url.searchParams.set("embed", "1");
-    url.searchParams.set("view", "participant");
-    url.searchParams.set("start", "1");
-    url.searchParams.set("protocol", protocol);
-    url.searchParams.set("sessionId", sessionId);
-    url.searchParams.set("releaseHash", releaseHash);
-    // Silence means nobody, and the module is written to read correctly with
-    // no name. Only sent when the study actually collected one.
-    if (firstName) url.searchParams.set("name", firstName);
-    return url.toString();
-  })();
+  const source = handoverUrl({
+    moduleUrl,
+    protocol,
+    sessionId,
+    releaseHash,
+    firstName,
+    sendsProtocol: definition !== undefined,
+  }).toString();
 
   useEffect(() => {
     if (started.current) return;
@@ -86,30 +93,41 @@ export function NarrativeStep(props: NarrativeStepProps) {
   }, []);
 
   useEffect(() => {
+    const origin = new URL(source).origin;
     const onMessage = (event: MessageEvent) => {
-      /**
-       * Only the module's own origin, and only the message it sends.
-       *
-       * A page in an iframe is not the only thing that can post here — an
-       * extension, another frame, the page itself — and a stray message that
-       * advanced the survey would skip a section without anybody doing
-       * anything.
-       */
-      if (event.origin !== new URL(source).origin) return;
-      const data = event.data as { type?: string; reason?: string; sessionId?: string } | null;
-      if (data?.type !== "mystory:finished") return;
-      if (data.sessionId && data.sessionId !== sessionId) return;
+      // Only the module's own origin, and only about this sitting (lib/narrative.ts).
+      const message = readModuleMessage(event, { origin, sessionId });
+      if (!message) return;
+      if (message.kind === "ready") {
+        // Every time it says so, so a module that reloads is sent it again.
+        // Addressed to the module's origin, so nothing else in the frame can
+        // read it.
+        if (definition !== undefined) {
+          frame.current?.contentWindow?.postMessage({ type: PROTOCOL_MESSAGE, protocol: definition }, origin);
+        }
+        return;
+      }
+      if (message.kind === "refused") {
+        // It will not run what this release froze, and says so rather than run
+        // something else. The way past is offered at once: waiting would change
+        // nothing.
+        setRefused(true);
+        setPatient(false);
+        onEvent("narrative_refused", { protocol, protocolVersion, problem: message.problem });
+        return;
+      }
       setFinished(true);
-      onEvent("narrative_finished", { protocol, protocolVersion, reason: data.reason ?? "finished" });
+      onEvent("narrative_finished", { protocol, protocolVersion, reason: message.reason });
     };
     window.addEventListener("message", onMessage);
     return () => window.removeEventListener("message", onMessage);
-  }, [onEvent, protocol, protocolVersion, sessionId, source]);
+  }, [onEvent, protocol, protocolVersion, sessionId, source, definition]);
 
   return (
     <div className="narrative-step">
       <div className="narrative-frame">
         <iframe
+          ref={frame}
           title="A short conversation"
           src={source}
           onLoad={() => setLoaded(true)}
@@ -121,29 +139,32 @@ export function NarrativeStep(props: NarrativeStepProps) {
         {!loaded && <p className="narrative-waiting">Getting the conversation ready…</p>}
       </div>
 
+      {/* When MyStory is the last position, the finish screen is next: saying
+          there is more of the survey to go would be untrue. */}
       {finished ? (
         <div className="narrative-after">
-          <p>That part is done. There is a little more of the survey to go.</p>
+          <p>{last ? "That part is done, and so is the survey." : "That part is done. There is a little more of the survey to go."}</p>
           <button type="button" className="primary" onClick={onDone}>
-            Keep going
+            {last ? "Finish" : "Keep going"}
           </button>
         </div>
       ) : (
         !patient && (
           <div className="narrative-after">
             <p className="note">
-              If the conversation will not load, you can carry on with the rest of the survey — nothing you have
-              already answered is affected.
+              {refused ? "The conversation cannot start on this device. You" : "If the conversation will not load, you"}{" "}
+              {last ? "can finish without it" : "can carry on with the rest of the survey"} — nothing you have already
+              answered is affected.
             </p>
             <button
               type="button"
               className="secondary"
               onClick={() => {
-                onEvent("narrative_abandoned", { protocol, protocolVersion, loaded });
+                onEvent("narrative_abandoned", { protocol, protocolVersion, loaded, refused });
                 onDone();
               }}
             >
-              Skip this part
+              {last ? "Finish without it" : "Skip this part"}
             </button>
           </div>
         )

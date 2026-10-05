@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { allInstruments, allModules, allScales } from "@myself/library";
+import { microNarrativeFull, narrativeProtocol, type NarrativeProtocol } from "@myself/narrative";
 import { allScoring } from "@myself/scoring";
 import { releaseAssets } from "./assets.js";
 import { ybmComposition } from "./compose-ybm.js";
@@ -158,6 +159,8 @@ describe("engine version", () => {
     }
     // A single choice that moves on by itself is older than D-53.
     expect(requiredEngineVersion(plain, { instruments: [{ forms: [{ items: [{ responseType: "single_choice", autoAdvance: true }] }] }] })).toBe("0.1.0");
+    // 0.4.0: MyStory, run from the protocol frozen into the release (docs/16 §10.1).
+    expect(requiredEngineVersion({ sections: [...plain.sections, { components: [{ kind: "narrative" }] }] })).toBe("0.4.0");
   });
 
   it("refuses a release that declares an older engine than it needs", () => {
@@ -170,5 +173,56 @@ describe("engine version", () => {
       "this composition needs engine 0.3.0, but the release declares engine 0.2.0",
     ]);
     expect(freeze(subset, registries, "0.3.0").failures).toEqual([]);
+  });
+});
+
+describe("MyStory through the gate (docs/16 §10.1)", () => {
+  const approved: NarrativeProtocol = { ...microNarrativeFull, approvalStatus: "approved" };
+  const id = `${approved.key}@${approved.version}`;
+  const withMyStory = (protocol: unknown, engine?: string) =>
+    freeze(
+      (c) => {
+        c.sections.push({ key: "mystory", title: "MyStory", components: [{ kind: "narrative", protocol: approved.key, protocolVersion: approved.version }] });
+      },
+      { ...registries, narrativeProtocols: [protocol as NarrativeProtocol] },
+      engine,
+    );
+
+  it("accepts an approved protocol that passes its checks, and freezes it with its prompts and model", () => {
+    const { body, failures } = withMyStory(approved);
+    expect(failures).toEqual([]);
+    expect(body.release.engineVersion).toBe("0.4.0");
+    expect(body.narrativeProtocols[id]).toEqual(approved);
+    expect(Object.keys(body.prompts).length).toBeGreaterThan(0);
+    expect(Object.keys(body.modelConfigs)).toEqual(approved.models.map((m) => m.key));
+  });
+
+  it("freezes the protocol as the schema reads it, every default spelled out", () => {
+    // What the module runs is what it parses; the release holds that, not a
+    // shorthand that only means the same thing after parsing.
+    const { character: _character, safeguarding: _safeguarding, ...short } = approved;
+    const { body, failures } = withMyStory(short);
+    expect(failures).toEqual([]);
+    expect(body.narrativeProtocols[id]).toEqual(narrativeProtocol.parse(short));
+    expect((body.narrativeProtocols[id] as NarrativeProtocol).character.name).toBe("Sam");
+  });
+
+  it("refuses a protocol that is not in the protocol format, rather than throwing", () => {
+    const { failures } = withMyStory({ ...approved, stages: "none" });
+    expect(failures).toEqual([`narrative protocol '${id}' does not match the protocol format (stages: Expected array, received string)`]);
+  });
+
+  it("refuses one that fails its own checks, and one not yet approved", () => {
+    const noElicitation = { ...approved, stages: approved.stages.filter((s) => s.kind !== "collect") };
+    expect(withMyStory(noElicitation).failures.some((f) => /no elicitation stage collects no narrative/.test(f))).toBe(true);
+    expect(withMyStory(microNarrativeFull).failures).toEqual([
+      `narrative protocol '${approved.key}' is 'draft' — only an approved protocol can be fielded`,
+    ]);
+  });
+
+  it("refuses a release with MyStory that declares an older engine", () => {
+    expect(withMyStory(approved, "0.3.0").failures).toEqual([
+      "this composition needs engine 0.4.0, but the release declares engine 0.3.0",
+    ]);
   });
 });

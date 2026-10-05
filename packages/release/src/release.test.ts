@@ -426,6 +426,9 @@ describe("publish gate", () => {
 });
 
 describe("placing a narrative protocol in a composition", () => {
+  // A release with MyStory needs the engine that sends the module the frozen
+  // protocol (docs/16 §10.1).
+  const narrativeMeta = { ...meta, engineVersion: "0.4.0" };
   const approved: NarrativeProtocol = { ...microNarrativeFull, approvalStatus: "approved" };
   const withNarrative = structuredClone(ybmComposition);
   withNarrative.sections.push({
@@ -439,7 +442,7 @@ describe("placing a narrative protocol in a composition", () => {
   const registriesWithProtocol: Registries = { ...registries, narrativeProtocols: [approved] };
 
   it("freezes the protocol, its assembled prompts and its model configs", () => {
-    const manifest = buildRelease(withNarrative, registriesWithProtocol, meta);
+    const manifest = buildRelease(withNarrative, registriesWithProtocol, narrativeMeta);
     expect(manifest.narrativeProtocols[`${approved.key}@${approved.version}`]).toBeDefined();
     // What went to the provider is answerable from the release alone, without
     // re-deriving it from a template and a config that have both moved on.
@@ -456,7 +459,7 @@ describe("placing a narrative protocol in a composition", () => {
   });
 
   it("leaves session variables standing rather than pretending to know them", () => {
-    const manifest = buildRelease(withNarrative, registriesWithProtocol, meta);
+    const manifest = buildRelease(withNarrative, registriesWithProtocol, narrativeMeta);
     const interviewer = manifest.prompts[`pt.interviewer@${approved.version}`] as { system: string };
     expect(interviewer.system).toContain("{topic}");
   });
@@ -464,21 +467,21 @@ describe("placing a narrative protocol in a composition", () => {
   it("changes the release hash when the protocol changes", () => {
     // A protocol edit is a different study. If the hash did not move, two
     // fieldings running different questions would be indistinguishable later.
-    const a = buildRelease(withNarrative, registriesWithProtocol, meta);
+    const a = buildRelease(withNarrative, registriesWithProtocol, narrativeMeta);
     const edited: NarrativeProtocol = {
       ...approved,
       interview: { ...approved.interview!, questions: ["Tell me about school."] },
     };
-    const b = buildRelease(withNarrative, { ...registries, narrativeProtocols: [edited] }, meta);
+    const b = buildRelease(withNarrative, { ...registries, narrativeProtocols: [edited] }, narrativeMeta);
     expect(a.hash).not.toBe(b.hash);
   });
 
   it("refuses a protocol the composition names but nobody supplied", () => {
-    expect(() => buildRelease(withNarrative, registries, meta)).toThrow(/unresolved narrative protocol/);
+    expect(() => buildRelease(withNarrative, registries, narrativeMeta)).toThrow(/unresolved narrative protocol/);
   });
 
   it("refuses a protocol that has not been approved", () => {
-    expect(() => buildRelease(withNarrative, { ...registries, narrativeProtocols: [microNarrativeFull] }, meta)).toThrow(
+    expect(() => buildRelease(withNarrative, { ...registries, narrativeProtocols: [microNarrativeFull] }, narrativeMeta)).toThrow(
       /is 'draft' — only an approved protocol can be fielded/,
     );
   });
@@ -490,7 +493,7 @@ describe("placing a narrative protocol in a composition", () => {
       permittedIdentifiers: [],
       interview: { ...approved.interview!, questions: ["Hi {first_name}, what happened?"] },
     };
-    expect(() => buildRelease(withNarrative, { ...registries, narrativeProtocols: [leaky] }, meta)).toThrow(
+    expect(() => buildRelease(withNarrative, { ...registries, narrativeProtocols: [leaky] }, narrativeMeta)).toThrow(
       /not listed in permittedIdentifiers/,
     );
   });
@@ -499,8 +502,14 @@ describe("placing a narrative protocol in a composition", () => {
     const offlineDraft = structuredClone(withNarrative);
     offlineDraft.offline.narrativeConnectivity = "offline_capable_with_queue";
     const pausing: NarrativeProtocol = { ...approved, offlineFallback: "pause_module" };
-    expect(() => buildRelease(offlineDraft, { ...registries, narrativeProtocols: [pausing] }, meta)).toThrow(
+    expect(() => buildRelease(offlineDraft, { ...registries, narrativeProtocols: [pausing] }, narrativeMeta)).toThrow(
       /pauses when offline/,
+    );
+  });
+
+  it("refuses a release with MyStory that declares an engine without it", () => {
+    expect(() => buildRelease(withNarrative, registriesWithProtocol, meta)).toThrow(
+      /needs engine 0\.4\.0, but the release declares engine 0\.3\.0/,
     );
   });
 

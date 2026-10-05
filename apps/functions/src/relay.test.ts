@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { modelConfig } from "@myself/llm";
+import { modelConfig, type ModelConfig } from "@myself/llm";
 import { protocols } from "@myself/narrative";
+import type { ReleaseManifest } from "@myself/schema";
 import { releasesByHash } from "./releases.js";
 import {
   ALLOWED_ORIGIN,
   allowedOrigins,
   configFor,
+  configForCall,
   LINK_CALL_CAP,
   LINK_DAYS,
   linkRefusal,
@@ -90,6 +92,46 @@ describe("which model configuration a call runs on", () => {
     expect(config.temperature).toBe(declared.temperature);
     expect(config.maxOutputTokens).toBe(declared.maxOutputTokens);
     expect(config.model).toBe(declared.model);
+  });
+});
+
+describe("a call that names the release its sitting is running (docs/16 §10.1)", () => {
+  // A version published from the Studio: in no bundle, only in the release
+  // store, with a MyStory protocol whose model settings were edited there.
+  const shipped = protocols[0]!.models.find((m) => m.provider !== "mock")!;
+  const frozen: ModelConfig = { ...(shipped as ModelConfig), maxOutputTokens: 321 };
+  const STUDIO_HASH = `sha256:${"a".repeat(64)}`;
+  const studioRelease = { hash: STUDIO_HASH, modelConfigs: { [shipped.key]: frozen } } as unknown as ReleaseManifest;
+  const store = async (hash: string) => (hash === STUDIO_HASH ? studioRelease : (releasesByHash.get(hash) ?? null));
+
+  it("runs exactly the config that release froze, for a device too", async () => {
+    // Not the shipped protocol's copy under the same key: the release's own.
+    await expect(configForCall(shipped.key, device, STUDIO_HASH, store)).resolves.toEqual(modelConfig.parse(frozen));
+    expect((await configForCall(shipped.key, researcher, STUDIO_HASH, store)).maxOutputTokens).toBe(321);
+  });
+
+  it("refuses a release the study never published, whoever is asking", async () => {
+    const unknown = `sha256:${"b".repeat(64)}`;
+    await expect(configForCall(shipped.key, researcher, unknown, store)).rejects.toThrow(/has not published/);
+    await expect(configForCall(shipped.key, device, unknown, store)).rejects.toMatchObject({ status: 400 });
+  });
+
+  it("refuses a config that release did not freeze, even one a shipped protocol declares", async () => {
+    const r800 = [...releasesByHash.values()].find((r) => r.release.version === "8.0.0")!;
+    await expect(configForCall(shipped.key, researcher, r800.hash!, store)).rejects.toThrow(/is not a model configuration the version this sitting is running declares/);
+    await expect(configForCall("constructor", device, STUDIO_HASH, store)).rejects.toThrow(/is not a model configuration/);
+  });
+
+  it("says the store could not be read rather than running something else", async () => {
+    const failing = async () => {
+      throw new Error("unavailable");
+    };
+    await expect(configForCall(shipped.key, device, STUDIO_HASH, failing)).rejects.toMatchObject({ status: 503, kind: "transport", retryable: true });
+  });
+
+  it("decides a call that names no release as before", async () => {
+    await expect(configForCall(shipped.key, researcher, undefined, store)).resolves.toEqual(configFor(shipped.key, researcher));
+    expect(relayRequest.safeParse({ prompt: { system: "s", messages: [] }, modelConfigKey: "mc.x", protocolKey: "np.x", releaseHash: "" }).success).toBe(false);
   });
 });
 

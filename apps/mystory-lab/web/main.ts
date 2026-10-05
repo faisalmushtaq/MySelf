@@ -5,9 +5,11 @@ import {
   defaultCharacter,
   protocols,
   type CharacterConfig,
+  type NarrativeProtocol,
   type RunnerSnapshot,
   type Screen,
 } from "@myself/narrative";
+import { REFUSED, receiveHostProtocol, sameProtocol, type HostProtocol } from "./host-protocol.js";
 import { session } from "./session.js";
 
 /**
@@ -67,6 +69,30 @@ const linkKey = new URL(window.location.href).searchParams.get("k");
 const embedded = new URL(window.location.href).searchParams.get("embed") === "1";
 const hostSessionId = new URL(window.location.href).searchParams.get("sessionId");
 const hostReleaseHash = new URL(window.location.href).searchParams.get("releaseHash");
+/**
+ * The same hash, sent with every model call, so the relay runs the settings
+ * that release froze — a version published from the Studio is in no bundle the
+ * relay carries (docs/16 §10.1). Nothing when the lab is used on its own.
+ */
+const relayRelease = hostReleaseHash ? { releaseHash: hostReleaseHash } : {};
+
+/**
+ * The protocol itself, sent by the survey (see host-protocol.ts).
+ *
+ * A survey that marks the URL `protocolFromHost=1` sends the protocol frozen
+ * into its release, which may have been edited in Studio and so be in no
+ * list bundled here. Asked for as the page loads, and waited for before
+ * anything starts; the module then runs that protocol or refuses. A survey that
+ * does not mark the URL sends nothing, and the bundled list is used as before.
+ */
+const protocolFromHost =
+  embedded && new URL(window.location.href).searchParams.get("protocolFromHost") === "1";
+const hostProtocol: Promise<HostProtocol | null> = protocolFromHost
+  ? receiveHostProtocol(window, {
+      sessionId: hostSessionId,
+      expectedKey: new URL(window.location.href).searchParams.get("protocol"),
+    })
+  : Promise.resolve(null);
 
 /**
  * Tell the survey the module is done.
@@ -179,14 +205,55 @@ async function detectServer(): Promise<void> {
   }
 }
 
-for (const p of protocols) {
+/**
+ * The protocols this page can run: the ones bundled with it and, inside the
+ * survey, the one the survey sent, in place of any bundled copy of the same
+ * protocol. Everything below looks protocols up here, never in the
+ * bundled list directly, so the one the survey sent is the one that runs.
+ */
+const available: NarrativeProtocol[] = [...protocols];
+/** The protocol the survey sent, once it has been checked and adopted. */
+let fromHost: NarrativeProtocol | null = null;
+
+for (const p of available) {
   const option = document.createElement("option");
   option.value = p.key;
   option.textContent = `${p.name} (${p.key}@${p.version})`;
   $("protocol").append(option);
 }
+
+function adoptHostProtocol(protocol: NarrativeProtocol): void {
+  fromHost = protocol;
+  const at = available.findIndex((p) => p.key === protocol.key);
+  if (at >= 0) available[at] = protocol;
+  else available.push(protocol);
+  const select = $("protocol") as HTMLSelectElement;
+  let option = [...select.options].find((o) => o.value === protocol.key);
+  if (!option) {
+    option = document.createElement("option");
+    option.value = protocol.key;
+    select.append(option);
+  }
+  option.textContent = `${protocol.name} (${protocol.key}@${protocol.version}, sent by the survey)`;
+}
+
+/**
+ * Refuse to start, say why on the page, and tell the survey, which offers the
+ * participant a way past at once rather than after its usual wait.
+ */
+function refuseToStart(problem: string): void {
+  ($("start") as HTMLButtonElement).disabled = true;
+  $("bootNote").innerHTML =
+    `<div class="alert">This conversation cannot start: ${escapeHtml(problem)}. Nothing has been started.</div>`;
+  try {
+    window.parent?.postMessage({ type: REFUSED, sessionId: hostSessionId, problem }, "*");
+  } catch {
+    // The page says so either way, and the survey offers a way past in time.
+  }
+}
+
 const showGate = () => {
-  const protocol = protocols.find((p) => p.key === ($("protocol") as HTMLSelectElement).value)!;
+  const protocol = available.find((p) => p.key === ($("protocol") as HTMLSelectElement).value)!;
   const problems = checkProtocol(protocol);
   $("gate").textContent = problems.length
     ? `Publish gate: ${problems.join(" · ")}`
@@ -218,7 +285,7 @@ const THIRD_PERSON = /\b(they|them|their|theirs|he|him|his|she|her|hers|the (?:y
 
 const showTopic = () => {
   const topic = ($("topic") as HTMLInputElement).value.trim();
-  const protocol = protocols.find((p) => p.key === ($("protocol") as HTMLSelectElement).value)!;
+  const protocol = available.find((p) => p.key === ($("protocol") as HTMLSelectElement).value)!;
   // The stage that speaks to the participant using the topic, whichever it is
   // in this protocol — found rather than assumed, so a protocol that words its
   // opening differently is previewed correctly.
@@ -2493,7 +2560,7 @@ async function restore(): Promise<boolean> {
   const saved = savedRun();
   if (!saved) return false;
 
-  const protocol = protocols.find((p) => p.key === saved.protocolKey);
+  const protocol = available.find((p) => p.key === saved.protocolKey);
   if (!protocol) {
     forget();
     return false;
@@ -2507,7 +2574,7 @@ async function restore(): Promise<boolean> {
 
   const calls: ModelCall[] = [...saved.calls];
   const gateway = new Gateway({
-    adapters: [new RelayAdapter({ url: relayUrl, ...(linkKey ? { linkKey } : { token: token! }) })],
+    adapters: [new RelayAdapter({ url: relayUrl, ...(linkKey ? { linkKey } : { token: token! }), ...relayRelease })],
     onCall: (call) => {
       const at = calls.findIndex((c) => c.callId === call.callId);
       if (at >= 0) calls[at] = call;
@@ -2724,11 +2791,20 @@ $("start").addEventListener("click", () => {
     handedOver = false;
 
     if (live) {
+      // The local server runs its own copy of each protocol, found by key, and
+      // cannot be handed another. So a protocol the survey sent runs there
+      // only when it is that copy exactly.
+      if (fromHost && !sameProtocol(fromHost, protocols.find((p) => p.key === key))) {
+        refuseToStart(
+          "the survey sent a protocol that differs from this local server's own copy, and the server can only run its own",
+        );
+        return;
+      }
       // A local server with a key, which holds it and makes the call.
       localRunner = null;
       // The character is a property of the protocol, so it is the same
       // whichever side is running it.
-      showCharacter(protocols.find((p) => p.key === key)?.character ?? defaultCharacter());
+      showCharacter(available.find((p) => p.key === key)?.character ?? defaultCharacter());
       const data = await api<Frame & { sessionId: string; provider: string }>("/api/start", {
         protocol: key,
         firstName,
@@ -2778,7 +2854,7 @@ $("start").addEventListener("click", () => {
 
     localCalls = [];
     const gateway = new Gateway({
-      adapters: [new RelayAdapter({ url: relay, ...(linkKey ? { linkKey } : { token: token! }) })],
+      adapters: [new RelayAdapter({ url: relay, ...(linkKey ? { linkKey } : { token: token! }), ...relayRelease })],
       onCall: (call) => {
         const at = localCalls.findIndex((c) => c.callId === call.callId);
         if (at >= 0) localCalls[at] = call;
@@ -2788,7 +2864,7 @@ $("start").addEventListener("click", () => {
     // The sitting's id when the survey handed one over, so the run is filed
     // against the sitting rather than against an id invented here.
     sessionId = hostSessionId ?? `lab_${Date.now().toString(36)}`;
-    const chosen = protocols.find((p) => p.key === key)!;
+    const chosen = available.find((p) => p.key === key)!;
     showCharacter(chosen.character);
     const variables = { first_name: firstName, topic };
     localRunner = new NarrativeRunner(chosen, { sessionId, variables, online }, gateway);
@@ -2813,7 +2889,9 @@ $("start").addEventListener("click", () => {
  * "should I wait?".
  */
 (window as unknown as { __mystoryReady?: boolean }).__mystoryReady = true;
-($("start") as HTMLButtonElement).disabled = false;
+// Not yet, when the survey is sending the protocol: nothing may start on the
+// bundled copy while that is on its way.
+($("start") as HTMLButtonElement).disabled = protocolFromHost;
 
 /**
  * Sign-in, shown only where it does something.
@@ -2906,7 +2984,7 @@ function applyLinkedRun(): { start: boolean } {
   const wanted = params.get("protocol");
   if (wanted !== null) {
     const select = $("protocol") as HTMLSelectElement;
-    if (protocols.some((p) => p.key === wanted)) select.value = wanted;
+    if (available.some((p) => p.key === wanted)) select.value = wanted;
     else {
       $("bootNote").innerHTML =
         `<div class="alert">This link asks for a protocol called <code>${escapeHtml(wanted)}</code>,
@@ -2999,7 +3077,7 @@ function wireTesterLink(): void {
 
 $("buildStamp").textContent = `built ${__BUILD_STAMP__} UTC`;
 wireViewToggle();
-void detectServer().then(() => {
+void detectServer().then(async () => {
   wireSignIn();
   wireTesterLink();
 
@@ -3014,6 +3092,21 @@ void detectServer().then(() => {
     session.onChange((user) => {
       $("signIn").classList.toggle("lab-only", user !== null);
     });
+  }
+
+  /**
+   * The survey's protocol, before the link is read or a saved run restored:
+   * both look the protocol up, and must find the one the survey sent. One
+   * that fails its checks, or never comes, stops everything here.
+   */
+  const host = await hostProtocol;
+  if (host && !host.ok) {
+    refuseToStart(host.problem);
+    return;
+  }
+  if (host?.ok) {
+    adoptHostProtocol(host.protocol);
+    if (live || relay) ($("start") as HTMLButtonElement).disabled = false;
   }
 
   const { start } = applyLinkedRun();

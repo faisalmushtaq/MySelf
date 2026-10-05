@@ -35,6 +35,7 @@ export const NO_ISSUES: IssueCount = Object.freeze({ errors: 0, warnings: 0 });
 export interface IssueIndex {
   welcome: IssueCount;
   completion: IssueCount;
+  mystory: IssueCount;
   survey: IssueCount;
   /** Issues located at a section itself (its title, its condition). */
   section: ReadonlyMap<string, IssueCount>;
@@ -58,7 +59,12 @@ export function indexIssues(issues: readonly Issue[]): IssueIndex {
   const section = new Map<string, IssueCount>();
   const block = new Map<string, IssueCount>();
   const question = new Map<string, IssueCount>();
-  const singles = { welcome: new Map<string, IssueCount>(), completion: new Map<string, IssueCount>(), survey: new Map<string, IssueCount>() };
+  const singles = {
+    welcome: new Map<string, IssueCount>(),
+    completion: new Map<string, IssueCount>(),
+    mystory: new Map<string, IssueCount>(),
+    survey: new Map<string, IssueCount>(),
+  };
   for (const issue of issues) {
     const at = issue.location;
     switch (at.kind) {
@@ -79,6 +85,7 @@ export function indexIssues(issues: readonly Issue[]): IssueIndex {
         break;
       case "welcome":
       case "completion":
+      case "mystory":
       case "survey":
         bump(singles[at.kind], "", issue.severity);
         break;
@@ -87,6 +94,7 @@ export function indexIssues(issues: readonly Issue[]): IssueIndex {
   return {
     welcome: singles.welcome.get("") ?? NO_ISSUES,
     completion: singles.completion.get("") ?? NO_ISSUES,
+    mystory: singles.mystory.get("") ?? NO_ISSUES,
     survey: singles.survey.get("") ?? NO_ISSUES,
     section,
     block,
@@ -162,6 +170,7 @@ export type NodeKind =
   | "question"
   | "add-question"
   | "add-section"
+  | "mystory"
   | "completion"
   | "settings"
   | "archive"
@@ -593,6 +602,34 @@ export function buildTree(o: Outline, index: IssueIndex, opts: TreeOptions): Tre
         [],
       ),
     );
+  }
+
+  // MyStory, between the last section and the completion screen: where a
+  // participant meets it. Listed when it is off too, as the place to switch it on.
+  {
+    const label = o.mystory ? "MyStory" : "MyStory (off)";
+    const textMatch = findMatches(label, query);
+    if (!filtering || leafPasses(index.mystory, textMatch.length > 0, false)) {
+      roots.push(
+        finish(
+          {
+            id: "mystory",
+            kind: "mystory",
+            level: 1,
+            parentId: null,
+            label,
+            expandable: false,
+            expanded: false,
+            children: [],
+            selection: { kind: "mystory" },
+            issues: index.mystory,
+            textMatch,
+            idMatch: [],
+          },
+          [o.mystory?.id ?? ""],
+        ),
+      );
+    }
   }
 
   for (const [id, kind, label, issues] of [

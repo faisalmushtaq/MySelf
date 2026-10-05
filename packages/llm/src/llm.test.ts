@@ -82,35 +82,7 @@ describe("how the relay adapter says who it is", () => {
    * of the credential, so sending the wrong one is a 401 for a link that is
    * perfectly valid — and the page would report it as the model being down.
    */
-  const sent = async (options: Record<string, unknown>) => {
-    const { RelayAdapter } = await import("./index.js");
-    let headers: Record<string, string> = {};
-    const original = globalThis.fetch;
-    globalThis.fetch = (async (_url: string, init: { headers: Record<string, string> }) => {
-      headers = init.headers;
-      return { ok: true, json: async () => ({ text: "{}", modelServed: "gpt-4o" }) };
-    }) as unknown as typeof fetch;
-    try {
-      await new RelayAdapter({ url: "https://example.test/relay", ...options }).generate(
-        { promptKey: "p.x", promptVersion: "1.0.0", system: "s", messages: [{ role: "user", content: "hello" }], variables: {} },
-        {
-          key: "mc.x",
-          provider: "openai",
-          model: "gpt-4o",
-          temperature: 0.7,
-          maxOutputTokens: 100,
-          timeoutSeconds: 30,
-          maxAttempts: 1,
-          dataHandling: { trainingUseOptOut: true },
-        },
-      );
-    } catch {
-      // The response shape is not what is under test; the header is.
-    } finally {
-      globalThis.fetch = original;
-    }
-    return headers["authorization"] ?? null;
-  };
+  const sent = async (options: Record<string, unknown>) => (await request(options)).headers["authorization"] ?? null;
 
   it("sends a signed-in credential as Bearer", async () => {
     expect(await sent({ token: "abc" })).toBe("Bearer abc");
@@ -130,3 +102,49 @@ describe("how the relay adapter says who it is", () => {
     expect(await sent({})).toBeNull();
   });
 });
+
+describe("which release the relay adapter names", () => {
+  /**
+   * The relay runs the model config the sitting's release froze, which for a
+   * version published from the Studio it can only know if told which release
+   * that is (docs/16 §10.1).
+   */
+  it("sends the sitting's release hash with the config key, and nothing when there is none", async () => {
+    const hash = `sha256:${"c".repeat(64)}`;
+    expect((await request({ token: "t", releaseHash: hash })).body).toMatchObject({ modelConfigKey: "mc.x", releaseHash: hash });
+    expect((await request({ token: "t" })).body).not.toHaveProperty("releaseHash");
+  });
+});
+
+/** What the relay adapter posts for one call: its headers and its body. */
+async function request(options: Record<string, unknown>): Promise<{ headers: Record<string, string>; body: Record<string, unknown> }> {
+  const { RelayAdapter } = await import("./index.js");
+  let headers: Record<string, string> = {};
+  let body: Record<string, unknown> = {};
+  const original = globalThis.fetch;
+  globalThis.fetch = (async (_url: string, init: { headers: Record<string, string>; body: string }) => {
+    headers = init.headers;
+    body = JSON.parse(init.body) as Record<string, unknown>;
+    return { ok: true, json: async () => ({ text: "{}", modelServed: "gpt-4o" }) };
+  }) as unknown as typeof fetch;
+  try {
+    await new RelayAdapter({ url: "https://example.test/relay", ...options }).generate(
+      { promptKey: "p.x", promptVersion: "1.0.0", system: "s", messages: [{ role: "user", content: "hello" }], variables: {} },
+      {
+        key: "mc.x",
+        provider: "openai",
+        model: "gpt-4o",
+        temperature: 0.7,
+        maxOutputTokens: 100,
+        timeoutSeconds: 30,
+        maxAttempts: 1,
+        dataHandling: { trainingUseOptOut: true },
+      },
+    );
+  } catch {
+    // The response shape is not what is under test; the request is.
+  } finally {
+    globalThis.fetch = original;
+  }
+  return { headers, body };
+}

@@ -1884,3 +1884,31 @@
     display: none;
   }
 }
+
+/* MyStory's protocol file: the TOML, as it is typed (MyStoryEditor). */
+.studio .stn-toml.st-input {
+  min-height: 320px;
+  resize: vertical;
+  line-height: 18px;
+  white-space: pre;
+  overflow-wrap: normal;
+  overflow-x: auto;
+  tab-size: 2;
+}
+.stn-problems {
+  margin: 0;
+  padding-left: 40px;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--st-danger);
+}
+.stn-problems li + li {
+  margin-top: 2px;
+}
+.stn-mystory .stn-panel > .stn-msgs:not(:empty),
+.stn-mystory .stn-panel > .stn-switchrow {
+  margin-bottom: 12px;
+}
+.stn-mystory .stn-panel > .stn-msgs[aria-live] {
+  margin: -8px 0 12px;
+}

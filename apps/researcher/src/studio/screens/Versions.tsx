@@ -1,6 +1,7 @@
 import { useId, useMemo, useState } from "react";
 import { atLeast, extractDraft, type StudioDraft } from "@myself/studio";
 import {
+  loadAudit,
   studio,
   StudioCallError,
   useAudit,
@@ -14,7 +15,9 @@ import {
   type VersionDoc,
 } from "../data/index.js";
 import { diffDrafts } from "../data/model-adapter.js";
+import { provenanceCsv, provenanceDocument, provenanceFilename, provenanceRows } from "../data/provenance.js";
 import { loadRelease, useRelease } from "../data/releases.js";
+import { STUDY } from "../firebase.js";
 import { downloadText, formatDate, formatDateTime, toDate, versionLabel } from "../format.js";
 import { navigate } from "../router.js";
 import { AuditList, ChangeList, LoadError, changeHeadline } from "../shell/common.js";
@@ -49,6 +52,7 @@ export function VersionsScreen({ surveyId, survey, editor }: { surveyId: string;
     <div className="stp-page">
       <PageHead
         title="Versions"
+        actions={<ProvenanceDownload surveyId={surveyId} survey={survey} versions={versions} stats={stats} />}
         lede={
           live ? (
             <>
@@ -148,6 +152,70 @@ export function VersionsScreen({ surveyId, survey, editor }: { surveyId: string;
         )}
       </TabPanel>
     </div>
+  );
+}
+
+/**
+ * The provenance of every version, as a spreadsheet or as JSON (docs/16
+ * §10.2): read from what the Studio already keeps — the version records,
+ * their releases, the audit trail and the sitting counts — when asked for.
+ */
+function ProvenanceDownload({
+  surveyId,
+  survey,
+  versions,
+  stats,
+}: {
+  surveyId: string;
+  survey: SurveyDoc | null;
+  versions: Loadable<VersionDoc[]>;
+  stats: Loadable<ResponseStatsResponse>;
+}) {
+  const toast = useToast();
+  const [busy, setBusy] = useState(false);
+  const ready = versions.status === "ready" && versions.data.length > 0;
+
+  const download = (format: "csv" | "json") => {
+    if (versions.status !== "ready") return;
+    const list = versions.data;
+    setBusy(true);
+    Promise.all([
+      loadAudit(surveyId),
+      // A release that can't be read leaves its MyStory column empty rather than the whole download undone.
+      Promise.all(list.map((v) => loadRelease(v.hash).then((r) => [v.hash, r.raw] as const, () => null))),
+    ])
+      .then(([audit, loaded]) => {
+        const live = survey?.active ?? null;
+        const rows = provenanceRows({
+          versions: list,
+          live,
+          audit,
+          releases: new Map(loaded.filter((x): x is readonly [string, unknown] => x !== null)),
+          sittings: stats.status === "ready" ? stats.data.byHash : null,
+        });
+        const now = new Date();
+        if (format === "csv") {
+          downloadText(provenanceCsv(rows), provenanceFilename(surveyId, now, "csv"), "text/csv;charset=utf-8");
+        } else {
+          const doc = provenanceDocument(rows, { study: STUDY, surveyId, title: survey?.title ?? null, live, exportedAt: now });
+          downloadText(`${JSON.stringify(doc, null, 2)}\n`, provenanceFilename(surveyId, now, "json"));
+        }
+      })
+      .catch((e: unknown) => toast.error("Couldn’t prepare the provenance", e instanceof Error ? e.message : undefined))
+      .finally(() => setBusy(false));
+  };
+
+  const hint = ready ? undefined : "There are no published versions yet.";
+  return (
+    <MenuButton
+      label="Download provenance"
+      icon="arrow-down"
+      buttonLabel={busy ? "Preparing…" : "Download provenance"}
+      items={[
+        { label: "As a spreadsheet (CSV)", icon: "arrow-down", onSelect: () => download("csv"), disabled: !ready || busy, ...(hint ? { hint } : {}) },
+        { label: "As JSON", icon: "arrow-down", onSelect: () => download("json"), disabled: !ready || busy, ...(hint ? { hint } : {}) },
+      ]}
+    />
   );
 }
 

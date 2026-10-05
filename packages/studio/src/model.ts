@@ -1,6 +1,7 @@
 import type { ItemDefinition } from "@myself/schema";
 import type { QuestionTypeId } from "./catalogue.js";
 import type { CompositionInput, InstrumentOrModule, ScaleInput, StudioDraft } from "./contract.js";
+import { isMyStorySection, myStoryOf } from "./mystory.js";
 import { definedQuestions, formOf, placements, splitItemKey, type Placement } from "./walk.js";
 
 /**
@@ -372,10 +373,24 @@ export interface OutlineSection {
   index: number;
   hasCondition: boolean;
   /**
-   * Instrument and module blocks. Screen and narrative components are outside
-   * what the Studio edits (docs/16 §8) and are not listed.
+   * Instrument and module blocks. Screen components are outside what the
+   * Studio edits (docs/16 §8) and are not listed; MyStory is `Outline.mystory`.
    */
   blocks: OutlineBlock[];
+}
+
+/** MyStory, when it is on (docs/16 §10.1). */
+export interface OutlineMyStory {
+  sectionKey: string;
+  sectionIndex: number;
+  title: string;
+  /** `key@version`. */
+  id: string;
+  protocol: string;
+  version: string;
+  /** The protocol's own name, when the draft carries its definition. */
+  name: string | null;
+  approvalStatus: "draft" | "in_review" | "approved" | null;
 }
 
 export interface Outline {
@@ -386,7 +401,9 @@ export interface Outline {
     participantCode: ParticipantCode | null;
     contact: Contact | null;
   };
+  /** Every section but MyStory's, which is always last and listed on its own. */
   sections: OutlineSection[];
+  mystory: OutlineMyStory | null;
   completion: { finish: Screen | null; review: Screen | null };
   archived: { itemKey: string; text: string; sectionKey: string | null }[];
 }
@@ -402,15 +419,22 @@ export function outline(draft: StudioDraft): Outline {
     return t;
   };
   let position = 0;
-  const sections: OutlineSection[] = c.sections.map((section, index) => ({
-    key: section.key,
-    title: section.title,
-    index,
-    hasCondition: section.displayIf != null,
-    blocks: all
-      .filter((p) => p.sectionIndex === index)
-      .map((p) => outlineBlock(draft, p, tierOf(p.instrument), () => position++)),
-  }));
+  const sections: OutlineSection[] = c.sections.flatMap((section, index) =>
+    isMyStorySection(section)
+      ? []
+      : [
+          {
+            key: section.key,
+            title: section.title,
+            index,
+            hasCondition: section.displayIf != null,
+            blocks: all
+              .filter((p) => p.sectionIndex === index)
+              .map((p) => outlineBlock(draft, p, tierOf(p.instrument), () => position++)),
+          },
+        ],
+  );
+  const story = myStoryOf(draft);
   return {
     welcome: {
       title: c.title,
@@ -419,6 +443,18 @@ export function outline(draft: StudioDraft): Outline {
       contact: c.contact ?? null,
     },
     sections,
+    mystory: story
+      ? {
+          sectionKey: story.sectionKey,
+          sectionIndex: story.sectionIndex,
+          title: c.sections[story.sectionIndex]?.title ?? "",
+          id: story.id,
+          protocol: story.protocol,
+          version: story.version,
+          name: story.definition?.name ?? null,
+          approvalStatus: story.definition?.approvalStatus ?? null,
+        }
+      : null,
     completion: { finish: c.screens["finish"] ?? null, review: c.screens["review"] ?? null },
     archived: draft.archived.map((a) => ({ itemKey: a.itemKey, text: a.item.stem.text, sectionKey: a.sectionKey })),
   };

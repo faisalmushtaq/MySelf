@@ -2,6 +2,7 @@ import { compareVersions } from "@myself/release/gate";
 import { assessmentDraft, canonicalJson, instrumentVersion, itemDefinition, moduleDefinition, responseScale, scaleOption } from "@myself/schema";
 import type { Bump, ChangeEntry, ChangeKind, ChangeSummary, StudioDraft } from "./contract.js";
 import { instrumentLabel, joinAnd, questionLabel, truncateText } from "./locked.js";
+import { isMyStorySection, myStoryOf, sameProtocol } from "./mystory.js";
 import { liveQuestions, placements, type LiveQuestion } from "./walk.js";
 
 /**
@@ -306,6 +307,8 @@ function sideOf(draft: StudioDraft | null): Side {
     }
     list(draft.composition.sections).forEach((section, index) => {
       if (!isObject(section) || typeof section["key"] !== "string" || sections.has(section["key"])) return;
+      // MyStory's section is MyStory, and is compared as that (`diffMyStory`).
+      if (isMyStorySection(section as Parameters<typeof isMyStorySection>[0])) return;
       sections.set(section["key"], { index, section });
       sectionOrder.push(section["key"]);
     });
@@ -433,6 +436,55 @@ function diffSections(a: Side, b: Side, out: ChangeEntry[]): void {
   for (const key of commonAfter) {
     if (!stable.has(key)) out.push(entry("section.reordered", "major", `Moved the section ${sectionName(b, key)} to a different point in the survey.`, { sectionKey: key }));
   }
+}
+
+/**
+ * MyStory (docs/16 §10.1): switched on or off, or running another protocol.
+ *
+ * Each is MAJOR. Participants meet a conversation that was not there, or one
+ * that asks them different things, and the narrative data of two versions is
+ * not comparable without an argument that it is. A protocol is named by its
+ * `key@version`, which is what the summary says.
+ */
+function diffMyStory(before: StudioDraft | null, after: StudioDraft, out: ChangeEntry[]): void {
+  const a = before ? myStoryOf(before) : null;
+  const b = myStoryOf(after);
+  if (!a && !b) return;
+  if (!a && b) {
+    out.push(entry("mystory.added", "major", `MyStory added (${b.id}).`, { sectionKey: b.sectionKey }));
+    return;
+  }
+  if (a && !b) {
+    out.push(entry("mystory.removed", "major", `MyStory removed (${a.id}).`, { sectionKey: a.sectionKey }));
+    return;
+  }
+  if (!a || !b) return;
+  if (a.id !== b.id) {
+    out.push(entry("mystory.changed", "major", `MyStory protocol changed from ${a.id} to ${b.id}.`, { sectionKey: b.sectionKey, aspects: ["protocol"] }));
+  } else if (!sameProtocol(a.definition, b.definition)) {
+    out.push(entry("mystory.changed", "major", `MyStory protocol ${b.id} changed, keeping its version.`, { sectionKey: b.sectionKey, aspects: ["protocol"] }));
+  }
+  const sectionOf = (draft: StudioDraft, index: number) => (list(draft.composition.sections)[index] ?? {}) as Loose;
+  const was = sectionOf(before!, a.sectionIndex);
+  const now = sectionOf(after, b.sectionIndex);
+  if (!same(was["title"], now["title"])) {
+    out.push(entry("mystory.changed", "minor", `Renamed MyStory's section to “${truncateText(String(now["title"] ?? ""), 40)}”.`, { sectionKey: b.sectionKey, aspects: ["title"] }));
+  }
+  if (!same(was["displayIf"], now["displayIf"])) {
+    out.push(entry("mystory.changed", "major", "Changed when MyStory is shown.", { sectionKey: b.sectionKey, aspects: ["logic"] }));
+  }
+}
+
+/**
+ * The composition with MyStory's connectivity setting set aside, when MyStory
+ * was switched on or off: switching it says that much on its own, and the
+ * setting means nothing without it.
+ */
+function withoutStoryConnectivity(c: Loose): Loose {
+  const offline = c["offline"];
+  if (!isObject(offline) || !("narrativeConnectivity" in offline)) return c;
+  const { narrativeConnectivity: _set, ...rest } = offline;
+  return { ...c, offline: rest };
 }
 
 function diffQuestions(a: Side, b: Side, out: ChangeEntry[], counts: ChangeSummary["counts"]): void {
@@ -615,10 +667,12 @@ function summarise(before: StudioDraft | null, after: StudioDraft): ChangeSummar
   if (before) diffWelcome(ca, cb, entries);
   diffSections(a, b, entries);
   diffQuestions(a, b, entries, counts);
+  diffMyStory(before, after, entries);
   if (before) {
     diffBlocks(a, b, entries);
     diffScreens(ca, cb, entries);
-    diffSettings(ca, cb, entries);
+    const toggled = !myStoryOf(before) !== !myStoryOf(after);
+    diffSettings(toggled ? withoutStoryConnectivity(ca) : ca, toggled ? withoutStoryConnectivity(cb) : cb, entries);
   }
   return { bump: suggestBump({ entries }), entries, counts };
 }
