@@ -180,6 +180,11 @@ describe("which release the relay adapter names", () => {
     expect((await request({ token: "t", releaseHash: hash })).body).toMatchObject({ modelConfigKey: "mc.x", releaseHash: hash });
     expect((await request({ token: "t" })).body).not.toHaveProperty("releaseHash");
   });
+
+  it("sends the sitting's study beside it (D-56), and nothing for the default's", async () => {
+    expect((await request({ deviceCredential: `ipad_1.${"s".repeat(43)}`, study: "future" })).body).toMatchObject({ study: "future" });
+    expect((await request({ token: "t" })).body).not.toHaveProperty("study");
+  });
 });
 
 /** What the relay adapter posts for one call: its headers and its body. */
