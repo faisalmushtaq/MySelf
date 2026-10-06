@@ -5,6 +5,7 @@ import { ROLE_NAMES } from "../format.js";
 import { Link, guardedAction, leaveStudio, navigate, type Route } from "../router.js";
 import { Icon, type IconName } from "../ui/icons.js";
 import { MenuButton, VisuallyHidden, type MenuItem } from "../ui/kit.js";
+import { StudySwitcher } from "./StudySwitcher.js";
 
 /**
  * The frame around every Studio page: a quiet 48px header (the mark, where you
@@ -63,6 +64,7 @@ export function Shell({
                 <VisuallyHidden>MySelf </VisuallyHidden>Studio
               </span>
             </Link>
+            <StudySwitcher />
             {crumb ? (
               <>
                 <span className="stp-crumb-sep" aria-hidden="true">

@@ -99,6 +99,24 @@ describe("resolving a release by hash", () => {
     expect(reads).toEqual([]);
   });
 
+  it("finds a bundled release only for its own study, so another study never reads ybm's questions (D-56)", async () => {
+    const { db, reads } = fakeStore();
+    const resolve = releaseResolver();
+    expect(await resolve(db, "future", latestRelease!.hash!)).toBeNull();
+    // It looked in that study's own store, and nowhere else.
+    expect(reads).toEqual([paths.publicRelease("future", hashHex(latestRelease!.hash!))]);
+    expect((await resolve(db, STUDY, latestRelease!.hash!))?.source).toBe("bundled");
+  });
+
+  it("finds a study's own stored release in that study only", async () => {
+    const { raw, hash } = await studioRelease();
+    const { db, put } = fakeStore();
+    put(hash, storeDoc(raw, hash), "future");
+    const resolve = releaseResolver();
+    expect(await resolve(db, STUDY, hash)).toBeNull();
+    expect((await resolve(db, "future", hash))?.source).toBe("store");
+  });
+
   it("reads a release only the store holds, once its hash verifies", async () => {
     const { raw, hash } = await studioRelease();
     const { db, put } = fakeStore();

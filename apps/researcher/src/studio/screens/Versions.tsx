@@ -17,7 +17,7 @@ import {
 import { diffDrafts } from "../data/model-adapter.js";
 import { provenanceCsv, provenanceDocument, provenanceFilename, provenanceRows } from "../data/provenance.js";
 import { loadRelease, useRelease } from "../data/releases.js";
-import { STUDY } from "../firebase.js";
+import { useStudy } from "../router.js";
 import { downloadText, formatDate, formatDateTime, toDate, versionLabel } from "../format.js";
 import { navigate } from "../router.js";
 import { AuditList, ChangeList, LoadError, changeHeadline } from "../shell/common.js";
@@ -25,6 +25,7 @@ import { PageHead } from "../shell/Shell.js";
 import { Dialog } from "../ui/dialog.js";
 import { Button, EmptyState, Field, IconButton, InfoTip, MenuButton, Notice, Skeleton, StatusDot, type MenuItem } from "../ui/kit.js";
 import { TabPanel, Tabs } from "../ui/tabs.js";
+import { ParticipantLinkDialog } from "./ParticipantLink.js";
 import { useToast } from "../ui/toast.js";
 
 /**
@@ -44,6 +45,7 @@ export function VersionsScreen({ surveyId, survey, editor }: { surveyId: string;
   const versions = useVersions(surveyId);
   const stats = useResponseStats(surveyId);
   const [view, setView] = useState<View>("history");
+  const [showLink, setShowLink] = useState(false);
   const [compare, setCompare] = useState<{ from: string; to: string } | null>(null);
   const idBase = useId().replace(/:/g, "");
   const live = survey?.active ?? null;
@@ -52,7 +54,17 @@ export function VersionsScreen({ surveyId, survey, editor }: { surveyId: string;
     <div className="stp-page">
       <PageHead
         title="Versions"
-        actions={<ProvenanceDownload surveyId={surveyId} survey={survey} versions={versions} stats={stats} />}
+        actions={
+          <>
+            {/* The survey's participant link, once something is live for it to open (D-56). */}
+            {live ? (
+              <Button icon="link" onClick={() => setShowLink(true)}>
+                Participant link
+              </Button>
+            ) : null}
+            <ProvenanceDownload surveyId={surveyId} survey={survey} versions={versions} stats={stats} />
+          </>
+        }
         lede={
           live ? (
             <>
@@ -151,6 +163,7 @@ export function VersionsScreen({ surveyId, survey, editor }: { surveyId: string;
           <ActivityView surveyId={surveyId} />
         )}
       </TabPanel>
+      {showLink && survey ? <ParticipantLinkDialog survey={survey} onClose={() => setShowLink(false)} /> : null}
     </div>
   );
 }
@@ -172,6 +185,7 @@ function ProvenanceDownload({
   stats: Loadable<ResponseStatsResponse>;
 }) {
   const toast = useToast();
+  const study = useStudy();
   const [busy, setBusy] = useState(false);
   const ready = versions.status === "ready" && versions.data.length > 0;
 
@@ -197,7 +211,7 @@ function ProvenanceDownload({
         if (format === "csv") {
           downloadText(provenanceCsv(rows), provenanceFilename(surveyId, now, "csv"), "text/csv;charset=utf-8");
         } else {
-          const doc = provenanceDocument(rows, { study: STUDY, surveyId, title: survey?.title ?? null, live, exportedAt: now });
+          const doc = provenanceDocument(rows, { study, surveyId, title: survey?.title ?? null, live, exportedAt: now });
           downloadText(`${JSON.stringify(doc, null, 2)}\n`, provenanceFilename(surveyId, now, "json"));
         }
       })

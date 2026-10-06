@@ -4,7 +4,7 @@ import * as logger from "firebase-functions/logger";
 import { paths, splitSession } from "@myself/firebase";
 import { contentHashAsync, hashHex, type ReleaseManifest } from "@myself/schema";
 import { buildDemoSessions, type DeviceSession } from "@myself/store";
-import { buildStudyDataset, datasetManifest, exportFiles } from "./export.js";
+import { buildStudyDataset, datasetManifest, exportFiles, exportPrefix } from "./export.js";
 import { bundledManifests, latestRelease, releaseResolver, releasesByHash } from "./releases.js";
 
 /**
@@ -180,5 +180,13 @@ describe("which release the dataset-level files describe", () => {
   it("keeps the compiled-in one on a tie", () => {
     const twin = { ...live, hash: `sha256:${"1".repeat(64)}` };
     expect(datasetManifest([twin], live)).toBe(live);
+  });
+});
+
+describe("where a study's export is written (D-56)", () => {
+  it("keeps the default study where it always was, and gives every other study its own tree", () => {
+    expect(exportPrefix("ybm", "2026-10-06", "ybm")).toBe("exports/2026-10-06");
+    expect(exportPrefix("future", "2026-10-06", "ybm")).toBe("exports/studies/future/2026-10-06");
+    expect(exportPrefix("future", "2026-10-06T120000-manual", "ybm")).toBe("exports/studies/future/2026-10-06T120000-manual");
   });
 });

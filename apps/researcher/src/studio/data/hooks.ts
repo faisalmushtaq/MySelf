@@ -20,7 +20,8 @@ import { httpsCallable } from "firebase/functions";
 import { paths } from "@myself/firebase";
 import { compareVersions } from "@myself/release/gate";
 import { CALLABLES, atLeast, extractDraft, type ResponseStatsRequest, type StudioDraft } from "@myself/studio";
-import { STUDY, studioFirebase } from "../firebase.js";
+import { studioFirebase } from "../firebase.js";
+import { currentStudy, useStudy } from "../router.js";
 import { toMillis } from "../format.js";
 import { usePlaygroundMode } from "../mode.js";
 import { toStudioCallError } from "./errors.js";
@@ -63,19 +64,27 @@ const byTitle = (a: SurveyDoc, b: SurveyDoc) => a.title.localeCompare(b.title, "
 const newestFirst = (a: VersionDoc, b: VersionDoc) =>
   compareVersions(b.version, a.version) || (toMillis(b.publishedAt) ?? 0) - (toMillis(a.publishedAt) ?? 0);
 
+/*
+ * Every read is in the study space the Studio is in (D-56, `useStudy`), and
+ * every query's key names it, so a listener from one study can never answer
+ * for another's — the pages are keyed by study as well (StudioApp).
+ */
+
 export function useSurveys(): Loadable<SurveyDoc[]> {
-  return useLiveQuery((db) => query(collection(db, paths.studioSurveys(STUDY))), "surveys", asSurvey, "the list of surveys", byTitle);
+  const study = useStudy();
+  return useLiveQuery((db) => query(collection(db, paths.studioSurveys(study))), `${study}:surveys`, asSurvey, "the list of surveys", byTitle);
 }
 
 export function useSurvey(surveyId: string): Loadable<SurveyDoc | null> {
-  return useLiveDoc(paths.studioSurvey(STUDY, surveyId), asSurvey, "this survey");
+  return useLiveDoc(paths.studioSurvey(useStudy(), surveyId), asSurvey, "this survey");
 }
 
 /** Newest first. */
 export function useVersions(surveyId: string): Loadable<VersionDoc[]> {
+  const study = useStudy();
   return useLiveQuery(
-    (db) => query(collection(db, paths.studioVersions(STUDY, surveyId))),
-    `versions:${surveyId}`,
+    (db) => query(collection(db, paths.studioVersions(study, surveyId))),
+    `${study}:versions:${surveyId}`,
     asVersion,
     "this survey’s versions",
     newestFirst,
@@ -87,9 +96,10 @@ export function useVersions(surveyId: string): Loadable<VersionDoc[]> {
  * composite index studioAudit (surveyId ASC, at DESC).
  */
 export function useAudit(surveyId: string | null, max = 100): Loadable<AuditDoc[]> {
+  const study = useStudy();
   return useLiveQuery(
-    (db) => query(collection(db, paths.studioAudit(STUDY)), where("surveyId", "==", surveyId), orderBy("at", "desc"), limit(max)),
-    `audit:${surveyId ?? "(access)"}:${max}`,
+    (db) => query(collection(db, paths.studioAudit(study)), where("surveyId", "==", surveyId), orderBy("at", "desc"), limit(max)),
+    `${study}:audit:${surveyId ?? "(access)"}:${max}`,
     asAudit,
     "the activity log",
   );
@@ -109,9 +119,10 @@ export async function loadAudit(surveyId: string): Promise<AuditDoc[]> {
   const fb = studioFirebase();
   if (!fb) throw new Error(NOT_CONNECTED);
   const out: AuditDoc[] = [];
+  const study = currentStudy();
   let after: QueryDocumentSnapshot | null = null;
   for (;;) {
-    const base = query(collection(fb.db, paths.studioAudit(STUDY)), where("surveyId", "==", surveyId), orderBy("at", "desc"), limit(AUDIT_PAGE));
+    const base = query(collection(fb.db, paths.studioAudit(study)), where("surveyId", "==", surveyId), orderBy("at", "desc"), limit(AUDIT_PAGE));
     const page: QuerySnapshot = await getDocs(after ? query(base, startAfter(after)) : base);
     for (const d of page.docs) out.push(asAudit(d.data()));
     if (page.docs.length < AUDIT_PAGE) return out;
@@ -121,9 +132,10 @@ export async function loadAudit(surveyId: string): Promise<AuditDoc[]> {
 
 /** Admins only (the rules refuse anyone else the list). */
 export function useMembers(): Loadable<MemberDoc[]> {
+  const study = useStudy();
   return useLiveQuery(
-    (db) => query(collection(db, paths.studioMembers(STUDY))),
-    "members",
+    (db) => query(collection(db, paths.studioMembers(study))),
+    `${study}:members`,
     asMember,
     "the list of people with access",
     (a, b) => a.email.localeCompare(b.email),
@@ -131,7 +143,7 @@ export function useMembers(): Loadable<MemberDoc[]> {
 }
 
 export function useAccessConfig(): Loadable<AccessConfigDoc | null> {
-  return useLiveDoc(paths.studioAccessConfig(STUDY), asAccess, "the domain rules");
+  return useLiveDoc(paths.studioAccessConfig(useStudy()), asAccess, "the domain rules");
 }
 
 /** A published release, fetched from the release store and verified against its hash. */
@@ -142,21 +154,22 @@ export function usePublishedManifest(hash: string | null): Loadable<ReleaseManif
 
 export function useResponseStats(surveyId: string): Loadable<ResponseStatsResponse> {
   const fb = studioFirebase();
+  const study = useStudy();
   const [attempt, setAttempt] = useState(0);
   const retry = useMemo(() => () => setAttempt((a) => a + 1), []);
-  const key = `${surveyId}#${attempt}`;
+  const key = `${study}:${surveyId}#${attempt}`;
   const [state, setState] = useState<{ key: string; value: Loadable<ResponseStatsResponse> } | null>(null);
 
   useEffect(() => {
     if (!fb) return;
     let live = true;
-    httpsCallable<ResponseStatsRequest, ResponseStatsResponse>(fb.fns, CALLABLES.responseStats)({ surveyId })
+    httpsCallable<ResponseStatsRequest, ResponseStatsResponse>(fb.fns, CALLABLES.responseStats)({ study, surveyId })
       .then((r) => live && setState({ key, value: { status: "ready", data: r.data } }))
       .catch((e: unknown) => live && setState({ key, value: { status: "error", error: toStudioCallError(e).message, retry } }));
     return () => {
       live = false;
     };
-  }, [fb, surveyId, key, retry]);
+  }, [fb, study, surveyId, key, retry]);
 
   if (!fb) return { status: "error", error: NOT_CONNECTED, retry };
   return state?.key === key ? state.value : { status: "loading" };
@@ -201,6 +214,7 @@ export function usePresence(surveyId: string, focus: string | null): PresenceDoc
   // Viewers still see who else is there.
   const writes = atLeast(role, "editor");
   const writer = writes ? fb : null;
+  const study = useStudy();
   const focusRef = useRef(focus);
   focusRef.current = focus;
   const [all, setAll] = useState<PresenceDoc[]>([]);
@@ -209,7 +223,7 @@ export function usePresence(surveyId: string, focus: string | null): PresenceDoc
   // Own heartbeat.
   useEffect(() => {
     if (!writer || !uid) return;
-    const ref = doc(writer.db, paths.studioPresenceOf(STUDY, surveyId, uid));
+    const ref = doc(writer.db, paths.studioPresenceOf(study, surveyId, uid));
     const beat = () => {
       void setDoc(ref, { uid, email, at: serverTimestamp(), focus: focusRef.current }).catch(() => undefined);
     };
@@ -227,7 +241,7 @@ export function usePresence(surveyId: string, focus: string | null): PresenceDoc
       unregister();
       leave();
     };
-  }, [writer, uid, email, surveyId]);
+  }, [writer, uid, email, study, surveyId]);
 
   // Tell others when the question in focus changes — debounced, so clicking
   // down an outline is one write, not twenty.
@@ -239,7 +253,7 @@ export function usePresence(surveyId: string, focus: string | null): PresenceDoc
     }
     if (!writer || !uid) return;
     const t = window.setTimeout(() => {
-      void setDoc(doc(writer.db, paths.studioPresenceOf(STUDY, surveyId, uid)), {
+      void setDoc(doc(writer.db, paths.studioPresenceOf(study, surveyId, uid)), {
         uid,
         email,
         at: serverTimestamp(),
@@ -247,17 +261,17 @@ export function usePresence(surveyId: string, focus: string | null): PresenceDoc
       }).catch(() => undefined);
     }, 800);
     return () => window.clearTimeout(t);
-  }, [writer, uid, email, surveyId, focus]);
+  }, [writer, uid, email, study, surveyId, focus]);
 
   // Everyone else.
   useEffect(() => {
     if (!fb || !uid) return;
     return onSnapshot(
-      collection(fb.db, paths.studioPresence(STUDY, surveyId)),
+      collection(fb.db, paths.studioPresence(study, surveyId)),
       (snap) => setAll(snap.docs.map((d) => asPresence(d.data())).filter((p) => p.uid !== uid)),
       () => setAll([]),
     );
-  }, [fb, uid, surveyId]);
+  }, [fb, uid, study, surveyId]);
 
   useEffect(() => {
     const t = window.setInterval(() => setNow(Date.now()), 15_000);

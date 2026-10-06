@@ -129,7 +129,7 @@ function bundledAssetHash(key: string, load: () => Promise<string>): Promise<str
 export async function verifyRelease(
   json: string,
   expectedHash: string,
-  options: { surveyId?: string } = {},
+  options: { surveyId?: string; study?: string } = {},
 ): Promise<Verification> {
   try {
     return await verify(json, expectedHash, options);
@@ -138,7 +138,7 @@ export async function verifyRelease(
   }
 }
 
-async function verify(json: string, expectedHash: string, options: { surveyId?: string }): Promise<Verification> {
+async function verify(json: string, expectedHash: string, options: { surveyId?: string; study?: string }): Promise<Verification> {
   let raw: unknown;
   try {
     raw = JSON.parse(json);
@@ -171,6 +171,11 @@ async function verify(json: string, expectedHash: string, options: { surveyId?: 
 
   if (options.surveyId !== undefined && manifest.release.assessment !== options.surveyId) {
     return refuse(`it is a release of '${manifest.release.assessment}', not '${options.surveyId}'`);
+  }
+  // And of this study (D-56): a release filed under one study that says it is
+  // another's would have its sittings filed somewhere its questions are not.
+  if (options.study !== undefined && manifest.release.study !== options.study) {
+    return refuse(`it is a release of the study '${manifest.release.study}', not '${options.study}'`);
   }
 
   // Every frozen question, in full. The manifest schema holds instruments as
@@ -268,6 +273,34 @@ const releaseDocument = z.object({
   }),
 });
 
+/**
+ * A study's registry document, `studies/{study}` (D-56, docs/16 §11.4): whether
+ * it is open, and its title. Anything but exactly "open" reads as closed, as
+ * the functions read it: a registry that cannot be read clearly does not open
+ * a study to new sittings.
+ */
+export interface StudyRecord {
+  status: "open" | "closed";
+  title: string | null;
+}
+
+const studyDocument = z.object({
+  fields: z
+    .object({
+      status: stringField.optional(),
+      title: stringField.optional(),
+    })
+    .optional(),
+});
+
+export function parseStudyDocument(body: unknown): StudyRecord | null {
+  const parsed = studyDocument.safeParse(body);
+  // A REST document always has a `name`; a reply without one is not Firestore's.
+  if (!parsed.success || typeof (body as { name?: unknown }).name !== "string") return null;
+  const f = parsed.data.fields ?? {};
+  return { status: f.status?.stringValue === "open" ? "open" : "closed", title: f.title?.stringValue || null };
+}
+
 /** A pointer document as the REST API returns it, or null when it is not one. */
 export function parsePointerDocument(body: unknown): PublishedPointer | null {
   const parsed = pointerDocument.safeParse(body);
@@ -329,6 +362,16 @@ export async function fetchReleaseDocument(source: string, hash: string, options
   return doc ? { kind: "release", json: doc.manifest, storedHash: doc.hash } : { kind: "unreachable", reason: NOT_FROM_THE_STUDY };
 }
 
+export type StudyResult = { kind: "study"; study: StudyRecord } | { kind: "none" } | { kind: "unreachable"; reason: string };
+
+/** `GET studies/{study}`: the source IS the study's document. 404 means no registry document. */
+export async function fetchStudy(source: string, options: FetchOptions = {}): Promise<StudyResult> {
+  const reply = await getDocument(source, options);
+  if (reply.kind !== "found") return reply;
+  const study = parseStudyDocument(reply.body);
+  return study ? { kind: "study", study } : { kind: "unreachable", reason: NOT_FROM_THE_STUDY };
+}
+
 type DocumentReply = { kind: "found"; body: unknown } | { kind: "none" } | { kind: "unreachable"; reason: string };
 
 /**
@@ -370,6 +413,10 @@ export type CheckOutcome =
   /** This build was made with no study to ask (the public preview, the e2e build). */
   | { kind: "not_configured" }
   | { kind: "offline" }
+  /** The study's registry has no such study (D-56). Only asked about a study other than the default. */
+  | { kind: "study_unknown" }
+  /** The study is closed: no new sitting starts on it (D-56). What was published stays as it was. */
+  | { kind: "study_closed"; title: string | null }
   | { kind: "nothing_published" }
   | { kind: "up_to_date"; hash: string; version: string | null }
   /** A different release is now the one new sittings start under. */
@@ -387,8 +434,8 @@ export interface CheckRecord {
 
 export interface RefreshResult {
   record: CheckRecord;
-  /** The release a new sitting should start under now. */
-  activeHash: string;
+  /** The release a new sitting should start under now; null for a survey with no built-in release and none downloaded. */
+  activeHash: string | null;
 }
 
 /** The cache, as the service needs it. Dexie in the app; a Map in the tests. */
@@ -400,11 +447,29 @@ export interface ReleaseCache {
 }
 
 export interface ReleaseServiceOptions {
-  builtIn: LoadedRelease;
+  /**
+   * The release to fall back to: r8.0.0 for the default survey. NULL FOR ANY
+   * OTHER SURVEY (D-56): it has no built-in release, so until it has been
+   * downloaded and verified once there is nothing to run, and the start screen
+   * says so rather than showing the default's questions under its name.
+   */
+  builtIn: LoadedRelease | null;
   cache: ReleaseCache;
   /** Firestore REST base for `studies/{study}`; empty means never ask. */
   source: string;
   surveyId: string;
+  /** The study every release must say it belongs to (D-56). Unchecked when absent, as before. */
+  study?: string;
+  /**
+   * Whether to read the study's registry document (D-56) before its pointer.
+   *
+   * `required` for a study other than the default: no document means no such
+   * study, and a registry that cannot be read means the check could not be
+   * made. `optional` for the default, which is registered with no document:
+   * only a document saying "closed" changes anything, and a registry that
+   * cannot be read never stops it from updating. Absent: not asked at all.
+   */
+  registry?: "required" | "optional";
   transport?: typeof fetch;
   online?: () => boolean;
   now?: () => Date;
@@ -412,14 +477,18 @@ export interface ReleaseServiceOptions {
 }
 
 export interface ActiveState {
-  activeHash: string;
+  activeHash: string | null;
   checkedAt: string | null;
   lastResult: CheckRecord | null;
 }
 
-export interface ReleaseService {
-  /** What the start screen shows now, from this device alone. Never throws, never waits on the network. */
-  resolveStartupRelease(): Promise<LoadedRelease>;
+export interface ReleaseService<Startup extends LoadedRelease | null = LoadedRelease> {
+  /**
+   * What the start screen shows now, from this device alone. Never throws, never
+   * waits on the network. Null only for a survey with no built-in release that
+   * has not been downloaded (or whose copy no longer verifies).
+   */
+  resolveStartupRelease(): Promise<Startup>;
   /** Ask the study what is live, and take it if it is new and proves itself. Never throws. */
   refreshActiveRelease(): Promise<RefreshResult>;
   /** The built-in release if the hash is its, else a verified cached one, else null. */
@@ -432,8 +501,11 @@ export interface ReleaseService {
   activeState(): Promise<ActiveState>;
 }
 
-export function releaseService(options: ReleaseServiceOptions): ReleaseService {
-  const { builtIn, cache, source, surveyId } = options;
+export function releaseService(options: ReleaseServiceOptions & { builtIn: LoadedRelease }): ReleaseService<LoadedRelease>;
+export function releaseService(options: ReleaseServiceOptions): ReleaseService<LoadedRelease | null>;
+export function releaseService(options: ReleaseServiceOptions): ReleaseService<LoadedRelease | null> {
+  const { builtIn, cache, source, surveyId, study } = options;
+  const checks = { surveyId, ...(study === undefined ? {} : { study }) };
   const online = options.online ?? (() => true);
   const now = options.now ?? (() => new Date());
   const fetchOptions: FetchOptions = {
@@ -474,7 +546,7 @@ export function releaseService(options: ReleaseServiceOptions): ReleaseService {
       }
       const known = verified.get(hash);
       if (known) return known;
-      const result = await verifyRelease(row.json, hash, { surveyId });
+      const result = await verifyRelease(row.json, hash, checks);
       if (!result.ok) return null;
       const loaded: LoadedRelease = { manifest: result.manifest, hash, source: "cached" };
       verified.set(hash, loaded);
@@ -484,23 +556,27 @@ export function releaseService(options: ReleaseServiceOptions): ReleaseService {
     }
   };
 
+  const builtInHash = builtIn?.hash ?? null;
+  const isBuiltIn = (hash: string | null): boolean => builtIn !== null && hash === builtIn.hash;
+
   const releaseForHash = async (hash: string): Promise<LoadedRelease | null> => {
-    if (hash === builtIn.hash) return builtIn;
+    if (builtIn !== null && hash === builtIn.hash) return builtIn;
     return cachedRelease(hash);
   };
 
-  const storedActiveHash = async (): Promise<string> => {
+  const storedActiveHash = async (): Promise<string | null> => {
     try {
-      return (await cache.state())?.activeHash ?? builtIn.hash;
+      return (await cache.state())?.activeHash ?? builtInHash;
     } catch {
-      return builtIn.hash;
+      return builtInHash;
     }
   };
 
-  const resolveStartupRelease = async (): Promise<LoadedRelease> => {
+  const resolveStartupRelease = async (): Promise<LoadedRelease | null> => {
     try {
       const active = await storedActiveHash();
-      if (active === builtIn.hash) return builtIn;
+      if (active === null) return builtIn;
+      if (builtIn !== null && active === builtIn.hash) return builtIn;
       return (await cachedRelease(active)) ?? builtIn;
     } catch {
       return builtIn;
@@ -508,7 +584,7 @@ export function releaseService(options: ReleaseServiceOptions): ReleaseService {
   };
 
   const cacheRelease = async (json: string, hash: string): Promise<Verification> => {
-    const result = await verifyRelease(json, hash, { surveyId });
+    const result = await verifyRelease(json, hash, checks);
     if (!result.ok) return result;
     await cache.put({
       hash,
@@ -525,9 +601,27 @@ export function releaseService(options: ReleaseServiceOptions): ReleaseService {
   };
 
   /** Everything between "ask" and "an answer", with no side effect but the cache and the pointer. */
-  const check = async (activeHash: string): Promise<CheckOutcome> => {
+  const check = async (activeHash: string | null): Promise<CheckOutcome> => {
     if (!source) return { kind: "not_configured" };
     if (!online()) return { kind: "offline" };
+
+    /**
+     * The study before its survey (D-56). A study that does not exist, or has
+     * closed, is said as such — it is the reason, and "nothing published" would
+     * send somebody looking in the Studio for a survey that is fine. Closed
+     * changes nothing on the device but whether a new sitting may start: the
+     * release already here stays, and unfinished sittings can be finished.
+     */
+    if (options.registry) {
+      const registry = await fetchStudy(source, fetchOptions);
+      if (registry.kind === "study" && registry.study.status === "closed") {
+        return { kind: "study_closed", title: registry.study.title };
+      }
+      if (options.registry === "required") {
+        if (registry.kind === "none") return { kind: "study_unknown" };
+        if (registry.kind === "unreachable") return registry;
+      }
+    }
 
     const reply = await fetchPointer(source, surveyId, fetchOptions);
     if (reply.kind === "none") return { kind: "nothing_published" };
@@ -538,7 +632,7 @@ export function releaseService(options: ReleaseServiceOptions): ReleaseService {
     // Already running it — provided it can still be loaded. A cached release
     // that has gone missing, or that this build no longer accepts, is fetched
     // and judged again rather than reported as current.
-    if (hash === activeHash && (hash === builtIn.hash || (await cachedRelease(hash)))) {
+    if (hash === activeHash && (isBuiltIn(hash) || (await cachedRelease(hash)))) {
       return { kind: "up_to_date", hash, version: pointer.version };
     }
 
@@ -622,12 +716,12 @@ export function releaseService(options: ReleaseServiceOptions): ReleaseService {
     try {
       const state = await cache.state();
       return {
-        activeHash: state?.activeHash ?? builtIn.hash,
+        activeHash: state?.activeHash ?? builtInHash,
         checkedAt: state?.checkedAt ?? null,
         lastResult: asCheckRecord(state?.lastResult),
       };
     } catch {
-      return { activeHash: builtIn.hash, checkedAt: null, lastResult: null };
+      return { activeHash: builtInHash, checkedAt: null, lastResult: null };
     }
   };
 
@@ -646,14 +740,21 @@ export function releaseService(options: ReleaseServiceOptions): ReleaseService {
  * What the handover panel says about the last look at the study. Plain words for
  * whoever is holding the iPad; the detail is in the reason.
  */
-export function describeCheck(outcome: CheckOutcome): string {
+export function describeCheck(outcome: CheckOutcome, hasBuiltIn = true): string {
   switch (outcome.kind) {
     case "not_configured":
       return "this build does not look for new versions of the survey.";
     case "offline":
       return "offline, so it will look for a new version when there is a connection.";
+    case "study_unknown":
+      return "the study this iPad is set to does not exist in this project.";
+    case "study_closed":
+      return `the study${outcome.title ? ` (${outcome.title})` : ""} is closed, so no new sittings can start on it; unfinished ones can still be finished.`;
     case "nothing_published":
-      return "the study has not published a version, so the one built into this app is used.";
+      // A survey other than the default has no built-in release to fall back on (D-56).
+      return hasBuiltIn
+        ? "the study has not published a version, so the one built into this app is used."
+        : "the study has not published this survey, so there is nothing to run yet.";
     case "up_to_date":
       return "up to date.";
     case "activated":
@@ -694,29 +795,8 @@ function explain(error: unknown): string {
 }
 
 // ---------------------------------------------------------------------------
-// This app's instance: the Dexie cache and the build's configuration
+// This app's instances are made per survey, in lib/selection.ts (D-56)
 // ---------------------------------------------------------------------------
-
-declare const __SURVEY_SOURCE__: string;
-declare const __SURVEY_ID__: string;
-
-const service = releaseService({
-  builtIn: BUILT_IN,
-  cache: { get: getCachedRelease, put: putCachedRelease, state: getReleaseState, saveState: saveReleaseState },
-  source: __SURVEY_SOURCE__,
-  surveyId: __SURVEY_ID__,
-  online: () => typeof navigator === "undefined" || navigator.onLine !== false,
-});
-
-export const {
-  resolveStartupRelease,
-  refreshActiveRelease,
-  releaseForHash,
-  cachedRelease,
-  cacheRelease,
-  setActiveHash,
-  activeState,
-} = service;
 
 /**
  * Drop cached releases that no sitting on this device, and no screen, can use.

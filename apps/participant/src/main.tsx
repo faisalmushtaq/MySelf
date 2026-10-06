@@ -1,9 +1,11 @@
 import React from "react";
 import { createRoot } from "react-dom/client";
 import { Workbox } from "workbox-window";
-import App from "./App.js";
-import { BUILT_IN, resolveStartupRelease, type LoadedRelease } from "./lib/releases.js";
+import { readParticipantLink } from "@myself/schema";
+import App, { type Startup } from "./App.js";
+import { BUILT_IN, type LoadedRelease } from "./lib/releases.js";
 import { buildRuntime, type Runtime } from "./lib/runtime.js";
+import { DEFAULT_CHOICE, serviceFor, storedChoice } from "./lib/selection.js";
 import { updates } from "./lib/updates.js";
 import "./styles.css";
 
@@ -54,30 +56,45 @@ navigator.serviceWorker?.addEventListener("controllerchange", () => updates.took
 
 /**
  * How long the first screen may wait for this device's own storage to say which
- * release is active. Local only — the study is never asked before the first
- * render — and bounded all the same, because an IndexedDB that hangs must not
- * leave a child looking at a blank page. Past it the built-in release is shown,
- * and the start screen switches to the active one as soon as it can be read.
+ * survey it runs and which release is active. Local only — the study is never
+ * asked before the first render — and bounded all the same, because an
+ * IndexedDB that hangs must not leave a child looking at a blank page. Past it
+ * the default survey's built-in release is shown, and App moves to whatever the
+ * iPad was set to as soon as it can be read (`late`).
  */
 const STARTUP_RELEASE_WAIT_MS = 1_500;
 
-function startupRelease(): Promise<LoadedRelease> {
-  const fallback = new Promise<LoadedRelease>((resolve) => setTimeout(() => resolve(BUILT_IN), STARTUP_RELEASE_WAIT_MS));
-  return Promise.race([resolveStartupRelease(), fallback]).catch(() => BUILT_IN);
+/**
+ * The participant link in the address, read once (D-56, docs/16 §11.2). Only
+ * read here: what to do with it is App's, once it knows where the iPad is.
+ */
+const link = readParticipantLink(window.location.search, DEFAULT_CHOICE.study);
+
+async function fromStorage(): Promise<Startup> {
+  const { choice, row } = await storedChoice();
+  const release: LoadedRelease | null = await serviceFor(choice).resolveStartupRelease();
+  return { choice, row, release, link, late: false };
 }
 
-function runtimeOf(release: LoadedRelease): Runtime {
+function startup(): Promise<Startup> {
+  const fallback: Startup = { choice: DEFAULT_CHOICE, row: undefined, release: BUILT_IN, link, late: true };
+  const timeout = new Promise<Startup>((resolve) => setTimeout(() => resolve(fallback), STARTUP_RELEASE_WAIT_MS));
+  return Promise.race([fromStorage(), timeout]).catch(() => fallback);
+}
+
+function runtimeOf(release: LoadedRelease | null): Runtime | null {
+  if (!release) return null;
   try {
     return buildRuntime(release.manifest, release.source);
   } catch {
-    return buildRuntime(BUILT_IN.manifest, "built-in");
+    return null;
   }
 }
 
-void startupRelease().then((release) => {
+void startup().then((initial) => {
   createRoot(document.getElementById("root")!).render(
     <React.StrictMode>
-      <App initialRuntime={runtimeOf(release)} />
+      <App initial={initial} initialRuntime={runtimeOf(initial.release)} />
     </React.StrictMode>,
   );
 });

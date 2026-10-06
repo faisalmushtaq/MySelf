@@ -8,6 +8,7 @@ import type {
   SessionResponse,
   StudioDraft,
   StudioRole,
+  StudySummary,
   SurveyDoc,
   VersionDoc,
 } from "@myself/studio";
@@ -43,9 +44,20 @@ export interface StudioSession {
    */
   status: "loading" | "unconfigured" | "signed_out" | "unauthorised" | "ready" | "error";
   user: StudioUser | null;
+  /** The person's role in the study space the Studio is in. */
   role: StudioRole | null;
   reason: SessionResponse["reason"];
   error: string | null;
+  /**
+   * The study spaces this person has a role in, for the switcher (D-56): the
+   * server works this out from each study's own list, so it never offers a
+   * study whose every read would be refused. Empty until known.
+   */
+  studies: StudySummary[];
+  /** Holds the project's owner claim: may create, close and reopen study spaces. */
+  owner: boolean;
+  /** The study space `role` is for; until it is the one in the address, the role is not yet known there. */
+  study: string | null;
   signIn: () => Promise<void>;
   signOut: () => Promise<void>;
   /** Ask the server again — after an admin has added you, for instance. */
@@ -114,4 +126,4 @@ export interface PublishedContext {
   publishedProtocols: Map<string, unknown>;
 }
 
-export type { AccessConfigDoc, AuditDoc, MemberDoc, PresenceDoc, ReleaseManifest, ResponseStatsResponse, SurveyDoc, VersionDoc };
+export type { AccessConfigDoc, AuditDoc, MemberDoc, PresenceDoc, ReleaseManifest, ResponseStatsResponse, StudySummary, SurveyDoc, VersionDoc };

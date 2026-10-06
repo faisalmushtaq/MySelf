@@ -33,8 +33,16 @@ export async function sittingToResume(
   code: string,
   current: Runtime,
   lookup: ResumeLookup,
+  /**
+   * The survey the iPad is on (D-56): only a sitting started on it is resumed.
+   * After an iPad is moved to another survey, a participant typing their code
+   * starts that survey; their unfinished sitting of the other one waits on the
+   * iPad, uploading as the partial sitting it is, until the iPad is moved back.
+   */
+  choice?: { study: string; surveyId: string },
 ): Promise<{ session: SessionRow | undefined; runtime: Runtime }> {
-  const newest = await lookup.find(code, { anyRelease: true });
+  const only = choice ? { choice } : {};
+  const newest = await lookup.find(code, { anyRelease: true, ...only });
   if (!newest || newest.releaseHash === current.hash) return { session: newest, runtime: current };
   try {
     const pinned = await lookup.releaseForHash(newest.releaseHash);
@@ -45,5 +53,5 @@ export async function sittingToResume(
   } catch {
     // Treated as unavailable, below.
   }
-  return { session: await lookup.find(code, { releaseHash: current.hash }), runtime: current };
+  return { session: await lookup.find(code, { releaseHash: current.hash, ...only }), runtime: current };
 }

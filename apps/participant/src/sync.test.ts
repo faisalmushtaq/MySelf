@@ -361,3 +361,38 @@ describe("verifyOutcome", () => {
     expect(() => verifyOutcome(outcome({ events: 3 }), session)).toThrow(/stored 3 of the 2/);
   });
 });
+
+describe("which study a sitting is filed into (D-56)", () => {
+  it("sends the study the sitting started in beside it, never inside the sitting", async () => {
+    const calls = noCalls();
+    const transport = vi.fn(async () => reply([{}]));
+    await synchroniseCompletedSessions({
+      storage: fakeStore(calls, { completed: [{ ...session, study: "future" }] }),
+      transport: transport as unknown as typeof fetch,
+    });
+    const [, init] = transport.mock.calls[0] as unknown as [string, RequestInit];
+    const body = JSON.parse(init.body as string) as { study?: string; sittings: Record<string, unknown>[] };
+    expect(body.study).toBe("future");
+    expect(body.sittings[0]).not.toHaveProperty("study");
+    expect(body.sittings[0]).toMatchObject({ sessionId: "ses_01" });
+  });
+
+  it("sends a checkpoint of a running sitting to its own study too", async () => {
+    const calls = noCalls();
+    const transport = vi.fn(async () => reply([{ events: 2 }]));
+    await checkpointRunningSessions({
+      storage: fakeStore(calls, { running: [{ ...session, complete: false, study: "future" }] }),
+      transport: transport as unknown as typeof fetch,
+    });
+    const [, init] = transport.mock.calls[0] as unknown as [string, RequestInit];
+    expect((JSON.parse(init.body as string) as { study?: string }).study).toBe("future");
+  });
+
+  it("sends no study for a sitting that has none, exactly as before", async () => {
+    const calls = noCalls();
+    const transport = vi.fn(async () => reply([{}]));
+    await synchroniseCompletedSessions({ storage: fakeStore(calls), transport: transport as unknown as typeof fetch });
+    const [, init] = transport.mock.calls[0] as unknown as [string, RequestInit];
+    expect(JSON.parse(init.body as string)).not.toHaveProperty("study");
+  });
+});

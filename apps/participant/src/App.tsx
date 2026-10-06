@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { AnswerStore, Walker, type AnswerValue, type PresentableUnit } from "@myself/engine";
+import { choiceKey, readTypedChoice, sameChoice, type LinkReading, type SurveyChoice } from "@myself/schema";
 import { resolveText, useScoringDefinitions } from "./lib/pipes.js";
 import {
   accessibilityPreferences,
@@ -13,7 +14,9 @@ import {
   saveAccessibilityPreferences,
   deviceSummary,
   forgetConfirmedSessions,
+  unfinishedElsewhere,
   type Enrolment,
+  type SelectionRow,
   type SessionRow,
   type StoredSessionCounts,
 } from "./lib/db.js";
@@ -37,16 +40,20 @@ import {
   type Durability,
 } from "./lib/durability.js";
 import { SessionTiming } from "./lib/timing.js";
-import {
-  activeState,
-  describeCheck,
-  pruneReleases,
-  refreshActiveRelease,
-  releaseForHash,
-  type CheckRecord,
-} from "./lib/releases.js";
+import { BUILT_IN, describeCheck, pruneReleases, type CheckRecord, type LoadedRelease } from "./lib/releases.js";
 import { buildRuntime, type Runtime } from "./lib/runtime.js";
-import { sittingToResume } from "./lib/resume.js";
+import { sittingToResume, type ResumeLookup } from "./lib/resume.js";
+import {
+  checkChoice,
+  DEFAULT_CHOICE,
+  isDefaultChoice,
+  planLink,
+  rememberChoice,
+  rememberLinkFollowed,
+  serviceFor,
+  storedChoice,
+  verdictOf,
+} from "./lib/selection.js";
 import { ReviewScreen } from "./components/ReviewScreen.js";
 import { SurveyScreen } from "./components/SurveyScreen.js";
 import { CheckInScreen } from "./screens/CheckInScreen.js";
@@ -54,7 +61,8 @@ import { FinishScreen } from "./screens/FinishScreen.js";
 import { HandoverPanel } from "./screens/HandoverPanel.js";
 import { PaceScreen } from "./screens/PaceScreen.js";
 import { SaveFailedScreen } from "./screens/SaveFailedScreen.js";
-import { StartScreen } from "./screens/StartScreen.js";
+import { StartScreen, type StartNotice } from "./screens/StartScreen.js";
+import type { PanelCheck } from "./screens/SurveyChoiceSection.js";
 
 /**
  * MySelf Go — participant application (preview build).
@@ -87,12 +95,66 @@ type Phase =
   | { kind: "finished"; session: SessionRow };
 
 /**
- * Which sitting a code resumes, and the release to render it with — pinned to
- * the sitting's own release. The rule, and its fallback, is `lib/resume.ts`.
+ * What main.tsx found before the first render (D-56): the survey this iPad is
+ * set to, its selection row, the release to show, and the link in the address.
+ * `late` when the device's storage did not answer in time, so the default was
+ * shown and App must look again.
  */
-const resumeLookup = { find: findResumableSession, releaseForHash };
+export interface Startup {
+  choice: SurveyChoice;
+  row: SelectionRow | undefined;
+  release: LoadedRelease | null;
+  link: LinkReading;
+  late: boolean;
+}
 
-export default function App({ initialRuntime }: { initialRuntime: Runtime }) {
+/**
+ * The built-in release, laid out once. The default survey's floor, and what the
+ * screen is drawn from while another survey has nothing to run — never what a
+ * sitting of another survey starts under (`loaded` says whether there is one).
+ */
+let builtInRuntimeMemo: Runtime | null = null;
+function builtInRuntime(): Runtime {
+  builtInRuntimeMemo ??= buildRuntime(BUILT_IN.manifest, "built-in");
+  return builtInRuntimeMemo;
+}
+
+/**
+ * Where a participant link stands on this iPad (D-56, docs/16 §11.3). Only
+ * `checking` and `waiting` stop a sitting from starting: the iPad was given a
+ * link to a survey it cannot run yet, and starting the one it is on instead
+ * would file a participant into a study nobody meant.
+ */
+type LinkState =
+  | { kind: "none" }
+  | { kind: "invalid"; problem: string }
+  | { kind: "followed"; choice: SurveyChoice }
+  | { kind: "checking"; choice: SurveyChoice }
+  | { kind: "waiting"; choice: SurveyChoice; reason: string }
+  | { kind: "refused"; choice: SurveyChoice; reason: string };
+
+/** A survey as staff read it on the start screen: ids, which are what a link carries. */
+const named = (choice: SurveyChoice) => `the survey “${choice.surveyId}” of the study “${choice.study}”`;
+
+const CLOSED_TO_NEW = "This study is closed, so no new sitting can be started. Please hand the iPad back to the research team.";
+
+export default function App({ initial, initialRuntime }: { initial: Startup; initialRuntime: Runtime | null }) {
+  /**
+   * Which survey of which study new sittings start on (D-56). Read from the
+   * device at start-up; changed only at the start screen, by a link that has
+   * proved itself or by staff in the handover panel.
+   */
+  const [choice, setChoice] = useState<SurveyChoice>(initial.choice);
+  const choiceRef = useRef(initial.choice);
+  const selectionRow = useRef<SelectionRow | undefined>(initial.row);
+  /** The release new sittings start under, or null for a survey not yet on this iPad. */
+  const startingRuntime = initialRuntime ?? (isDefaultChoice(initial.choice) ? builtInRuntime() : null);
+  const [loaded, setLoaded] = useState(startingRuntime !== null);
+  const [link, setLink] = useState<LinkState>({ kind: "none" });
+  const linkRef = useRef(link);
+  linkRef.current = link;
+  /** The link is read once per page; a second run of the start-up effect (StrictMode in development) must not follow it again. */
+  const linkHandled = useRef(false);
   /**
    * The release on screen. At the start screen it is the active one; during a
    * resumed sitting it is that sitting's own. Every value below that used to be
@@ -103,14 +165,24 @@ export default function App({ initialRuntime }: { initialRuntime: Runtime }) {
    * it is rendered, here and in `showRuntime`.
    */
   const [runtime, setRuntime] = useState<Runtime>(() => {
-    useScoringDefinitions(initialRuntime.scoring);
-    return initialRuntime;
+    const shown = startingRuntime ?? builtInRuntime();
+    useScoringDefinitions(shown.scoring);
+    return shown;
   });
   const { manifest, flattened, scaleMap, effort, codeRule, contact, finishScreen, reviewScreen, unitKeyOf, wordsAt } =
     runtime;
-  const runtimeRef = useRef(initialRuntime);
-  /** The release a new sitting starts under — what the start screen returns to. */
-  const activeRuntime = useRef(initialRuntime);
+  const runtimeRef = useRef(runtime);
+  /** The release a new sitting starts under — what the start screen returns to. Null while there is none. */
+  const activeRuntime = useRef<Runtime | null>(startingRuntime);
+  /**
+   * Which sitting a code resumes, and the release to render it with — pinned to
+   * the sitting's own release, and only a sitting of the survey the iPad is on.
+   * The rule, and its fallback, is `lib/resume.ts`.
+   */
+  const resumeLookup = useMemo<ResumeLookup>(
+    () => ({ find: findResumableSession, releaseForHash: (hash) => serviceFor(choiceRef.current).releaseForHash(hash) }),
+    [],
+  );
   const showRuntime = useCallback((next: Runtime) => {
     useScoringDefinitions(next.scoring);
     runtimeRef.current = next;
@@ -317,9 +389,11 @@ export default function App({ initialRuntime }: { initialRuntime: Runtime }) {
 
   useEffect(() => {
     let live = true;
-    void activeState().then((state) => {
-      if (live && state.lastResult) setReleaseCheck((shown) => shown ?? state.lastResult);
-    });
+    void serviceFor(choiceRef.current)
+      .activeState()
+      .then((state) => {
+        if (live && state.lastResult) setReleaseCheck((shown) => shown ?? state.lastResult);
+      });
     return () => {
       live = false;
     };
@@ -335,13 +409,19 @@ export default function App({ initialRuntime }: { initialRuntime: Runtime }) {
    * end, and a new release takes effect for the next participant.
    */
   const checkRelease = useCallback(async () => {
-    const result = await refreshActiveRelease();
+    const asked = choiceRef.current;
+    const service = serviceFor(asked);
+    const result = await service.refreshActiveRelease();
+    // Moved to another survey while that was in flight: its answer is about a
+    // survey this screen is no longer showing.
+    if (!sameChoice(asked, choiceRef.current)) return;
     setReleaseCheck(result.record);
-    if (result.activeHash !== activeRuntime.current.hash) {
-      const loaded = await releaseForHash(result.activeHash);
-      if (loaded) {
+    if (result.activeHash !== null && result.activeHash !== activeRuntime.current?.hash) {
+      const found = await service.releaseForHash(result.activeHash);
+      if (found) {
         try {
-          activeRuntime.current = buildRuntime(loaded.manifest, loaded.source);
+          activeRuntime.current = buildRuntime(found.manifest, found.source);
+          setLoaded(true);
         } catch {
           // Verification lays a release out before accepting it, so this cannot
           // happen; if it did, the release already running simply carries on.
@@ -349,20 +429,136 @@ export default function App({ initialRuntime }: { initialRuntime: Runtime }) {
       }
     }
     if (phaseRef.current.kind !== "start" || starting.current) return;
-    if (runtimeRef.current !== activeRuntime.current) showRuntime(activeRuntime.current);
+    if (activeRuntime.current && runtimeRef.current !== activeRuntime.current) showRuntime(activeRuntime.current);
     if (result.record.outcome.kind === "activated") {
-      void pruneReleases([runtimeRef.current.hash, activeRuntime.current.hash]);
+      void pruneReleases([runtimeRef.current.hash, ...(activeRuntime.current ? [activeRuntime.current.hash] : [])]);
     }
   }, [showRuntime]);
 
+  /**
+   * Show a survey at the start screen: its release from the device, its last
+   * check, then a fresh look at the study. Saves nothing — `adopt` decides
+   * whether the iPad is moved; this only draws where it now is.
+   */
+  const switchTo = useCallback(
+    async (next: SurveyChoice) => {
+      choiceRef.current = next;
+      setChoice(next);
+      const service = serviceFor(next);
+      const release = await service.resolveStartupRelease();
+      let shown: Runtime | null = null;
+      if (release) {
+        try {
+          shown = buildRuntime(release.manifest, release.source);
+        } catch {
+          shown = null;
+        }
+      }
+      if (!shown && isDefaultChoice(next)) shown = builtInRuntime();
+      activeRuntime.current = shown;
+      setLoaded(shown !== null);
+      showRuntime(shown ?? builtInRuntime());
+      setReleaseCheck((await service.activeState()).lastResult);
+      void checkRelease();
+    },
+    [showRuntime, checkRelease],
+  );
+
+  /** Move this iPad to a survey that has proved itself, and remember it. */
+  const adopt = useCallback(
+    async (next: SurveyChoice, how: SelectionRow["chosenBy"], followedLink: string | null) => {
+      const previous = choiceRef.current;
+      const lastLink = followedLink ?? selectionRow.current?.lastLink ?? null;
+      await rememberChoice(next, how, previous, lastLink);
+      selectionRow.current = (await storedChoice()).row;
+      await switchTo(next);
+    },
+    [switchTo],
+  );
+
+  /**
+   * Follow a participant link (D-56): check it online, and move the iPad only
+   * once it has proved itself. A definite no is said and the iPad stays where
+   * it was; a check that could not be made blocks new sittings and is tried
+   * again when the network returns, because the iPad was given this survey and
+   * running another in its place would file somebody into the wrong study.
+   */
+  const followLink = useCallback(
+    async (target: SurveyChoice) => {
+      setLink({ kind: "checking", choice: target });
+      const verdict = await checkChoice(target);
+      if (verdict.kind === "ready") {
+        await adopt(target, "link", choiceKey(target));
+        setLink({ kind: "none" });
+      } else if (verdict.kind === "refused") {
+        setLink({ kind: "refused", choice: target, reason: verdict.reason });
+      } else {
+        setLink({ kind: "waiting", choice: target, reason: verdict.reason });
+      }
+    },
+    [adopt],
+  );
+
+  /**
+   * Once, at start-up: settle where the iPad is (if its storage was too slow
+   * for the first render), then decide what the link in the address asks for.
+   */
+  useEffect(() => {
+    if (linkHandled.current) return;
+    linkHandled.current = true;
+    void (async () => {
+      let current = choiceRef.current;
+      if (initial.late) {
+        try {
+          const stored = await storedChoice();
+          selectionRow.current = stored.row;
+          if (!sameChoice(stored.choice, current)) {
+            await switchTo(stored.choice);
+            current = stored.choice;
+          }
+        } catch {
+          // Storage still not answering: the default carries on, as before.
+        }
+      }
+      const plan = planLink(initial.link, current, selectionRow.current?.lastLink ?? null);
+      switch (plan.kind) {
+        case "none":
+          return;
+        case "invalid":
+          setLink({ kind: "invalid", problem: plan.problem });
+          return;
+        case "same":
+          if (selectionRow.current?.lastLink !== choiceKey(plan.choice)) {
+            await rememberLinkFollowed(current, selectionRow.current, choiceKey(plan.choice)).catch(() => undefined);
+            selectionRow.current = (await storedChoice().catch(() => null))?.row ?? selectionRow.current;
+          }
+          return;
+        case "followed":
+          setLink({ kind: "followed", choice: plan.choice });
+          return;
+        case "follow":
+          await followLink(plan.choice);
+          return;
+      }
+    })();
+    // Once per page: the link is read once, by design (docs/16 §11.3).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // On arriving at the start screen (which includes launch and every handover),
   // when the network comes back, and every few minutes while a device waits.
+  // A link that could not be checked is tried again at the same moments.
   useEffect(() => {
     if (phase.kind !== "start") return;
-    void checkRelease();
-    const timer = window.setInterval(() => void checkRelease(), RELEASE_CHECK_MS);
+    const look = () => {
+      void checkRelease();
+      const waiting = linkRef.current;
+      if (waiting.kind === "waiting") void followLink(waiting.choice);
+    };
+    look();
+    const timer = window.setInterval(look, RELEASE_CHECK_MS);
     return () => window.clearInterval(timer);
-  }, [phase.kind, online, checkRelease]);
+  }, [phase.kind, online, checkRelease, followLink]);
 
   useEffect(() => {
     if (online && (phase.kind === "start" || phase.kind === "finished")) void runSync();
@@ -454,9 +650,15 @@ export default function App({ initialRuntime }: { initialRuntime: Runtime }) {
 
   const tMono = () => Math.round(performance.now() - monoStart.current);
 
+  const linkBlocks = link.kind === "checking" || link.kind === "waiting";
+  const studyClosed = releaseCheck?.outcome.kind === "study_closed";
+
   const start = useCallback(async () => {
     const trimmed = code.trim();
     if (trimmed.length < 2 || busy) return;
+    // Nothing to run, or a link still to be followed: the start screen says
+    // why, and offers no Start. Checked here too, so Enter cannot get past it.
+    if (!loaded || linkBlocks) return;
     /**
      * The code's format is the ACTIVE release's rule — the one on the start
      * screen, whose instructions and hint the participant is reading — as it
@@ -476,7 +678,12 @@ export default function App({ initialRuntime }: { initialRuntime: Runtime }) {
       // active one for a new sitting, the sitting's own for a resumed one. Read
       // from here down instead of the names above, which are still the start
       // screen's until the next render.
-      const { session: existing, runtime: rt } = await sittingToResume(trimmed, runtime, resumeLookup);
+      const { session: existing, runtime: rt } = await sittingToResume(trimmed, runtime, resumeLookup, choiceRef.current);
+      // A closed study finishes what it started and starts nothing new (D-56).
+      if (!existing && studyClosed) {
+        setCodeError(CLOSED_TO_NEW);
+        return;
+      }
       const store = new AnswerStore();
       let session: SessionRow;
       if (existing) {
@@ -487,7 +694,7 @@ export default function App({ initialRuntime }: { initialRuntime: Runtime }) {
         }
         session = existing;
       } else {
-        session = await createSession(trimmed, rt.manifest.release.key, rt.manifest.hash ?? "");
+        session = await createSession(trimmed, rt.manifest.release.key, rt.manifest.hash ?? "", choiceRef.current);
         await appendEvent(
           session,
           "session.started",
@@ -525,7 +732,7 @@ export default function App({ initialRuntime }: { initialRuntime: Runtime }) {
       starting.current = false;
       setBusy(false);
     }
-  }, [code, busy, runtime, codeRule, showRuntime]);
+  }, [code, busy, runtime, codeRule, showRuntime, loaded, linkBlocks, studyClosed, resumeLookup]);
 
   /**
    * Do a write, and stop the survey if it fails.
@@ -859,9 +1066,84 @@ export default function App({ initialRuntime }: { initialRuntime: Runtime }) {
     // Back to the release new sittings start under, straight away and from what
     // this device already holds — a resumed sitting may have been shown under an
     // older one. The start screen then asks the study whether anything is newer.
-    if (runtimeRef.current !== activeRuntime.current) showRuntime(activeRuntime.current);
+    if (activeRuntime.current && runtimeRef.current !== activeRuntime.current) showRuntime(activeRuntime.current);
     setPhase({ kind: "start" });
   }, [effort, showRuntime]);
+
+  /** The handover panel's "Check": what typed text names, and whether this iPad can run it (D-56). */
+  const checkTypedSurvey = useCallback(async (text: string): Promise<PanelCheck> => {
+    const reading = readTypedChoice(text, DEFAULT_CHOICE.study);
+    if (reading.kind === "none") return { kind: "invalid", problem: "paste a participant link, or type study/survey" };
+    if (reading.kind === "invalid") return reading;
+    if (sameChoice(reading.choice, choiceRef.current)) return { kind: "same" };
+    const verdict = await checkChoice(reading.choice);
+    if (verdict.kind !== "ready") return verdict;
+    return {
+      kind: "ready",
+      choice: reading.choice,
+      title: verdict.title,
+      version: verdict.version,
+      leftBehind: await unfinishedElsewhere(reading.choice).catch(() => 0),
+    };
+  }, []);
+
+  /** The handover panel's confirmed "Use this survey on this iPad". */
+  const useSurvey = useCallback(
+    async (next: SurveyChoice) => {
+      if (phaseRef.current.kind !== "start") return;
+      await adopt(next, "staff", null);
+      setLink({ kind: "none" });
+    },
+    [adopt],
+  );
+
+  /**
+   * What the start screen says to staff about the survey (D-56), and whether it
+   * stands in for the code and Start: a link not yet followed, or a survey with
+   * nothing on this iPad to run.
+   */
+  const startNotice = useMemo<StartNotice | null>(() => {
+    const here = named(choice);
+    switch (link.kind) {
+      case "checking":
+        return { blocking: true, text: `This iPad has been given a link to ${named(link.choice)}. Checking it and downloading it now…` };
+      case "waiting":
+        return {
+          blocking: true,
+          text: `This iPad has been given a link to ${named(link.choice)}. It has to be downloaded once, and ${link.reason}. Connect this iPad to the internet: it will try again by itself.`,
+        };
+      case "refused":
+        return {
+          blocking: false,
+          text: `The link to ${named(link.choice)} can't be used: ${link.reason}. This iPad stays on ${here}.`,
+          dismiss: () => setLink({ kind: "none" }),
+        };
+      case "invalid":
+        return {
+          blocking: false,
+          text: `This link isn't one MySelf can use: ${link.problem}. This iPad stays on ${here}.`,
+          dismiss: () => setLink({ kind: "none" }),
+        };
+      case "followed":
+        return {
+          blocking: false,
+          text: `This iPad was set up from this link before and has been moved since: it is on ${here}. Staff can change it in the handover panel.`,
+          dismiss: () => setLink({ kind: "none" }),
+        };
+      case "none":
+        break;
+    }
+    if (!loaded) {
+      const verdict = releaseCheck ? verdictOf(releaseCheck.outcome, false) : null;
+      const why = verdict?.kind === "refused" ? ` The last check found that ${verdict.reason}.` : "";
+      return {
+        blocking: true,
+        text: `This iPad is set to ${here}, which is not on this iPad yet. Connect it to the internet: it will download by itself.${why} Staff can move the iPad back to the default survey in the handover panel.`,
+      };
+    }
+    if (studyClosed) return { blocking: false, text: "This study is closed. An unfinished sitting can still be finished; no new one can start." };
+    return null;
+  }, [choice, link, loaded, releaseCheck, studyClosed]);
 
   return (
     <div className="app">
@@ -873,6 +1155,8 @@ export default function App({ initialRuntime }: { initialRuntime: Runtime }) {
 
       {phase.kind === "start" && (
         <StartScreen
+          notice={startNotice}
+          surveyLabel={isDefaultChoice(choice) ? null : `${choice.study}/${choice.surveyId}`}
           studyLabel={manifest.composition.studyLabel}
           codeRule={codeRule}
           contact={contact}
@@ -912,18 +1196,23 @@ export default function App({ initialRuntime }: { initialRuntime: Runtime }) {
               onNote={setHandoverNote}
               onCleared={refreshDeviceStatus}
               onSittingsErased={async () => {
-                await pruneReleases([runtimeRef.current.hash, activeRuntime.current.hash]);
+                await pruneReleases([runtimeRef.current.hash, ...(activeRuntime.current ? [activeRuntime.current.hash] : [])]);
               }}
+              survey={{ choice, isDefault: isDefaultChoice(choice), defaultChoice: DEFAULT_CHOICE }}
+              onCheckSurvey={checkTypedSurvey}
+              onUseSurvey={useSurvey}
               releaseNote={
-                `New sittings use release ${manifest.release.version} (${manifest.hash?.slice(7, 19)}), ` +
-                (runtime.source === "built-in"
-                  ? "the version built into this app."
-                  : runtime.source === "live"
-                    ? "downloaded from the study and verified since the app was opened."
-                    : "downloaded from the study earlier and verified on this device.") +
+                (loaded
+                  ? `New sittings use release ${manifest.release.version} (${manifest.hash?.slice(7, 19)}), ` +
+                    (runtime.source === "built-in"
+                      ? "the version built into this app."
+                      : runtime.source === "live"
+                        ? "downloaded from the study and verified since the app was opened."
+                        : "downloaded from the study earlier and verified on this device.")
+                  : "This survey is not on this iPad yet, so no sitting can start.") +
                 " " +
                 (releaseCheck
-                  ? `Last checked ${new Date(releaseCheck.at).toLocaleTimeString()}: ${describeCheck(releaseCheck.outcome)}`
+                  ? `Last checked ${new Date(releaseCheck.at).toLocaleTimeString()}: ${describeCheck(releaseCheck.outcome, isDefaultChoice(choice))}`
                   : "Not yet checked for a newer version.")
               }
               syncNote={syncNote}
@@ -960,6 +1249,8 @@ export default function App({ initialRuntime }: { initialRuntime: Runtime }) {
             moduleUrl: __MYSTORY_URL__ || null,
             sessionId: phase.session.sessionId,
             releaseHash: manifest.hash ?? "",
+            // The sitting's own study (D-56), which the module acts in.
+            study: phase.session.study ?? DEFAULT_CHOICE.study,
             // The frozen protocols, sent to the module so it runs exactly what
             // this version published, which Studio may have edited.
             protocols: manifest.narrativeProtocols,

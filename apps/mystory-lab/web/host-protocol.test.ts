@@ -6,6 +6,7 @@ import {
   acceptHostCredential,
   acceptHostProtocol,
   belongsHere,
+  hostStudy,
   receiveHostProtocol,
   sameProtocol,
   trustedHostOrigins,
@@ -202,5 +203,13 @@ describe("a run kept on a shared iPad", () => {
 
   it("comes back as before in the lab on its own, which has no sitting", () => {
     expect(belongsHere("lab_abc", null)).toBe(true);
+  });
+});
+
+describe("the sitting's study, from the survey's address (D-56)", () => {
+  it("is taken when it is a study id, and nothing otherwise, so a value that is not one is never sent", () => {
+    expect(hostStudy("future")).toBe("future");
+    expect(hostStudy(null)).toBeNull();
+    for (const raw of ["", "Future", "ybm/sessions", "..", "f", "a".repeat(41)]) expect(hostStudy(raw)).toBeNull();
   });
 });

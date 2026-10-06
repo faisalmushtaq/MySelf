@@ -5,6 +5,7 @@ import { FieldValue } from "firebase-admin/firestore";
 import { paths } from "@myself/firebase";
 import { STUDY, auth, research } from "./apps.js";
 import { LINK_CALL_CAP, LINK_DAYS } from "./relay-policy.js";
+import { studyForCall } from "./studies.js";
 
 /**
  * Administration: who may use the platform, and which iPads may post to it.
@@ -29,8 +30,8 @@ function requireOwner(request: CallableRequest): string {
   return request.auth.uid;
 }
 
-async function audit(actor: string, action: string, subject: string, detail: unknown): Promise<void> {
-  await research().collection(paths.audit(STUDY)).add({
+async function audit(actor: string, action: string, subject: string, detail: unknown, study: string = STUDY): Promise<void> {
+  await research().collection(paths.audit(study)).add({
     at: FieldValue.serverTimestamp(),
     actor,
     action,
@@ -59,16 +60,24 @@ async function audit(actor: string, action: string, subject: string, detail: unk
  *
  * A Firebase account is disabled too where one exists, for the older enrolled
  * devices that were given one before self-registration replaced it.
+ *
+ * IN ONE STUDY (D-56). An iPad is registered separately in each study it files
+ * into, so it is stopped separately too: `study` names which, and absent means
+ * the default, as before.
  */
 export const revokeDevice = onCall(async (request) => {
   const actor = requireOwner(request);
-  const { deviceId } = (request.data ?? {}) as { deviceId?: string };
+  const { deviceId, study: asked } = (request.data ?? {}) as { deviceId?: string; study?: unknown };
   if (!deviceId) throw new HttpsError("invalid-argument", "deviceId is required");
+  // A device id ends up as a document id: one that could name another
+  // document, or none, is refused rather than written.
+  if (!/^[A-Za-z0-9_-]{1,120}$/.test(deviceId)) throw new HttpsError("invalid-argument", "that is not a device id");
+  const { study } = await studyForCall(research(), asked);
 
   await research()
-    .doc(paths.device(STUDY, deviceId))
+    .doc(paths.device(study, deviceId))
     .set(
-      { deviceId, study: STUDY, revokedAt: FieldValue.serverTimestamp(), revokedBy: actor },
+      { deviceId, study, revokedAt: FieldValue.serverTimestamp(), revokedBy: actor },
       { merge: true },
     );
 
@@ -81,8 +90,8 @@ export const revokeDevice = onCall(async (request) => {
     // No account under this id. The document is what stops it.
   }
 
-  await audit(actor, "device.revoked", deviceId, null);
-  return { deviceId, revoked: true };
+  await audit(actor, "device.revoked", deviceId, null, study);
+  return { deviceId, study, revoked: true };
 });
 
 /**

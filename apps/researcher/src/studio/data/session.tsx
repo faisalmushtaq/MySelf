@@ -3,6 +3,7 @@ import { GoogleAuthProvider, onAuthStateChanged, signInWithPopup, signOut as fbS
 import { httpsCallable } from "firebase/functions";
 import { CALLABLES, type SessionRequest, type SessionResponse } from "@myself/studio";
 import { studioFirebase } from "../firebase.js";
+import { currentStudy, useStudy } from "../router.js";
 import { authErrorMessage, toStudioCallError } from "./errors.js";
 import type { StudioSession, StudioUser } from "./types.js";
 
@@ -16,10 +17,11 @@ import type { StudioSession, StudioUser } from "./types.js";
  * nothing, because every read and write is checked again where it lands.
  */
 
-type SessionState = Pick<StudioSession, "status" | "user" | "role" | "reason" | "error">;
+type SessionState = Pick<StudioSession, "status" | "user" | "role" | "reason" | "error" | "studies" | "owner" | "study">;
 
-const UNCONFIGURED: SessionState = { status: "unconfigured", user: null, role: null, reason: null, error: null };
-const SIGNED_OUT: SessionState = { status: "signed_out", user: null, role: null, reason: "not_signed_in", error: null };
+const NONE = { studies: [], owner: false, study: null } as const satisfies Pick<SessionState, "studies" | "owner" | "study">;
+const UNCONFIGURED: SessionState = { status: "unconfigured", user: null, role: null, reason: null, error: null, ...NONE };
+const SIGNED_OUT: SessionState = { status: "signed_out", user: null, role: null, reason: "not_signed_in", error: null, ...NONE };
 
 const SessionContext = createContext<StudioSession | null>(null);
 
@@ -39,8 +41,13 @@ function userOf(u: User): StudioUser {
 export function StudioDataProvider({ children }: { children: ReactNode }) {
   const fb = studioFirebase();
   const [state, setState] = useState<SessionState>(
-    fb ? { status: "loading", user: null, role: null, reason: null, error: null } : UNCONFIGURED,
+    fb ? { status: "loading", user: null, role: null, reason: null, error: null, ...NONE } : UNCONFIGURED,
   );
+  /**
+   * The study space the Studio is in (D-56). The role is per study, so moving
+   * to another asks the server again; the studies list comes with each answer.
+   */
+  const study = useStudy();
   // Answers can arrive out of order (a slow session call from before a sign-out);
   // only the latest request may set the state.
   const seq = useRef(0);
@@ -53,15 +60,17 @@ export function StudioDataProvider({ children }: { children: ReactNode }) {
         setState(SIGNED_OUT);
         return;
       }
-      if (!keepShowing) setState({ status: "loading", user: userOf(user), role: null, reason: null, error: null });
+      if (!keepShowing) setState((s) => ({ status: "loading", user: userOf(user), role: null, reason: null, error: null, studies: s.studies, owner: s.owner, study: null }));
       try {
         const call = httpsCallable<SessionRequest, SessionResponse>(fb!.fns, CALLABLES.session);
-        const { data } = await call({});
+        const asked = currentStudy();
+        const { data } = await call({ study: asked });
         if (mine !== seq.current) return;
+        const known = { studies: data.studies ?? [], owner: data.owner === true, study: asked };
         setState(
           data.role
-            ? { status: "ready", user: userOf(user), role: data.role, reason: null, error: null }
-            : { status: "unauthorised", user: userOf(user), role: null, reason: data.reason ?? "not_listed", error: null },
+            ? { status: "ready", user: userOf(user), role: data.role, reason: null, error: null, ...known }
+            : { status: "unauthorised", user: userOf(user), role: null, reason: data.reason ?? "not_listed", error: null, ...known },
         );
       } catch (error) {
         if (mine !== seq.current) return;
@@ -71,6 +80,7 @@ export function StudioDataProvider({ children }: { children: ReactNode }) {
           role: null,
           reason: null,
           error: `Couldn’t check your access to the Studio. ${toStudioCallError(error).message}`,
+          ...NONE,
         };
         // A background re-check (the draft editor asks after a refused save)
         // that merely failed to reach the server must not replace the whole
@@ -89,6 +99,15 @@ export function StudioDataProvider({ children }: { children: ReactNode }) {
       void resolve(user, false);
     });
   }, [fb, resolve]);
+
+  // Another study space: the same person, asked about that study. Skipped on
+  // the first render, which the sign-in listener above has already asked about.
+  const askedFor = useRef(study);
+  useEffect(() => {
+    if (askedFor.current === study) return;
+    askedFor.current = study;
+    if (userRef.current) void resolve(userRef.current, false);
+  }, [study, resolve]);
 
   const signIn = useCallback(async () => {
     if (!fb) return;

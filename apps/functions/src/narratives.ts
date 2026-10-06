@@ -3,9 +3,10 @@ import * as logger from "firebase-functions/logger";
 import { onRequest } from "firebase-functions/v2/https";
 import { z } from "zod";
 import { paths } from "@myself/firebase";
-import { STUDY, research } from "./apps.js";
+import { research } from "./apps.js";
 import { RelayError, isParticipantDevice, type Caller } from "./relay-policy.js";
 import { authenticate, cors, refuse } from "./relay.js";
+import { studyForRequest } from "./studies.js";
 
 /**
  * Storing a narrative run.
@@ -78,6 +79,11 @@ export const narrativeSave = z.object({
    * came through the survey always has one.
    */
   releaseHash: z.string().max(200).optional(),
+  /**
+   * Which study the sitting belongs to (D-56), as the survey told MyStory. The
+   * run is stored there, beside its sitting; absent means the default study.
+   */
+  study: z.string().min(1).max(64).optional(),
 });
 
 /**
@@ -211,18 +217,25 @@ export const saveNarrative = onRequest(
 
     try {
       /**
+       * The sitting's study first (D-56): the run is stored beside its sitting,
+       * and the iPad is who it is in that study. A closed study still takes a
+       * run, like a sitting, from an iPad it knows.
+       */
+      const study = await studyForRequest(research(), (req.body as { study?: unknown } | undefined)?.study);
+
+      /**
        * A participant's iPad too, on its own credential (D-55). Storing a run is a
        * Firestore write like filing a sitting, so it spends none of the model
        * limits; what it needs instead is the ownership rule in `storeNarrative`.
        */
-      const caller = await authenticate(req.headers.authorization, { allowDeviceCredential: true });
+      const caller = await authenticate(req.headers.authorization, { allowDeviceCredential: true, study });
       const parsed = narrativeSave.safeParse(req.body);
       if (!parsed.success) {
         throw new RelayError(400, "unknown", `that is not a narrative run: ${parsed.error.issues[0]?.message ?? ""}`);
       }
       const run = parsed.data;
 
-      await storeNarrative(research(), STUDY, caller, run);
+      await storeNarrative(research(), study.study, caller, run);
 
       res.status(200).json({ saved: run.records.length, sessionId: run.sessionId });
     } catch (error) {

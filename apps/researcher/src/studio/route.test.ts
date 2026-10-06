@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatRoute, isStudioHash, parseHash, safeNext, samePage, type Route } from "./route.js";
+import { DEFAULT_STUDY, formatRoute, isStudioHash, parseHash, safeNext, samePage, studyOfHash, type Route } from "./route.js";
 
 describe("Studio addresses", () => {
   it("reads every page", () => {
@@ -82,5 +82,41 @@ describe("Studio addresses", () => {
         { name: "survey", surveyId: "s", tab: "preview", q: null },
       ),
     ).toBe(false);
+  });
+});
+
+describe("addresses in a study space (D-56)", () => {
+  it("leaves every address of the default study as it was", () => {
+    expect(studyOfHash("#/surveys/s1/edit")).toBe(DEFAULT_STUDY);
+    expect(formatRoute({ name: "surveys" }, DEFAULT_STUDY)).toBe("#/surveys");
+    expect(formatRoute({ name: "survey", surveyId: "s1", tab: "versions", q: null })).toBe("#/surveys/s1/versions");
+  });
+
+  it("puts another study's pages under its own prefix, and reads them back", () => {
+    const routes: Route[] = [
+      { name: "surveys" },
+      { name: "access" },
+      { name: "survey", surveyId: "future_main", tab: "edit", q: "future_studio.q_1" },
+      { name: "survey", surveyId: "future_main", tab: "settings", q: null },
+    ];
+    for (const r of routes) {
+      const hash = formatRoute(r, "future");
+      expect(hash.startsWith("#/study/future/")).toBe(true);
+      expect(studyOfHash(hash)).toBe("future");
+      expect(parseHash(hash)).toEqual(r);
+    }
+    expect(parseHash("#/study/future")).toEqual({ name: "surveys" });
+  });
+
+  it("is no page at all when the prefix names something that is not a study id", () => {
+    for (const hash of ["#/study/Future/surveys", "#/study//surveys", "#/study/..%2F/surveys", "#/study/a/surveys", "#/study/%E0%A4%A/surveys"]) {
+      expect(studyOfHash(hash)).toBeNull();
+      expect(parseHash(hash).name).toBe("not_found");
+    }
+  });
+
+  it("sends someone back to the study they were in after signing in", () => {
+    expect(safeNext("#/study/future/surveys/f1/versions")).toBe("#/study/future/surveys/f1/versions");
+    expect(safeNext("#/study/Bad/surveys")).toBeNull();
   });
 });

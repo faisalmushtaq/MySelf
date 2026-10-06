@@ -36,6 +36,24 @@ export const READY = "mystory:ready";
 export const REFUSED = "mystory:refused";
 export const PROTOCOL_MESSAGE = "myself:narrative-protocol";
 
+/**
+ * The study the sitting belongs to, from the address the survey opened this
+ * page at (D-56), or null for none — the default study, as before.
+ *
+ * Beside the release hash and of the same kind: no secret, and set by the page
+ * that framed this one. It is only acted on with a credential that page handed
+ * over by message from a trusted origin, and the relay, the transcriber and
+ * `saveNarrative` each check it against the study's registry and act as this
+ * iPad only in a study it is registered in. Held to the study-id pattern here
+ * too (`STUDY_ID_PATTERN` in @myself/schema, which this module does not
+ * import), so a value that is not one is never sent anywhere.
+ */
+export const STUDY_ID = /^[a-z][a-z0-9_]{1,39}$/;
+
+export function hostStudy(raw: string | null): string | null {
+  return raw !== null && STUDY_ID.test(raw) ? raw : null;
+}
+
 /** How long to wait for a protocol the survey said it would send. It is sent the moment the survey hears we are ready. */
 export const PROTOCOL_PATIENCE_MS = 15_000;
 

@@ -69,6 +69,35 @@ function deriveSurveySource(): string {
   }
 }
 
+/**
+ * Where any study's public documents are read from (D-56, docs/16 §11.3): the
+ * parent of `studies/{study}`, so a participant link can name a study other
+ * than this build's own. Derived from the project like the source above;
+ * `MYSELF_STUDIES_SOURCE` overrides it (the e2e suite's stand-in), and a
+ * `MYSELF_SURVEY_SOURCE` that ends in `/studies/<the default>` gives its parent.
+ *
+ * Only the study id from a link is ever appended to it, after the strict
+ * pattern has refused anything that could carry a `/`, so a link can choose a
+ * study and never a host or a path. EMPTY MEANS THIS BUILD RUNS ONLY ITS OWN
+ * SURVEY: a link to another study is refused, saying so.
+ */
+function deriveStudiesSource(): string {
+  const explicit = process.env["MYSELF_STUDIES_SOURCE"];
+  if (explicit) return explicit.replace(/\/+$/, "");
+  const study = process.env["MYSELF_STUDY"] || "ybm";
+  const survey = process.env["MYSELF_SURVEY_SOURCE"];
+  if (survey) {
+    const trimmed = survey.replace(/\/+$/, "");
+    return trimmed.endsWith(`/studies/${study}`) ? trimmed.slice(0, -`/${study}`.length) : "";
+  }
+  try {
+    const projectId = (JSON.parse(firebaseConfig || "null") as { projectId?: string } | null)?.projectId;
+    return projectId ? `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/studies` : "";
+  } catch {
+    return "";
+  }
+}
+
 export default defineConfig({
   base,
   define: {
@@ -98,9 +127,17 @@ export default defineConfig({
     __CHECKPOINT_SECONDS__: JSON.stringify(Number(process.env["MYSELF_CHECKPOINT_SECONDS"] ?? 120)),
     __SURVEY_SOURCE__: JSON.stringify(deriveSurveySource()),
     /**
-     * Which survey's pointer the start screen follows. Baked in, like the
-     * endpoints: which questionnaire a child is given is not something the page
-     * should let anybody change from the address bar.
+     * The study this build files into unless an iPad has been given a link to
+     * another (D-56). The same `MYSELF_STUDY` the source above is built from.
+     */
+    __STUDY__: JSON.stringify(process.env["MYSELF_STUDY"] || "ybm"),
+    __STUDIES_SOURCE__: JSON.stringify(deriveStudiesSource()),
+    /**
+     * Which survey's pointer the start screen follows until an iPad is given a
+     * participant link (D-56). Baked in, like the endpoints. A link can choose
+     * among surveys a study has PUBLISHED, and nothing else: it is checked
+     * against the study's registry and live pointer, and the release it names
+     * is verified, before it is run (lib/selection.ts).
      */
     __SURVEY_ID__: JSON.stringify(process.env["MYSELF_SURVEY_ID"] || "ybm_nd2026_standard"),
   },

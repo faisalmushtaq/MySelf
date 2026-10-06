@@ -55,6 +55,14 @@ export interface HandoverOptions {
   protocol: string;
   sessionId: string;
   releaseHash: string;
+  /**
+   * The study the sitting belongs to (D-56). In the address beside the release
+   * hash, because it is the same kind of fact and no secret: the module sends
+   * it to the relay, the transcriber and `saveNarrative`, each of which checks
+   * it against the registry and acts as this iPad in that study. Absent means
+   * the default, and the address is then exactly what it was.
+   */
+  study?: string | undefined;
   firstName?: string | undefined;
   /** Whether the survey will send the protocol by message. */
   sendsProtocol: boolean;
@@ -69,6 +77,7 @@ export function handoverUrl(options: HandoverOptions): URL {
   url.searchParams.set("protocol", options.protocol);
   url.searchParams.set("sessionId", options.sessionId);
   url.searchParams.set("releaseHash", options.releaseHash);
+  if (options.study) url.searchParams.set("study", options.study);
   if (options.sendsProtocol) url.searchParams.set("protocolFromHost", "1");
   // Silence means nobody, and the module is written to read correctly with
   // no name. Only sent when the study actually collected one.

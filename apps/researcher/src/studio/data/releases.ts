@@ -3,7 +3,8 @@ import { doc, getDoc } from "firebase/firestore";
 import { paths } from "@myself/firebase";
 import { hashHex, releaseManifest, verifyRawManifestHash, type ReleaseManifest } from "@myself/schema";
 import type { PublicReleaseDoc } from "@myself/studio";
-import { STUDY, studioFirebase } from "../firebase.js";
+import { studioFirebase } from "../firebase.js";
+import { currentStudy } from "../router.js";
 import { readErrorMessage } from "./errors.js";
 import { NOT_CONNECTED } from "./live.js";
 import type { Loadable } from "./types.js";
@@ -37,22 +38,29 @@ export class ReleaseLoadError extends Error {
 
 const cache = new Map<string, Promise<LoadedRelease>>();
 
-/** Fetch and verify one release. Cached by hash; a failure is not cached, so a retry fetches again. */
+/**
+ * Fetch and verify one release, from the release store of the study space the
+ * Studio is in. Cached by study and hash — a release is read from its own
+ * study's store, and one study's copy never answers for another (D-56). A
+ * failure is not cached, so a retry fetches again.
+ */
 export function loadRelease(hash: string): Promise<LoadedRelease> {
-  const hit = cache.get(hash);
+  const study = currentStudy();
+  const key = `${study}\u0000${hash}`;
+  const hit = cache.get(key);
   if (hit) return hit;
-  const promise = fetchRelease(hash);
-  cache.set(hash, promise);
-  promise.catch(() => cache.delete(hash));
+  const promise = fetchRelease(study, hash);
+  cache.set(key, promise);
+  promise.catch(() => cache.delete(key));
   return promise;
 }
 
-async function fetchRelease(hash: string): Promise<LoadedRelease> {
+async function fetchRelease(study: string, hash: string): Promise<LoadedRelease> {
   const fb = studioFirebase();
   if (!fb) throw new ReleaseLoadError(NOT_CONNECTED);
   let data: PublicReleaseDoc | undefined;
   try {
-    const snap = await getDoc(doc(fb.db, paths.publicRelease(STUDY, hashHex(hash))));
+    const snap = await getDoc(doc(fb.db, paths.publicRelease(study, hashHex(hash))));
     data = snap.exists() ? (snap.data() as PublicReleaseDoc) : undefined;
   } catch (error) {
     throw new ReleaseLoadError(readErrorMessage(error, "this published version"));

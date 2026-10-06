@@ -12,6 +12,7 @@ import {
 import {
   REFUSED,
   belongsHere,
+  hostStudy,
   receiveHostProtocol,
   sameProtocol,
   trustedHostOrigins,
@@ -77,11 +78,19 @@ const embedded = new URL(window.location.href).searchParams.get("embed") === "1"
 const hostSessionId = new URL(window.location.href).searchParams.get("sessionId");
 const hostReleaseHash = new URL(window.location.href).searchParams.get("releaseHash");
 /**
+ * The sitting's study (D-56), when the survey's sitting is in a study other than
+ * the default: the relay, the transcriber and `saveNarrative` act as this iPad
+ * in it, find its release there and count its limits there. See `hostStudy`.
+ */
+const hostStudyId = hostStudy(new URL(window.location.href).searchParams.get("study"));
+const studyField = hostStudyId ? { study: hostStudyId } : {};
+/**
  * The same hash, sent with every model call, so the relay runs the settings
  * that release froze — a version published from the Studio is in no bundle the
- * relay carries (docs/16 §10.1). Nothing when the lab is used on its own.
+ * relay carries (docs/16 §10.1) — with the study it was published in. Nothing
+ * when the lab is used on its own.
  */
-const relayRelease = hostReleaseHash ? { releaseHash: hostReleaseHash } : {};
+const relayRelease = { ...(hostReleaseHash ? { releaseHash: hostReleaseHash } : {}), ...studyField };
 
 /**
  * The protocol itself, sent by the survey (see host-protocol.ts).
@@ -1516,6 +1525,7 @@ function wireMic(): void {
           protocolKey: ($("protocol") as HTMLSelectElement | null)?.value ?? "unknown",
           sessionId: sessionId ?? "unknown",
           seconds: Math.round((Date.now() - startedAt) / 1000),
+          ...studyField,
         }),
       });
       const body = (await res.json()) as {
@@ -2742,6 +2752,7 @@ async function store(runner: NarrativeRunner, finished: boolean): Promise<boolea
         protocolKey: records[0]!.protocolKey,
         protocolVersion: records[0]!.protocolVersion,
         ...(hostReleaseHash ? { releaseHash: hostReleaseHash } : {}),
+        ...studyField,
         records,
         finished,
         elapsedSeconds: runStartedAt ? Math.round((Date.now() - runStartedAt) / 1000) : 0,

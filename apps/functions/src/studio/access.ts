@@ -149,6 +149,7 @@ const REASON_MESSAGES: Record<NonNullable<SessionResponse["reason"]>, string> = 
   not_google: "MySelf Studio only accepts a Google sign-in. Sign out, then sign in with Google.",
   email_not_verified: "Google hasn't confirmed that this email address belongs to this account, so MySelf Studio can't use it.",
   not_listed: "This Google account isn't on the MySelf Studio list. Ask a Studio admin to add you.",
+  unknown_study: "There's no study space at this address.",
 };
 
 const ROLE_NAMES: Record<StudioRole, string> = { viewer: "viewer", editor: "editor", publisher: "publisher", admin: "admin" };

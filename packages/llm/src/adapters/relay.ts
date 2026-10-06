@@ -71,6 +71,16 @@ export interface RelayOptions {
    * one the study never published.
    */
   releaseHash?: string | undefined;
+  /**
+   * The study the sitting belongs to (D-56), when a survey opened the module.
+   *
+   * Sent with every call so the relay registers and checks this iPad, finds the
+   * release and counts the limits in THAT study. Not a choice the page gets to
+   * make on anyone's behalf: the relay checks it against the study's registry,
+   * and an iPad is only who it is in a study it registered in. Absent means the
+   * default study, as every call meant before study spaces.
+   */
+  study?: string | undefined;
 }
 
 interface RelayResponse {
@@ -138,6 +148,7 @@ export class RelayAdapter implements ModelAdapter {
           protocolKey: prompt.promptKey,
           ...(schema ? { schema } : {}),
           ...(this.options.releaseHash ? { releaseHash: this.options.releaseHash } : {}),
+          ...(this.options.study ? { study: this.options.study } : {}),
         }),
         ...(signal ? { signal } : {}),
       });

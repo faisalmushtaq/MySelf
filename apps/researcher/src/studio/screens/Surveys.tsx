@@ -3,24 +3,43 @@ import { atLeast } from "@myself/studio";
 import { studio, StudioCallError, useStudioSession, useSurveys, useVersions, type SurveyDoc } from "../data/index.js";
 import { SURVEY_ID } from "../firebase.js";
 import { formatDate, formatDateTime, formatRelative, plural, toDate, versionLabel } from "../format.js";
-import { Link, navigate, type Route } from "../router.js";
+import { DEFAULT_STUDY, Link, navigate, useStudy, type Route } from "../router.js";
 import { LoadError } from "../shell/common.js";
-import { PageHead, Shell } from "../shell/Shell.js";
+import { Banner, PageHead, Shell } from "../shell/Shell.js";
 import { Dialog } from "../ui/dialog.js";
 import { Icon } from "../ui/icons.js";
-import { Button, EmptyState, Field, InfoTip, Notice, Skeleton, StatusDot, Tooltip } from "../ui/kit.js";
+import { Button, EmptyState, Field, IconButton, InfoTip, Notice, Skeleton, StatusDot, Tooltip } from "../ui/kit.js";
 import { useToast } from "../ui/toast.js";
+import { ParticipantLinkDialog } from "./ParticipantLink.js";
 
 /** Every survey in the study, what is live, and whether its draft has moved on. */
 export function SurveysScreen() {
   const session = useStudioSession();
+  const study = useStudy();
   const surveys = useSurveys();
   const isAdmin = atLeast(session.role, "admin");
   const [creating, setCreating] = useState(false);
-  const hasLive = surveys.status === "ready" && surveys.data.some((s) => s.surveyId === SURVEY_ID);
+  const [linkFor, setLinkFor] = useState<SurveyDoc | null>(null);
+  /**
+   * "Set up from the live survey" imports the releases this build carries,
+   * which are the default study's own (D-56): a study space starts with a new
+   * survey instead.
+   */
+  const canImport = study === DEFAULT_STUDY;
+  const hasLive = !canImport || (surveys.status === "ready" && surveys.data.some((s) => s.surveyId === SURVEY_ID));
+  const closed = session.studies.find((s) => s.study === study)?.status === "closed";
 
   return (
-    <Shell>
+    <Shell
+      banner={
+        closed ? (
+          <Banner tone="warn" title="This study space is closed.">
+            No new iPad can join it and no new sitting can start in it. Its surveys can still be edited and published; an
+            owner can reopen it.
+          </Banner>
+        ) : null
+      }
+    >
       <div className="stp-page">
         <PageHead
           title="Surveys"
@@ -37,11 +56,23 @@ export function SurveysScreen() {
         ) : surveys.status === "error" ? (
           <LoadError error={surveys.error} retry={surveys.retry} />
         ) : surveys.data.length === 0 ? (
-          isAdmin ? (
+          isAdmin && canImport ? (
             <FirstRun onNew={() => setCreating(true)} />
+          ) : isAdmin ? (
+            <EmptyState
+              icon="section"
+              title="No surveys in this study space yet"
+              action={
+                <Button variant="primary" icon="plus" onClick={() => setCreating(true)}>
+                  New survey
+                </Button>
+              }
+            >
+              <p>Each survey gets its own participant link once a version of it is published.</p>
+            </EmptyState>
           ) : (
             <EmptyState icon="section" title="No surveys yet">
-              <p>An admin sets the Studio up from the live survey. It appears here once they have.</p>
+              <p>{canImport ? "An admin sets the Studio up from the live survey. It appears here once they have." : "An admin creates this study space’s first survey. It appears here once they have."}</p>
             </EmptyState>
           )
         ) : (
@@ -68,7 +99,7 @@ export function SurveysScreen() {
                 </thead>
                 <tbody>
                   {surveys.data.map((s) => (
-                    <SurveyRow key={s.surveyId} survey={s} />
+                    <SurveyRow key={s.surveyId} survey={s} onLink={() => setLinkFor(s)} />
                   ))}
                 </tbody>
               </table>
@@ -77,11 +108,12 @@ export function SurveysScreen() {
         )}
       </div>
       {creating ? <NewSurveyDialog existing={surveys.status === "ready" ? surveys.data : []} onClose={() => setCreating(false)} /> : null}
+      {linkFor ? <ParticipantLinkDialog survey={linkFor} onClose={() => setLinkFor(null)} /> : null}
     </Shell>
   );
 }
 
-function SurveyRow({ survey }: { survey: SurveyDoc }) {
+function SurveyRow({ survey, onLink }: { survey: SurveyDoc; onLink: () => void }) {
   const active = survey.active;
   const publishedAt = toDate(active?.publishedAt);
   const editors = survey.draftEditors;
@@ -139,6 +171,8 @@ function SurveyRow({ survey }: { survey: SurveyDoc }) {
         <span className="stp-actions">
           <IconLink label={`Preview ${survey.title}`} tip="Preview" icon="eye" to={{ name: "survey", surveyId: survey.surveyId, tab: "preview", q: null }} />
           <IconLink label={`Versions of ${survey.title}`} tip="Versions" icon="history" to={{ name: "survey", surveyId: survey.surveyId, tab: "versions", q: null }} />
+          {/* A link only once there is something live for it to open (D-56). */}
+          {active ? <IconButton icon="link" label={`Participant link for ${survey.title}`} onClick={onLink} /> : null}
         </span>
       </td>
     </tr>

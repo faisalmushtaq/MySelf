@@ -116,3 +116,35 @@ export async function auditActions(db: Firestore): Promise<string[]> {
   const snap = await db.collection(paths.studioAudit(STUDY)).get();
   return snap.docs.map((d) => String(d.get("action")));
 }
+
+// ── Study spaces (D-56) ──────────────────────────────────────────────────────
+
+/**
+ * Make an account a project owner, as `grant-role.mjs` would: the `owner`
+ * claim on the Auth emulator. The account must have signed in once; its next
+ * token carries the claim.
+ */
+export async function grantOwner(email: string): Promise<void> {
+  if (!process.env["FIREBASE_AUTH_EMULATOR_HOST"]) throw new Error("the Auth emulator is not running");
+  const { getAuth } = await import("firebase-admin/auth");
+  const app: App = initializeApp({ projectId: process.env["GCLOUD_PROJECT"] ?? "demo-myself" }, `studio-e2e-auth-${Date.now()}`);
+  try {
+    const auth = getAuth(app);
+    const user = await auth.getUserByEmail(email.trim().toLowerCase());
+    await auth.setCustomUserClaims(user.uid, { role: "owner" });
+  } finally {
+    await deleteApp(app);
+  }
+}
+
+/** Any document, as stored, or null. */
+export async function stored(db: Firestore, path: string): Promise<Record<string, unknown> | null> {
+  const snap = await db.doc(path).get();
+  return snap.exists ? (snap.data() as Record<string, unknown>) : null;
+}
+
+/** The sittings filed for one study code in one study. */
+export async function sittingsIn(db: Firestore, study: string, studyCode: string): Promise<{ sessionId: string; releaseHash: string; study: string; deviceId: string }[]> {
+  const snap = await db.collection(paths.sessions(study)).where("studyCode", "==", studyCode).get();
+  return snap.docs.map((d) => d.data() as { sessionId: string; releaseHash: string; study: string; deviceId: string });
+}

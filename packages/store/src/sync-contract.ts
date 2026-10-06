@@ -85,6 +85,20 @@ export const sittingUpload = z.object({
    * this is recorded as an observation, not used as a time.
    */
   sentAt: z.string().min(1).max(40).optional(),
+  /**
+   * Which study these sittings belong to (D-56, docs/16 §11.3).
+   *
+   * The study a sitting STARTED in, which the device recorded then — not the one
+   * the iPad happens to be on when it uploads, because an iPad switched to another
+   * survey still has the last one's sittings to send. One study per request: the
+   * device sends one sitting at a time, so it always knows which.
+   *
+   * OPTIONAL, and absent means the deployment's default study, which is what every
+   * upload before this field meant. Loose here and strict in the function, which
+   * checks it against the pattern and the registry and says in words what is wrong;
+   * a shape refusal here would only say "invalid".
+   */
+  study: z.string().min(1).max(64).optional(),
   sittings: z.array(sittingUploadItem).min(1).max(50),
 });
 

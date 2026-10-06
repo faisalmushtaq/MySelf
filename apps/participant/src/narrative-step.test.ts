@@ -48,6 +48,12 @@ describe("what the survey hands to the module", () => {
     expect(handoverUrl(base).searchParams.get("releaseHash")).toBe("sha256-abc");
   });
 
+  it("carries the sitting's study when there is one, so the module acts in it (D-56)", () => {
+    expect(buildHandoverUrl({ ...base, study: "future", sendsProtocol: true }).searchParams.get("study")).toBe("future");
+    // The default's sittings send none, and the address is what it always was.
+    expect(handoverUrl(base).searchParams.has("study")).toBe(false);
+  });
+
   it("asks for the participant view and starts straight away", () => {
     const url = handoverUrl(base);
     expect(url.searchParams.get("view")).toBe("participant");

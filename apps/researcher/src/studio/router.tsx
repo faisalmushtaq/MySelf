@@ -11,7 +11,7 @@ import {
 } from "react";
 import { Dialog } from "./ui/dialog.js";
 import { Button, Notice } from "./ui/kit.js";
-import { formatRoute, isStudioHash, parseHash, samePage, type Route } from "./route.js";
+import { DEFAULT_STUDY, formatRoute, isStudioHash, parseHash, samePage, studyOfHash, type Route } from "./route.js";
 
 export * from "./route.js";
 
@@ -52,6 +52,23 @@ export function useRoute(): Route {
   return routeOf(hash);
 }
 
+/**
+ * The study space the Studio is in (D-56): the address's `study/<id>`, or the
+ * project's default. Read at the moment of asking, so a data call made in a
+ * study is made in that study; every page is keyed by it (StudioApp), so
+ * moving to another study starts every listener afresh rather than carrying
+ * one study's documents into the next. An address naming no study id is no
+ * page (`parseHash`), and reads here as the default.
+ */
+export function currentStudy(): string {
+  return (typeof window === "undefined" ? null : studyOfHash(window.location.hash)) ?? DEFAULT_STUDY;
+}
+
+/** The study space, re-rendering when the address moves to another. */
+export function useStudy(): string {
+  return useSyncExternalStore(subscribe, currentStudy, () => DEFAULT_STUDY);
+}
+
 // ── Guards ────────────────────────────────────────────────────────────────
 
 export interface NavigationBlocker {
@@ -69,6 +86,8 @@ interface Pending {
   /** Where to go: a Studio route, a whole hash (leaving the Studio), or something to do (signing out). */
   target: Route | string | (() => void);
   replace: boolean;
+  /** The study space a Studio route is in, when it is not the current one. */
+  study?: string;
   blocker: NavigationBlocker;
 }
 
@@ -88,8 +107,8 @@ function blockerFor(next: Route | null): NavigationBlocker | null {
 /** The last address this router accepted, so a refused back-button press can be put back. */
 let accepted: string | null = null;
 
-function go(target: Route | string, replace: boolean) {
-  const hash = typeof target === "string" ? target : formatRoute(target);
+function go(target: Route | string, replace: boolean, study?: string) {
+  const hash = typeof target === "string" ? target : formatRoute(target, study ?? currentStudy());
   if (hash === window.location.hash) return;
   if (replace) {
     const url = new URL(window.location.href);
@@ -106,17 +125,20 @@ function go(target: Route | string, replace: boolean) {
 }
 
 /**
- * Go somewhere in the Studio. Returns false when a guard stopped it to ask
- * first; the navigation then happens (or not) when the person answers.
+ * Go somewhere in the Studio — in this study space, or in `options.study`.
+ * Returns false when a guard stopped it to ask first; the navigation then
+ * happens (or not) when the person answers. Moving to another study space is
+ * never the same page, so unsaved work there is always asked about.
  */
-export function navigate(to: Route, options: { replace?: boolean } = {}): boolean {
+export function navigate(to: Route, options: { replace?: boolean; study?: string } = {}): boolean {
   const current = routeOf(window.location.hash);
-  const blocker = samePage(current, to) ? null : blockerFor(to);
+  const study = options.study ?? currentStudy();
+  const blocker = study === currentStudy() && samePage(current, to) ? null : blockerFor(to);
   if (blocker) {
-    setPending({ target: to, replace: options.replace ?? false, blocker });
+    setPending({ target: to, replace: options.replace ?? false, study, blocker });
     return false;
   }
-  go(to, options.replace ?? false);
+  go(to, options.replace ?? false, study);
   return true;
 }
 
@@ -195,7 +217,8 @@ function useHashGuard() {
       const previous = accepted;
       const next = isStudioHash(hash) ? routeOf(hash) : null;
       const prevRoute = previous !== null && isStudioHash(previous) ? routeOf(previous) : null;
-      const blocker = prevRoute && next && samePage(prevRoute, next) ? null : blockerFor(next);
+      const sameStudy = previous !== null && studyOfHash(previous) === studyOfHash(hash);
+      const blocker = prevRoute && next && sameStudy && samePage(prevRoute, next) ? null : blockerFor(next);
       if (blocker && previous !== null) {
         const url = new URL(window.location.href);
         url.hash = previous;
@@ -235,10 +258,10 @@ export function NavigationPrompt() {
   const canSave = !!current.blocker.save && !why;
 
   const proceed = () => {
-    const { target, replace } = current;
+    const { target, replace, study } = current;
     setPending(null);
     if (typeof target === "function") target();
-    else go(target, replace);
+    else go(target, replace, study);
   };
 
   return (
@@ -298,12 +321,14 @@ export function NavigationPrompt() {
 export interface LinkProps extends Omit<AnchorHTMLAttributes<HTMLAnchorElement>, "href"> {
   to: Route;
   replace?: boolean;
+  /** Another study space's page; the current one's otherwise. */
+  study?: string;
   children: ReactNode;
 }
 
 /** A real link (it can be opened in a new tab and copied), navigated through the guard. */
-export function Link({ to, replace, onClick, children, ...rest }: LinkProps) {
-  const href = formatRoute(to);
+export function Link({ to, replace, study, onClick, children, ...rest }: LinkProps) {
+  const href = formatRoute(to, study ?? currentStudy());
   return (
     <a
       href={href}
@@ -311,7 +336,7 @@ export function Link({ to, replace, onClick, children, ...rest }: LinkProps) {
         onClick?.(e);
         if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
         e.preventDefault();
-        navigate(to, replace ? { replace } : {});
+        navigate(to, { ...(replace ? { replace } : {}), ...(study ? { study } : {}) });
       }}
       {...rest}
     >

@@ -756,7 +756,10 @@ describe("anyone trying to enumerate the public documents", () => {
       ["admin", member("admin").db],
       ["owner", caller("u_owner", { role: "owner" }).db],
     ] as const) {
-      await refused(`${who}: list published`, () => getDocs(collection(db, P.publishedAll)));
+      // The project's people may list a study's live pointers (D-56: how the
+      // dashboard finds its surveys); a Studio role and the public may not.
+      if (who === "owner") await allowed(`${who}: list published`, () => getDocs(collection(db, P.publishedAll)));
+      else await refused(`${who}: list published`, () => getDocs(collection(db, P.publishedAll)));
       await refused(`${who}: list public releases`, () => getDocs(collection(db, P.publicReleases)));
       await refused(`${who}: query public releases`, () =>
         getDocs(query(collection(db, P.publicReleases), where("surveyId", "==", SURVEY))),
@@ -859,7 +862,9 @@ describe("everything else in the Studio", () => {
     await refused("unknown survey subcollection", () => getDoc(doc(db, `${P.survey}/secrets/x`)));
     await refused("write unknown survey subcollection", () => setDoc(doc(db, `${P.survey}/secrets/x`), { a: 1 }));
     await refused("unknown studio collection", () => getDoc(doc(db, `studies/${STUDY}/studioThings/x`)));
-    await refused("the study document", () => getDoc(doc(db, `studies/${STUDY}`)));
+    // The study document is the registry now (D-56): anyone may get it, and
+    // nobody writes it from a browser — that is covered under "study spaces".
+    await refused("write the study document", () => setDoc(doc(db, paths.study(STUDY)), { status: "open" }));
     // Studio access is not access to the sittings.
     await refused("sittings", () => getDoc(doc(db, paths.session(STUDY, "s1"))));
     await refused("narratives", () => getDoc(doc(db, paths.narrative(STUDY, "s1"))));
@@ -892,6 +897,172 @@ describe("everything else in the Studio", () => {
         await refused(`${who}: collection group ${group}`, () => getDocs(collectionGroup(db, group)));
       }
     }
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Study spaces (D-56, docs/16 §11.4–§11.5)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * A second study space, `future`, set up as `studioCreateStudy` leaves one:
+ * its registry document, its creator on its own list as admin, a survey with
+ * a live version, and a sitting. Its people are not on `ybm`'s list and
+ * `ybm`'s are not on its.
+ */
+const FUTURE = "future";
+const F = {
+  study: paths.study(FUTURE),
+  survey: paths.studioSurvey(FUTURE, "future_main"),
+  surveys: paths.studioSurveys(FUTURE),
+  draft: paths.studioDraft(FUTURE, "future_main"),
+  version: paths.studioVersion(FUTURE, "future_main", "1.0.0"),
+  presence: (uid: string) => paths.studioPresenceOf(FUTURE, "future_main", uid),
+  published: paths.publishedPointer(FUTURE, "future_main"),
+  publishedAll: `studies/${FUTURE}/published`,
+  publicRelease: paths.publicRelease(FUTURE, "a".repeat(64)),
+  members: paths.studioMembers(FUTURE),
+  member: (email: string) => paths.studioMember(FUTURE, email),
+  access: paths.studioAccessConfig(FUTURE),
+  auditRow: `${paths.studioAudit(FUTURE)}/row_1`,
+  session: paths.session(FUTURE, "ses_f1"),
+};
+const FUTURE_ADMIN = "Fay.Future@Example.org";
+
+const seedFuture = () =>
+  seed(async (db) => {
+    await setDoc(doc(db, F.study), {
+      study: FUTURE,
+      title: "Perspectives of the future",
+      status: "open",
+      createdAt: T0,
+      createdBy: "u_owner",
+      updatedAt: T0,
+      updatedBy: "u_owner",
+      closedAt: null,
+    });
+    await setDoc(doc(db, F.member(FUTURE_ADMIN.toLowerCase())), { email: FUTURE_ADMIN.toLowerCase(), role: "admin" });
+    await setDoc(doc(db, F.survey), { surveyId: "future_main", study: FUTURE, title: "Future" });
+    await setDoc(doc(db, F.draft), { ...draftDoc(), surveyId: "future_main" });
+    await setDoc(doc(db, F.version), { surveyId: "future_main", version: "1.0.0" });
+    await setDoc(doc(db, F.published), { surveyId: "future_main", study: FUTURE, hash: `sha256:${"a".repeat(64)}`, version: "1.0.0" });
+    await setDoc(doc(db, F.publicRelease), { surveyId: "future_main", study: FUTURE, manifest: "{}" });
+    await setDoc(doc(db, F.auditRow), { at: T0, actor: "u_owner", action: "study.created" });
+    await setDoc(doc(db, F.session), { sessionId: "ses_f1", study: FUTURE, deviceId: "ipad_1", releaseHash: "sha256:x" });
+  });
+
+const futureAdmin = () => google("u_fay", FUTURE_ADMIN);
+
+describe("the study registry", () => {
+  it("is readable by anyone, one study at a time — an iPad reads it before anybody types a code", async () => {
+    await seedFuture();
+    for (const [who, db] of [
+      ["signed out", nobody()],
+      ["an iPad", caller("dev_a", { device: true, study: STUDY }).db],
+      ["a stranger", google("u_s", "stranger@example.org").db],
+    ] as const) {
+      await allowed(`${who}: get a study`, () => getDoc(doc(db, F.study)));
+      // The default study has no document, and reading that is not an error.
+      await allowed(`${who}: get the default study's absent document`, () => getDoc(doc(db, paths.study(STUDY))));
+    }
+  });
+
+  it("is listed only by the project's people, so a stranger cannot learn what studies exist", async () => {
+    await seedFuture();
+    for (const role of ["owner", "researcher", "analyst"]) {
+      const db = caller(`u_${role}`, { role }).db;
+      await allowed(`${role}: list studies`, () => getDocs(collection(db, paths.studies())));
+    }
+    for (const [who, db] of [
+      ["signed out", nobody()],
+      ["an iPad", caller("dev_a", { device: true, study: STUDY }).db],
+      ["a Studio admin of the study", futureAdmin().db],
+      ["a ybm Studio admin", member("admin").db],
+      ["an iPad carrying an owner claim", caller("dev_b", { device: true, role: "owner" }).db],
+    ] as const) {
+      await refused(`${who}: list studies`, () => getDocs(collection(db, paths.studies())));
+    }
+  });
+
+  it("is written by nobody from a browser, the owner included: studies are created by a function", async () => {
+    await seedFuture();
+    for (const [who, db] of [
+      ["owner", caller("u_owner", { role: "owner", email: "owner@leeds.test" }).db],
+      ["the study's Studio admin", futureAdmin().db],
+      ["signed out", nobody()],
+    ] as const) {
+      await refused(`${who}: create a study`, () => setDoc(doc(db, paths.study("rogue")), { title: "x", status: "open" }));
+      await refused(`${who}: reopen or rename a study`, () => updateDoc(doc(db, F.study), { status: "closed", title: "x" }));
+      await refused(`${who}: delete a study`, () => deleteDoc(doc(db, F.study)));
+      await refused(`${who}: register the default study`, () => setDoc(doc(db, paths.study(STUDY)), { status: "closed" }));
+    }
+  });
+
+  it("answers the participant app's signed-out REST GET: 200 for a study, 404 for none, never a list", async () => {
+    await seedFuture();
+    const emulator = env.emulators.firestore!;
+    const base = `http://${emulator.host}:${emulator.port}/v1/projects/${env.projectId}/databases/(default)/documents`;
+    const status = async (path: string) => (await fetch(`${base}/${path}`)).status;
+    expect(await status(F.study)).toBe(200);
+    expect(await status(paths.study("no_such_study"))).toBe(404);
+    expect(await status(paths.study(STUDY))).toBe(404);
+    expect(await status(paths.studies())).toBe(403);
+    expect(await status(F.published)).toBe(200);
+    expect(await status(F.publicRelease)).toBe(200);
+    expect(await status(F.publishedAll)).toBe(403);
+  });
+});
+
+describe("two study spaces", () => {
+  it("keep their Studios apart: a role in one is nothing in the other, both ways", async () => {
+    await seedFuture();
+    const fay = futureAdmin();
+    // In her own study, everything an admin may do.
+    await allowed("future admin: get survey", () => getDoc(doc(fay.db, F.survey)));
+    await allowed("future admin: list surveys", () => getDocs(collection(fay.db, F.surveys)));
+    await allowed("future admin: get version", () => getDoc(doc(fay.db, F.version)));
+    await allowed("future admin: list members", () => getDocs(collection(fay.db, F.members)));
+    await allowed("future admin: read the audit", () => getDoc(doc(fay.db, F.auditRow)));
+    await allowed("future admin: save the draft", () => save(fay, {}, F.draft));
+    await allowed("future admin: mark presence", () => setDoc(doc(fay.db, F.presence(fay.uid)), presenceFields(fay)));
+    // In ybm, nothing at all.
+    for (const [what, attempt] of memberReads(fay.db)) await refused(`future admin in ybm: ${what}`, attempt);
+    for (const [what, attempt] of adminReads(fay.db)) await refused(`future admin in ybm: ${what}`, attempt);
+    await refused("future admin in ybm: save the draft", () => save(fay));
+
+    // And ybm's people in future, nothing.
+    for (const role of STUDIO_ROLES) {
+      const c = member(role);
+      await refused(`ybm ${role}: get future's survey`, () => getDoc(doc(c.db, F.survey)));
+      await refused(`ybm ${role}: get future's draft`, () => getDoc(doc(c.db, F.draft)));
+      await refused(`ybm ${role}: list future's members`, () => getDocs(collection(c.db, F.members)));
+      await refused(`ybm ${role}: save future's draft`, () => save(c, {}, F.draft));
+    }
+  });
+
+  it("give no Studio member any sitting, in either study", async () => {
+    await seedFuture();
+    await refused("future admin: future's sitting", () => getDoc(doc(futureAdmin().db, F.session)));
+    await refused("ybm admin: future's sitting", () => getDoc(doc(member("admin").db, F.session)));
+    // The project's people read sittings in every study, as they read ybm's.
+    await allowed("researcher: future's sitting", () => getDoc(doc(caller("u_r", { role: "researcher" }).db, F.session)));
+  });
+
+  it("let the project's people list each study's live surveys, and nobody else", async () => {
+    await seedFuture();
+    await allowed("analyst: list future's pointers", () => getDocs(collection(caller("u_a", { role: "analyst" }).db, F.publishedAll)));
+    await refused("future admin: list future's pointers", () => getDocs(collection(futureAdmin().db, F.publishedAll)));
+    await refused("an iPad: list future's pointers", () =>
+      getDocs(collection(caller("dev_a", { device: true, study: FUTURE }).db, F.publishedAll)),
+    );
+  });
+
+  it("keep one study's iPad out of another's sittings", async () => {
+    await seedFuture();
+    const ipad = caller("ipad_1", { device: true, study: STUDY }).db;
+    await refused("a ybm iPad creates a sitting in future", () =>
+      setDoc(doc(ipad, paths.session(FUTURE, "ses_x")), { sessionId: "ses_x", deviceId: "ipad_1", study: FUTURE }),
+    );
   });
 });
 
