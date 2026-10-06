@@ -1449,7 +1449,7 @@ spaces"); `apps/participant/src/selection.test.ts`, `sync.test.ts`,
 9. **The researcher view's data tools stay on the default study.** The
    companion dashboard reads every study from §11.6.
 
-## 12. The item library, and copying between studies (D-57, designed 2026-10-06)
+## 12. The item library, and copying between studies (D-57, designed and built 2026-10-06)
 
 The research team asked that surveys be copied "across for different
 versions", and that researchers "pick and drop in different items from
@@ -1463,7 +1463,8 @@ different surveys — making this modular with library of items". They chose
 - a copied question **keeps its question ID and its variable name**, so the
   same question in two surveys exports to the same column and can be pooled.
 
-This section was written as the design before the change was built. Nothing in
+This section was written as the design before the change was built; §12.11
+records what was built and where, and where it differs. Nothing in
 it changes what a participant's iPad runs, the release format, or the data
 contract the dashboard reads (§11.6): a survey built from library pieces is
 published, frozen and fielded exactly as any other.
@@ -1704,3 +1705,55 @@ migrated.
 6. **Update notices are for saved modules only.** A question copied from a
    published survey stays as it was copied; the source survey's later
    versions do not notify.
+
+### 12.11 As built
+
+**Where it is.**
+
+| What | Where |
+|---|---|
+| The contract: pieces, provenance, module documents, the five callables | `packages/studio/src/contract.ts` (`StudioFragment`, `ImportRecord`, `StudioDraft.imports`, `LibraryModuleDoc`, `Library*Request/Response`, `CALLABLES.library*`) |
+| Picking, adding, vouchers, saved modules and their updates (pure) | `packages/studio/src/library.ts` (`fragmentFromDraft`, `insertFragment`, `validatedFragment`, `lockVouchers`, `planModuleUpdate`, `updateFromModule`, …); placement helpers shared with ops.ts in `editing.ts`; `parseDraft` carries `imports` (`draft.ts`) |
+| Publish: reading and verifying the releases a draft copied from, in their own study's store; the library as a voucher; `imports` on the version | `apps/functions/src/studio/publish.ts`, `store.ts` (`readReleasesAt`) |
+| Copying a survey from another study space | `apps/functions/src/studio/surveys.ts` (`createSurvey`, `from.study`, `basedOn.study`); `versions.ts` (restore keeps provenance) |
+| The library's callables | `apps/functions/src/studio/library.ts`, registered in `functions.ts`, parsed in `requests.ts`; paths in `packages/firebase/src/layout.ts` |
+| The rules | `infra/firebase/firestore.rules` (`studioLibrary` closed to browsers); `firestore.indexes.json` (a module's stored content is not indexed) |
+| The editor: the drawer, its shelves and preview, where a piece goes, the protected-module reason, the summary | `apps/researcher/src/studio/editor/library/*` (`LibraryDrawer`, `Shelves`, `PiecePreview`, `TargetPicker`, `InsertDialogs`, `model.ts`) |
+| Save to library; update notices and their review; "Copied from" | `editor/library/SaveModuleDialog.tsx`, `ModuleUpdate.tsx`, `Provenance.tsx`; the block, section, question and overview pages in `editor/node/` |
+| The editor's vouchers (the same as the server's) | `editor/context.tsx`, `editor/PublishDialog.tsx`, `data/library.ts` |
+| The Library page (saved modules: details, versions, retire) | `screens/Library.tsx`; `#/library`, `#/study/<id>/library` (`route.ts`, `shell/Shell.tsx`) |
+| Copying a survey from any study space | `screens/CopySource.tsx`, `screens/Surveys.tsx` |
+| The provenance export's `copied_from` | `data/provenance.ts` |
+
+**Where it differs from the design above.**
+
+- **A block's own condition travels with it.** It is kept when the piece is
+  taken and removed (and reported) only on adding, if the survey it goes into
+  does not ask what it tests. Dropping it when taking the piece would have
+  lost the SDQ's age split without a word.
+- **Any survey copy records where it came from**, within a study as well as
+  across, as one import naming the source release. That is what puts
+  provenance on a copied survey's versions; it costs one more release read at
+  each later publish.
+- **Saved modules are added whole.** Single questions can be picked from
+  published surveys, not yet from a module.
+- **Search in "Published surveys"** looks through each survey's latest version;
+  an older version is searched once it is chosen.
+- **A retired module takes no new versions** until it is brought back.
+- **The catalogue** lists only surveys with at least one published version,
+  the default study first.
+
+**Tests.** `packages/studio/src/library.test.ts` (46);
+`apps/functions/src/studio/library.test.ts` and additions to `requests`,
+`restore` tests; `apps/functions/integration/library.integration.test.ts` (11,
+on the emulator: saving and its conflicts and permissions, the catalogue, a
+library questionnaire published, a reworded one refused, one copied from
+another study accepted, a forged source refused, a survey copied across
+studies published); `infra/firebase/test/studio.rules.test.ts` (the library
+closed); `apps/researcher/src/studio/editor/library/model.test.ts`,
+`save-error.test.ts`, `data/library.test.ts` and additions to the provenance,
+outline and route tests; `e2e-studio/library.spec.ts` (4, through the deployed
+handlers on the emulators: a validated questionnaire added and published,
+questions copied from another survey keeping their IDs, a module saved,
+improved elsewhere and updated through its notice, a survey copied from
+another study space).
