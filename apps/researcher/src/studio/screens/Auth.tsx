@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { useStudioSession } from "../data/index.js";
 import { studyContact } from "../contact.js";
-import { Link, formatRoute, leaveStudio, navigate, parseHash, safeNext, type Route } from "../router.js";
+import { DEFAULT_STUDY, Link, currentStudy, formatRoute, leaveStudio, navigate, parseHash, safeNext, studyOfHash, type Route } from "../router.js";
 import { Avatar, StudioMark } from "../shell/Shell.js";
 import { Icon } from "../ui/icons.js";
 import { Button, Notice, Spinner } from "../ui/kit.js";
@@ -53,7 +53,7 @@ export function LoginScreen({ next }: { next: string | null }) {
   useEffect(() => {
     if (session.status === "ready") {
       const target = safeNext(next);
-      navigate(target ? parseHash(target) : { name: "surveys" }, { replace: true });
+      navigate(target ? parseHash(target) : { name: "surveys" }, { replace: true, study: (target ? studyOfHash(target) : null) ?? currentStudy() });
     }
   }, [session.status, next]);
 
@@ -126,6 +126,10 @@ const REASONS: Record<string, { title: string; body: (email: ReactNode) => React
     title: "Google accounts only",
     body: () => <>Sign out, then sign in with a Google account (a Google Workspace work account is fine).</>,
   },
+  unknown_study: {
+    title: "There’s no study space here",
+    body: () => <>This address is for a study space that doesn&rsquo;t exist. It may have been typed wrongly, or never created.</>,
+  },
 };
 
 export function UnauthorisedScreen() {
@@ -146,6 +150,21 @@ export function UnauthorisedScreen() {
       {checked && !checking ? (
         <div className="stp-auth-body">
           <Notice tone="warn">Still no access. It can take a moment after an admin adds you.</Notice>
+        </div>
+      ) : null}
+      {session.studies.length > 0 ? (
+        // Somewhere they can go instead (D-56): the study spaces they do have a role in.
+        <div className="stp-auth-body">
+          <p className="stp-auth-small">You can open:</p>
+          <ul className="stp-auth-studies">
+            {session.studies.map((s) => (
+              <li key={s.study}>
+                <Link to={{ name: "surveys" }} study={s.study}>
+                  {s.title}
+                </Link>
+              </li>
+            ))}
+          </ul>
         </div>
       ) : null}
       <div className="stp-auth-actions two">
@@ -221,9 +240,9 @@ export function CheckingScreen() {
 
 /** Replaces the address with another without adding to history, then shows a quiet loading state. */
 export function Redirect({ to }: { to: Route }) {
-  const hash = formatRoute(to);
+  const hash = formatRoute(to, currentStudy());
   useEffect(() => {
-    navigate(parseHash(hash), { replace: true });
+    navigate(parseHash(hash), { replace: true, study: studyOfHash(hash) ?? DEFAULT_STUDY });
   }, [hash]);
   return <CheckingScreen />;
 }

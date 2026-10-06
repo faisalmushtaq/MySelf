@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { useStudioSession } from "./data/index.js";
-import { formatRoute, NavigationPrompt, samePage, useRoute, type Route } from "./router.js";
+import { formatRoute, NavigationPrompt, samePage, useRoute, useStudy, type Route } from "./router.js";
 import { AccessScreen } from "./screens/Access.js";
 import { CheckingScreen, LoginScreen, Redirect, SessionErrorScreen, UnauthorisedScreen } from "./screens/Auth.js";
 import { PlaygroundScreen } from "./screens/Playground.js";
@@ -19,18 +19,26 @@ import { navigate } from "./router.js";
  */
 export function StudioApp() {
   const route = useRoute();
+  const study = useStudy();
   const session = useStudioSession();
   usePageChrome(route);
 
   return (
     <>
-      <Page route={route} status={session.status} />
+      {/* Keyed by study space (D-56): another study is another page, so no
+          listener, draft editor or cached answer from one study is carried
+          into the next. */}
+      <Page key={study} route={route} study={study} status={session.status} />
       <NavigationPrompt />
     </>
   );
 }
 
-function Page({ route, status }: { route: Route; status: ReturnType<typeof useStudioSession>["status"] }) {
+function Page({ route, study, status: sessionStatus }: { route: Route; study: string; status: ReturnType<typeof useStudioSession>["status"] }) {
+  const session = useStudioSession();
+  // A role known for another study space is not a role here: until the server
+  // has answered for this one, this page is still being checked (D-56).
+  const status = (sessionStatus === "ready" || sessionStatus === "unauthorised") && session.study !== study ? "loading" : sessionStatus;
   // Pages anyone can see, signed in or not.
   if (route.name === "playground") return <PlaygroundScreen tab={route.tab} q={route.q} />;
   if (route.name === "login") return <LoginScreen next={route.next} />;
@@ -41,7 +49,7 @@ function Page({ route, status }: { route: Route; status: ReturnType<typeof useSt
     case "unconfigured":
     case "signed_out":
       // Remember where they were going, so signing in takes them there.
-      return <Redirect to={{ name: "login", next: route.name === "not_found" ? null : formatRoute(route) }} />;
+      return <Redirect to={{ name: "login", next: route.name === "not_found" ? null : formatRoute(route, study) }} />;
     case "unauthorised":
       return <UnauthorisedScreen />;
     case "error":

@@ -38,9 +38,7 @@ export const studioConfigured = config !== null;
 /** Whether this build talks to local emulators rather than the real project. */
 export const usingEmulators = emulators !== null;
 
-export const STUDY = __STUDY__ || "ybm";
-
-/** What "Set up from the live survey" imports. */
+/** What "Set up from the live survey" imports — in the default study only (D-56). */
 export const SURVEY_ID = __SURVEY_ID__ || "ybm_nd2026_standard";
 
 export const REGION = "europe-west2";

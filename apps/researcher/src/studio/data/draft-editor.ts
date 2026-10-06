@@ -10,7 +10,8 @@ import {
   type DraftDoc,
   type StudioDraft,
 } from "@myself/studio";
-import { STUDY, studioFirebase } from "../firebase.js";
+import { studioFirebase } from "../firebase.js";
+import { DEFAULT_STUDY, useStudy } from "../router.js";
 import { downloadText, toMillis, versionLabel } from "../format.js";
 import { useToast } from "../ui/toast.js";
 import { assessBackup, clearBackup, currentRecoveryKind, readBackup, sessionStore, writeBackup, type DraftBackup } from "./backup.js";
@@ -92,6 +93,15 @@ type Outcome = { kind: "saved"; revision: number } | { kind: "conflict"; theirs:
 
 export function useDraftSession(surveyId: string): DraftSession {
   const fb = studioFirebase();
+  // The study space this draft is in (D-56), fixed for the editor's life: the
+  // page is keyed by study, so another study is another editor.
+  const study = useStudy();
+  /**
+   * Which tab backup is this draft's: the survey id in the default study, as
+   * before, and `<study>/<survey>` in any other, so two study spaces' surveys
+   * of the same id never offer each other's unsaved work.
+   */
+  const backupSurvey = study === DEFAULT_STUDY ? surveyId : `${study}/${surveyId}`;
   const session = useStudioSession();
   const toast = useToast();
   const canEdit = atLeast(session.role, "editor");
@@ -201,7 +211,7 @@ export function useDraftSession(surveyId: string): DraftSession {
         });
         return;
       }
-      const ref = doc(fb.db, paths.studioDraft(STUDY, surveyId));
+      const ref = doc(fb.db, paths.studioDraft(study, surveyId));
       // Remembered before the transaction runs, so a retry of this very
       // transaction (after its first commit landed unacknowledged) knows its
       // own write when it reads it.
@@ -259,7 +269,7 @@ export function useDraftSession(surveyId: string): DraftSession {
         dispatch({ type: "save_failed", failure, now: now() });
       }
     },
-    [fb, surveyId, dispatch],
+    [fb, study, surveyId, dispatch],
   );
 
   runRef.current = (effect: SaveEffect) => {
@@ -271,7 +281,7 @@ export function useDraftSession(surveyId: string): DraftSession {
   // ── The draft document ──────────────────────────────────────────────────
   useEffect(() => {
     if (!fb) return;
-    const ref = doc(fb.db, paths.studioDraft(STUDY, surveyId));
+    const ref = doc(fb.db, paths.studioDraft(study, surveyId));
     return onSnapshot(
       ref,
       // Metadata changes too: a cached snapshot that the server then confirms
@@ -311,8 +321,8 @@ export function useDraftSession(surveyId: string): DraftSession {
         setStatus("ready");
         setLoadError(null);
         const uid = ctx.current.uid ?? "";
-        const backup = uid ? readBackup(sessionStore(), { surveyId, uid }) : null;
-        const kind = assessBackup(backup, { surveyId, uid, revision: data.revision, content: data.content });
+        const backup = uid ? readBackup(sessionStore(), { surveyId: backupSurvey, uid }) : null;
+        const kind = assessBackup(backup, { surveyId: backupSurvey, uid, revision: data.revision, content: data.content });
         if (backup && kind !== "none") setRecovery({ kind, backup });
       },
       (error) => {
@@ -325,7 +335,7 @@ export function useDraftSession(surveyId: string): DraftSession {
         if (codeOf(error)?.endsWith("permission-denied")) void ctx.current.refresh();
       },
     );
-  }, [fb, surveyId, attempt, dispatch, setHistory]);
+  }, [fb, study, surveyId, backupSurvey, attempt, dispatch, setHistory]);
 
   // ── The save timer ──────────────────────────────────────────────────────
   // Re-armed on every change of state. A timer that fires a moment before
@@ -367,23 +377,23 @@ export function useDraftSession(surveyId: string): DraftSession {
     if (!dirty) {
       // Saved: the backup has done its job. Unless one from before the reload
       // is still waiting for a decision — that is the only copy of it.
-      if (!recovery) clearBackup(store, { surveyId, uid });
+      if (!recovery) clearBackup(store, { surveyId: backupSurvey, uid });
       return;
     }
     const base = machine.baseRevision;
     const t = window.setTimeout(
-      () => writeBackup(store, { surveyId, uid, baseRevision: base, content: serialiseDraft(history.present), savedAt: Date.now() }),
+      () => writeBackup(store, { surveyId: backupSurvey, uid, baseRevision: base, content: serialiseDraft(history.present), savedAt: Date.now() }),
       400,
     );
     return () => window.clearTimeout(t);
-  }, [history, dirty, machine.loaded, machine.baseRevision, recovery, surveyId, uid]);
+  }, [history, dirty, machine.loaded, machine.baseRevision, recovery, backupSurvey, uid]);
 
   useEffect(() => {
     const keep = () => {
       const s = machineRef.current;
       const h = historyRef.current;
       if (h && s.loaded && isDirty(s) && uid) {
-        writeBackup(sessionStore(), { surveyId, uid, baseRevision: s.baseRevision, content: serialiseDraft(h.present), savedAt: Date.now() });
+        writeBackup(sessionStore(), { surveyId: backupSurvey, uid, baseRevision: s.baseRevision, content: serialiseDraft(h.present), savedAt: Date.now() });
       }
     };
     window.addEventListener("pagehide", keep);
@@ -393,7 +403,7 @@ export function useDraftSession(surveyId: string): DraftSession {
       // leave prompt promised.
       keep();
     };
-  }, [surveyId, uid]);
+  }, [backupSurvey, uid]);
 
   // ── Editing ─────────────────────────────────────────────────────────────
   const readOnly = !canEdit || machine.conflict !== null || status !== "ready";
@@ -553,10 +563,10 @@ export function useDraftSession(surveyId: string): DraftSession {
     const store = sessionStore();
     // Only remove it if what is stored is still that copy: this tab may since
     // have written a backup of its own work under the same key.
-    const slot = { surveyId, uid: recovery.backup.uid };
+    const slot = { surveyId: backupSurvey, uid: recovery.backup.uid };
     if (readBackup(store, slot)?.content === recovery.backup.content) clearBackup(store, slot);
     setRecovery(null);
-  }, [recovery, surveyId]);
+  }, [recovery, backupSurvey]);
 
   const downloadRecovery = useCallback(() => {
     if (!recovery) return;

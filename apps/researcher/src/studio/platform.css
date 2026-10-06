@@ -1265,3 +1265,71 @@
   display: flex;
   flex-direction: column;
 }
+
+/* ── Study spaces and participant links (D-56, docs/16 §11) ───────────── */
+
+/* The study switcher sits in the crumb trail, after the mark: where you are,
+   at the coarsest level. Quiet like the rest of the header. */
+.stp-study-switch {
+  flex: none;
+  max-width: 220px;
+}
+.stp-study-switch .st-btn {
+  max-width: 220px;
+}
+.stp-study-switch .st-btn span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.stp-study-closed {
+  margin-left: 6px;
+  color: var(--st-warn);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* The participant link dialog: the link and its copy button on one line, the
+   QR code beside what the link does. The code is always black on white — it
+   has to scan on paper, whatever the page's theme. */
+.stp-plink {
+  display: grid;
+  gap: 12px;
+}
+.stp-plink-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.stp-plink-row .st-input {
+  flex: 1;
+  min-width: 0;
+}
+.stp-plink-qr {
+  margin: 4px 0 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+.stp-plink-qr svg {
+  display: block;
+  border: 1px solid var(--st-border);
+  border-radius: var(--st-radius-sm);
+}
+.stp-plink-what p {
+  margin: 0 0 8px;
+  color: var(--st-text-secondary);
+  line-height: 1.5;
+}
+.stp-plink-what p:last-child {
+  margin-bottom: 0;
+}
+/* The study spaces someone can open instead, on the page that says they can't open this one. */
+.stp-auth-studies {
+  margin: 4px 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 4px;
+}

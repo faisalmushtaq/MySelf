@@ -36,8 +36,10 @@ export default defineConfig({
     // Public identifiers, baked in rather than typed into the page — same
     // reasoning as the participant app and the narrative module.
     __FIREBASE_CONFIG__: JSON.stringify(process.env["MYSELF_FIREBASE_CONFIG"] ?? ""),
-    // One study per project keeps IAM simple, so this matches MYSELF_STUDY on
-    // the functions rather than being chosen in the browser.
+    // The project's default study, matching MYSELF_STUDY on the functions: the
+    // researcher view reads it, and the Studio opens on it. Other study spaces
+    // are reached by address (`#/study/<id>/…`, D-56), checked by the functions
+    // and the rules against the registry and each study's own list.
     __STUDY__: JSON.stringify(process.env["MYSELF_STUDY"] ?? "ybm"),
     // MySelf Studio. Emulators only for local runs and the end-to-end tests:
     // left empty, the build contains no emulator or test sign-in code at all.

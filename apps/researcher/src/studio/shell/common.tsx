@@ -163,6 +163,21 @@ export function describeAudit(row: AuditDoc): string {
       return role
         ? `${who} let every verified account at ${row.subject} in as ${role}.`
         : `${who} removed the rule for ${row.subject}.`;
+    // Study spaces (D-56): created, renamed, closed and reopened by an owner.
+    case "study.created": {
+      const title = str(d["title"]);
+      return title ? `${who} created this study space, “${title}”.` : `${who} created this study space.`;
+    }
+    case "study.updated": {
+      const change = (key: string) => (d[key] && typeof d[key] === "object" ? (d[key] as { from?: unknown; to?: unknown }) : {});
+      const status = change("status");
+      const title = change("title");
+      const parts: string[] = [];
+      if (status.to !== status.from && status.to === "closed") parts.push("closed this study space");
+      if (status.to !== status.from && status.to === "open" && status.from === "closed") parts.push("reopened this study space");
+      if (title.to !== title.from && str(title.to)) parts.push(`named it “${str(title.to)}”`);
+      return parts.length > 0 ? `${who} ${parts.join(" and ")}.` : `${who} changed this study space’s settings.`;
+    }
     default:
       return `${who}: ${String(row.action)} ${row.subject}`;
   }
