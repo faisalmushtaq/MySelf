@@ -82,6 +82,129 @@ export interface StudioDraft {
    * when the survey has no MyStory, and in drafts saved before it could have one.
    */
   narrativeProtocols?: Record<string, NarrativeProtocol>;
+  /**
+   * Where copied questions came from (D-57, docs/16 §12.5): one record per
+   * piece added from the library. Written by `insertFragment` and
+   * `updateFromModule`, never edited by hand. Its release origins are what the
+   * server reads, verifies and compares a copied validated questionnaire with
+   * at publish (§12.4); naming a release vouches for nothing on its own.
+   * Absent in drafts saved before the library.
+   */
+  imports?: ImportRecord[];
+}
+
+// ---------------------------------------------------------------------------
+// The item library (D-57, docs/16 §12)
+// ---------------------------------------------------------------------------
+
+/** Where a piece came from. */
+export type FragmentOrigin =
+  /** A published version of a survey, in any study space. */
+  | { kind: "release"; study: string; surveyId: string; version: string; hash: string }
+  /** A validated questionnaire from the instrument library, frozen as a release freezes it. */
+  | { kind: "validated"; instrument: string; refKey: string }
+  /** A saved module, at one of its versions. */
+  | { kind: "module"; moduleId: string; version: number; contentHash: string };
+
+/** One piece added to a draft, and what became of its questions (docs/16 §12.5). */
+export interface ImportRecord {
+  /** `imp_` and random characters. */
+  id: string;
+  /** ISO time it was added. */
+  at: string;
+  by: string;
+  byEmail: string;
+  origin: FragmentOrigin;
+  /** Question ID in this draft -> question ID in the source. Identical unless renamed. */
+  items: Record<string, string>;
+  /** Source question ID -> the ID it was given here, only for renamed ones. */
+  renamed?: Record<string, string>;
+  /** Source variable -> the variable it was given here, only for renamed ones. */
+  variablesRenamed?: Record<string, string>;
+  /** Modules only: the newest version the team chose not to take (§12.6). */
+  dismissed?: number;
+}
+
+export const FRAGMENT_FORMAT = "myself-studio-fragment" as const;
+export const FRAGMENT_FORMAT_VERSION = 1 as const;
+
+/** One block of a piece. */
+export interface FragmentBlock {
+  refKey: string;
+  /**
+   * The instrument or module definition. Its one form holds only the piece's
+   * questions, in the order they are placed — except a validated
+   * questionnaire, which is always its whole licensed form.
+   */
+  definition: InstrumentOrModule;
+  /**
+   * The block's display condition, as the source had it. Adding the piece keeps
+   * it only when every question it tests is in the draft after the copy, and
+   * says when it does not (§12.3 rule 7); a saved module may test only
+   * questions inside itself (`moduleProblems`).
+   */
+  displayIf?: unknown;
+}
+
+/**
+ * What is copied (docs/16 §12.1): questions from one block, a whole block, or
+ * a whole section. Self-contained: everything its questions need comes with it.
+ */
+export interface StudioFragment {
+  format: typeof FRAGMENT_FORMAT;
+  formatVersion: typeof FRAGMENT_FORMAT_VERSION;
+  /** A name for the piece: the block's, the section's, or the module's title. */
+  title: string;
+  /** Present when the piece is a whole section: added as a new section with this title. */
+  section?: { title: string } | null;
+  blocks: FragmentBlock[];
+  /** Every option list the questions use, by scale key. */
+  scales: Record<string, ScaleInput>;
+  /** Scoring that comes with a block (validated questionnaires), by key. */
+  scoring: Record<string, ScoringInput>;
+  /** Files the questions need (the postcode list, D-52). */
+  assets?: Record<string, { path: string; sha256: string; bytes: number }>;
+  origin: FragmentOrigin;
+}
+
+/** The project-wide library's module id pattern: the same as a survey id. */
+export const MODULE_ID_PATTERN = /^[a-z][a-z0-9_]{0,63}$/;
+/** Largest saved module, in characters of canonical JSON. */
+export const MAX_MODULE_CHARS = 200_000;
+/** Most releases one publish reads to vouch for copied content (docs/16 §12.4). */
+export const MAX_IMPORTED_RELEASES = 25;
+
+/** `studioLibrary/{moduleId}` — project-wide; written only by functions (docs/16 §12.6). */
+export interface LibraryModuleDoc {
+  moduleId: string;
+  title: string;
+  description: string;
+  tags: string[];
+  latestVersion: number;
+  retired: boolean;
+  createdAt: StoredTime;
+  createdBy: string;
+  createdByEmail: string;
+  updatedAt: StoredTime;
+  updatedBy: string;
+}
+
+/** `studioLibrary/{moduleId}/versions/{n}` — immutable. */
+export interface LibraryModuleVersionDoc {
+  moduleId: string;
+  version: number;
+  /** The StudioFragment, as canonical JSON. */
+  content: string;
+  /** `sha256:` over `content`. */
+  contentHash: string;
+  /** What changed, in the saver's words. */
+  note: string;
+  questionCount: number;
+  savedAt: StoredTime;
+  savedBy: string;
+  savedByEmail: string;
+  /** The survey it was saved from. */
+  source: { study: string; surveyId: string; draftRevision: number | null };
 }
 
 export interface ArchivedQuestion {
@@ -282,8 +405,12 @@ export interface DraftDoc {
   updatedAt: StoredTime;
   updatedBy: string;
   updatedByEmail: string;
-  /** The published version this draft started from. Set by functions only. */
-  basedOn: { version: string; hash: string } | null;
+  /**
+   * The published version this draft started from. Set by functions only.
+   * `study` is present when it was copied from another study space (D-57);
+   * absent means this draft's own study.
+   */
+  basedOn: { version: string; hash: string; study?: string } | null;
   createdAt: StoredTime;
 }
 
@@ -310,6 +437,8 @@ export interface VersionDoc {
   source: "studio" | "repository";
   draftRevision: number | null;
   basedOnVersion: string | null;
+  /** The draft's provenance records for the questions this version asks (D-57, docs/16 §12.5). */
+  imports?: ImportRecord[];
   /** Editors of the draft this version was published from. */
   authors: string[];
   publishedAt: StoredTime;
@@ -376,7 +505,9 @@ export type AuditAction =
   | "version.activated"
   | "access.member_set"
   | "access.member_removed"
-  | "access.domain_set";
+  | "access.domain_set"
+  | "library.module_saved"
+  | "library.module_changed";
 
 // ---------------------------------------------------------------------------
 // Study spaces (D-56, docs/16 §11.4)
@@ -468,6 +599,11 @@ export const CALLABLES = {
   responseStats: "studioResponseStats",
   createStudy: "studioCreateStudy",
   setStudy: "studioSetStudy",
+  libraryCatalogue: "studioLibraryCatalogue",
+  libraryModules: "studioLibraryModules",
+  libraryModule: "studioLibraryModule",
+  librarySaveModule: "studioLibrarySaveModule",
+  librarySetModule: "studioLibrarySetModule",
 } as const;
 
 export interface SessionRequest extends StudyScoped {}
@@ -527,8 +663,11 @@ export interface ImportLiveResponse {
 export interface CreateSurveyRequest extends StudyScoped {
   surveyId: string;
   title: string;
-  /** Start from a published version of any survey; omitted starts blank. */
-  from?: { surveyId: string; version: string } | null;
+  /**
+   * Start from a published version of any survey; omitted starts blank.
+   * `study` names another study space to copy from (D-57); absent means this one.
+   */
+  from?: { surveyId: string; version: string; study?: string } | null;
 }
 export interface CreateSurveyResponse {
   surveyId: string;
@@ -608,4 +747,106 @@ export interface ResponseStatsRequest extends StudyScoped {
 export interface ResponseStatsResponse {
   /** Sittings recorded per release hash — counts only, never content. */
   byHash: Record<string, { complete: number; partial: number }>;
+}
+
+// ---------------------------------------------------------------------------
+// The item library's callables (D-57, docs/16 §12)
+// ---------------------------------------------------------------------------
+
+/** Every study's published surveys, for the "Published surveys" shelf. Needs viewer in `study`. */
+export interface LibraryCatalogueRequest extends StudyScoped {}
+export interface LibraryCatalogueResponse {
+  studies: {
+    study: string;
+    title: string;
+    status: StudyStatus;
+    surveys: {
+      surveyId: string;
+      title: string;
+      /** The live version, or null. */
+      live: string | null;
+      /** Newest first. Each release is public by hash in `studies/{study}/publicReleases/{hashHex}`. */
+      versions: { version: string; hash: string; publishedAt: string }[];
+    }[];
+  }[];
+}
+
+/** A saved module as the shelf lists it. */
+export interface LibraryModuleSummary {
+  moduleId: string;
+  title: string;
+  description: string;
+  tags: string[];
+  latestVersion: number;
+  retired: boolean;
+  createdByEmail: string;
+  /** ISO. */
+  updatedAt: string;
+  /** In the latest version. */
+  questionCount: number;
+  /** The latest version's content hash. */
+  contentHash: string;
+}
+
+export interface LibraryModulesRequest extends StudyScoped {
+  includeRetired?: boolean;
+}
+export interface LibraryModulesResponse {
+  modules: LibraryModuleSummary[];
+}
+
+export interface LibraryModuleRequest extends StudyScoped {
+  moduleId: string;
+  /** Omitted for the latest. */
+  version?: number;
+}
+export interface LibraryModuleVersionSummary {
+  version: number;
+  note: string;
+  /** ISO. */
+  savedAt: string;
+  savedByEmail: string;
+  contentHash: string;
+  questionCount: number;
+  source: { study: string; surveyId: string; draftRevision: number | null };
+}
+export interface LibraryModuleResponse {
+  module: LibraryModuleSummary;
+  /** The version asked for, with its piece. */
+  version: LibraryModuleVersionSummary & { fragment: StudioFragment };
+  /** Every version, newest first, without content. */
+  versions: LibraryModuleVersionSummary[];
+}
+
+/**
+ * Save a piece as a new module (`create`) or as the next version of one
+ * (`moduleId` + `baseVersion`, refused if that is no longer the latest).
+ * Needs editor in `study`; the piece must be editable content only.
+ */
+export interface LibrarySaveModuleRequest extends StudyScoped {
+  /** The survey it is saved from, for the record. */
+  surveyId: string;
+  draftRevision?: number | null;
+  create?: { moduleId: string; title: string; description: string; tags: string[] } | null;
+  moduleId?: string | null;
+  baseVersion?: number | null;
+  note: string;
+  fragment: StudioFragment;
+}
+export interface LibrarySaveModuleResponse {
+  moduleId: string;
+  version: number;
+  contentHash: string;
+}
+
+/** Change a module's title, description or tags (editor), or retire/restore it (its creator or an owner). */
+export interface LibrarySetModuleRequest extends StudyScoped {
+  moduleId: string;
+  title?: string;
+  description?: string;
+  tags?: string[];
+  retired?: boolean;
+}
+export interface LibrarySetModuleResponse {
+  module: LibraryModuleSummary;
 }

@@ -1448,3 +1448,312 @@ spaces"); `apps/participant/src/selection.test.ts`, `sync.test.ts`,
    an iPad back to it; so is "Back to the default survey" in its handover panel.
 9. **The researcher view's data tools stay on the default study.** The
    companion dashboard reads every study from §11.6.
+
+## 12. The item library, and copying between studies (D-57, designed and built 2026-10-06)
+
+The research team asked that surveys be copied "across for different
+versions", and that researchers "pick and drop in different items from
+different surveys — making this modular with library of items". They chose
+(docs/09 D-57):
+
+- a library holding **every question and block ever published, in every study
+  space, the validated questionnaires, and modules researchers save** by name;
+- a reused module that is later improved gives each survey using it **an
+  update notice**, never an automatic change;
+- a copied question **keeps its question ID and its variable name**, so the
+  same question in two surveys exports to the same column and can be pooled.
+
+This section was written as the design before the change was built; §12.11
+records what was built and where, and where it differs. Nothing in
+it changes what a participant's iPad runs, the release format, or the data
+contract the dashboard reads (§11.6): a survey built from library pieces is
+published, frozen and fielded exactly as any other.
+
+### 12.1 Words
+
+- A **piece** is what is copied: one or more questions from one block, a whole
+  block, or a whole section (its blocks, in order, under its title). Inside
+  the code a piece is a *fragment* (`StudioFragment`).
+- A **block** is a placement of an instrument or module in a section (§4).
+- A **saved module** is a piece a researcher has named and put in the library,
+  with a description, tags and numbered versions.
+- **Provenance** is the record, kept in the draft and in every version
+  published from it, of where each copied question came from.
+
+### 12.2 The library's three shelves
+
+| Shelf | What is on it | Where it comes from |
+|---|---|---|
+| **Saved modules** | Pieces researchers have saved, by title, description and tags, each with its versions | `studioLibrary/{moduleId}` and `versions/{n}`, project-wide (§12.6) |
+| **Validated questionnaires** | SDQ (11–17, 18+), RCADS-25, SWEMWBS, STAI-5, KSS, SQS, EHI-SF, BIS/BAS, Doomscrolling, MacArthur | The instrument library in the code (`packages/library`), frozen exactly as a release freezes it |
+| **Published surveys** | Every published version of every survey in every study space; the live version first | The release store (`studies/{study}/publicReleases/{hash}`), each release verified against its hash before anything is taken from it |
+
+One search box searches the open shelf: question wording, variable names,
+block names, and a saved module's title, description and tags. Published
+surveys show each survey's latest version by default, with its earlier
+versions a choice away.
+
+**What can be picked.**
+
+- From an **editable block**: any of its questions, or the whole block.
+- From a **validated questionnaire**: only the whole questionnaire, exactly as
+  licensed. Picking single items from a validated scale breaks its scoring and
+  usually its licence; the Studio already refuses to change one (§4.4).
+- From the **consent and identity modules** (`ybm_intro_consent`,
+  `ybm_identity`): the whole module, and only with the reason recorded, as for
+  unlocking one (§4.4). Consent wording is approved for a study; using it
+  elsewhere is an ethics decision somebody must own.
+- **A whole section**: its blocks in order, as a new section with its title.
+- **MyStory is not a piece.** It is switched on per survey (§10.1), and is
+  always last.
+
+### 12.3 Adding a piece to a draft
+
+Adding is an ordinary draft edit (`insertFragment` in `packages/studio`), made
+in the editor and saved like any other, so it can be undone, previewed and
+validated before anything is published. The piece goes where it was asked
+for: after a chosen question, at the end of a section, or as a new section
+(always before MyStory, and never before the consent module).
+
+The rules, in order:
+
+1. **The question ID and the variable are kept.** A question copied from
+   `ybm_studio.pets` with variable `pets` is `ybm_studio.pets` and `pets` in
+   the new survey too, and keeps its revision number. Its block's instrument
+   comes with it.
+2. **Already there.** If the draft already has the same question (same ID and
+   the same content), it is not added twice; the summary says so.
+3. **Renamed only on a clash, and always said.** If the ID is taken by a
+   different question — in the draft, in its archive, or in anything this
+   survey has ever published — the copy gets a new ID (`pets_2`) and revision
+   1. If the variable is taken, the copy gets a new variable. A renamed copy
+   loses any legacy variable, which belonged to the original. The summary
+   lists every rename, because a rename means the data will not line up.
+4. **Into the same block where it can.** If the draft already has the block's
+   instrument and it is editable, the copied questions join it. A validated
+   questionnaire is only ever added whole, and a survey holds one version of
+   it: adding SDQ 2.0 where SDQ 1.0 is used is refused with that reason.
+5. **Answer options.** An option list the draft lacks is added. One it has
+   with identical content is shared. One it has under the same key with
+   different content is added under a new key and the copied questions point
+   at that — except for a validated questionnaire, whose options must be the
+   licensed ones, which is refused instead.
+6. **Scoring** comes with a validated questionnaire. Scoring with the same key
+   and different content is refused.
+7. **Display conditions** are kept when every question they test is in the
+   draft after the copy (a renamed question is followed to its new ID).
+   Otherwise the condition is removed and the summary says which and why: a
+   condition about a question the survey does not ask would hide the question
+   from everyone, or from no-one.
+8. **Files the questions need** (the postcode list, D-52) come with them.
+9. **Provenance** is added to the draft (§12.5).
+
+The editor then runs the same validation as for any edit, so a copy that would
+publish badly (a condition on a later question, a variable clash with the
+identity variables) is shown at once with the usual fix.
+
+### 12.4 Why the locks still hold
+
+The Studio refuses a locked questionnaire whose content nothing vouches for
+(§4.4, `lockedDifferences`): today only the published version a draft came
+from vouches. Copying a validated questionnaire from the library or from
+another survey needs two more vouchers, and both are checked on the server
+when the version is published, from nothing the editor can change:
+
+- **The instrument library**, frozen exactly as a release freezes it. A
+  questionnaire matching it exactly, with its answer options and scoring, is
+  accepted.
+- **The releases the draft copied from**, named in its provenance by study
+  and hash. Each is read from that study's release store and verified against
+  its hash before it vouches for anything. Naming a release proves nothing by
+  itself: the copy must match what that release froze, exactly. The number of
+  releases one publish reads is capped (25).
+
+Every verified release was itself published through these checks, so a
+questionnaire that matches one exactly is the licensed questionnaire. The
+editor applies the same two vouchers (it reads the same releases from the
+public store), so a copy never looks ready in the Studio and is then refused.
+
+Consent and identity modules are not vouched for by another survey's release:
+approval of their wording is per study. One copied in must be unlocked with a
+reason (§12.2), which is recorded and audited as unlocking is today.
+
+### 12.5 Provenance
+
+The draft gains `imports`: one entry per piece added, never edited by hand:
+
+```jsonc
+{
+  "id": "imp_…",                 // random
+  "at": "2026-10-06T14:03:11Z", "by": "<uid>", "byEmail": "a@b.c",
+  "origin": { "kind": "release", "study": "ybm", "surveyId": "ybm_nd2026_standard",
+              "version": "8.0.0", "hash": "sha256:…" }
+          // or { "kind": "validated", "instrument": "sdq25_s", "refKey": "sdq25_s@2.0/en-GB/self/standard" }
+          // or { "kind": "module", "moduleId": "sleep_habits", "version": 3, "contentHash": "sha256:…" },
+  "items":   { "<new question ID>": "<question ID in the source>" },
+  "renamed": { "<source ID>": "<new ID>" },          // only when renamed
+  "variablesRenamed": { "<source variable>": "<new variable>" },
+  "dismissed": 4                                     // modules only: a newer version the team chose not to take
+}
+```
+
+Publishing copies the entries for the questions the version still asks onto
+the version document (`VersionDoc.imports`), and the provenance export (§10.2)
+gains a "copied from" column per question. The release itself is unchanged:
+provenance is about how a survey was built, and lives with its history, not in
+what the iPad runs.
+
+### 12.6 Saved modules
+
+**Saving.** From a block's menu, "Save to library…": a title, a description,
+tags, and which of the block's questions (all by default). Only editable
+content can be saved: validated questionnaires are already a shelf, and the
+consent and identity modules belong to their study. Unpublished questions can
+be saved; whatever survey uses them later publishes them through every check.
+
+**Storage.** Project-wide, beside the studies, because the point is reuse
+across them:
+
+- `studioLibrary/{moduleId}`: `title`, `description`, `tags`,
+  `latestVersion`, `createdAt`/`createdBy`, `updatedAt`, `retired`.
+- `studioLibrary/{moduleId}/versions/{n}`: the piece as canonical JSON, its
+  SHA-256 `contentHash`, a note on what changed, who saved it and when, and the
+  survey it was saved from. **Versions are immutable**; saving again makes
+  version n+1. A save made against a version that is no longer the latest is
+  refused, so two people cannot silently overwrite each other.
+
+Both are written only by functions, which check the piece (the schema, the
+size, no locked or protected content, conditions only about questions inside
+it) and write the audit row in the saving study's audit trail. Browsers read
+the library only through functions, which check the caller's Studio access.
+
+**Who.** Anyone with editor access to a study's Studio may save a module, or a
+new version of one, and edit its title, description and tags. Retiring a
+module (it leaves the shelf; surveys using it keep their copies) is for its
+creator or a project owner. Nothing is ever deleted.
+
+**Update notices.** A block whose questions came from a saved module, where the
+module now has a later version than the one copied and that version has not
+been dismissed, shows "A newer version of *Sleep habits* is in the library
+(v4)". "Review" shows what would change; "Update this survey's copy" applies
+it as one draft edit (`updateFromModule`), question by question, three ways
+(the copied version, the newer version, the draft):
+
+| The draft's question | In the newer version | Result |
+|---|---|---|
+| unchanged since copied | changed | takes the newer wording/options |
+| changed here | unchanged | keeps this survey's |
+| changed here | changed | keeps this survey's, and says so |
+| unchanged since copied | removed | archived (its ID stays reserved) |
+| changed here | removed | kept, and says so |
+| — | added | added, by the §12.3 rules |
+
+"Not now" records the version as dismissed; a later version notifies again.
+Nothing changes in a survey until somebody chooses to update it, and an update
+is published like any other change, with the bump it calls for (an option
+code changing meaning is refused as always, §4.4).
+
+### 12.7 Copying a whole survey from another study
+
+"New survey → Copy a published version" offers every study's surveys, not only
+this study's. The copy remembers where it came from (`basedOn`, which now
+carries the source's study), and its first publish checks its locked and
+protected content against that release, read from the source study's store
+and verified, exactly as a copy within a study is checked today.
+
+A copy from another study carries that study's consent and identity modules
+unchanged and still protected. The dialog says so before the copy is made:
+the new study's ethics approval must cover them, or they are unlocked (with
+the reason recorded) and changed.
+
+### 12.8 Access and security
+
+- **Browsing.** Anyone with Studio access (viewer or above) to the study they
+  are working in can browse every shelf, including other studies' published
+  surveys. Those are the questionnaires participants are shown, already
+  public by hash; the library adds a list of them for the project's
+  researchers, never for the public. No sitting, narrative, draft or access
+  list of another study is read.
+- **Adding to a draft** needs editor access to that draft's study, as any edit.
+- **Saving modules** needs editor access to the study saved from (§12.6).
+- **Copying a survey from another study** needs editor access to the new
+  survey's study; the source must be a published version.
+- The server never trusts the editor's say-so: provenance names releases; the
+  server verifies them by hash and compares content exactly (§12.4).
+- `studioLibrary` is closed to browsers in the rules; functions alone read
+  and write it.
+
+### 12.9 What does not change
+
+The participant app, the release format and its hash, the publish gate, the
+dashboard's data contract (§11.6), the iPads, and every existing draft and
+version. A draft without `imports` is read as having none. Nothing is
+migrated.
+
+### 12.10 Decisions for the research team to confirm
+
+1. **Every Studio member can browse every study's published surveys** in the
+   library (not their drafts, data or access lists).
+2. **Saved modules are shared across all study spaces.** Any Studio editor may
+   save or improve one; only its creator or an owner retires one; nothing is
+   deleted.
+3. **Validated questionnaires are added whole and unchanged.**
+4. **The consent and identity modules can be copied only with a recorded
+   reason**, because their approval is per study.
+5. **A copy keeps its question ID and variable**, renamed only on a clash, and
+   every rename is reported.
+6. **Update notices are for saved modules only.** A question copied from a
+   published survey stays as it was copied; the source survey's later
+   versions do not notify.
+
+### 12.11 As built
+
+**Where it is.**
+
+| What | Where |
+|---|---|
+| The contract: pieces, provenance, module documents, the five callables | `packages/studio/src/contract.ts` (`StudioFragment`, `ImportRecord`, `StudioDraft.imports`, `LibraryModuleDoc`, `Library*Request/Response`, `CALLABLES.library*`) |
+| Picking, adding, vouchers, saved modules and their updates (pure) | `packages/studio/src/library.ts` (`fragmentFromDraft`, `insertFragment`, `validatedFragment`, `lockVouchers`, `planModuleUpdate`, `updateFromModule`, …); placement helpers shared with ops.ts in `editing.ts`; `parseDraft` carries `imports` (`draft.ts`) |
+| Publish: reading and verifying the releases a draft copied from, in their own study's store; the library as a voucher; `imports` on the version | `apps/functions/src/studio/publish.ts`, `store.ts` (`readReleasesAt`) |
+| Copying a survey from another study space | `apps/functions/src/studio/surveys.ts` (`createSurvey`, `from.study`, `basedOn.study`); `versions.ts` (restore keeps provenance) |
+| The library's callables | `apps/functions/src/studio/library.ts`, registered in `functions.ts`, parsed in `requests.ts`; paths in `packages/firebase/src/layout.ts` |
+| The rules | `infra/firebase/firestore.rules` (`studioLibrary` closed to browsers); `firestore.indexes.json` (a module's stored content is not indexed) |
+| The editor: the drawer, its shelves and preview, where a piece goes, the protected-module reason, the summary | `apps/researcher/src/studio/editor/library/*` (`LibraryDrawer`, `Shelves`, `PiecePreview`, `TargetPicker`, `InsertDialogs`, `model.ts`) |
+| Save to library; update notices and their review; "Copied from" | `editor/library/SaveModuleDialog.tsx`, `ModuleUpdate.tsx`, `Provenance.tsx`; the block, section, question and overview pages in `editor/node/` |
+| The editor's vouchers (the same as the server's) | `editor/context.tsx`, `editor/PublishDialog.tsx`, `data/library.ts` |
+| The Library page (saved modules: details, versions, retire) | `screens/Library.tsx`; `#/library`, `#/study/<id>/library` (`route.ts`, `shell/Shell.tsx`) |
+| Copying a survey from any study space | `screens/CopySource.tsx`, `screens/Surveys.tsx` |
+| The provenance export's `copied_from` | `data/provenance.ts` |
+
+**Where it differs from the design above.**
+
+- **A block's own condition travels with it.** It is kept when the piece is
+  taken and removed (and reported) only on adding, if the survey it goes into
+  does not ask what it tests. Dropping it when taking the piece would have
+  lost the SDQ's age split without a word.
+- **Any survey copy records where it came from**, within a study as well as
+  across, as one import naming the source release. That is what puts
+  provenance on a copied survey's versions; it costs one more release read at
+  each later publish.
+- **Saved modules are added whole.** Single questions can be picked from
+  published surveys, not yet from a module.
+- **Search in "Published surveys"** looks through each survey's latest version;
+  an older version is searched once it is chosen.
+- **A retired module takes no new versions** until it is brought back.
+- **The catalogue** lists only surveys with at least one published version,
+  the default study first.
+
+**Tests.** `packages/studio/src/library.test.ts` (46);
+`apps/functions/src/studio/library.test.ts` and additions to `requests`,
+`restore` tests; `apps/functions/integration/library.integration.test.ts` (11,
+on the emulator: saving and its conflicts and permissions, the catalogue, a
+library questionnaire published, a reworded one refused, one copied from
+another study accepted, a forged source refused, a survey copied across
+studies published); `infra/firebase/test/studio.rules.test.ts` (the library
+closed); `apps/researcher/src/studio/editor/library/model.test.ts`,
+`save-error.test.ts`, `data/library.test.ts` and additions to the provenance,
+outline and route tests; `e2e-studio/library.spec.ts` (4, through the deployed
+handlers on the emulators: a validated questionnaire added and published,
+questions copied from another survey keeping their IDs, a module saved,
+improved elsewhere and updated through its notice, a survey copied from
+another study space).

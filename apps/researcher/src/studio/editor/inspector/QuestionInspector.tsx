@@ -16,6 +16,7 @@ import { ConfirmDialog } from "../../ui/dialog.js";
 import { Icon } from "../../ui/icons.js";
 import { Button, IconButton, InfoTip, StatusDot } from "../../ui/kit.js";
 import { useEditor } from "../context.js";
+import { CopiedFrom } from "../library/Provenance.js";
 import { Disclosure, IssueMessages, LockTip, NumberField, ReadOnlyValue, SwitchRow, TextField } from "../node/controls.js";
 import { noteRename } from "../node/identity.js";
 import { questionIssues, type FieldIssues } from "../node/issues.js";
@@ -69,6 +70,7 @@ export function QuestionInspector({ itemKey, stableId }: { itemKey: string; stab
       <Logic itemKey={itemKey} item={item} />
       <Reporting {...props} stableId={stableId} lock={lock} />
       <Status itemKey={itemKey} item={item} lock={lock} />
+      <CopiedFrom itemKey={itemKey} />
     </div>
   );
 }

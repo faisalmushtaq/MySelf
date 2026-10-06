@@ -239,10 +239,11 @@ test("a researcher switches MyStory on, edits its protocol, publishes it, and do
   expect(ten).toContain(",live,studio,");
   expect(ten).toContain(",on,np.phone_wellbeing@0.1.1,");
   expect(ten).toContain("MyStory added (np.phone_wellbeing@0.1.1).");
-  expect(ten).toMatch(/to now \(published\)$/);
+  // The live periods, then copied_from (D-57), empty: nothing in it was copied from the library.
+  expect(ten).toMatch(/to now \(published\),$/);
   const nine = lines.find((l) => l.startsWith("9.0.0,"))!;
   expect(nine).toContain(",previous,studio,");
   expect(nine).toContain(",off,,");
   // r8.0.0 was live from the set-up until 9.0.0 was published.
-  expect(lines.find((l) => l.startsWith("8.0.0,"))).toMatch(/ to \d{4}-[^ ]+ \(set up from the live survey\)$/);
+  expect(lines.find((l) => l.startsWith("8.0.0,"))).toMatch(/ to \d{4}-[^ ]+ \(set up from the live survey\),$/);
 });

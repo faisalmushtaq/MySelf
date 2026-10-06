@@ -9,6 +9,11 @@ import {
   createStudyRequest,
   createSurveyRequest,
   importLiveRequest,
+  libraryModuleRequest,
+  libraryModulesRequest,
+  librarySaveModuleRequest,
+  librarySetModuleRequest,
+  MAX_MODULE_TAGS,
   publishRequest,
   restoreVersionRequest,
   setDomainRequest,
@@ -174,5 +179,67 @@ describe("a study space's id and settings (D-56)", () => {
     expect(parseRequest(setStudyRequest, { study: "future", status: "closed" })).toEqual({ study: "future", status: "closed" });
     expect(refusal(() => parseRequest(setStudyRequest, { study: "future" })).code).toBe("invalid-argument");
     expect(refusal(() => parseRequest(setStudyRequest, { study: "future", status: "deleted" })).code).toBe("invalid-argument");
+  });
+});
+
+describe("copying a survey from another study space (D-57)", () => {
+  it("names the study with the participant link's pattern, or not at all", () => {
+    const from = { surveyId: "ybm_nd2026_standard", version: "8.0.0", study: "future" };
+    expect(parseRequest(createSurveyRequest, { surveyId: "abc", title: "T", from }).from).toEqual(from);
+    for (const study of ["Future", "f", "future/x", "..", ""]) {
+      expect(refusal(() => parseRequest(createSurveyRequest, { surveyId: "abc", title: "T", from: { ...from, study } })).code, study).toBe("invalid-argument");
+    }
+  });
+});
+
+describe("the item library's requests (D-57)", () => {
+  const piece = { format: "myself-studio-fragment", formatVersion: 1, blocks: [] };
+  const create = { moduleId: "sleep_habits", title: " Sleep habits ", description: " Bedtimes and routines. ", tags: [" Sleep", "sleep ", "BED  time", ""] };
+
+  it("tidy a new module's title, description and tags, and keep each tag once", () => {
+    const parsed = parseRequest(librarySaveModuleRequest, { surveyId: "s1", note: " First. ", create, fragment: piece });
+    expect(parsed.create).toEqual({ moduleId: "sleep_habits", title: "Sleep habits", description: "Bedtimes and routines.", tags: ["sleep", "bed time"] });
+    expect(parsed.note).toBe("First.");
+    expect(parsed.fragment).toEqual(piece);
+  });
+
+  it("save either a new module or the next version of one, never both or neither", () => {
+    expect(parseRequest(librarySaveModuleRequest, { surveyId: "s1", note: "", moduleId: "sleep_habits", baseVersion: 3, fragment: piece })).toMatchObject({
+      moduleId: "sleep_habits",
+      baseVersion: 3,
+    });
+    for (const data of [
+      { surveyId: "s1", note: "", fragment: piece },
+      { surveyId: "s1", note: "", moduleId: "sleep_habits", fragment: piece },
+      { surveyId: "s1", note: "", create, moduleId: "sleep_habits", baseVersion: 1, fragment: piece },
+    ]) {
+      expect(refusal(() => parseRequest(librarySaveModuleRequest, data)).code).toBe("invalid-argument");
+    }
+  });
+
+  it("hold module IDs, sizes and versions to the contract", () => {
+    for (const moduleId of ["", "Sleep", "1sleep", "sleep/x", "..", "a".repeat(65)]) {
+      expect(refusal(() => parseRequest(libraryModuleRequest, { moduleId })).code, moduleId).toBe("invalid-argument");
+    }
+    for (const version of [0, -1, 1.5, "2"]) expect(refusal(() => parseRequest(libraryModuleRequest, { moduleId: "m", version })).code).toBe("invalid-argument");
+    const tooMany = Array.from({ length: MAX_MODULE_TAGS + 1 }, (_, i) => `tag ${i}`);
+    for (const bad of [
+      { ...create, title: " " },
+      { ...create, title: "x".repeat(121) },
+      { ...create, description: "x".repeat(1001) },
+      { ...create, tags: tooMany },
+      { ...create, tags: ["x".repeat(41)] },
+    ]) {
+      expect(refusal(() => parseRequest(librarySaveModuleRequest, { surveyId: "s1", note: "", create: bad, fragment: piece })).code).toBe("invalid-argument");
+    }
+    expect(refusal(() => parseRequest(librarySaveModuleRequest, { surveyId: "s1", note: "x".repeat(501), create, fragment: piece })).code).toBe("invalid-argument");
+    expect(refusal(() => parseRequest(librarySaveModuleRequest, { surveyId: "s1", note: "", create, fragment: "not a piece" })).code).toBe("invalid-argument");
+    expect(parseRequest(libraryModulesRequest, { includeRetired: true })).toEqual({ includeRetired: true });
+  });
+
+  it("change a module's description or whether it is retired, and refuse a request that changes nothing", () => {
+    expect(parseRequest(librarySetModuleRequest, { moduleId: "m", retired: true })).toEqual({ moduleId: "m", retired: true });
+    expect(parseRequest(librarySetModuleRequest, { moduleId: "m", tags: ["A", "a"] })).toEqual({ moduleId: "m", tags: ["a"] });
+    expect(refusal(() => parseRequest(librarySetModuleRequest, { moduleId: "m" })).code).toBe("invalid-argument");
   });
 });

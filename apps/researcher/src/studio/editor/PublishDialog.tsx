@@ -1,6 +1,7 @@
 import { useEffect, useId, useMemo, useReducer, useRef, useState, type ReactNode, type RefObject } from "react";
-import { diffDrafts, outline, validateDraft, type Issue, type ValidationContext } from "@myself/studio";
-import { StudioCallError, studio, type PublishedContext } from "../data/index.js";
+import { diffDrafts, outline, validateDraft, type Issue } from "@myself/studio";
+import { StudioCallError, studio } from "../data/index.js";
+import { refreshLibrary } from "../data/library.js";
 import { versionLabel } from "../format.js";
 import { Link } from "../router.js";
 import { ChangeList, changeHeadline } from "../shell/common.js";
@@ -56,16 +57,6 @@ export function PublishDialog() {
 const CONFIRM_ATTEMPTS = 3;
 const CONFIRM_GAP_MS = 2000;
 
-function validationContext(published: PublishedContext | null): ValidationContext {
-  if (!published) return {};
-  return {
-    reserved: published.reserved,
-    ...(published.baseline ? { baseline: published.baseline } : {}),
-    publishedScaleCodes: published.publishedScaleCodes,
-    publishedProtocols: published.publishedProtocols,
-  };
-}
-
 /** How the save before publishing went, and — if it went through — everything the dialog decides with. */
 function prepare(c: EditorContextValue): PrepareOutcome {
   const save = c.editor.save;
@@ -94,7 +85,7 @@ function prepare(c: EditorContextValue): PrepareOutcome {
     inputs: {
       revision: c.editor.revision,
       // Validation already ran on exactly this draft if it is fresh; otherwise run it now.
-      issues: c.issuesFresh ? c.issues : validateDraft(c.draft, validationContext(c.published)),
+      issues: c.issuesFresh ? c.issues : validateDraft(c.draft, c.validationContextFor(c.draft)),
       summary: diffDrafts(c.published.baseline ?? null, c.draft),
       latest: c.published.latestVersion ?? c.survey?.latestVersion ?? null,
       liveVersion: c.survey?.active?.version ?? c.published.active?.version ?? null,
@@ -138,7 +129,11 @@ function PublishFlow() {
     if (!version) return;
     studio
       .publish({ surveyId: ctxRef.current.surveyId, expectedRevision: s.inputs.revision, version, releaseNote: s.note.trim() })
-      .then((res) => dispatch({ type: "published", result: { version: res.version, hash: res.hash, alreadyPublished: res.alreadyPublished } }))
+      .then((res) => {
+        // A new version is on the library's "Published surveys" shelf now.
+        refreshLibrary();
+        dispatch({ type: "published", result: { version: res.version, hash: res.hash, alreadyPublished: res.alreadyPublished } });
+      })
       .catch((error: unknown) => {
         const e = error instanceof StudioCallError ? error : null;
         dispatch({

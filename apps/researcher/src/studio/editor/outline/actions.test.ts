@@ -236,3 +236,20 @@ describe("an archived question's menu", () => {
     expect(find(items, "restore").label).toMatch(/whole questionnaire/);
   });
 });
+
+describe("the library in the menus (D-57)", () => {
+  it("offers “Add from library…” on every section", () => {
+    const d = live();
+    for (const s of outline(d).sections) expect(find(sectionActions(s.key, facts(d)), "add-from-library").disabled).toBeUndefined();
+  });
+
+  it("saves only editable blocks to the library, and says why not otherwise", () => {
+    const d = live();
+    expect(find(blockActions("gaming", 0, facts(d)), "save-to-library").disabled).toBeUndefined();
+    expect(find(blockActions("wellbeing", 1, facts(d)), "save-to-library").disabled).toMatch(/validated questionnaire is in the library already/);
+    expect(find(blockActions("welcome", 0, facts(d)), "save-to-library").disabled).toMatch(/ethics approval/);
+    // Unlocked or not, the consent and identity modules belong to their study.
+    const unlocked = unlockModule(d, "ybm_identity", { ...actor, reason: "Testing what the library menu offers here." }).draft;
+    expect(find(blockActions("about_you", 0, facts(unlocked)), "save-to-library").disabled).toMatch(/isn’t saved to the library/);
+  });
+});

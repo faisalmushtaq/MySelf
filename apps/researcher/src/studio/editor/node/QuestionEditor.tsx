@@ -17,6 +17,8 @@ import { Icon } from "../../ui/icons.js";
 import { Button, Tooltip } from "../../ui/kit.js";
 import { useToast } from "../../ui/toast.js";
 import { useEditor } from "../context.js";
+import { useLibraryUi } from "../library/LibraryContext.js";
+import { ModuleUpdateBanner } from "../library/ModuleUpdate.js";
 import { ConditionBuilder } from "./ConditionBuilder.js";
 import { Disclosure, IssueMessages, LockBanner, LockTip, Panel, TextField } from "./controls.js";
 import { focusField, focusSoon } from "./focus.js";
@@ -147,7 +149,7 @@ export function QuestionEditor({ itemKey }: { itemKey: string }) {
         </div>
       </header>
 
-      <QuestionNotices lock={lock} onUnlock={() => setUnlocking(true)} variable={item.variable} />
+      <QuestionNotices itemKey={itemKey} lock={lock} onUnlock={() => setUnlocking(true)} variable={item.variable} />
 
       <article className="stn-canvas" aria-label="The question as participants see it">
         <IssueMessages issues={unplacedIssues(issues, fieldsShownFor(item.responseType))} />
@@ -302,9 +304,14 @@ export function QuestionEditor({ itemKey }: { itemKey: string }) {
 }
 
 /** What is special about the question, one slim line each, the why behind an ⓘ. */
-function QuestionNotices({ lock, onUnlock, variable }: { lock: QuestionLock; onUnlock: () => void; variable: string }) {
+function QuestionNotices({ itemKey, lock, onUnlock, variable }: { itemKey: string; lock: QuestionLock; onUnlock: () => void; variable: string }) {
   const ctx = useEditor();
+  const library = useLibraryUi();
   const notices = [];
+  // A newer version of the saved module it was copied from (D-57).
+  for (const update of library.updates) {
+    if (update.itemKeys.includes(itemKey)) notices.push(<ModuleUpdateBanner key={`update:${update.importId}`} update={update} />);
+  }
   if (lock.tier === "locked") {
     const text = lockedBanner(lock);
     notices.push(<LockBanner key="locked" title="Licensed questionnaire · wording locked" info={`${text.title}. ${text.body}`} infoLabel="the licence" />);

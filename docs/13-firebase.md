@@ -36,6 +36,8 @@ studies/{study}/
   assignments/{sessionId}       twin splits
   devices/{deviceId}            enrolled iPads
   audit/{id}                    who did what
+studioLibrary/{moduleId}        the Studio's saved modules (D-57), project-wide; functions only
+  versions/{n}                  each saved version, immutable
 ```
 
 **One project, several studies (D-56).** Everything above is per study. `ybm`

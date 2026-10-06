@@ -15,6 +15,11 @@ import { ConfirmDialog } from "../../ui/dialog.js";
 import { Icon } from "../../ui/icons.js";
 import { Button } from "../../ui/kit.js";
 import { useEditor } from "../context.js";
+import { useLibraryUi } from "../library/LibraryContext.js";
+import { updatesForBlock } from "../library/model.js";
+import { ModuleUpdateBanner } from "../library/ModuleUpdate.js";
+import { BlockOrigins } from "../library/Provenance.js";
+import { saveRefusal } from "../outline/actions.js";
 import { ConditionBuilder } from "./ConditionBuilder.js";
 import { Facts, IssueMessages, LockBanner, Panel } from "./controls.js";
 import { blockIssues } from "./issues.js";
@@ -82,6 +87,10 @@ export function BlockEditor({ sectionKey, componentIndex }: BlockRef) {
   );
   const [unlocking, setUnlocking] = useState(false);
   const [confirmRemove, setConfirmRemove] = useState(false);
+  const library = useLibraryUi();
+  const updates = useMemo(() => (blocks[0] ? updatesForBlock(library.updates, blocks[0]) : []), [library.updates, blocks]);
+  const itemKeys = useMemo(() => blocks[0]?.questions.map((q) => q.itemKey) ?? [], [blocks]);
+  const cantSave = saveRefusal(draft, p.instrument, tier, p.items.length);
   const linkage = p.items.some((item) => identityRoleOf(`${p.instrument}.${item.key}`, item) === "linkage");
   const name = def?.name ?? p.instrument;
 
@@ -160,7 +169,14 @@ export function BlockEditor({ sectionKey, componentIndex }: BlockRef) {
         {def?.construct ? <p className="stn-lead">{def.construct}</p> : null}
       </div>
 
-      {lockNotice ? <div className="stn-notices">{lockNotice}</div> : null}
+      {lockNotice || updates.length > 0 ? (
+        <div className="stn-notices">
+          {lockNotice}
+          {updates.map((u) => (
+            <ModuleUpdateBanner key={u.importId} update={u} />
+          ))}
+        </div>
+      ) : null}
       <IssueMessages issues={[...issues.general, ...(issues.byField.get("items") ?? [])]} />
 
       <Panel title={`Questions · ${p.items.length}`} description={p.subset ? `A chosen ${p.items.length} of the module's questions, in this order.` : undefined}>
@@ -208,6 +224,30 @@ export function BlockEditor({ sectionKey, componentIndex }: BlockRef) {
             <blockquote>{p.form.instructions}</blockquote>
           </div>
         ) : null}
+      </Panel>
+
+      <Panel
+        title="Library"
+        info="Saved modules are shared by every study space. A survey that uses one is told when a newer version is saved, and chooses whether to take it."
+      >
+        <BlockOrigins itemKeys={itemKeys} />
+        {cantSave ? (
+          <p className="stn-inline-note">
+            <Icon name="lock" size={14} /> {cantSave}
+          </p>
+        ) : (
+          <div className="stn-actionrow">
+            <p className="stn-flush stn-muted">Save its questions as a module any survey can add from the library.</p>
+            <Button
+              variant="secondary"
+              icon="library"
+              onClick={() => library.openSave({ sectionKey, componentIndex })}
+              disabled={!ctx.canEdit}
+            >
+              Save to library…
+            </Button>
+          </div>
+        )}
       </Panel>
 
       <Panel title="Remove block">

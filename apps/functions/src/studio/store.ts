@@ -1,7 +1,7 @@
 import type { DocumentReference, DocumentSnapshot, Firestore, Transaction } from "firebase-admin/firestore";
 import { paths } from "@myself/firebase";
 import { compareVersions } from "@myself/release/gate";
-import { canonicalJson, hashHex, sha256, type ReleaseManifest } from "@myself/schema";
+import { canonicalJson, hashHex, sha256, STUDY_ID_PATTERN, type ReleaseManifest } from "@myself/schema";
 import {
   editTier,
   extractDraft,
@@ -83,6 +83,50 @@ export async function readReleases(tx: Transaction, refs: SurveyRefs, hashes: It
     const release = await verifiedRelease(snapshots[i]!, hash);
     if ("refused" in release) throw storeRefusal(hash, release.refused);
     out.set(hash, release);
+  }
+  return out;
+}
+
+/** Where a release is filed: a study's store, under its hash. */
+export interface ReleaseAt {
+  study: string;
+  hash: string;
+}
+
+/** How a release from any study's store is remembered: by study AND hash, as `releaseResolver` keys them. */
+export const releaseAtKey = (at: ReleaseAt): string => `${at.study}\u0000${at.hash}`;
+
+/**
+ * Releases from any study's store (D-57: a survey copied, or a questionnaire
+ * copied, from another study space), each verified against its hash, in one
+ * round trip. Keyed by `releaseAtKey`. Refuses the operation with what
+ * `refusal` makes of the first that is missing or does not verify: a release
+ * is believed only once its hash has been recomputed over what is stored.
+ *
+ * The study must already have been checked against the registry; it is held
+ * to the id pattern again here only because it is about to become part of a
+ * document path.
+ */
+export async function readReleasesAt(
+  tx: Transaction,
+  db: Firestore,
+  wanted: Iterable<ReleaseAt>,
+  refusal: (at: ReleaseAt, why: string) => Error,
+): Promise<Map<string, VerifiedRelease>> {
+  const unique = new Map<string, ReleaseAt>();
+  for (const at of wanted) unique.set(releaseAtKey(at), at);
+  const out = new Map<string, VerifiedRelease>();
+  if (unique.size === 0) return out;
+  const list = [...unique.values()];
+  for (const at of list) {
+    if (!STUDY_ID_PATTERN.test(at.study)) throw refusal(at, "it names a study space in a form no study id takes");
+    if (!sha256.safeParse(at.hash).success) throw refusal(at, "it is not a release hash");
+  }
+  const snapshots = await tx.getAll(...list.map((at) => db.doc(paths.publicRelease(at.study, hashHex(at.hash)))));
+  for (const [i, at] of list.entries()) {
+    const release = await verifiedRelease(snapshots[i]!, at.hash);
+    if ("refused" in release) throw refusal(at, release.refused);
+    out.set(releaseAtKey(at), release);
   }
   return out;
 }

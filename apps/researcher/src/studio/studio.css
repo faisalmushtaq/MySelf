@@ -910,6 +910,50 @@
   background: var(--st-bg-subtle);
   border-radius: 0 0 var(--st-radius-xl) var(--st-radius-xl);
 }
+/* A side sheet: the same dialog, the window's full height, on the right. */
+.st-overlay-side {
+  padding: 0;
+  justify-content: flex-end;
+  align-items: stretch;
+  overflow: hidden;
+}
+.st-drawer {
+  height: 100%;
+  max-height: none;
+  border-radius: 0;
+  box-shadow: var(--st-shadow-lg);
+}
+.st-drawer .st-dialog-head {
+  padding: 16px 20px 8px;
+  border-bottom: 1px solid var(--st-border);
+}
+.st-drawer .st-dialog-body {
+  flex: 1;
+  min-height: 0;
+  padding: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.st-drawer .st-dialog-foot {
+  border-radius: 0;
+  padding: 12px 20px;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .st-drawer {
+    animation: st-slide 160ms ease-out;
+  }
+}
+@keyframes st-slide {
+  from {
+    opacity: 0;
+    transform: translateX(12px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
 .st-confirm-body {
   margin-bottom: 12px;
   color: var(--st-text-secondary);
@@ -928,12 +972,17 @@
   display: grid;
   gap: 8px;
   width: min(440px, calc(100vw - 32px));
+  /* The live regions are there, empty, all the time: only a toast takes a click,
+     never the gap between them, which sat over whatever was at the bottom of
+     the window (the library drawer's Add button). */
+  pointer-events: none;
 }
 .st-toasts > div {
   display: grid;
   gap: 8px;
 }
 .st-toast {
+  pointer-events: auto;
   display: flex;
   gap: 10px;
   align-items: flex-start;

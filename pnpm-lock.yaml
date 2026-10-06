@@ -439,6 +439,9 @@ importers:
 
   packages/studio:
     dependencies:
+      '@myself/library':
+        specifier: workspace:*
+        version: link:../library
       '@myself/narrative':
         specifier: workspace:*
         version: link:../narrative
@@ -448,6 +451,9 @@ importers:
       '@myself/schema':
         specifier: workspace:*
         version: link:../schema
+      '@myself/scoring':
+        specifier: workspace:*
+        version: link:../scoring
       zod:
         specifier: ^3.23.8
         version: 3.25.76

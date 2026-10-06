@@ -1,15 +1,16 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { atLeast } from "@myself/studio";
-import { studio, StudioCallError, useStudioSession, useSurveys, useVersions, type SurveyDoc } from "../data/index.js";
+import { studio, StudioCallError, useStudioSession, useSurveys, type SurveyDoc } from "../data/index.js";
 import { SURVEY_ID } from "../firebase.js";
-import { formatDate, formatDateTime, formatRelative, plural, toDate, versionLabel } from "../format.js";
+import { formatDateTime, formatRelative, plural, toDate, versionLabel } from "../format.js";
 import { DEFAULT_STUDY, Link, navigate, useStudy, type Route } from "../router.js";
 import { LoadError } from "../shell/common.js";
-import { Banner, PageHead, Shell } from "../shell/Shell.js";
+import { Banner, PageHead, Shell, studyTabs } from "../shell/Shell.js";
 import { Dialog } from "../ui/dialog.js";
 import { Icon } from "../ui/icons.js";
 import { Button, EmptyState, Field, IconButton, InfoTip, Notice, Skeleton, StatusDot, Tooltip } from "../ui/kit.js";
 import { useToast } from "../ui/toast.js";
+import { CopySource, useAnythingToCopy, type CopyChoice } from "./CopySource.js";
 import { ParticipantLinkDialog } from "./ParticipantLink.js";
 
 /** Every survey in the study, what is live, and whether its draft has moved on. */
@@ -31,6 +32,8 @@ export function SurveysScreen() {
 
   return (
     <Shell
+      tabs={studyTabs("surveys")}
+      navLabel="Study space"
       banner={
         closed ? (
           <Banner tone="warn" title="This study space is closed.">
@@ -296,9 +299,10 @@ function NewSurveyDialog({ existing, onClose }: { existing: SurveyDoc[]; onClose
   const [id, setId] = useState("");
   const [idTouched, setIdTouched] = useState(false);
   const [start, setStart] = useState<"blank" | "version">("blank");
-  const published = useMemo(() => existing.filter((s) => s.versionCount > 0), [existing]);
-  const [fromSurvey, setFromSurvey] = useState(published[0]?.surveyId ?? "");
-  const [fromVersion, setFromVersion] = useState("");
+  const here = useStudy();
+  // Any study's published versions, this study space first (D-57, docs/16 §12.7).
+  const canCopy = useAnythingToCopy(existing);
+  const [copy, setCopy] = useState<CopyChoice | null>(null);
   const [submitted, setSubmitted] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -306,7 +310,7 @@ function NewSurveyDialog({ existing, onClose }: { existing: SurveyDoc[]; onClose
   const effectiveId = idTouched ? id : suggestId(title);
   const idError = surveyIdProblem(effectiveId, existing);
   const titleError = title.trim() ? null : "Give the survey a title.";
-  const versionError = start === "version" && (!fromSurvey || !fromVersion) ? "Choose the version to start from." : null;
+  const versionError = start === "version" && (!copy?.surveyId || !copy.version) ? "Choose the version to start from." : null;
   const valid = !idError && !titleError && !versionError;
 
   const submit = () => {
@@ -318,7 +322,10 @@ function NewSurveyDialog({ existing, onClose }: { existing: SurveyDoc[]; onClose
       .createSurvey({
         surveyId: effectiveId,
         title: title.trim(),
-        from: start === "version" ? { surveyId: fromSurvey, version: fromVersion } : null,
+        from:
+          start === "version" && copy
+            ? { surveyId: copy.surveyId, version: copy.version, ...(copy.study !== here ? { study: copy.study } : {}) }
+            : null,
       })
       .then((res) => {
         toast.success("Survey created", `“${title.trim()}” is ready to edit.`);
@@ -383,45 +390,20 @@ function NewSurveyDialog({ existing, onClose }: { existing: SurveyDoc[]; onClose
               <small>A start screen and a thank-you screen, ready for questions.</small>
             </span>
           </label>
-          <label className={`stp-radio${published.length === 0 ? " disabled" : ""}`}>
-            <input
-              type="radio"
-              name="start"
-              checked={start === "version"}
-              disabled={published.length === 0}
-              onChange={() => setStart("version")}
-            />
+          <label className={`stp-radio${canCopy ? "" : " disabled"}`}>
+            <input type="radio" name="start" checked={start === "version"} disabled={!canCopy} onChange={() => setStart("version")} />
             <span>
-              <strong>A published version of another survey</strong>
+              <strong>A published version of a survey</strong>
               <small>
-                {published.length === 0
-                  ? "No survey has published a version yet."
-                  : "Question IDs stay as they are, so data can be compared."}
+                {canCopy
+                  ? "In any study space. Question IDs stay as they are, so data can be compared."
+                  : "No survey has published a version yet."}
               </small>
             </span>
           </label>
           {start === "version" ? (
             <div className="stp-indent">
-              <Field label="Survey">
-                {(p) => (
-                  <select
-                    {...p}
-                    className="st-select"
-                    value={fromSurvey}
-                    onChange={(e) => {
-                      setFromSurvey(e.target.value);
-                      setFromVersion("");
-                    }}
-                  >
-                    {published.map((s) => (
-                      <option key={s.surveyId} value={s.surveyId}>
-                        {s.title}
-                      </option>
-                    ))}
-                  </select>
-                )}
-              </Field>
-              {fromSurvey ? <VersionSelect surveyId={fromSurvey} value={fromVersion} onChange={setFromVersion} error={submitted ? versionError : null} /> : null}
+              <CopySource existing={existing} value={copy} onChange={setCopy} error={submitted ? versionError : null} />
             </div>
           ) : null}
         </fieldset>
@@ -429,35 +411,5 @@ function NewSurveyDialog({ existing, onClose }: { existing: SurveyDoc[]; onClose
         <button type="submit" hidden />
       </form>
     </Dialog>
-  );
-}
-
-function VersionSelect({
-  surveyId,
-  value,
-  onChange,
-  error,
-}: {
-  surveyId: string;
-  value: string;
-  onChange: (v: string) => void;
-  error: string | null;
-}) {
-  const versions = useVersions(surveyId);
-  if (versions.status === "loading") return <Skeleton lines={1} label="Loading versions" />;
-  if (versions.status === "error") return <LoadError error={versions.error} retry={versions.retry} />;
-  return (
-    <Field label="Version" error={error}>
-      {(p) => (
-        <select {...p} className="st-select" value={value} onChange={(e) => onChange(e.target.value)}>
-          <option value="">Choose a version…</option>
-          {versions.data.map((v) => (
-            <option key={v.version} value={v.version}>
-              {versionLabel(v.version)} — published {formatDate(toDate(v.publishedAt))}
-            </option>
-          ))}
-        </select>
-      )}
-    </Field>
   );
 }

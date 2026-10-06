@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto";
 import { FieldValue, Timestamp, type Firestore } from "firebase-admin/firestore";
 import { compareVersions } from "@myself/release/gate";
 import { verifyRawManifestHash, type ReleaseManifest } from "@myself/schema";
@@ -8,11 +9,14 @@ import {
   MAX_DRAFT_CHARS,
   serialiseDraft,
   type CreateSurveyResponse,
+  type DraftDoc,
   type ImportLiveResponse,
+  type ImportRecord,
   type StudioDraft,
   type VersionDoc,
 } from "@myself/studio";
 import { bundledManifests } from "../releases.js";
+import { lookupStudy } from "../studies.js";
 import { auditRow, newAuditRef, type AuditActor } from "./audit.js";
 import { problem, refuse } from "./errors.js";
 import { readReleases, surveyRefs } from "./store.js";
@@ -237,8 +241,17 @@ export interface CreateSurveyArgs {
   study: string;
   surveyId: string;
   title: string;
-  from?: { surveyId: string; version: string } | null;
+  /** A published version to copy; `study` names another study space to copy from (D-57), absent this one. */
+  from?: { surveyId: string; version: string; study?: string | undefined } | null;
   actor: AuditActor;
+  /** The function's clock, for the copy's provenance record. */
+  now?: () => Date;
+}
+
+/** `imp_` and 16 random letters and digits, as the Studio makes them. */
+function newImportId(): string {
+  const alphabet = "abcdefghijklmnopqrstuvwxyz0123456789";
+  return `imp_${Array.from(randomBytes(16), (b) => alphabet[b % alphabet.length]).join("")}`;
 }
 
 /**
@@ -248,10 +261,30 @@ export interface CreateSurveyArgs {
  * (`basedOn`): the first publish of the new survey checks its licensed and
  * protected content against that release, so a copy cannot be the way round
  * the locks (see `lockBaseline`).
+ *
+ * FROM ANOTHER STUDY SPACE (D-57, docs/16 §12.7) the source must be a study
+ * this project runs and the version one published there; its release is read
+ * from THAT study's store and verified, and `basedOn` names the study, so the
+ * first publish reads it from there too. The copy is this study's survey (its
+ * composition says so, or it could never be published here), and carries the
+ * source's consent and identity modules unchanged and still protected: the new
+ * study's approval must cover them, or they are unlocked with a reason.
+ *
+ * Either way the copy records, in its provenance (`imports`), which release
+ * every question came from, so the version it publishes says so too.
  */
 export async function createSurvey(db: Firestore, args: CreateSurveyArgs): Promise<CreateSurveyResponse> {
   const { study, surveyId, title, from, actor } = args;
+  const now = args.now ?? (() => new Date());
   const refs = surveyRefs(db, study, surveyId);
+  const sourceStudy = from?.study ?? study;
+  if (from && sourceStudy !== study) {
+    // A request naming a study makes nothing so: it must be in the registry.
+    const found = await lookupStudy(db, sourceStudy);
+    if (found.kind !== "registered") {
+      throw refuse.notFound(`study:${sourceStudy}`, `There's no study space “${sourceStudy}” to copy from. It may have been typed wrongly, or never created.`);
+    }
+  }
 
   return db.runTransaction(async (tx) => {
     const [survey, draft, pointer] = await tx.getAll(refs.survey, refs.draft, refs.pointer);
@@ -262,19 +295,35 @@ export async function createSurvey(db: Firestore, args: CreateSurveyArgs): Promi
     }
 
     let content: StudioDraft;
-    let basedOn: { version: string; hash: string } | null = null;
+    let basedOn: DraftDoc["basedOn"] = null;
     if (from) {
-      const sourceRefs = surveyRefs(db, study, from.surveyId);
+      const sourceRefs = surveyRefs(db, sourceStudy, from.surveyId);
       const versionSnap = await tx.get(sourceRefs.version(from.version));
       if (!versionSnap.exists) {
-        throw refuse.notFound(`version:${from.surveyId}@${from.version}`, `Version ${from.version} of “${from.surveyId}” has not been published, so it can't be copied.`);
+        const where = sourceStudy === study ? "" : ` in the study space “${sourceStudy}”`;
+        throw refuse.notFound(
+          `version:${sourceStudy === study ? "" : `${sourceStudy}/`}${from.surveyId}@${from.version}`,
+          `Version ${from.version} of “${from.surveyId}”${where} has not been published, so it can't be copied.`,
+        );
       }
       const hash = versionSnap.get("hash") as string;
       const release = (await readReleases(tx, sourceRefs, [hash])).get(hash)!;
       content = extractDraft(release.raw);
       content.surveyId = surveyId;
-      content.composition = { ...content.composition, key: surveyId, title };
-      basedOn = { version: from.version, hash };
+      content.composition = { ...content.composition, key: surveyId, title, study };
+      const items = Object.fromEntries(
+        Object.values(content.instruments).flatMap((def) => def.forms[0]!.items.map((item) => [`${def.instrument}.${item.key}`, `${def.instrument}.${item.key}`])),
+      );
+      const record: ImportRecord = {
+        id: newImportId(),
+        at: now().toISOString(),
+        by: actor.uid,
+        byEmail: actor.email ?? "",
+        origin: { kind: "release", study: sourceStudy, surveyId: from.surveyId, version: from.version, hash },
+        items,
+      };
+      content.imports = [record];
+      basedOn = sourceStudy === study ? { version: from.version, hash } : { version: from.version, hash, study: sourceStudy };
     } else {
       content = emptyDraft({ surveyId, study, title });
     }
@@ -311,6 +360,7 @@ export async function createSurvey(db: Firestore, args: CreateSurveyArgs): Promi
         from: from?.surveyId ?? null,
         fromVersion: from?.version ?? null,
         fromHash: basedOn?.hash ?? null,
+        fromStudy: from ? sourceStudy : null,
       }),
     );
     return { surveyId };

@@ -3,6 +3,7 @@ import { outline } from "@myself/studio";
 import { Icon, type IconName } from "../../ui/icons.js";
 import { Button } from "../../ui/kit.js";
 import { useEditor } from "../context.js";
+import { useLibraryUi } from "../library/LibraryContext.js";
 import type { Selection } from "../selection.js";
 import { AddQuestionDialog } from "./AddQuestion.js";
 
@@ -15,6 +16,7 @@ export function Overview() {
   const { draft } = ctx;
   const o = useMemo(() => outline(draft), [draft]);
   const [adding, setAdding] = useState(false);
+  const library = useLibraryUi();
   const counts = useMemo(() => {
     let questions = 0;
     let conditional = 0;
@@ -62,6 +64,9 @@ export function Overview() {
           <p className="stn-lead">Select a question on the left, or add one.</p>
         </div>
         <div className="stn-row-actions">
+          <Button size="sm" variant="secondary" icon="library" onClick={() => library.openDrawer()}>
+            Library
+          </Button>
           <Button size="sm" variant="primary" icon="plus" onClick={() => setAdding(true)} disabled={!ctx.canEdit}>
             Add question
           </Button>
@@ -76,6 +81,31 @@ export function Overview() {
           </div>
         ))}
       </dl>
+
+      {library.updates.length > 0 ? (
+        <section className="stn-panel" aria-labelledby="stn-overview-updates">
+          <header className="stn-panel-head">
+            <h3 id="stn-overview-updates" className="stn-panel-title">
+              Library updates
+            </h3>
+          </header>
+          <ul className="stn-linklist">
+            {library.updates.map((u) => {
+              const title = library.modules.get(u.moduleId)?.title ?? u.moduleId;
+              return (
+                <li key={u.importId}>
+                  <button type="button" className="stn-linkrow" onClick={() => library.review(u)}>
+                    <Icon name="library" size={16} />
+                    <span className="stn-linkrow-title">A newer version of ‘{title}’ is in the library (v{u.to})</span>
+                    <span className="stn-linkrow-meta">Review</span>
+                    <Icon name="chevron-right" size={14} className="st-icon stn-linkrow-chevron" />
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      ) : null}
 
       <section className="stn-panel" aria-labelledby="stn-overview-screens">
         <header className="stn-panel-head">

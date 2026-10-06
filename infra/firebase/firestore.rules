@@ -430,6 +430,28 @@ service cloud.firestore {
       }
     }
 
+    // ── The Studio's item library (D-57, docs/16 §12.6) ──────────────────────
+    // Saved modules, project-wide rather than per study, because the point is
+    // reuse across study spaces: `studioLibrary/{moduleId}` and its immutable
+    // `versions/{version}`. CLOSED TO EVERY BROWSER — an owner and a Studio
+    // admin included: functions alone read and write it. They check the
+    // caller's Studio access in the study the caller is working in, check
+    // every piece before it is stored (editable content only, well formed,
+    // within the size limit, testing nothing outside itself), refuse a save
+    // made against a version that is no longer the latest, check stored
+    // content against its hash before handing it out, and audit each save in
+    // the saving study's trail. A browser reading here directly would skip
+    // the access and hash checks; one writing here would skip all the rest.
+    // Stated explicitly rather than left to the catch-all below, so that
+    // nobody adds a convenient read rule here without reading this first.
+    match /studioLibrary/{moduleId} {
+      allow read, write: if false;
+
+      match /versions/{version} {
+        allow read, write: if false;
+      }
+    }
+
     // Anything not named above is closed. Firestore's default is already deny,
     // but stating it means a new collection added in a hurry does not quietly
     // inherit somebody else's permissions.

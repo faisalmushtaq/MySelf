@@ -84,7 +84,8 @@ export interface DraftEditor {
   draft: StudioDraft | null;
   /** The saved revision the working copy is based on. */
   revision: number;
-  basedOn: { version: string; hash: string } | null;
+  /** `study` is set when it was copied from another study space's version (D-57). */
+  basedOn: { version: string; hash: string; study?: string } | null;
   save: SaveState;
   /** True for viewers, and while a conflict is unresolved. */
   readOnly: boolean;

@@ -58,6 +58,8 @@ export type Route =
   | { name: "surveys" }
   /** Who has access — study-wide, so reachable before any survey exists. */
   | { name: "access" }
+  /** The item library's saved modules (D-57): project-wide, reached from any study space. */
+  | { name: "library" }
   /** `q` is a question ID (`<instrument>.<key>`) to select, where the tab has one. */
   | { name: "survey"; surveyId: string; tab: SurveyTab; q: string | null }
   | { name: "playground"; tab: "edit" | "preview"; q: string | null }
@@ -111,6 +113,7 @@ export function parseHash(hash: string): Route {
     return { name: "login", next: next && isStudioHash(next) ? next : null };
   }
   if (first === "access" && second === undefined) return { name: "access" };
+  if (first === "library" && second === undefined) return { name: "library" };
   if (first === "playground") {
     if (second === undefined || second === "edit") return { name: "playground", tab: "edit", q: cleanQ(params.get("q")) };
     if (second === "preview" && third === undefined) return { name: "playground", tab: "preview", q: cleanQ(params.get("q")) };
@@ -146,6 +149,8 @@ function formatPage(route: Route): string {
       return "#/surveys";
     case "access":
       return "#/access";
+    case "library":
+      return "#/library";
     case "survey": {
       const base = `#/surveys/${encodeURIComponent(route.surveyId)}/${route.tab}`;
       return route.q ? `${base}?${new URLSearchParams({ q: route.q }).toString()}` : base;

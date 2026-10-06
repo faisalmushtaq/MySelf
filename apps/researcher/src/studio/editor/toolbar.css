@@ -320,6 +320,7 @@
 @media (max-width: 480px) {
   /* Words only, so the actions fit on one line at phone width. */
   .sto-preview > .st-icon,
+  .sto-library > .st-icon,
   .sto-tb-actions .st-btn-accent > .st-icon {
     display: none;
   }

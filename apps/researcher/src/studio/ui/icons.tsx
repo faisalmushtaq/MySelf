@@ -72,7 +72,8 @@ export type IconName =
   | "import"
   | "keyboard"
   | "link"
-  | "folder";
+  | "folder"
+  | "library";
 
 const paths: Record<IconName, JSX.Element> = {
   plus: <path d="M10 4v12M4 10h12" />,
@@ -164,6 +165,7 @@ const paths: Record<IconName, JSX.Element> = {
   keyboard: <path d="M2.5 5.5h15v9h-15zM5.5 8.5h1M9.5 8.5h1M13.5 8.5h1M6.5 11.5h7" />,
   link: <path d="M8.5 11.5a3 3 0 0 0 4.2 0l2.6-2.6a3 3 0 0 0-4.2-4.2l-1.2 1.2M11.5 8.5a3 3 0 0 0-4.2 0l-2.6 2.6a3 3 0 0 0 4.2 4.2l1.2-1.2" />,
   folder: <path d="M2.5 5h5l1.5 2h8.5v9h-15z" />,
+  library: <path d="M3.5 3.5h3v13h-3zM8 3.5h3v13H8zM12.6 4.3l2.9-.8 2.9 12.6-2.9.7z" />,
 };
 
 export function Icon({ name, size = 18, ...rest }: { name: IconName; size?: number } & SVGProps<SVGSVGElement>) {

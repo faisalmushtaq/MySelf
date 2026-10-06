@@ -44,6 +44,11 @@
       "collectionGroup": "studioAudit",
       "fieldPath": "detail",
       "indexes": []
+    },
+    {
+      "collectionGroup": "versions",
+      "fieldPath": "content",
+      "indexes": []
     }
   ]
 }

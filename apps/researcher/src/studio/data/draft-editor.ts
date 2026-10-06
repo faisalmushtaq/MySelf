@@ -297,7 +297,9 @@ export function useDraftSession(surveyId: string): DraftSession {
           return;
         }
         const data = snap.data() as DraftDoc;
-        setBasedOn((prev) => (prev?.version === data.basedOn?.version && prev?.hash === data.basedOn?.hash ? prev : (data.basedOn ?? null)));
+        setBasedOn((prev) =>
+          prev?.version === data.basedOn?.version && prev?.hash === data.basedOn?.hash && prev?.study === data.basedOn?.study ? prev : (data.basedOn ?? null),
+        );
         if (action === "remote") {
           // Our own save whose answer never came back is not someone else's.
           const mine = landedAttempt(attemptsRef.current, data, ctx.current.uid);

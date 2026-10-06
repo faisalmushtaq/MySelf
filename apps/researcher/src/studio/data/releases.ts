@@ -4,7 +4,7 @@ import { paths } from "@myself/firebase";
 import { hashHex, releaseManifest, verifyRawManifestHash, type ReleaseManifest } from "@myself/schema";
 import type { PublicReleaseDoc } from "@myself/studio";
 import { studioFirebase } from "../firebase.js";
-import { currentStudy } from "../router.js";
+import { currentStudy, useStudy } from "../router.js";
 import { readErrorMessage } from "./errors.js";
 import { NOT_CONNECTED } from "./live.js";
 import type { Loadable } from "./types.js";
@@ -40,12 +40,12 @@ const cache = new Map<string, Promise<LoadedRelease>>();
 
 /**
  * Fetch and verify one release, from the release store of the study space the
- * Studio is in. Cached by study and hash — a release is read from its own
- * study's store, and one study's copy never answers for another (D-56). A
- * failure is not cached, so a retry fetches again.
+ * Studio is in, or of the study named (the library reads every study's
+ * published versions, D-57). Cached by study and hash — a release is read from
+ * its own study's store, and one study's copy never answers for another
+ * (D-56). A failure is not cached, so a retry fetches again.
  */
-export function loadRelease(hash: string): Promise<LoadedRelease> {
-  const study = currentStudy();
+export function loadRelease(hash: string, study: string = currentStudy()): Promise<LoadedRelease> {
   const key = `${study}\u0000${hash}`;
   const hit = cache.get(key);
   if (hit) return hit;
@@ -88,9 +88,16 @@ async function fetchRelease(study: string, hash: string): Promise<LoadedRelease>
   return { hash, json: data.manifest, raw, manifest: parsed.data };
 }
 
-/** Several releases at once, keyed by hash. `hashes` null means "not known yet" (stays loading). */
-export function useReleases(hashes: readonly string[] | null): Loadable<Map<string, LoadedRelease>> {
-  const key = hashes ? [...new Set(hashes)].sort().join(",") : null;
+/**
+ * Several releases at once, keyed by hash. `hashes` null means "not known yet"
+ * (stays loading). From the study space the Studio is in, unless `study` names
+ * another.
+ */
+export function useReleases(hashes: readonly string[] | null, study?: string | null): Loadable<Map<string, LoadedRelease>> {
+  const here = useStudy();
+  const from = study ?? here;
+  const hashKey = hashes ? [...new Set(hashes)].sort().join(",") : null;
+  const key = hashKey === null ? null : `${from}:${hashKey}`;
   const [attempt, setAttempt] = useState(0);
   const [state, setState] = useState<{ key: string; value: Loadable<Map<string, LoadedRelease>> } | null>(null);
   const retry = useMemo(() => () => setAttempt((a) => a + 1), []);
@@ -99,8 +106,8 @@ export function useReleases(hashes: readonly string[] | null): Loadable<Map<stri
   useEffect(() => {
     if (key === null) return;
     let live = true;
-    const list = key ? key.split(",") : [];
-    Promise.all(list.map((h) => loadRelease(h)))
+    const list = hashKey ? hashKey.split(",") : [];
+    Promise.all(list.map((h) => loadRelease(h, from)))
       .then((loaded) => {
         if (live) setState({ key: stateKey, value: { status: "ready", data: new Map(loaded.map((r) => [r.hash, r])) } });
       })
@@ -119,16 +126,16 @@ export function useReleases(hashes: readonly string[] | null): Loadable<Map<stri
     return () => {
       live = false;
     };
-  }, [key, stateKey, retry]);
+  }, [key, hashKey, from, stateKey, retry]);
 
   if (key === null || state?.key !== stateKey) return { status: "loading" };
   return state.value;
 }
 
-/** One release. `hash` null means there is none (ready with null). */
-export function useRelease(hash: string | null): Loadable<LoadedRelease | null> {
+/** One release. `hash` null means there is none (ready with null). `study` as for `useReleases`. */
+export function useRelease(hash: string | null, study?: string | null): Loadable<LoadedRelease | null> {
   const hashes = useMemo(() => (hash ? [hash] : []), [hash]);
-  const all = useReleases(hashes);
+  const all = useReleases(hashes, study);
   return useMemo(() => {
     if (all.status !== "ready") return all;
     return { status: "ready", data: hash ? (all.data.get(hash) ?? null) : null };

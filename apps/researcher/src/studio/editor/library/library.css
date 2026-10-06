@@ -1,0 +1,571 @@
+/*
+ * The item library (D-57): the editor's drawer, its dialogs, and the
+ * study-level Library page. Built from the Studio's tokens (DESIGN.md §2):
+ * hairlines rather than boxes, one accent, state in words as well as colour.
+ */
+
+/* ── The drawer ───────────────────────────────────────────────────────── */
+.stl-drawer .st-dialog-body {
+  background: var(--st-bg);
+}
+.stl-top {
+  padding: 4px 20px 0;
+  flex: none;
+}
+.stl-top .stp-tabs {
+  margin-bottom: 12px;
+}
+.stl-drawer .stp-tabpanel {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  outline: none;
+}
+.stl-drawer .stp-tabpanel:focus-visible {
+  box-shadow: inset var(--st-focus);
+}
+.stl-split {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 320px minmax(0, 1fr);
+  border-top: 1px solid var(--st-border);
+}
+.stl-list-col {
+  min-height: 0;
+  overflow-y: auto;
+  padding: 8px;
+  background: var(--st-bg-subtle);
+  border-right: 1px solid var(--st-border);
+}
+.stl-preview-col {
+  min-height: 0;
+  overflow-y: auto;
+  padding: 16px 24px 24px;
+}
+.stl-preview-col > .st-notice {
+  margin-bottom: 12px;
+}
+
+/* The search box: the outline's, with its own name so the page can use it too. */
+.stl-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+  margin-bottom: 12px;
+}
+.stl-search > .st-icon {
+  position: absolute;
+  left: 9px;
+  width: 14px;
+  height: 14px;
+  color: var(--st-text-tertiary);
+  pointer-events: none;
+}
+.studio .stl-search .st-input {
+  height: 32px;
+  min-height: 32px;
+  padding: 0 32px 0 29px;
+  font-size: 13px;
+}
+.stl-search .st-input::-webkit-search-cancel-button {
+  display: none;
+}
+.stl-search > .st-tip-anchor {
+  position: absolute;
+  right: 4px;
+}
+
+/* ── Lists on the left ────────────────────────────────────────────────── */
+.stl-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 2px;
+}
+.stl-item {
+  position: relative;
+  width: 100%;
+  display: grid;
+  gap: 2px;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: var(--st-radius);
+  background: none;
+  font: inherit;
+  text-align: left;
+  color: var(--st-text);
+  cursor: pointer;
+  transition: background var(--st-ease);
+}
+.stl-item:hover {
+  background: var(--st-bg-muted);
+}
+.stl-item[aria-pressed="true"] {
+  background: var(--st-bg-muted);
+}
+.stl-item[aria-pressed="true"]::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 6px;
+  bottom: 6px;
+  width: 2px;
+  border-radius: 2px;
+  background: var(--st-accent);
+}
+.stl-item-title {
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+.stl-item[aria-pressed="true"] .stl-item-title {
+  font-weight: 600;
+}
+.stl-item-meta,
+.stl-meta {
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--st-text-tertiary);
+}
+.stl-meta {
+  margin: 0 0 8px;
+}
+.stl-mono {
+  font-family: var(--st-mono);
+  font-size: 12px;
+}
+.stl-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 2px 0 0;
+}
+.stl-tag {
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: var(--st-radius-sm);
+  background: var(--st-bg-muted);
+  color: var(--st-text-secondary);
+  font-size: 12px;
+  font-weight: 500;
+}
+.stl-item .stl-tag {
+  background: var(--st-bg-emphasis);
+}
+.stl-groups {
+  display: grid;
+  gap: 12px;
+}
+.stl-group-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 4px 10px 4px;
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 600;
+  color: var(--st-text-secondary);
+}
+.stl-empty-line {
+  margin: 8px 10px;
+  color: var(--st-text-secondary);
+}
+.stl-hint {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  padding: 48px 16px;
+  color: var(--st-text-tertiary);
+  text-align: center;
+}
+.stl-hint p {
+  margin: 0;
+  max-width: 340px;
+  color: var(--st-text-secondary);
+}
+
+/* ── What is chosen, on the right ─────────────────────────────────────── */
+.stl-detail-head {
+  margin-bottom: 12px;
+}
+.stl-detail-title {
+  margin: 0 0 2px;
+  font-size: 15px;
+  line-height: 22px;
+  font-weight: 600;
+}
+.stl-detail-desc {
+  margin: 0 0 8px;
+  color: var(--st-text-secondary);
+}
+.stl-detail-head .stl-meta {
+  margin-bottom: 4px;
+}
+.stl-whole {
+  display: flex;
+  gap: 6px;
+  align-items: flex-start;
+  margin: 0 0 12px;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--st-text-secondary);
+}
+.stl-whole > .st-icon {
+  flex: none;
+  margin-top: 1px;
+  color: var(--st-text-tertiary);
+}
+.stl-detail .st-notice {
+  margin-bottom: 12px;
+}
+.stl-version {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+.stl-version .st-select {
+  width: auto;
+  max-width: 100%;
+}
+
+/* A published version, to tick from. */
+.stl-src-section {
+  padding: 8px 0 12px;
+  border-top: 1px solid var(--st-border);
+}
+.stl-src-section:first-of-type {
+  border-top: 0;
+}
+.stl-src-block {
+  margin: 6px 0 0 7px;
+  padding-left: 12px;
+  border-left: 1px solid var(--st-border);
+}
+.stl-blockhead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px 12px;
+}
+.stl-blockname {
+  margin: 8px 0 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--st-text-secondary);
+}
+.stl-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  min-height: 28px;
+  padding: 4px 0;
+}
+.stl-check input {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  margin: 2px 0 0;
+  accent-color: var(--st-accent);
+}
+.stl-check label {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 8px;
+  min-width: 0;
+  cursor: pointer;
+}
+.stl-check.is-implied label {
+  cursor: default;
+  color: var(--st-text-secondary);
+}
+.stl-check-title {
+  font-weight: 500;
+}
+.stl-check-section .stl-check-title {
+  font-weight: 600;
+}
+.stl-lock {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--st-text-secondary);
+}
+.stl-lock > .st-icon {
+  color: var(--st-text-tertiary);
+}
+.stl-questions {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 0 24px;
+}
+.stl-questions-numbered {
+  list-style: decimal;
+  padding-left: 28px;
+  color: var(--st-text-tertiary);
+}
+.stl-questions-numbered > li {
+  padding-left: 2px;
+}
+.stl-q-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 8px;
+  padding: 4px 0;
+  color: var(--st-text);
+}
+.stl-q-whole {
+  padding-left: 24px;
+}
+.stl-q-text {
+  overflow-wrap: anywhere;
+}
+.stl-q-id {
+  font-family: var(--st-mono);
+  font-size: 12px;
+  color: var(--st-text-tertiary);
+  overflow-wrap: anywhere;
+}
+
+/* ── The footer: where it goes, and Add ───────────────────────────────── */
+.stl-foot {
+  flex: 1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px 16px;
+}
+.stl-target {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.stl-target-field {
+  display: grid;
+  gap: 4px;
+  min-width: 180px;
+}
+.stl-target-field .st-select,
+.stl-target-field .st-input {
+  max-width: 300px;
+}
+.stl-foot-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.stl-foot-where {
+  margin: 0;
+  max-width: 340px;
+}
+
+/* ── Dialogs ──────────────────────────────────────────────────────────── */
+.stl-protected {
+  list-style: none;
+  margin: 0 0 12px;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+}
+.stl-protected li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 500;
+}
+.stl-protected .st-icon {
+  color: var(--st-text-tertiary);
+}
+.stl-renames,
+.stl-bullets {
+  margin: 6px 0 0;
+  padding-left: 18px;
+}
+.stl-renames li,
+.stl-bullets li {
+  margin: 2px 0;
+}
+.stl-renames code,
+.stl-result-part code,
+.stl-origins code {
+  font-family: var(--st-mono);
+  font-size: 12px;
+}
+.stl-result-part {
+  margin-top: 16px;
+}
+.stl-h3 {
+  margin: 0 0 4px;
+  font-size: 13px;
+  line-height: 20px;
+  font-weight: 600;
+}
+.stl-summary {
+  color: var(--st-text-secondary);
+}
+.stl-summary + .stl-summary {
+  margin-top: 6px;
+}
+/* Rows grow with their text: a question and its outcome often take two lines each. */
+.stl-plan tbody th,
+.stl-plan tbody td {
+  height: auto;
+  padding-top: 10px;
+  padding-bottom: 10px;
+  vertical-align: top;
+}
+.stl-plan tbody th {
+  width: 45%;
+  font-weight: 400;
+}
+.stl-plan-text {
+  display: block;
+  overflow-wrap: anywhere;
+}
+.stl-plan .stl-q-id {
+  display: block;
+  margin-top: 2px;
+}
+.stl-outcome {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.stl-outcome.is-attention {
+  color: var(--st-warn);
+  font-weight: 500;
+}
+.stl-plan-detail {
+  display: block;
+  margin: 2px 0 0;
+}
+.stl-save-questions .stl-questions {
+  max-height: 220px;
+  overflow-y: auto;
+  padding-left: 0;
+  margin-bottom: 4px;
+}
+.stl-origins {
+  margin: 0 0 12px;
+  padding-left: 18px;
+  color: var(--st-text-secondary);
+}
+
+/* ── Narrow windows ───────────────────────────────────────────────────── */
+@media (max-width: 760px) {
+  .stl-split {
+    grid-template-columns: 1fr;
+    grid-template-rows: minmax(120px, 38%) minmax(0, 1fr);
+  }
+  .stl-list-col {
+    border-right: 0;
+    border-bottom: 1px solid var(--st-border);
+  }
+  .stl-preview-col {
+    padding: 12px 16px 16px;
+  }
+  .stl-top {
+    padding: 4px 16px 0;
+  }
+  .stl-target-field {
+    min-width: 0;
+    flex: 1 1 140px;
+  }
+}
+
+/* ── The Library page ─────────────────────────────────────────────────── */
+.stl-page-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 24px;
+  margin-bottom: 12px;
+}
+.stl-page-tools .stl-search {
+  flex: 1 1 280px;
+  max-width: 420px;
+  margin: 0;
+}
+.stl-page-tools .st-switch {
+  margin: 0;
+}
+.stl-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 16px;
+}
+.stl-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 24px;
+  padding: 0 7px;
+  border: 1px solid var(--st-border);
+  border-radius: var(--st-radius-sm);
+  background: var(--st-bg);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 16px;
+  color: var(--st-text-secondary);
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    border-color var(--st-ease),
+    background var(--st-ease);
+}
+.stl-chip:hover {
+  border-color: var(--st-border-strong);
+  color: var(--st-text);
+}
+.stl-chip[aria-pressed="true"] {
+  background: var(--st-text);
+  border-color: var(--st-text);
+  color: #ffffff;
+}
+.stl-chip .st-icon {
+  width: 12px;
+  height: 12px;
+}
+.stl-row-title {
+  font-weight: 500;
+  text-align: left;
+}
+.stl-row-desc {
+  color: var(--st-text-tertiary);
+}
+.stl-about {
+  margin-bottom: 8px;
+}
+.stl-about-actions {
+  margin-top: 12px;
+  gap: 8px;
+}
+.stl-questions-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.stl-questions-head .stl-h3 {
+  margin: 0 auto 0 0;
+}
+.studio .stl-inline-select {
+  width: auto;
+}
+.stl-after-table {
+  margin-top: 12px;
+}
