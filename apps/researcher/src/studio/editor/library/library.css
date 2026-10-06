@@ -417,13 +417,25 @@
 .stl-summary + .stl-summary {
   margin-top: 6px;
 }
-.stl-plan th[scope="row"] {
-  display: grid;
-  gap: 2px;
+/* Rows grow with their text: a question and its outcome often take two lines each. */
+.stl-plan tbody th,
+.stl-plan tbody td {
+  height: auto;
+  padding-top: 10px;
+  padding-bottom: 10px;
+  vertical-align: top;
+}
+.stl-plan tbody th {
+  width: 45%;
   font-weight: 400;
 }
 .stl-plan-text {
+  display: block;
   overflow-wrap: anywhere;
+}
+.stl-plan .stl-q-id {
+  display: block;
+  margin-top: 2px;
 }
 .stl-outcome {
   display: inline-flex;
@@ -553,4 +565,7 @@
 }
 .studio .stl-inline-select {
   width: auto;
+}
+.stl-after-table {
+  margin-top: 12px;
 }

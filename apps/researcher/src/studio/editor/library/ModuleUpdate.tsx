@@ -154,7 +154,7 @@ export function ModuleUpdateDialog({ update, title, onClose }: { update: Pending
               </tbody>
             </table>
           </div>
-          <p className="stl-meta">It is one change to the draft: undo takes it back, and it is published like any other, with the version bump it needs.</p>
+          <p className="stl-meta stl-after-table">It is one change to the draft: undo takes it back, and it is published like any other, with the version bump it needs.</p>
         </>
       ) : null}
     </Dialog>
