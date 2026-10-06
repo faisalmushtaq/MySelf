@@ -56,7 +56,7 @@ export function SaveModuleDialog({ block, onClose }: { block: BlockRef; onClose:
   const [chosen, setChosen] = useState<Set<string>>(() => new Set(questions.map((q) => q.itemKey)));
   const [submitted, setSubmitted] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<{ title: string; body: string; issues?: Issue[] } | null>(null);
+  const [error, setError] = useState<ReturnType<typeof saveError> | null>(null);
   const groupId = useId();
 
   const source = mode === NEW ? null : (sources.find((s) => s.moduleId === mode) ?? null);
@@ -123,7 +123,12 @@ export function SaveModuleDialog({ block, onClose }: { block: BlockRef; onClose:
         );
         onClose();
       })
-      .catch((e: unknown) => setError(saveError(e, name, source?.version ?? null)))
+      .catch((e: unknown) => {
+        const refused = saveError(e, name, source?.version ?? null);
+        // Someone saved first: read the library again, so this survey's notice for their version appears.
+        if (refused.conflict) refreshLibrary();
+        setError(refused);
+      })
       .finally(() => setBusy(false));
   };
 
@@ -251,6 +256,12 @@ export function SaveModuleDialog({ block, onClose }: { block: BlockRef; onClose:
           )}
         </Field>
 
+        {source && (lib.modules.get(source.moduleId)?.latestVersion ?? 0) > source.version ? (
+          <Notice tone="warn" title="The library has a newer version">
+            ‘{lib.modules.get(source.moduleId)?.title ?? source.moduleId}’ is at version {lib.modules.get(source.moduleId)?.latestVersion}, and this
+            survey has version {source.version}. Review and take the update on this block first; a version saved from here now would be refused.
+          </Notice>
+        ) : null}
         {built.error ? <Notice tone="error">{built.error}</Notice> : null}
         {built.dropped.length > 0 ? (
           <Notice tone="warn" title="Saved without these conditions">
@@ -296,16 +307,17 @@ export function SaveModuleDialog({ block, onClose }: { block: BlockRef; onClose:
 }
 
 /** A refused save, in words — above all, someone else saving a newer version first. */
-export function saveError(e: unknown, name: string, base: number | null): { title: string; body: string; issues?: Issue[] } {
+export function saveError(e: unknown, name: string, base: number | null): { title: string; body: string; issues?: Issue[]; conflict?: boolean } {
   if (!(e instanceof StudioCallError)) return { title: "Not saved", body: "The module couldn’t be saved. Try again." };
   const d = e.details;
   if (d?.kind === "conflict" || (base !== null && e.code === "aborted")) {
     const latest = d?.kind === "conflict" ? d.currentRevision : null;
     return {
+      conflict: true,
       title: "Someone saved a newer version first",
       body:
-        `${latest ? `“${name}” is now at version ${latest}` : `“${name}” has a newer version than ${base ?? "the one this survey has"}`}, saved while you were working, so nothing was saved. ` +
-        "Review and take the update on this block first, then save your changes as the next version.",
+        `${latest ? `“${name}” is now at version ${latest}` : `“${name}” has a newer version than ${base ?? "the one this survey has"}`}, saved after this survey took version ${base ?? "its copy"}, so nothing was saved. ` +
+        "The newer version is now offered on this block: review it and take the update, then save your changes as the next version.",
     };
   }
   if (e.code === "already-exists") {
