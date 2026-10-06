@@ -350,8 +350,16 @@ an owner granted (`owner`, `researcher`, `analyst`). Signing in says who you
 are; the role is how the study says it knows you. Without this the public page
 would be a stranger's route to the study's OpenAI bill.
 
+**A participant's iPad, under daily limits (D-55).** From 2026-10-06 the
+credential an iPad issues itself also buys MyStory's model calls, handed to the
+module by the survey. It runs only what the sitting's release froze, and is
+capped per iPad (`MYSELF_RELAY_DEVICE_DAILY_LIMIT`, 120) and across all iPads
+(`MYSELF_RELAY_DEVICES_DAILY_LIMIT`, 2,000) each day; either at `0` switches it
+off. The reasoning is in docs/09 §5, the operating side in docs/15 §10.
+
 **It is metered.** Every call is counted per caller per day (600 by default,
-`MYSELF_RELAY_DAILY_LIMIT`), and every call writes a provenance row server-side
+`MYSELF_RELAY_DAILY_LIMIT`; an iPad on its own credential has the limits above
+instead), and every call writes a provenance row server-side
 — what was sent, which snapshot answered, latency, tokens, and whether it
 failed. A relay that will make any number of calls for anyone who asks is a bill
 with an API in front of it, and a device's account of a call it did not make is
