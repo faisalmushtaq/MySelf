@@ -27,6 +27,7 @@ materially better position than the file-based route it replaces.
 ## 2. How the data sits
 
 ```
+studies/{study}                 the study's registry document (D-56): title, open or closed
 studies/{study}/
   sessions/{sessionId}          one document per sitting, whole event log inside
     chunks/{0000…}              only when a log is too big to fit — rare
@@ -36,6 +37,18 @@ studies/{study}/
   devices/{deviceId}            enrolled iPads
   audit/{id}                    who did what
 ```
+
+**One project, several studies (D-56).** Everything above is per study. `ybm`
+is the project's default study and needs no registry document; any other
+**study space** is created by a project owner in the Studio, which writes its
+`studies/{study}` document (public by `get`: its title and status, so an iPad
+can tell a closed study) and makes its creator its first Studio admin. Every
+function that takes a study checks it against that document first, and does
+everything else in that study: an iPad is registered per study, MyStory's
+limits are counted per study, releases are read from the study's own store,
+and the nightly export writes `exports/studies/{study}/{date}/` for each study
+other than `ybm`. The paths, fields and how to attribute a sitting to a study
+and a survey are in docs/16 §11.6.
 
 **One document per sitting** is the decision that keeps this in the free tier. A
 whole event log is ~54 kB against a 1 MiB limit, so deriving the dataset costs
@@ -66,6 +79,14 @@ Roles are Firebase Auth custom claims, set by an owner through `setRole`.
 A signed-in account with **no role** can do nothing and is told so plainly —
 silence looks like a bug and invites a workaround.
 
+The claims are the project's, so they reach **every** study: an owner,
+researcher or analyst reads sittings in each study space as in `ybm`, and may
+list the registry and each study's live surveys (the dashboard's way in). Only
+an owner creates, closes or reopens a study space. **MySelf Studio** access is
+per study (each study's own `studioMembers` list, docs/16 §5.7, §11.5): a
+Studio role in one study is nothing in another, in the rules and in the
+functions.
+
 An iPad can post sittings and **read nothing**. A stolen device is a device that
 can write, not a window into the cohort.
 
@@ -93,7 +114,10 @@ no idea where the logs came from. Three routes:
 1. **Click it.** The researcher view builds the zip in the browser.
 2. **Nightly.** `nightlyExport` writes the tree to Cloud Storage under
    `exports/YYYY-MM-DD/…`, plus a `bids.zip` beside it. Object names contain
-   slashes, so the console renders them as real folders.
+   slashes, so the console renders them as real folders. Every other study
+   space with sittings is written beside it under
+   `exports/studies/<study>/YYYY-MM-DD/…` (D-56); one study failing does not
+   stop the others.
 3. **Sync it.** `gsutil -m rsync -r gs://…/exports/2026-09-01 ./ybm-bids`.
 
 Two different backups, commonly conflated:

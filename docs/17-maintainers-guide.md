@@ -72,7 +72,17 @@ an app.
 | `src/components/SurveyScreen.tsx` | One question per screen: the stem, the control, Next, Back, skipping and the effort prompts. |
 | `src/components/ReviewScreen.tsx` | The list of answers, offered from the finish screen (D-31). |
 | `src/components/controls/` | One file per response type (`SingleChoice.tsx`, `NumericControl.tsx`, `FormFieldsControl.tsx` …). `shared.ts` holds the props they all take; import them from `index.ts`. |
-| `src/lib/` | Everything that is not drawing: `flatten.ts` (manifest to screens), `db.ts` and `crypto.ts` (encrypted storage), `sync.ts` (uploads), `export.ts` (the handover file), `postcodes.ts` and `streets.ts` (release assets), `timing.ts`, `pipes.ts`, `durability.ts`, `space.ts`, `updates.ts`. |
+| `src/lib/` | Everything that is not drawing: `flatten.ts` (manifest to screens), `db.ts` and `crypto.ts` (encrypted storage), `sync.ts` (uploads), `export.ts` (the handover file), `postcodes.ts` and `streets.ts` (release assets), `timing.ts`, `pipes.ts`, `durability.ts`, `space.ts`, `updates.ts`, `releases.ts` (a published release, checked and cached) and `selection.ts` (which survey of which study the iPad runs, and its participant link; D-56). |
+
+**One project, several studies (D-56, docs/16 §11).** Everything is filed under
+`studies/{study}/…`, and the study is no longer a build constant: a request
+names it, and `apps/functions/src/studies.ts` checks it against the registry
+(`studies/{study}`; `ybm` is registered with no document) before anything else.
+Add a function that reads or writes study data by taking the study from the
+request and passing it through `studyForRequest` (an `onRequest` endpoint) or
+`studyForCall` (an `onCall`), never by reading `STUDY`, which is now only the
+default for a request that names none. A participant link is
+`?study=<id>&survey=<id>`, read and written only by `packages/schema/src/link.ts`.
 
 ---
 

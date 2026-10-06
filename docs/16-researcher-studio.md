@@ -557,8 +557,8 @@ can run it. `packages/schema/src/canonical.ts` is the one hash implementation.
 
 ### 9.2 Collections and documents
 
-All are under `studies/{study}/` (the study is `ybm`). The typed shapes are in
-`packages/studio/src/contract.ts`, and the paths in
+All are under `studies/{study}/`: `ybm`, or any other study space (§11). The
+typed shapes are in `packages/studio/src/contract.ts`, and the paths in
 `packages/firebase/src/layout.ts`.
 
 | Collection | Document shape | Who writes |
@@ -628,7 +628,7 @@ the browser tab.
 
 ### 9.4 Security rules and their tests
 
-`infra/firebase/test/studio.rules.test.ts` (47 tests), with the existing
+`infra/firebase/test/studio.rules.test.ts` (55 tests), with the existing
 `rules.test.ts` (20), runs against the Firestore emulator:
 - **Authorised:** each role, a domain member, the owner claim.
 - **Unauthorised:** signed out; not listed; an unverified email; a non-Google
@@ -643,6 +643,10 @@ the browser tab.
   - domain spoofs (`evil@brainpop.test@attacker.com`, `…brainpop.test.attacker.com`);
   - a role in one study used in another;
   - collection-group queries.
+- **Study spaces (§11):** the registry from every side (public `get`, `list`
+  only for the project's people, written by nobody), two study spaces whose
+  Studios are closed to each other in both directions, no Studio member reading
+  any sitting, and an iPad of one study refused a sitting in another.
 
 The deploy workflow runs the rules suite before it deploys the rules.
 
@@ -829,10 +833,10 @@ performs this whole loop.
 | Command | What it covers |
 |---|---|
 | `pnpm -r test` | Unit tests. The Studio model alone has 302, including the exact round trip of r7.1.0 through the Studio and of a version with MyStory. |
-| `pnpm --filter @myself/functions test:integration` | Publish atomicity, conflicts, concurrent publishes, idempotent retries, rollback, restore, access races, and publishing with MyStory (Firestore emulator). |
-| `cd infra/firebase/test && npm test` | The rules (67 tests). |
-| `pnpm test:e2e` | The participant app, including runtime loading, pinning, a tampered release and the database upgrade (15 tests). |
-| `pnpm test:e2e:studio` | The whole Studio loop (§9.8) on the Auth, Firestore and Functions emulators, and a second loop that switches MyStory on, publishes it and downloads the provenance. |
+| `pnpm --filter @myself/functions test:integration` | Publish atomicity, conflicts, concurrent publishes, idempotent retries, rollback, restore, access races, publishing with MyStory, and study spaces through the deployed handlers (Firestore emulator; 105 tests). |
+| `cd infra/firebase/test && npm test` | The rules (75 tests). |
+| `pnpm test:e2e` | The participant app, including runtime loading, pinning, a tampered release, the database upgrade and participant links (30 tests on Chromium). |
+| `pnpm test:e2e:studio` | The whole Studio loop (§9.8) on the Auth, Firestore and Functions emulators; a second loop that switches MyStory on, publishes it and downloads the provenance; and a third in which an owner creates a study space, publishes a survey in it, and its participant link files a sitting there (§11). |
 
 ### 9.11 Decisions for the research team to confirm
 
@@ -1388,8 +1392,59 @@ runs the default survey, and files into `ybm`, which is what it always did).
 
 ### 11.10 Where it is
 
-Filled in as it is built.
+| What | Where |
+|---|---|
+| The link format, the id patterns, reading a link or typed `study/survey` | `packages/schema/src/link.ts` (`participantLink`, `readParticipantLink`, `readTypedChoice`, `STUDY_ID_PATTERN`) |
+| The registry path; the registry and scoped-request types | `packages/firebase/src/layout.ts` (`paths.study`); `packages/studio/src/contract.ts` (`StudyDoc`, `StudySummary`, `StudyScoped`, `CALLABLES.createStudy` / `setStudy`) |
+| A request's study, checked against the registry | `apps/functions/src/studies.ts` (`lookupStudy`, `studyForRequest`, `studyForCall`, `registeredStudies`) |
+| Filing, registering, metering and resolving per study | `apps/functions/src/{sittings,relay,narratives,transcribe,releases,identity,admin,export}.ts` |
+| Creating, closing and reopening study spaces; the Studio callables per study | `apps/functions/src/studio/{study-spaces,functions,stats,requests}.ts` |
+| The rules | `infra/firebase/firestore.rules` (the registry document; `published` listable by the project's people) |
+| The iPad's choice of survey | `apps/participant/src/lib/selection.ts`; `lib/releases.ts` (a service per survey, the registry check); `lib/db.ts` (`selection` and `active:<study>/<survey>` rows, a sitting's `study`/`surveyId`); `App.tsx`, `main.tsx`; `screens/StartScreen.tsx`, `screens/SurveyChoiceSection.tsx`, `screens/HandoverPanel.tsx`; `lib/sync.ts` (the upload's `study`) |
+| MyStory's study | `apps/participant/src/lib/narrative.ts` (in the frame's address); `apps/mystory-lab/web/host-protocol.ts` (`hostStudy`), `main.ts`; `packages/llm/src/adapters/relay.ts` (`study`) |
+| The Studio | `apps/researcher/src/studio/route.ts`, `router.tsx` (`#/study/<id>/…`, `currentStudy`, `useStudy`); `data/*` (every read, save and call in the address's study); `shell/StudySwitcher.tsx`; `screens/ParticipantLink.tsx`, `ui/qr.ts` |
+
+**Tests.** `packages/schema/src/link.test.ts`; `apps/functions/src/studies.test.ts`
+and additions to `participant-devices`, `releases`, `export` and
+`studio/requests` tests; `apps/functions/integration/study-spaces.integration.test.ts`
+(19, on the emulator, through the deployed handlers);
+`infra/firebase/test/studio.rules.test.ts` ("the study registry", "two study
+spaces"); `apps/participant/src/selection.test.ts`, `sync.test.ts`,
+`narrative-step.test.ts`; `apps/mystory-lab/web/host-protocol.test.ts`;
+`packages/llm/src/llm.test.ts`; `apps/researcher/src/studio/{route,ui/qr,shell/study-switcher,shell/common}.test.ts`;
+`e2e/study-links.spec.ts` (6); `e2e-studio/study-space.spec.ts`.
 
 ### 11.11 Decisions for the research team to confirm
 
-Filled in as it is built.
+1. **No separate Firebase projects.** One project, study spaces inside it, one
+   deploy. A separate project is still possible for a study that must not
+   share IAM, an OpenAI key or a budget with the rest; nothing here prevents it.
+2. **Who creates a study space: project owners only** (the `owner` claim). The
+   creator becomes its first Studio admin and adds the rest of its team from
+   its own "Who has access".
+3. **Device limits per study.** 120 calls per iPad per day per study, and the
+   2,000-call daily ceiling per study, so a link circulating in one study
+   cannot stop MyStory in another. The worst day is the ceiling times the
+   number of open studies with MyStory live; the OpenAI budget limit is the last
+   line. The alternative, one ceiling across the project, is a small change.
+4. **Closing keeps what was collected.** A closed study refuses new iPads, new
+   sittings on an iPad that can see it is closed, and MyStory's calls; it
+   still accepts sittings from an iPad it already knows. An iPad that
+   collected in a study but never reached the network before it closed must
+   hand its sittings over as a file (or the study is reopened for a day).
+5. **Reading sittings stays project-wide.** The `researcher` and `analyst`
+   claims read every study's sittings, as they read `ybm`'s today. A
+   per-study reader (a claim naming studies, or reader lists per study) is the
+   next step if a study's data must be closed to the rest of the team.
+6. **A study's title is public to anyone who knows its id.** Its registry
+   document is readable without signing in, so an iPad can say a study is
+   closed; titles are written for the public.
+7. **A survey is copied only within its study.** "A published version of
+   another survey" offers the study's own surveys. Starting a study space's
+   survey from `ybm`'s would mean copying a `ybm` release into the new study's
+   store (its locks are checked against it); worth doing if the team asks.
+8. **The bare survey URL keeps an iPad on what it is on.** A link to the
+   default survey (which the Studio writes with both parameters) is how to send
+   an iPad back to it; so is "Back to the default survey" in its handover panel.
+9. **The researcher view's data tools stay on the default study.** The
+   companion dashboard reads every study from §11.6.

@@ -2,7 +2,8 @@
 
 Written to be followed on the morning, not read in advance. It covers the
 survey, and MyStory where the version being fielded includes it: its daily
-limits, and how to switch it off, are in §10 (D-55).
+limits, and how to switch it off, are in §10 (D-55). Participant links, moving
+an iPad to another survey, and study spaces are in §11 (D-56).
 
 ---
 
@@ -341,3 +342,71 @@ how many calls iPads make in a day, not how large each one is. A typical full
 day is a few pounds, but a stranger crafting oversized calls could make the
 worst day cost hundreds. Set a monthly budget limit and alerts on the OpenAI
 project; that is the last line, and it is the provider's, not this platform's.
+
+## 11. Participant links and study spaces (D-56)
+
+From D-56 (docs/09 §5, docs/16 §11) one project runs several studies and
+surveys. A **study space** (`ybm` is one) has its own surveys, its own Studio
+access list and its own data. Each Studio survey with a live version has a
+**participant link**:
+
+```
+https://faisalmushtaq.github.io/MySelf/?study=<study>&survey=<survey>
+```
+
+It is in the Studio, on the survey's row in the list and on its **Versions**
+page (**Participant link**), with a copy button and a QR code to print.
+
+**Setting an iPad to a survey.**
+
+1. On wifi, open the participant link on the iPad, or scan its QR code.
+2. The iPad checks the survey is live, downloads it and keeps it. The small
+   print under the start screen then says `survey <study>/<survey>`. From then
+   on new sittings use that survey, offline too, and pick up each new version
+   at the start screen.
+3. **An iPad that runs MySelf from the Home Screen** keeps its own storage,
+   apart from Safari's. A link opened in Safari sets Safari's copy, not the
+   app's. So either open the link in Safari and **Share → Add to Home Screen**
+   from that page, or (simplest) open the app, open the handover panel (five
+   taps on the build line), paste the link under **Survey on this iPad**, tap
+   **Check**, then **Use this survey on this iPad**.
+
+**What the iPad says, and what to do.**
+
+| The start screen says | What to do |
+|---|---|
+| "…given a link to … It has to be downloaded once, and this iPad is offline" | Put it on wifi. It tries again by itself. Nothing can start until it has. |
+| "The link to … can't be used: there is no such study / it has no live version / the study is closed" | Check the link; publish the survey in the Studio; or ask an owner to reopen the study. The iPad stays on what it was on. |
+| "This iPad was set up from this link before and has been moved since" | It was moved in the handover panel after the link was used. Use the panel to move it again. |
+| "This iPad is set to … which is not on this iPad yet" | Put it on wifi; or move it back to the default survey in the handover panel. |
+| "This study is closed" | An unfinished sitting can be finished; a new code is refused. |
+
+**Back to the default survey:** in the handover panel, **Back to the default
+survey**, then **Use this survey on this iPad**. It works offline. The Studio's
+link for the default survey does the same.
+
+**Unfinished sittings stay where they started.** After a switch, a code starts
+the new survey; a participant's unfinished sitting of the old one stays on the
+iPad, keeps uploading its progress to its own study, and is finished once the
+iPad is moved back. The panel says how many there are before you confirm.
+
+**Uploads sort themselves.** Each sitting is filed into the study it started
+in, whichever survey the iPad is on when it is sent. Handover files record each
+sitting's study.
+
+**Creating and closing a study space** (project owners only, in the Studio):
+the study switcher in the header → **New study space…** (a title, and an id of
+2 to 40 lower-case letters, numbers and underscores, which can never change).
+You become its admin; add its team under **Who has access**. **This study
+space's settings…** renames it or closes it. Closed: no new iPad can join, an
+iPad that sees it is closed starts no new sitting, and MyStory makes no calls
+for it; sittings from iPads it already knows are still accepted, and nothing is
+deleted. Reopen it the same way.
+
+**MyStory's limits are per study:** 120 calls per iPad per day in each study,
+and the 2,000-call ceiling per study (§10). The counts are under
+`studies/<study>/audit_relayDevices`.
+
+**Data.** Each study's sittings are under `studies/<study>/sessions`; the
+nightly export writes `exports/<date>/` for `ybm` as before and
+`exports/studies/<study>/<date>/` for every other study with sittings.
