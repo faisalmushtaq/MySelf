@@ -1,5 +1,6 @@
 import { z } from "zod";
-import { STUDIO_ROLES } from "@myself/studio";
+import { STUDY_ID_PATTERN } from "@myself/schema";
+import { STUDIO_ROLES, STUDY_STATUSES } from "@myself/studio";
 import { domainKey, emailKey, isDomainKey, isEmailKey } from "./domains.js";
 
 /**
@@ -95,9 +96,28 @@ export const setDomainRequest = z.object({
 
 export const responseStatsRequest = z.object({ surveyId: surveyIdField });
 
+/**
+ * A study space's id (D-56): the participant link's pattern, so a study the
+ * Studio creates is one a link can name. Its own document id, so it is held to
+ * the pattern before anything is read.
+ */
+export const studyField = z
+  .string()
+  .regex(STUDY_ID_PATTERN, "must be a study id: 2 to 40 lower-case letters, numbers and underscores, starting with a letter");
+
+const studyTitleField = z.string().trim().min(1, "give the study space a title").max(120, "must be at most 120 characters");
+
+export const createStudyRequest = z.object({ study: studyField, title: studyTitleField });
+
+export const setStudyRequest = z
+  .object({ study: studyField, title: studyTitleField.optional(), status: z.enum(STUDY_STATUSES).optional() })
+  .refine((r) => r.title !== undefined || r.status !== undefined, "say what to change: the title, or open or closed");
+
 export type CreateSurveyInput = z.output<typeof createSurveyRequest>;
 export type PublishInput = z.output<typeof publishRequest>;
 export type RestoreVersionInput = z.output<typeof restoreVersionRequest>;
 export type ActivateVersionInput = z.output<typeof activateVersionRequest>;
 export type SetMemberInput = z.output<typeof setMemberRequest>;
 export type SetDomainInput = z.output<typeof setDomainRequest>;
+export type CreateStudyInput = z.output<typeof createStudyRequest>;
+export type SetStudyInput = z.output<typeof setStudyRequest>;

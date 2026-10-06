@@ -6,12 +6,14 @@ import { CONSUMER_DOMAINS, domainKey, emailKey, isConsumerDomain, isDomainKey, i
 import { parseRequest } from "./errors.js";
 import {
   activateVersionRequest,
+  createStudyRequest,
   createSurveyRequest,
   importLiveRequest,
   publishRequest,
   restoreVersionRequest,
   setDomainRequest,
   setMemberRequest,
+  setStudyRequest,
 } from "./requests.js";
 
 /**
@@ -153,5 +155,24 @@ describe("the public mail providers", () => {
     const listed = [...block.matchAll(/"([^"]+)"/g)].map((m) => m[1]!);
     expect(listed.length).toBeGreaterThan(5);
     for (const d of listed) expect(CONSUMER_DOMAINS.has(d), d).toBe(true);
+  });
+});
+
+describe("a study space's id and settings (D-56)", () => {
+  it("takes the participant link's pattern and nothing else", () => {
+    expect(parseRequest(createStudyRequest, { study: "future", title: "  Perspectives of the future " })).toEqual({
+      study: "future",
+      title: "Perspectives of the future",
+    });
+    for (const study of ["Future", "f", "future/x", "..", "__name__", `a${"b".repeat(40)}`]) {
+      expect(refusal(() => parseRequest(createStudyRequest, { study, title: "T" })).code).toBe("invalid-argument");
+    }
+    expect(refusal(() => parseRequest(createStudyRequest, { study: "future", title: " " })).code).toBe("invalid-argument");
+  });
+
+  it("changes a title, a status or both, and refuses a request that changes neither", () => {
+    expect(parseRequest(setStudyRequest, { study: "future", status: "closed" })).toEqual({ study: "future", status: "closed" });
+    expect(refusal(() => parseRequest(setStudyRequest, { study: "future" })).code).toBe("invalid-argument");
+    expect(refusal(() => parseRequest(setStudyRequest, { study: "future", status: "deleted" })).code).toBe("invalid-argument");
   });
 });

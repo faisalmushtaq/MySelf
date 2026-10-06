@@ -31,5 +31,7 @@ export {
   studioSetMember,
   studioSetDomain,
   studioResponseStats,
+  studioCreateStudy,
+  studioSetStudy,
   onStudioDraftWritten,
 } from "./studio/functions.js";

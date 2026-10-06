@@ -144,8 +144,16 @@ export function releaseResolver(bundled: ReadonlyMap<string, ReleaseManifest> = 
    * that skipped a release because the database hiccuped would look complete.
    */
   return async function resolveRelease(db: Firestore, study: string, hash: string): Promise<ResolvedRelease | null> {
+    /**
+     * A bundled release only for ITS OWN study (D-56). The bundle is the
+     * repository's releases, which are `ybm`'s; a sitting, or a model call, in
+     * another study names a release that study published, and finding a `ybm`
+     * one in its place would read the sitting through a questionnaire it was
+     * never given — or run a config that study never froze. Every bundled
+     * release says `release.study: "ybm"`, so nothing changes for `ybm`.
+     */
     const inBundle = bundled.get(hash);
-    if (inBundle) return { manifest: inBundle, source: "bundled" };
+    if (inBundle && inBundle.release.study === study) return { manifest: inBundle, source: "bundled" };
     const known = verified.get(cacheKey(study, hash));
     if (known) return { manifest: known, source: "store" };
 

@@ -6,10 +6,11 @@ import { defineSecret } from "firebase-functions/params";
 import { onRequest } from "firebase-functions/v2/https";
 import { z } from "zod";
 import { paths } from "@myself/firebase";
-import { STUDY, research } from "./apps.js";
+import { research } from "./apps.js";
 import { sessionClaimRefusal } from "./narratives.js";
-import { RelayError, isParticipantDevice, type Caller } from "./relay-policy.js";
+import { RelayError, deviceLimitError, isParticipantDevice, type Caller } from "./relay-policy.js";
 import { authenticate, cors, meter, refuse } from "./relay.js";
+import { studyForRequest } from "./studies.js";
 
 /**
  * Speaking instead of typing.
@@ -82,6 +83,8 @@ const request = z.object({
   protocolKey: z.string().min(1).max(120),
   sessionId: z.string().min(1).max(120),
   seconds: z.number().min(0).max(600).optional(),
+  /** The sitting's study (D-56); absent means the default. */
+  study: z.string().min(1).max(64).optional(),
 });
 
 /**
@@ -127,11 +130,12 @@ export function extensionFor(mimeType: string): string {
  */
 async function recordTranscription(
   caller: Caller,
+  study: string,
   fields: { bytes: number; ms: number; ok: boolean; characters: number; path?: string },
 ): Promise<void> {
   try {
     await research()
-      .collection(`${paths.audit(STUDY)}_transcriptions`)
+      .collection(`${paths.audit(study)}_transcriptions`)
       .add({
         ...fields,
         model: MODEL,
@@ -154,6 +158,7 @@ async function recordTranscription(
  * guessable object name even behind rules.
  */
 async function keepRecording(
+  study: string,
   sessionId: string,
   clipId: string,
   extension: string,
@@ -161,7 +166,7 @@ async function keepRecording(
   audio: Buffer,
   caller: Caller,
 ): Promise<string> {
-  const path = paths.voiceNote(STUDY, sessionId, clipId, extension);
+  const path = paths.voiceNote(study, sessionId, clipId, extension);
   /**
    * Which bucket, said out loud.
    *
@@ -187,7 +192,7 @@ async function keepRecording(
       metadata: {
         // Enough to know whose run it belongs to and how it got here, without
         // putting a word of what was said on the object.
-        metadata: { study: STUDY, sessionId, uid: caller.uid, clipId },
+        metadata: { study, sessionId, uid: caller.uid, clipId },
       },
     });
   return path;
@@ -227,10 +232,18 @@ export const transcribe = onRequest(
 
     const started = Date.now();
     let caller: Caller | null = null;
+    let study = "";
     let bytes = 0;
     try {
+      // The sitting's study first (D-56): the recording is kept under it, and
+      // the iPad is who it is, and is counted, in it.
+      const registered = await studyForRequest(research(), (req.body as { study?: unknown } | undefined)?.study);
+      study = registered.study;
+
       // A participant's iPad too, on its own credential, within its limits (D-55).
-      caller = await authenticate(req.headers.authorization, { allowDeviceCredential: true });
+      caller = await authenticate(req.headers.authorization, { allowDeviceCredential: true, study: registered });
+      // A closed study's iPads spend nothing (D-56), as for the relay.
+      if (isParticipantDevice(caller) && registered.status === "closed") throw deviceLimitError("off");
 
       const parsed = request.safeParse(req.body);
       if (!parsed.success) {
@@ -268,8 +281,8 @@ export const transcribe = onRequest(
       if (isParticipantDevice(caller)) {
         const db = research();
         const [run, sitting] = await db.getAll(
-          db.doc(paths.narrative(STUDY, parsed.data.sessionId)),
-          db.doc(paths.session(STUDY, parsed.data.sessionId)),
+          db.doc(paths.narrative(study, parsed.data.sessionId)),
+          db.doc(paths.session(study, parsed.data.sessionId)),
         );
         if (sessionClaimRefusal(caller, run?.data()?.["uid"], sitting?.data()?.["deviceId"])) {
           throw new RelayError(409, "auth", "That recording could not be sent. You can type your answer instead.");
@@ -286,7 +299,7 @@ export const transcribe = onRequest(
        * counts once the call is known to be one it will make: a recording
        * refused for its container or its size spent nothing.
        */
-      await meter(caller);
+      await meter(caller, study);
 
       /**
        * Both at once.
@@ -301,7 +314,7 @@ export const transcribe = onRequest(
        */
       const clipId = randomUUID();
       const [kept, written] = await Promise.allSettled([
-        keepRecording(parsed.data.sessionId, clipId, extension, parsed.data.mimeType, audio, caller),
+        keepRecording(study, parsed.data.sessionId, clipId, extension, parsed.data.mimeType, audio, caller),
         transcribeClip(audio, parsed.data.mimeType, extension),
       ]);
 
@@ -317,7 +330,7 @@ export const transcribe = onRequest(
       const path = kept.status === "fulfilled" ? kept.value : null;
       const said = written.status === "fulfilled" ? written.value : null;
 
-      await recordTranscription(caller, {
+      await recordTranscription(caller, study, {
         bytes,
         ms: Date.now() - started,
         ok: said !== null,
@@ -341,7 +354,7 @@ export const transcribe = onRequest(
 
       res.status(200).json({ text: said, clipId, kept: path !== null, seconds: parsed.data.seconds ?? null });
     } catch (error) {
-      if (caller) void recordTranscription(caller, { bytes, ms: Date.now() - started, ok: false, characters: 0 });
+      if (caller && study) void recordTranscription(caller, study, { bytes, ms: Date.now() - started, ok: false, characters: 0 });
       if (error instanceof RelayError) {
         refuse(res, error);
         return;

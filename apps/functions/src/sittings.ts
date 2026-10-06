@@ -10,9 +10,10 @@ import {
   type SittingConflict,
 } from "@myself/firebase";
 import { sittingUpload, type DeviceSession, type SittingOutcome } from "@myself/store";
-import { STUDY, research } from "./apps.js";
+import { research } from "./apps.js";
 import { RelayError, type Caller } from "./relay-policy.js";
 import { authenticate, cors } from "./relay.js";
+import { studyForRequest } from "./studies.js";
 
 /**
  * How many uploads one device may make in a day.
@@ -61,9 +62,9 @@ export function clockIsSuspect(skewMs: number | null): boolean {
   return skewMs !== null && Math.abs(skewMs) > CLOCK_SKEW_TOLERANCE_MS;
 }
 
-async function meterUploads(caller: Caller): Promise<void> {
+async function meterUploads(caller: Caller, study: string): Promise<void> {
   const day = new Date().toISOString().slice(0, 10);
-  const ref = research().doc(`${paths.audit(STUDY)}_uploads/${day}_${caller.uid}`);
+  const ref = research().doc(`${paths.audit(study)}_uploads/${day}_${caller.uid}`);
   const used = await research().runTransaction(async (tx) => {
     const snap = await tx.get(ref);
     const count = ((snap.data()?.["uploads"] as number | undefined) ?? 0) + 1;
@@ -382,9 +383,21 @@ export const saveSitting = onRequest(
     const started = Date.now();
     let caller: Caller | null = null;
     try {
+      /**
+       * The study these sittings started in (D-56), checked against the
+       * registry before anything else: an unknown study is refused here, and
+       * nothing is registered, counted or written in its name. Absent means the
+       * default, which is what every upload before study spaces meant.
+       *
+       * A CLOSED study still takes sittings from an iPad it already knows —
+       * `authenticate` refuses only a new installation — so nothing collected
+       * before the closure is turned away (docs/16 §11.4).
+       */
+      const study = await studyForRequest(research(), (req.body as { study?: unknown } | undefined)?.study);
+
       // An iPad that signed itself in may file a sitting. That is the whole
       // participation model: somebody opens the URL and takes part.
-      caller = await authenticate(req.headers.authorization, { allowAnonymous: true });
+      caller = await authenticate(req.headers.authorization, { allowAnonymous: true, study });
       const refusal = sittingRefusal(caller);
       if (refusal) throw new RelayError(403, "auth", refusal);
 
@@ -398,7 +411,7 @@ export const saveSitting = onRequest(
         );
       }
       const deviceId = deviceIdFor(caller, parsed.data.deviceId);
-      await meterUploads(caller);
+      await meterUploads(caller, study.study);
       const db = research();
       const now = new Date();
 
@@ -423,7 +436,7 @@ export const saveSitting = onRequest(
              * `anonymous` had it exactly backwards, recording an imported file as having
              * come from a vouched-for device.
              */
-            await storeSitting(db, STUDY, one as DeviceSession, deviceId, now, caller.device ? "device" : "imported"),
+            await storeSitting(db, study.study, one as DeviceSession, deviceId, now, caller.device ? "device" : "imported"),
           );
         } catch (error) {
           logger.error("a sitting could not be stored", { sessionId: one.sessionId, error: String(error) });
@@ -456,7 +469,7 @@ export const saveSitting = onRequest(
         });
       }
       try {
-        await db.collection(paths.audit(STUDY)).add({
+        await db.collection(paths.audit(study.study)).add({
           action: "sittings.received",
           actor: caller.uid,
           deviceId,

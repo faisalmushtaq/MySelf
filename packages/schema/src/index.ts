@@ -9,3 +9,4 @@ export * from "./instrument.js";
 // disagrees with itself is worse than no definition layer.
 export * from "./assessment.js";
 export * from "./canonical.js";
+export * from "./link.js";

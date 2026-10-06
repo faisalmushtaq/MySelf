@@ -7,6 +7,7 @@ import { Gateway, OpenAiAdapter, type ModelCall } from "@myself/llm";
 import { paths } from "@myself/firebase";
 import { STUDY, auth, research } from "./apps.js";
 import { resolveRelease } from "./releases.js";
+import { implicitDefault, studyForRequest, type RegisteredStudy } from "./studies.js";
 import {
   ALLOWED_ORIGIN,
   CALLS_PER_CALLER_PER_DAY,
@@ -191,6 +192,15 @@ export async function registerDevice(
   db: FirebaseFirestore.Firestore,
   study: string,
   raw: string,
+  options: {
+    /**
+     * Whether an installation this study has never seen may register (D-56).
+     * False for a CLOSED study: a link that circulates after a study closes
+     * must file nothing. An installation the study already knows is let in
+     * either way, so nothing an iPad collected before the closure is refused.
+     */
+    admitNew?: boolean;
+  } = {},
 ): Promise<Caller> {
   const at = raw.indexOf(".");
   if (at <= 0 || at === raw.length - 1) {
@@ -208,6 +218,7 @@ export async function registerDevice(
   const known = await db.runTransaction(async (tx) => {
     const snap = await tx.get(ref);
     if (!snap.exists) {
+      if (options.admitNew === false) return null;
       tx.set(ref, {
         deviceId: installId,
         study,
@@ -222,6 +233,13 @@ export async function registerDevice(
     return { secretHash: data.secretHash ?? "", revokedAt: data.revokedAt ?? null };
   });
 
+  if (known === null) {
+    throw new RelayError(
+      403,
+      "auth",
+      "this study has closed, so it takes no new devices. Anything on this iPad is safe: hand it over as a file, or ask the research team to reopen the study for a day.",
+    );
+  }
   if (known.revokedAt) {
     throw new RelayError(403, "auth", "this device has been withdrawn from the study");
   }
@@ -286,6 +304,14 @@ export interface AuthOptions {
    * the decision to it would admit a caller nobody decided to admit.
    */
   allowDeviceCredential?: boolean;
+  /**
+   * The study the request is for, already looked up in the registry (D-56,
+   * `studyForRequest`). An iPad's credential is registered and checked IN THIS
+   * STUDY: first writer wins per study, so being one installation in `ybm` is
+   * nothing in another study, and a closed study admits no new installation.
+   * Absent means the deployment's default, as every caller meant until now.
+   */
+  study?: RegisteredStudy;
 }
 
 /**
@@ -314,7 +340,8 @@ export async function authenticate(header: string | undefined, options: AuthOpti
     if (!options.allowAnonymous && !options.allowDeviceCredential) {
       throw new RelayError(403, "auth", "a device credential cannot be used for this");
     }
-    return registerDevice(research(), STUDY, header.slice(7).trim());
+    const study = options.study ?? implicitDefault(STUDY);
+    return registerDevice(research(), study.study, header.slice(7).trim(), { admitNew: study.status === "open" });
   }
 
   const token = header?.startsWith("Bearer ") ? header.slice(7) : null;
@@ -360,14 +387,15 @@ export async function authenticate(header: string | undefined, options: AuthOpti
  * that quietly runs ten times longer than anyone expected all end the same way
  * without this, and the first anyone hears of it is the invoice.
  */
-export async function meter(caller: Caller): Promise<void> {
+export async function meter(caller: Caller, study: string = STUDY): Promise<void> {
   // A participant's iPad has limits of its own (D-55), and a counter of its own:
   // its installation id is a string the caller chose, and sharing this
   // collection would let one name its installation after somebody's account and
-  // spend that person's day.
-  if (isParticipantDevice(caller)) return meterDevice(research(), STUDY, caller, DEVICE_LIMITS);
+  // spend that person's day. Both kinds are counted in the request's own study
+  // (D-56): an iPad's day, and the ceiling across iPads, are per study.
+  if (isParticipantDevice(caller)) return meterDevice(research(), study, caller, DEVICE_LIMITS);
   const day = new Date().toISOString().slice(0, 10);
-  const ref = research().doc(`${paths.audit(STUDY)}_relay/${day}_${caller.uid}`);
+  const ref = research().doc(`${paths.audit(study)}_relay/${day}_${caller.uid}`);
   const used = await research().runTransaction(async (tx) => {
     const snap = await tx.get(ref);
     const count = ((snap.data()?.["calls"] as number | undefined) ?? 0) + 1;
@@ -461,10 +489,10 @@ export async function meterDevice(
  * cost, and whether it failed. A device's account of a call it did not make is
  * a guess.
  */
-async function recordCall(caller: Caller, call: ModelCall): Promise<void> {
+async function recordCall(caller: Caller, call: ModelCall, study: string): Promise<void> {
   try {
     await research()
-      .collection(`${paths.audit(STUDY)}_modelCalls`)
+      .collection(`${paths.audit(study)}_modelCalls`)
       .add({ ...call, uid: caller.uid, device: caller.device, at: FieldValue.serverTimestamp() });
   } catch (error) {
     // A provenance row that cannot be written must not cost a participant the
@@ -509,8 +537,24 @@ export const llmRelay = onRequest(
     const started = Date.now();
     let caller: Caller | null = null;
     try {
+      /**
+       * The study first (D-56): the sitting's, which the survey told MyStory and
+       * MyStory sends with every call. Everything after is decided in it — who
+       * the iPad is, which release the hash names, whose limits are counted —
+       * so a registration, a release or a count in one study is nothing here.
+       */
+      const study = await studyForRequest(research(), (req.body as { study?: unknown } | undefined)?.study);
+
       // A participant's iPad too, on its own credential, within its limits (D-55).
-      caller = await authenticate(req.headers.authorization, { allowDeviceCredential: true });
+      caller = await authenticate(req.headers.authorization, { allowDeviceCredential: true, study });
+
+      /**
+       * A closed study's iPads make no model calls (D-56). Said as MyStory
+       * being switched off, which is what it is for them, so the module offers
+       * the way past at once rather than retrying. Researchers and tester links
+       * are not participants' devices and are not stopped by it.
+       */
+      if (isParticipantDevice(caller) && study.status === "closed") throw deviceLimitError("off");
 
       const parsed = relayRequest.safeParse(req.body);
       if (!parsed.success) {
@@ -519,12 +563,13 @@ export const llmRelay = onRequest(
       const { prompt, modelConfigKey, protocolKey, schema, releaseHash } = parsed.data;
 
       // From the release the sitting is running, when it says which: exactly
-      // what that version froze, Studio-published ones included (docs/16 §10.1).
+      // what that version froze, Studio-published ones included (docs/16 §10.1),
+      // found in the sitting's own study and nowhere else.
       const config = await configForCall(
         modelConfigKey,
         caller,
         releaseHash,
-        async (hash) => (await resolveRelease(research(), STUDY, hash))?.manifest ?? null,
+        async (hash) => (await resolveRelease(research(), study.study, hash))?.manifest ?? null,
       );
       if (config.provider !== "openai") {
         throw new RelayError(400, "unknown", `this relay serves OpenAI; '${modelConfigKey}' asks for ${config.provider}`);
@@ -536,7 +581,7 @@ export const llmRelay = onRequest(
        * spent nothing, and must not use up anybody's day — least of all a
        * participant's iPad, whose day is 120 calls rather than 600.
        */
-      await meter(caller);
+      await meter(caller, study.study);
 
       const calls: ModelCall[] = [];
       const gateway = new Gateway({
@@ -557,7 +602,7 @@ export const llmRelay = onRequest(
         ...(schema ? { jsonSchema: schema } : {}),
       });
 
-      for (const call of calls) await recordCall(caller, call);
+      for (const call of calls) await recordCall(caller, call, study.study);
 
       res.status(200).json({
         text: result.raw,

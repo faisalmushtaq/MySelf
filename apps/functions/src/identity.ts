@@ -4,8 +4,9 @@ import * as logger from "firebase-functions/logger";
 import { FieldValue, type Firestore } from "firebase-admin/firestore";
 import { joinSession, paths, type SessionDoc } from "@myself/firebase";
 import { ingest, parseHomeAddress, type HomeAddress } from "@myself/store";
-import { STUDY, identity, research } from "./apps.js";
+import { identity, research } from "./apps.js";
 import { resolveRelease } from "./releases.js";
+import { studyForCall } from "./studies.js";
 
 /**
  * The identity side: names in, names out, both under control.
@@ -19,6 +20,11 @@ import { resolveRelease } from "./releases.js";
  * OUT — callables, owner-only, each of which writes the access log BEFORE it
  * reads anything. A log written only on success is a log of successes; the
  * lookups worth reviewing later include the ones that found nothing.
+ *
+ * EACH IN ONE STUDY (D-56). The identity project mirrors the research one,
+ * `studies/{study}/…`, so a name filed from one study's sitting is found only
+ * in that study. The callables take an optional `study`, checked against the
+ * registry; absent means the default, as before.
  */
 
 function requireOwner(request: CallableRequest): string {
@@ -40,8 +46,8 @@ function requireJustification(value: unknown): string {
   return text;
 }
 
-async function logAccess(actor: string, action: string, subject: string, justification: string): Promise<void> {
-  await identity().collection(paths.accessLog(STUDY)).add({
+async function logAccess(study: string, actor: string, action: string, subject: string, justification: string): Promise<void> {
+  await identity().collection(paths.accessLog(study)).add({
     at: FieldValue.serverTimestamp(),
     actor,
     action,
@@ -188,9 +194,10 @@ export const lookupParticipant = onCall(async (request) => {
   const { participantCode } = (request.data ?? {}) as { participantCode?: string };
   const why = requireJustification((request.data as { justification?: string })?.justification);
   if (!participantCode) throw new HttpsError("invalid-argument", "participantCode is required");
+  const { study } = await studyForCall(research(), (request.data as { study?: unknown })?.study);
 
-  await logAccess(actor, "identity.lookup", participantCode, why);
-  const snap = await identity().doc(paths.participant(STUDY, participantCode)).get();
+  await logAccess(study, actor, "identity.lookup", participantCode, why);
+  const snap = await identity().doc(paths.participant(study, participantCode)).get();
   if (!snap.exists) throw new HttpsError("not-found", "no registry entry for that code");
   return snap.data();
 });
@@ -209,18 +216,19 @@ export const searchParticipants = onCall(async (request) => {
     upn?: string;
   };
   const why = requireJustification((request.data as { justification?: string })?.justification);
-  await logAccess(actor, "identity.search", upn ?? `${givenName ?? ""} ${familyName ?? ""}`.trim(), why);
+  const { study } = await studyForCall(research(), (request.data as { study?: unknown })?.study);
+  await logAccess(study, actor, "identity.search", upn ?? `${givenName ?? ""} ${familyName ?? ""}`.trim(), why);
 
   const db = identity();
   const hits = new Map<string, { participantCode: string; matchedOn: string }>();
 
   if (upn) {
-    const byUpn = await db.collection(paths.participants(STUDY)).where("upn", "==", upn).get();
+    const byUpn = await db.collection(paths.participants(study)).where("upn", "==", upn).get();
     for (const d of byUpn.docs) hits.set(d.id, { participantCode: d.id, matchedOn: "upn" });
   }
   if (familyName) {
     const claims = await db
-      .collection(paths.claims(STUDY))
+      .collection(paths.claims(study))
       .where("familyName", "==", familyName)
       .get();
     for (const d of claims.docs) {
@@ -244,8 +252,9 @@ export const linkIdentifier = onCall(async (request) => {
   const why = requireJustification((request.data as { justification?: string })?.justification);
   if (!participantCode) throw new HttpsError("invalid-argument", "participantCode is required");
   if (!upn && !nhsNumber) throw new HttpsError("invalid-argument", "give a UPN or an NHS number");
+  const { study } = await studyForCall(research(), (request.data as { study?: unknown })?.study);
 
-  await logAccess(actor, "identity.link", participantCode, why);
+  await logAccess(study, actor, "identity.link", participantCode, why);
   const db = identity();
 
   // One identifier, one pupil. A clash means somebody has been given another
@@ -256,12 +265,12 @@ export const linkIdentifier = onCall(async (request) => {
     ["nhsNumber", nhsNumber],
   ] as const) {
     if (!value) continue;
-    const clash = await db.collection(paths.participants(STUDY)).where(field, "==", value).get();
+    const clash = await db.collection(paths.participants(study)).where(field, "==", value).get();
     const other = clash.docs.find((d) => d.id !== participantCode);
     if (other) throw new HttpsError("already-exists", `that ${field} is already linked to ${other.id}`);
   }
 
-  await db.doc(paths.participant(STUDY, participantCode)).set(
+  await db.doc(paths.participant(study, participantCode)).set(
     {
       ...(upn ? { upn, upnSource: source ?? null, upnLinkedAt: FieldValue.serverTimestamp(), upnLinkedBy: actor } : {}),
       ...(nhsNumber
@@ -289,15 +298,16 @@ export const recordRelationship = onCall(async (request) => {
   if (participantCode === relatedCode) {
     throw new HttpsError("invalid-argument", "a person cannot be related to themselves");
   }
+  const { study } = await studyForCall(research(), (request.data as { study?: unknown })?.study);
 
-  await logAccess(actor, "identity.relationship", `${participantCode} ${kind} ${relatedCode}`, why);
+  await logAccess(study, actor, "identity.relationship", `${participantCode} ${kind} ${relatedCode}`, why);
   const inverse = { parent_of: "child_of", child_of: "parent_of", sibling_of: "sibling_of", twin_of: "twin_of" } as const;
   const db = identity();
   const at = FieldValue.serverTimestamp();
   // Both directions, because a relationship readable only one way is one
   // somebody will miss when they look from the other end.
-  await db.collection(paths.relationships(STUDY)).add({ participantCode, relatedCode, kind, note: note ?? null, recordedBy: actor, recordedAt: at });
-  await db.collection(paths.relationships(STUDY)).add({
+  await db.collection(paths.relationships(study)).add({ participantCode, relatedCode, kind, note: note ?? null, recordedBy: actor, recordedAt: at });
+  await db.collection(paths.relationships(study)).add({
     participantCode: relatedCode,
     relatedCode: participantCode,
     kind: inverse[kind],

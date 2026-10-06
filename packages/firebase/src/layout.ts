@@ -37,6 +37,17 @@ export const MAX_DOCUMENT_BYTES = 700_000;
 export const EVENTS_PER_CHUNK = 250;
 
 export const paths = {
+  /**
+   * The study registry (D-56, docs/16 §11.4): one document per study space,
+   * `studies/{study}`, holding its title and whether it is open. Public by
+   * `get`, so an iPad can tell a closed study before anybody types a code;
+   * listed only by the project's people; written only by functions. The
+   * deployment's default study (`ybm`) counts as registered and open with no
+   * document at all, which is why nothing had to be written for it.
+   */
+  studies: () => "studies",
+  study: (study: string) => `studies/${study}`,
+
   /** research project */
   sessions: (study: string) => `studies/${study}/sessions`,
   session: (study: string, sessionId: string) => `studies/${study}/sessions/${sessionId}`,

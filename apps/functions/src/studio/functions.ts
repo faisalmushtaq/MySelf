@@ -4,13 +4,15 @@ import * as logger from "firebase-functions/logger";
 import type { StudioRole } from "@myself/studio";
 // The region, set before any function below is defined (see apps.ts).
 import { STUDY, research } from "../apps.js";
-import { requireStudio, type StudioActor } from "./access.js";
+import type { RegisteredStudy } from "../studies.js";
+import { requireStudio, type StudioActor, type StudioToken } from "./access.js";
 import { recordDraftWrite, type DraftSide } from "./draft-trigger.js";
-import { parseRequest } from "./errors.js";
+import { parseRequest, problem, refuse } from "./errors.js";
 import { setDomain, setMember } from "./members.js";
 import { publish } from "./publish.js";
 import {
   activateVersionRequest,
+  createStudyRequest,
   createSurveyRequest,
   importLiveRequest,
   publishRequest,
@@ -18,8 +20,10 @@ import {
   restoreVersionRequest,
   setDomainRequest,
   setMemberRequest,
+  setStudyRequest,
 } from "./requests.js";
 import { responseStats, studioSessionFor } from "./stats.js";
+import { createStudy, setStudy, studyForStudio } from "./study-spaces.js";
 import { createSurvey, importLive } from "./surveys.js";
 import { activateVersion, restoreVersion } from "./versions.js";
 
@@ -35,13 +39,25 @@ import { activateVersion, restoreVersion } from "./versions.js";
  *
  * The actor passed on is the verified uid and the list's own key for the
  * caller's address. Nothing in the request can say who is asking.
+ *
+ * WHICH STUDY is the one thing the request does say (D-56): `study`, optional,
+ * the default when absent. It is looked up in the registry first — an unknown
+ * study is refused before anybody's list is read — and then the caller is
+ * checked against THAT study's list. So a role in one study space is nothing
+ * in another, here exactly as in the rules, and every core below is handed the
+ * study that was checked, never the one the request typed.
  */
 
-function studioCall<T>(needed: StudioRole, run: (request: CallableRequest, actor: StudioActor) => Promise<T>) {
+function studioCall<T>(
+  needed: StudioRole,
+  run: (request: CallableRequest, actor: StudioActor, study: RegisteredStudy) => Promise<T>,
+) {
   return onCall(async (request) => {
-    const actor = await requireStudio(request, needed, { db: research(), study: STUDY });
+    if (!request.auth) throw refuse.unauthenticated(needed);
+    const study = await studyForStudio(research(), (request.data as { study?: unknown } | null | undefined)?.study);
+    const actor = await requireStudio(request, needed, { db: research(), study: study.study });
     try {
-      return await run(request, actor);
+      return await run(request, actor, study);
     } catch (error) {
       if (error instanceof HttpsError) throw error;
       // Anything unexpected is logged with the detail and returned without
@@ -52,38 +68,55 @@ function studioCall<T>(needed: StudioRole, run: (request: CallableRequest, actor
   });
 }
 
-/** Who the caller is to the Studio. Answers anyone, including somebody not signed in. */
-export const studioSession = onCall(async (request) => studioSessionFor(research(), STUDY, request.auth ?? null));
+/**
+ * Who the caller is to the Studio, in the study asked about, and the studies
+ * they may switch to. Answers anyone, including somebody not signed in.
+ */
+export const studioSession = onCall(async (request) =>
+  studioSessionFor(research(), (request.data as { study?: unknown } | null | undefined)?.study, request.auth ?? null),
+);
 
-export const studioImportLive = studioCall("admin", (request, actor) => {
+/**
+ * "Set up from the live survey" brings in the releases built into this build,
+ * which are the default study's (their `release.study` says so). Anywhere else
+ * it would file `ybm`'s questionnaire, and a draft that says it is `ybm`'s,
+ * into a study space that is not — so it is the default study's alone.
+ */
+export const studioImportLive = studioCall("admin", (request, actor, study) => {
   const { surveyId } = parseRequest(importLiveRequest, request.data);
-  return importLive(research(), { study: STUDY, surveyId, actor });
+  if (!study.isDefault) {
+    throw refuse.invalid(
+      `“Set up from the live survey” brings in ${STUDY}'s own releases, so it can only be used in that study. A new study space starts with a new survey.`,
+      [problem("import.other_study", `The live survey belongs to ${STUDY}.`)],
+    );
+  }
+  return importLive(research(), { study: study.study, surveyId, actor });
 });
 
-export const studioCreateSurvey = studioCall("admin", (request, actor) => {
+export const studioCreateSurvey = studioCall("admin", (request, actor, study) => {
   const req = parseRequest(createSurveyRequest, request.data);
-  return createSurvey(research(), { study: STUDY, surveyId: req.surveyId, title: req.title, from: req.from ?? null, actor });
+  return createSurvey(research(), { study: study.study, surveyId: req.surveyId, title: req.title, from: req.from ?? null, actor });
 });
 
-export const studioPublish = studioCall("publisher", (request, actor) => {
+export const studioPublish = studioCall("publisher", (request, actor, study) => {
   const req = parseRequest(publishRequest, request.data);
-  return publish(research(), { study: STUDY, ...req, actor });
+  return publish(research(), { study: study.study, ...req, actor });
 });
 
-export const studioRestoreVersion = studioCall("publisher", (request, actor) => {
+export const studioRestoreVersion = studioCall("publisher", (request, actor, study) => {
   const req = parseRequest(restoreVersionRequest, request.data);
-  return restoreVersion(research(), { study: STUDY, ...req, actor });
+  return restoreVersion(research(), { study: study.study, ...req, actor });
 });
 
-export const studioActivateVersion = studioCall("publisher", (request, actor) => {
+export const studioActivateVersion = studioCall("publisher", (request, actor, study) => {
   const req = parseRequest(activateVersionRequest, request.data);
-  return activateVersion(research(), { study: STUDY, ...req, actor });
+  return activateVersion(research(), { study: study.study, ...req, actor });
 });
 
-export const studioSetMember = studioCall("admin", (request, actor) => {
+export const studioSetMember = studioCall("admin", (request, actor, study) => {
   const req = parseRequest(setMemberRequest, request.data);
   return setMember(research(), {
-    study: STUDY,
+    study: study.study,
     email: req.email,
     role: req.role,
     ...(req.note !== undefined ? { note: req.note } : {}),
@@ -91,15 +124,61 @@ export const studioSetMember = studioCall("admin", (request, actor) => {
   });
 });
 
-export const studioSetDomain = studioCall("admin", (request, actor) => {
+export const studioSetDomain = studioCall("admin", (request, actor, study) => {
   const req = parseRequest(setDomainRequest, request.data);
-  return setDomain(research(), { study: STUDY, domain: req.domain, role: req.role, actor });
+  return setDomain(research(), { study: study.study, domain: req.domain, role: req.role, actor });
 });
 
-export const studioResponseStats = studioCall("viewer", (request) => {
+export const studioResponseStats = studioCall("viewer", (request, _actor, study) => {
   const { surveyId } = parseRequest(responseStatsRequest, request.data);
-  return responseStats(research(), { study: STUDY, surveyId });
+  return responseStats(research(), { study: study.study, surveyId });
 });
+
+/**
+ * The project's owners, and nobody else: whoever holds the `owner` claim, not
+ * on an iPad. A Studio admin of one study cannot make another — that would let
+ * anybody an admin added start a study under the project's approval and budget.
+ */
+function requireOwner(request: CallableRequest): { uid: string; email: string | null } {
+  if (!request.auth) throw refuse.unauthenticated("admin");
+  const token = request.auth.token as StudioToken;
+  if (token.role !== "owner" || token.device === true) {
+    throw refuse.forbidden("admin", "Only an owner of the project can create, close or reopen a study space.");
+  }
+  return { uid: request.auth.uid, email: typeof token.email === "string" ? token.email.toLowerCase() : null };
+}
+
+/** A new study space, open, its creator its first Studio admin (D-56). */
+export const studioCreateStudy = onCall(async (request) => {
+  const actor = requireOwner(request);
+  const req = parseRequest(createStudyRequest, request.data);
+  return guarded("createStudy", actor.uid, () => createStudy(research(), { study: req.study, title: req.title, actor }));
+});
+
+/** Rename a study space, or close or reopen it (D-56). */
+export const studioSetStudy = onCall(async (request) => {
+  const actor = requireOwner(request);
+  const req = parseRequest(setStudyRequest, request.data);
+  return guarded("setStudy", actor.uid, () =>
+    setStudy(research(), {
+      study: req.study,
+      ...(req.title !== undefined ? { title: req.title } : {}),
+      ...(req.status !== undefined ? { status: req.status } : {}),
+      actor,
+    }),
+  );
+});
+
+/** The same "nothing unexpected leaks" rule as `studioCall`, for the owners' calls. */
+async function guarded<T>(what: string, uid: string, run: () => Promise<T>): Promise<T> {
+  try {
+    return await run();
+  } catch (error) {
+    if (error instanceof HttpsError) throw error;
+    logger.error("studio call failed", { what, uid, error: error instanceof Error ? error.stack ?? error.message : String(error) });
+    throw new HttpsError("internal", "Something went wrong on the server and nothing was changed. Try again.");
+  }
+}
 
 /**
  * The draft's activity log (see draft-trigger.ts). Every study's drafts, as

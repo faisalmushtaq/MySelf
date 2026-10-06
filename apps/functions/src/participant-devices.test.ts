@@ -453,3 +453,54 @@ describe("whose conversation it is", () => {
     expect(fake.docs.has("studies/ybm/narratives/ses_01J")).toBe(false);
   });
 });
+
+describe("an iPad in more than one study (D-56)", () => {
+  const future = { study: "future", title: "Perspectives of the future", status: "open" as const, implicit: false, isDefault: false };
+  const closed = { ...future, status: "closed" as const };
+
+  it("is registered separately in each, first writer wins in each", async () => {
+    await authenticate(credential(), { allowDeviceCredential: true });
+    await authenticate(credential(), { allowDeviceCredential: true, study: future });
+    expect(fake.docs.has("studies/ybm/devices/ipad_01ABC")).toBe(true);
+    expect(fake.docs.has("studies/future/devices/ipad_01ABC")).toBe(true);
+    // Being the installation in `ybm` proves nothing in `future`: a second iPad
+    // holding the id is refused there too, by the registration made there.
+    const error = await refused(authenticate(credential("ipad_01ABC", "t".repeat(43)), { allowDeviceCredential: true, study: future }));
+    expect(error.message).toMatch(/another device is already registered/);
+  });
+
+  it("is stopped in the study it was stopped in, and only there", async () => {
+    fake.docs.set("studies/future/devices/ipad_01ABC", { secretHash: "x", revokedAt: new Date() });
+    await expect(authenticate(credential(), { allowDeviceCredential: true })).resolves.toMatchObject({ uid: "ipad_01ABC" });
+    expect((await refused(authenticate(credential(), { allowDeviceCredential: true, study: future }))).message).toMatch(/withdrawn/);
+  });
+
+  it("cannot newly register in a closed study, so a link that circulates after closing files nothing", async () => {
+    const error = await refused(authenticate(credential(), { allowAnonymous: true, study: closed }));
+    expect(error).toMatchObject({ status: 403, kind: "auth" });
+    expect(error.message).toMatch(/closed/);
+    expect(error.message).toMatch(/safe/);
+    expect(fake.docs.size).toBe(0);
+  });
+
+  it("is still let in to a closed study it already knows, so nothing collected is refused", async () => {
+    await authenticate(credential(), { allowAnonymous: true, study: future });
+    await expect(authenticate(credential(), { allowAnonymous: true, study: closed })).resolves.toMatchObject({ uid: "ipad_01ABC" });
+  });
+
+  it("is counted in the study the call is for: its own day, and that study's ceiling", async () => {
+    await meter(ipad, "future");
+    const keys = [...fake.docs.keys()];
+    expect(keys.filter((p) => p.startsWith("studies/future/audit_relayDevices/"))).toHaveLength(2);
+    expect(keys.some((p) => p.startsWith("studies/ybm/"))).toBe(false);
+  });
+
+  it("stores a run beside its own study's sitting, and checks the claim there", async () => {
+    // A sitting another device filed in `ybm` says nothing about `future`.
+    fake.docs.set("studies/ybm/sessions/ses_01J", { deviceId: "ipad_02DEF" });
+    const run = { sessionId: "ses_01J", protocolKey: "np.phone_wellbeing", protocolVersion: "0.1.0", records: [], finished: false, releaseHash: `sha256:${"a".repeat(64)}` };
+    await storeNarrative(fake.db, "future", ipad, run);
+    expect(fake.docs.get("studies/future/narratives/ses_01J")).toMatchObject({ uid: "ipad_01ABC" });
+    expect(fake.docs.has("studies/ybm/narratives/ses_01J")).toBe(false);
+  });
+});

@@ -18,6 +18,7 @@ import {
 } from "@myself/store";
 import { STUDY, research } from "./apps.js";
 import { latestRelease, resolveRelease, type ReleaseResolverFn } from "./releases.js";
+import { registeredStudies, studyForCall } from "./studies.js";
 
 /**
  * The archival copy, written nightly.
@@ -255,8 +256,40 @@ export function exportFiles(
   return files;
 }
 
-async function writeExport(study: string, prefix: string): Promise<{ files: number; bytes: number }> {
+/**
+ * Where a study's export is written (D-56). The default study keeps
+ * `exports/{stamp}` exactly as before, so nothing that reads last night's export
+ * has to change; every other study has its own tree under
+ * `exports/studies/{study}/{stamp}`. The two cannot collide: a stamp starts with
+ * a digit, and `studies` does not.
+ */
+export function exportPrefix(study: string, stamp: string, defaultStudy: string = STUDY): string {
+  return study === defaultStudy ? `exports/${stamp}` : `exports/studies/${study}/${stamp}`;
+}
+
+/**
+ * The release the dataset-level files describe, for this study: the compiled-in
+ * one counts only for the study it belongs to. Another study's export is
+ * described by its own releases or not written at all — a `ybm` dictionary on
+ * a dataset of somebody else's questions would describe columns that are not
+ * there.
+ */
+function compiledInFor(study: string): ReleaseManifest | undefined {
+  return latestRelease?.release.study === study ? latestRelease : undefined;
+}
+
+async function writeExport(study: string, prefix: string): Promise<{ files: number; bytes: number } | null> {
   const built = await buildStudyDataset(study);
+
+  /**
+   * A study with nothing to describe — a study space with no sittings yet, or
+   * none readable — writes nothing rather than failing the night for every
+   * study after it. The default study always writes, as it always did.
+   */
+  if (study !== STUDY && !datasetManifest(built.releases, compiledInFor(study))) {
+    logger.info("export skipped: nothing to describe yet", { study, sittings: built.sittings });
+    return null;
+  }
 
   /**
    * The narratives, joined to the sittings they belong to.
@@ -267,7 +300,7 @@ async function writeExport(study: string, prefix: string): Promise<{ files: numb
    */
   const narratives = await readNarratives(study);
 
-  const files = exportFiles(built, study, narratives);
+  const files = exportFiles(built, study, narratives, compiledInFor(study));
   const bucket = getStorage().bucket();
 
   for (const file of files) {
@@ -282,6 +315,7 @@ async function writeExport(study: string, prefix: string): Promise<{ files: numb
   await bucket.file(`${prefix}/bids.zip`).save(Buffer.from(zip), { contentType: "application/zip" });
 
   logger.info("export written", {
+    study,
     prefix,
     files: files.length,
     sittings: built.sittings,
@@ -291,20 +325,41 @@ async function writeExport(study: string, prefix: string): Promise<{ files: numb
   return { files: files.length, bytes: zip.length };
 }
 
-/** 02:00 UTC, every night. */
+/**
+ * 02:00 UTC, every night, for every registered study (D-56), the default first.
+ *
+ * One study's failure is logged and the next one still runs: a study space with
+ * a corrupt document must not cost every other study its archival copy. The
+ * night is reported as failed afterwards, so the scheduler's own record still
+ * says something went wrong.
+ */
 export const nightlyExport = onSchedule({ schedule: "0 2 * * *", timeZone: "Etc/UTC", memory: "1GiB" }, async () => {
   const day = new Date().toISOString().slice(0, 10);
-  await writeExport(STUDY, `exports/${day}`);
+  const failed: string[] = [];
+  for (const { study } of await registeredStudies(research())) {
+    try {
+      await writeExport(study, exportPrefix(study, day));
+    } catch (error) {
+      failed.push(study);
+      logger.error("a study's nightly export failed", { study, error: error instanceof Error ? error.message : String(error) });
+    }
+  }
+  if (failed.length > 0) throw new Error(`the nightly export failed for ${failed.join(", ")}`);
 });
 
-/** The same export, on demand, for when somebody needs today's rather than last night's. */
+/**
+ * The same export, on demand, for when somebody needs today's rather than last
+ * night's. `study` is optional and names which (D-56); absent is the default.
+ */
 export const exportNow = onCall({ memory: "1GiB" }, async (request) => {
   const token = request.auth?.token as { role?: string; device?: boolean } | undefined;
   if (!request.auth || token?.device || !["owner", "researcher"].includes(token?.role ?? "")) {
     throw new HttpsError("permission-denied", "only an owner or researcher can export");
   }
+  const { study } = await studyForCall(research(), (request.data as { study?: unknown } | undefined)?.study);
   const stamp = new Date().toISOString().slice(0, 19).replace(/[:]/g, "");
-  const prefix = `exports/${stamp}-manual`;
-  const result = await writeExport(STUDY, prefix);
+  const prefix = exportPrefix(study, `${stamp}-manual`);
+  const result = await writeExport(study, prefix);
+  if (!result) throw new HttpsError("failed-precondition", "this study has no sittings to export yet");
   return { prefix, ...result };
 });

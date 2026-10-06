@@ -104,6 +104,13 @@ export const relayRequest = z.object({
    * it; absent when the lab is used on its own.
    */
   releaseHash: z.string().min(1).max(200).optional(),
+  /**
+   * Which study the sitting belongs to (D-56), as the survey told MyStory. Read
+   * before this shape is checked, because it decides where the caller is
+   * registered (`studyForRequest`, then `authenticate`); declared here so the
+   * shape of a call is written down in one place. Absent means the default.
+   */
+  study: z.string().min(1).max(64).optional(),
 });
 
 export type RelayRequest = z.infer<typeof relayRequest>;

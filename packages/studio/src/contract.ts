@@ -365,6 +365,8 @@ export interface AccessConfigDoc {
 }
 
 export type AuditAction =
+  | "study.created"
+  | "study.updated"
   | "survey.imported"
   | "survey.created"
   | "draft.edited"
@@ -375,6 +377,59 @@ export type AuditAction =
   | "access.member_set"
   | "access.member_removed"
   | "access.domain_set";
+
+// ---------------------------------------------------------------------------
+// Study spaces (D-56, docs/16 §11.4)
+// ---------------------------------------------------------------------------
+
+export const STUDY_STATUSES = ["open", "closed"] as const;
+/**
+ * Open: takes new devices, new sittings and MyStory's model calls. Closed:
+ * none of the three — but a sitting from an iPad the study already knows is
+ * still accepted, so nothing collected before the closure is refused.
+ */
+export type StudyStatus = (typeof STUDY_STATUSES)[number];
+
+/**
+ * `studies/{study}` — the registry, one document per study space. PUBLIC by
+ * `get` (an iPad reads `status` to tell a closed study), so it holds nothing a
+ * poster could not: the creator is a uid here and an address only in the audit
+ * trail. Written only by functions. The deployment's default study is
+ * registered and open whether or not it has one.
+ */
+export interface StudyDoc {
+  /** The id again, so a document read on its own says what it is. */
+  study: string;
+  title: string;
+  status: StudyStatus;
+  createdAt: StoredTime;
+  createdBy: string;
+  updatedAt: StoredTime;
+  updatedBy: string;
+  /** When it was last closed; null while it has never been. */
+  closedAt: StoredTime | null;
+}
+
+/** A study as the Studio's switcher lists it: only ones the caller has a role in. */
+export interface StudySummary {
+  study: string;
+  title: string;
+  status: StudyStatus;
+  /** The caller's role in this study; an owner is admin in every one. */
+  role: StudioRole;
+  /** The deployment's default study (`ybm`), registered with or without a document. */
+  isDefault: boolean;
+}
+
+/**
+ * What every Studio request may say about which study it is for. Absent means
+ * the deployment's default, which is what every request meant before study
+ * spaces (D-56). Checked against the registry, and the caller against THAT
+ * study's list, before anything else is read.
+ */
+export interface StudyScoped {
+  study?: string;
+}
 
 /** `studies/{study}/studioAudit/{id}` — written only by functions, never changed. */
 export interface AuditDoc {
@@ -411,18 +466,55 @@ export const CALLABLES = {
   setMember: "studioSetMember",
   setDomain: "studioSetDomain",
   responseStats: "studioResponseStats",
+  createStudy: "studioCreateStudy",
+  setStudy: "studioSetStudy",
 } as const;
 
-export interface SessionRequest {}
+export interface SessionRequest extends StudyScoped {}
 export interface SessionResponse {
   email: string | null;
+  /** The caller's role in `study`. */
   role: StudioRole | null;
-  /** Why there is no role, in terms the unauthorised page can explain. */
-  reason: "not_signed_in" | "not_google" | "email_not_verified" | "not_listed" | null;
+  /**
+   * Why there is no role, in terms the unauthorised page can explain.
+   * `unknown_study`: the study asked for is not registered.
+   */
+  reason: "not_signed_in" | "not_google" | "email_not_verified" | "not_listed" | "unknown_study" | null;
+  /** The study this answer is about: the one asked for, or the default. */
+  study: string;
+  /** The deployment's default study. */
+  defaultStudy: string;
+  /**
+   * Every study the caller has a role in, for the switcher (D-56). Absent from
+   * an older function, which knew only the default.
+   */
+  studies?: StudySummary[];
+  /** Holds the project's `owner` claim: may create, close and reopen study spaces. */
+  owner?: boolean;
+}
+
+export interface CreateStudyRequest {
+  /** The new study's id (`STUDY_ID_PATTERN`). */
+  study: string;
+  title: string;
+}
+export interface CreateStudyResponse {
   study: string;
 }
 
-export interface ImportLiveRequest {
+/** Change a study's title, or close or reopen it. Owners only. */
+export interface SetStudyRequest {
+  study: string;
+  title?: string;
+  status?: StudyStatus;
+}
+export interface SetStudyResponse {
+  study: string;
+  title: string;
+  status: StudyStatus;
+}
+
+export interface ImportLiveRequest extends StudyScoped {
   surveyId: string;
 }
 export interface ImportLiveResponse {
@@ -432,7 +524,7 @@ export interface ImportLiveResponse {
   active: string;
 }
 
-export interface CreateSurveyRequest {
+export interface CreateSurveyRequest extends StudyScoped {
   surveyId: string;
   title: string;
   /** Start from a published version of any survey; omitted starts blank. */
@@ -442,7 +534,7 @@ export interface CreateSurveyResponse {
   surveyId: string;
 }
 
-export interface PublishRequest {
+export interface PublishRequest extends StudyScoped {
   surveyId: string;
   /** The draft revision the publisher validated and previewed. */
   expectedRevision: number;
@@ -471,7 +563,7 @@ export type StudioErrorDetails =
   | { kind: "not_found"; what: string }
   | { kind: "forbidden"; needed: StudioRole };
 
-export interface RestoreVersionRequest {
+export interface RestoreVersionRequest extends StudyScoped {
   surveyId: string;
   version: string;
   expectedRevision: number;
@@ -480,7 +572,7 @@ export interface RestoreVersionResponse {
   revision: number;
 }
 
-export interface ActivateVersionRequest {
+export interface ActivateVersionRequest extends StudyScoped {
   surveyId: string;
   version: string;
   reason: string;
@@ -491,7 +583,7 @@ export interface ActivateVersionResponse {
   generation: number;
 }
 
-export interface SetMemberRequest {
+export interface SetMemberRequest extends StudyScoped {
   email: string;
   /** null removes the person. */
   role: StudioRole | null;
@@ -502,7 +594,7 @@ export interface SetMemberResponse {
   role: StudioRole | null;
 }
 
-export interface SetDomainRequest {
+export interface SetDomainRequest extends StudyScoped {
   domain: string;
   role: StudioRole | null;
 }
@@ -510,7 +602,7 @@ export interface SetDomainResponse {
   domains: Record<string, StudioRole>;
 }
 
-export interface ResponseStatsRequest {
+export interface ResponseStatsRequest extends StudyScoped {
   surveyId: string;
 }
 export interface ResponseStatsResponse {
