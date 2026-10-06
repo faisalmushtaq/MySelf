@@ -101,7 +101,73 @@ describe("how the relay adapter says who it is", () => {
   it("sends nothing at all rather than an empty credential", async () => {
     expect(await sent({})).toBeNull();
   });
+
+  /**
+   * A participant's iPad's own credential, handed to MyStory by the survey that
+   * embedded it (D-55). The relay reads the same `Device` scheme `saveSitting`
+   * does, so the iPad is one identity whichever endpoint it reaches.
+   */
+  it("sends a participant's iPad's credential as Device", async () => {
+    expect(await sent({ deviceCredential: "ipad_01ABC.secret" })).toBe("Device ipad_01ABC.secret");
+  });
+
+  it("acts as the iPad rather than as whoever is signed in, and as a link above both", async () => {
+    expect(await sent({ token: "abc", deviceCredential: "ipad_01ABC.secret" })).toBe("Device ipad_01ABC.secret");
+    expect(await sent({ linkKey: "xyz", deviceCredential: "ipad_01ABC.secret" })).toBe("Link xyz");
+  });
 });
+
+describe("a participant's iPad reaching its daily limit (D-55)", () => {
+  const refusal = (limit: string | undefined) => ({
+    kind: "rate_limit",
+    message: "MyStory has had as many conversations as it can for today.",
+    retryable: true,
+    ...(limit ? { limit } : {}),
+  });
+
+  it("tells the page, with the relay's own words, and is not retried", async () => {
+    const told: string[] = [];
+    const error = await failure({ deviceCredential: "ipad_1.s", onLimit: (m: string) => void told.push(m) }, 429, refusal("study"));
+    expect(told).toEqual(["MyStory has had as many conversations as it can for today."]);
+    // Whatever the body says: the next attempt meets the same count.
+    expect(error).toMatchObject({ kind: "rate_limit", retryable: false });
+  });
+
+  it("says nothing about a limit when the relay names none", async () => {
+    // A busy provider is worth a retry and is not the end of anybody's day.
+    const told: string[] = [];
+    const error = await failure({ onLimit: (m: string) => void told.push(m) }, 502, refusal(undefined));
+    expect(told).toEqual([]);
+    expect(error).toMatchObject({ kind: "rate_limit", retryable: true });
+  });
+});
+
+/** What the relay adapter throws when the relay answers with an error. */
+async function failure(options: Record<string, unknown>, status: number, error: Record<string, unknown>): Promise<unknown> {
+  const { RelayAdapter } = await import("./index.js");
+  const original = globalThis.fetch;
+  globalThis.fetch = (async () => ({ ok: false, status, json: async () => ({ error }) })) as unknown as typeof fetch;
+  try {
+    await new RelayAdapter({ url: "https://example.test/relay", ...options }).generate(
+      { promptKey: "p.x", promptVersion: "1.0.0", system: "s", messages: [], variables: {} },
+      {
+        key: "mc.x",
+        provider: "openai",
+        model: "gpt-4o",
+        temperature: 0.7,
+        maxOutputTokens: 100,
+        timeoutSeconds: 30,
+        maxAttempts: 1,
+        dataHandling: { trainingUseOptOut: true },
+      },
+    );
+  } catch (thrown) {
+    return thrown;
+  } finally {
+    globalThis.fetch = original;
+  }
+  throw new Error("the refusal was not passed on");
+}
 
 describe("which release the relay adapter names", () => {
   /**

@@ -30,6 +30,27 @@ export interface RelayOptions {
    */
   linkKey?: string | undefined;
   /**
+   * A participant's iPad's own credential, `<installId>.<secret>` (D-55).
+   *
+   * Sent as `Authorization: Device <credential>`, the scheme `saveSitting`
+   * already reads. MyStory only holds one when the survey that embedded it
+   * handed it over, and then the page is acting as that iPad — under that
+   * iPad's daily limits, and running only what its release froze.
+   */
+  deviceCredential?: string | undefined;
+  /**
+   * Told when the relay refuses because a participant's device limit has been
+   * reached, or devices are switched off (D-55) — with the relay's message,
+   * which is written for the participant.
+   *
+   * The call still fails, as any refused call does, and the protocol's fallback
+   * still applies. This is so the page can say the plain thing — MyStory is done
+   * for today — and let the survey offer the way past at once, instead of
+   * reporting a model that cannot be reached and leaving the participant to wait
+   * for something that will not change until tomorrow.
+   */
+  onLimit?: ((message: string) => void) | undefined;
+  /**
    * The provider this relay stands in for. Defaults to OpenAI.
    *
    * A relay is a transport, not a provider: the study's config says `openai`
@@ -56,7 +77,25 @@ interface RelayResponse {
   text?: string;
   modelServed?: string | null;
   usage?: { inputTokens?: number | null; outputTokens?: number | null };
-  error?: { kind?: string; message?: string; retryable?: boolean };
+  /** `limit` names which of a device's daily limits refused the call, when one did. */
+  error?: { kind?: string; message?: string; retryable?: boolean; limit?: string };
+}
+
+/**
+ * The `Authorization` header for whoever this page is acting as.
+ *
+ * A link key wins when there is more than one: a page opened from a tester link
+ * is acting as that link, not as whoever happens to be signed in to Google in
+ * the same browser. A device credential comes next, for the same reason — the
+ * page is inside a participant's survey, acting as that iPad. A signed-in
+ * person's token is the last resort, and nothing at all is sent rather than an
+ * empty credential.
+ */
+function authorization(options: RelayOptions): Record<string, string> {
+  if (options.linkKey) return { authorization: `Link ${options.linkKey}` };
+  if (options.deviceCredential) return { authorization: `Device ${options.deviceCredential}` };
+  if (options.token) return { authorization: `Bearer ${options.token}` };
+  return {};
 }
 
 const KINDS = new Set([
@@ -89,17 +128,7 @@ export class RelayAdapter implements ModelAdapter {
     try {
       response = await fetch(this.options.url, {
         method: "POST",
-        headers: {
-          "content-type": "application/json",
-          // A link key wins when both are present: a page opened from a tester
-          // link is acting as that link, not as whoever happens to be signed
-          // in to Google in the same browser.
-          ...(this.options.linkKey
-            ? { authorization: `Link ${this.options.linkKey}` }
-            : this.options.token
-              ? { authorization: `Bearer ${this.options.token}` }
-              : {}),
-        },
+        headers: { "content-type": "application/json", ...authorization(this.options) },
         body: JSON.stringify({
           prompt: { system: prompt.system, messages: prompt.messages },
           // The key, not the parameters: the function reads the settings from
@@ -123,6 +152,12 @@ export class RelayAdapter implements ModelAdapter {
       const detail = (await response.json().catch(() => ({}))) as RelayResponse;
       const message = detail.error?.message ?? `HTTP ${response.status}`;
       const kind = detail.error?.kind;
+      if (typeof detail.error?.limit === "string") {
+        // Over for today, or switched off: never worth asking again at once,
+        // whatever the body said, because the next attempt meets the same count.
+        this.options.onLimit?.(message);
+        throw new ModelError("rate_limit", message, false);
+      }
       if (kind && KINDS.has(kind)) {
         throw new ModelError(kind as never, message, detail.error?.retryable ?? true);
       }
