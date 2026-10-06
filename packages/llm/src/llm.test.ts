@@ -153,7 +153,7 @@ async function failure(options: Record<string, unknown>, status: number, error: 
       {
         key: "mc.x",
         provider: "openai",
-        model: "gpt-4o",
+        model: "test-model",
         temperature: 0.7,
         maxOutputTokens: 100,
         timeoutSeconds: 30,
