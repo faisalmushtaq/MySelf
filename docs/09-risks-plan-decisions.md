@@ -253,3 +253,49 @@ contract the companion dashboard is built from):
   therefore the ceiling times the number of open studies with MyStory live,
   which only an owner can add to; the OpenAI budget limit (D-55) remains the
   last line.
+
+### The item library, and copying between studies (2026-10-06, D-57)
+
+**What was asked (the research team's words).** "We should be able to copy
+across for different versions. We should be able to pick and drop in different
+items from different surveys — making this modular with library of items etc."
+
+**What the team chose.**
+
+1. **A library with three shelves:** every question and block from any
+   published version of any survey, in every study space; the validated
+   questionnaires (SDQ, RCADS, SWEMWBS…); and modules researchers save by name,
+   with a description, tags and versions, for the whole team to reuse.
+2. **Copies, with an update notice.** A survey keeps its own copy of whatever
+   it took and remembers where it came from. When a saved module gains a
+   newer version, the Studio says so on the block and offers to update; nothing
+   changes in a survey until somebody chooses to.
+3. **A copied question keeps its question ID and variable name**, so the same
+   question in two surveys exports to the same column. The Studio renames a
+   copy only when the name is already taken there, and says so.
+
+And surveys can now be copied from a published version **in any study space**,
+not only the study they are created in.
+
+**How it stays safe** (docs/16 §12 has the design):
+
+- **Adding a piece is an ordinary draft edit**, validated as any other and
+  published through the same gate. The release format, the participant app
+  and the dashboard's data contract do not change.
+- **The licence locks still hold.** A validated questionnaire can be added only
+  whole and unchanged. At publish the server accepts it only if it matches,
+  exactly, the instrument library or a release the draft names as its source,
+  read from that study's store and verified against its hash. Naming a release
+  proves nothing by itself.
+- **Consent and identity modules** can be copied only with a recorded reason,
+  because their wording is approved per study.
+- **Provenance** (what was copied, from where, and every rename) is kept in the
+  draft, on each published version, and in the provenance export.
+- **Saved modules** are project-wide, written only by functions that check
+  them, versioned immutably, and never deleted; retiring one takes it off the
+  shelf without touching surveys that use it.
+- **Browsing** other studies' published surveys is for the project's Studio
+  members only; no draft, sitting, narrative or access list of another study
+  is read.
+
+Decisions for the team to confirm are in docs/16 §12.10.
