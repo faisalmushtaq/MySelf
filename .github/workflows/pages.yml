@@ -32,22 +32,33 @@ jobs:
       - run: pnpm install --frozen-lockfile
       # The Firebase web config is a set of PUBLIC identifiers — the apiKey
       # names a project, it does not authorise anything. What authorises is a
-      # signed-in account carrying a role an owner granted, or the `device`
-      # claim on an enrolled iPad, both checked server-side. It is here rather
-      # than in a secret because it ships inside the built JavaScript either
-      # way, and pretending otherwise would be theatre.
+      # signed-in account carrying a role an owner granted, the `device` claim
+      # on an enrolled iPad, or the credential a participant's iPad issues
+      # itself (within daily limits, D-55), all checked server-side. It is here
+      # rather than in a secret because it ships inside the built JavaScript
+      # either way, and pretending otherwise would be theatre.
       #
       # THE PARTICIPANT APP GETS IT TOO, and uses only the project ID from it:
       # to derive where it files sittings (saveSitting, with a credential the
       # device issues itself) and where it reads the published survey from (the
       # public, get-only `published` pointer and `publicReleases` store — docs/16
       # §5.3). It carries no Firebase SDK and signs in to nothing.
+      #
+      # AND WHERE MYSTORY IS, which nothing used to say: without it every
+      # MyStory position said "not available on this device". It is the copy
+      # this same workflow puts at /mystory/ below, so the survey and the module
+      # are one origin — which is what lets the module believe the iPad's
+      # credential from the survey without being told of any other origin
+      # (D-55). Written out rather than derived from the base, because it has to
+      # be a whole address with the site's origin in it, and that origin is also
+      # the one the relay's allowlist names; the two move together or not at all.
       - run: pnpm -r build
         env:
           MYSELF_FIREBASE_CONFIG: >-
             {"apiKey":"AIzaSyCqcaFWJMobljhX63s--l4NEPZV6IXWJvM",
              "authDomain":"myself-research.firebaseapp.com",
              "projectId":"myself-research"}
+          MYSELF_MYSTORY_URL: https://faisalmushtaq.github.io/MySelf/mystory
       # After the build, because it reads the service worker the build emits:
       # a preview server has none, which is how /researcher/ shipped broken twice.
       - run: pnpm -r test
@@ -56,8 +67,12 @@ jobs:
       # app's service worker out of the researcher view's scope — a shared
       # scope would have the survey's cache serving the wrong build.
       - run: cp -R apps/researcher/dist apps/participant/dist/researcher
-      # MyStory, static: it runs the narrative protocols in the page against
-      # the deterministic mock, so it needs no server and no key.
+      # MyStory, static. It runs the narrative protocols in the page and makes
+      # every model call through the study's relay, which holds the key — the
+      # page holds none. There is no mock mode (apps/mystory-lab/web/main.ts):
+      # with nothing to call it says so and starts nothing. Inside the survey it
+      # calls as the participant's iPad, under daily limits (D-55); on its own it
+      # needs a tester link or somebody signed in with a role.
       - run: cp -R apps/mystory-lab/dist apps/participant/dist/mystory
       # GitHub Pages serves the site's 404.html for any path it has no file
       # for. This one sends Studio paths typed without their hash

@@ -99,6 +99,30 @@ writeFileSync(
 );
 
 /**
+ * The settings the functions read, carried into their environment.
+ *
+ * The Firebase CLI deploys a `.env` it finds in the functions directory as the
+ * functions' environment, and this directory is rebuilt from nothing on every
+ * deploy — so without this, a limit could only ever be its default, and the way
+ * to switch participants' devices off (D-55, docs/15 §10) would be a code change.
+ *
+ * So the spending limits are read from THIS process's environment and written
+ * there: a repository variable in the deploy workflow, or a variable set in the
+ * shell of whoever deploys by hand. Only the names listed, so nothing else in a
+ * deploy machine's environment — a token, a path — can end up in a function.
+ * An empty value is left out rather than written, because an unset repository
+ * variable arrives as an empty string and must mean "the default", not "0".
+ */
+const SETTINGS = ["MYSELF_RELAY_DAILY_LIMIT", "MYSELF_RELAY_DEVICE_DAILY_LIMIT", "MYSELF_RELAY_DEVICES_DAILY_LIMIT"];
+const settings = SETTINGS.filter((name) => (process.env[name] ?? "").trim() !== "").map(
+  (name) => `${name}=${process.env[name].trim()}`,
+);
+if (settings.length > 0) {
+  writeFileSync(`${out}/.env`, `${settings.join("\n")}\n`);
+  console.log(`functions environment: ${settings.join(", ")}`);
+}
+
+/**
  * Install the two runtime dependencies, here, before deploying.
  *
  * Not for the cloud — Google installs them again from the package.json above.
