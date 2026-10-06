@@ -98,6 +98,9 @@ export default defineConfig({
       MYSELF_SITTINGS_URL: "",
       MYSELF_MYSTORY_URL: "",
       MYSELF_SURVEY_SOURCE: `http://127.0.0.1:${PORT}/__survey`,
+      // Every other study's documents, for participant links (D-56): answered by
+      // `study-links.spec.ts`'s stand-in, and 404 otherwise, like the source above.
+      MYSELF_STUDIES_SOURCE: `http://127.0.0.1:${PORT}/__studies`,
       MYSELF_SURVEY_ID: "ybm_nd2026_standard",
     },
   },
