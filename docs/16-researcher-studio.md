@@ -996,6 +996,7 @@ nothing is sent to a model and nothing is saved.
 - A release store that can't be read is a refusal the module may retry,
   never a fall-back to some other release's settings.
 - A call with no hash (the MyStory lab on its own) is treated as before.
+- A participant's iPad must send one (§10.4, D-55).
 
 **What changes on the survey side.** The release format does not change.
 There is a new engine version (`0.4.0`), the relay reads Studio-published
@@ -1066,3 +1067,27 @@ in it.
 | The relay | `apps/functions/src/relay-policy.ts` (`configForCall`), `relay.ts`; `packages/llm/src/adapters/relay.ts`; `apps/mystory-lab/web/main.ts` |
 | The participant app | `apps/participant/src/lib/narrative.ts`, `components/NarrativeStep.tsx`, `SurveyScreen.tsx`, `lib/releases.ts` |
 | Provenance | `apps/researcher/src/studio/data/provenance.ts`, `screens/Versions.tsx` |
+| A participant's iPad and its limits (§10.4) | `apps/functions/src/relay-policy.ts` (`DEVICE_LIMITS`, `deviceLimitReached`), `relay.ts` (`authenticate`, `meterDevice`), `narratives.ts`, `transcribe.ts`; `apps/mystory-lab/web/host-protocol.ts`; `apps/participant/src/lib/narrative.ts`; `.github/workflows/pages.yml`, `firebase.yml` |
+
+### 10.4 MyStory on a participant's iPad (D-55)
+
+A version with MyStory on runs it for participants, on the iPad, with nobody
+signed in. The decision and its reasons are D-55 (docs/09 §5); the operating
+side is the fielding runbook (docs/15 §10). In short:
+
+- **Where the module is.** The Pages build tells the survey
+  (`MYSELF_MYSTORY_URL` = `https://faisalmushtaq.github.io/MySelf/mystory`).
+  Without it a MyStory position still says it is not available on this device
+  and lets the participant past.
+- **Who is calling.** The survey sends the module the iPad's own credential by
+  `postMessage`, addressed to the module's origin, with the protocol. Never in
+  the URL. The module takes it only from a host origin it trusts and keeps it in
+  memory. It calls the relay, `transcribe` and `saveNarrative` with it, and
+  does not ask anyone to sign in.
+- **What it may run.** Only the config the sitting's release froze: a device's
+  call without a release hash is refused.
+- **How much.** 120 model calls per iPad per day and 2,000 across all iPads per
+  day by default, a transcription counting as one call. A refusal says so in
+  words for the participant, and the survey offers the way past at once.
+- **Off.** Either limit set to `0`, with no code change.
+- **The preview** never runs the module, as before (§10.1).

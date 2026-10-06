@@ -393,6 +393,12 @@ key in a school. The device sends the model *key*, not the parameters, so the
 function reads the settings from the frozen release and a tampered page cannot
 raise the temperature or point the study somewhere else.
 
+**Inside the survey, the module calls as the participant's iPad** (D-55, docs/09
+§5). The survey hands it the credential it files sittings with, by message and
+never in the URL, and the relay accepts it under a daily limit per iPad and a
+ceiling across all of them. Such a call must name the sitting's release, so it
+runs only what that release froze.
+
 ### 10.9 Seeing it as a participant
 
 `?view=participant` on the lab URL, or the button in the corner. The setup
@@ -435,6 +441,12 @@ link key is not a consented participant, so their run is stored with
 `provenance: "test"` and is excluded from the research dataset. The marking comes
 from the credential rather than from a field in the request, because a page can
 set a field and cannot forge a credential.
+
+**A run belongs to whoever first stored it** (D-55). Once any participant's
+iPad could store one, the write had to be owned: a run stored under one caller
+is never replaced by another, a device cannot attach a run to a sitting another
+device filed, and a device's run must name its release. The transcriber applies
+the same claim before it files a recording under a session.
 
 **No client may write one.** The rules refuse every browser write to
 `narratives`; the function uses the Admin SDK and passes them by. Reading is for

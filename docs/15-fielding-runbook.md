@@ -1,7 +1,8 @@
 # MySelf — fielding a survey on several iPads
 
 Written to be followed on the morning, not read in advance. It covers the
-survey only: the micro-narrative module is not fielded (docs/14 §4).
+survey, and MyStory where the version being fielded includes it: its daily
+limits, and how to switch it off, are in §10 (D-55).
 
 ---
 
@@ -13,10 +14,11 @@ survey only: the micro-narrative module is not fielded (docs/14 §4).
 | **`saveSitting`** | Cloud Function, europe-west2 | The only write path into the study. Idempotent, and refuses anything that contradicts a copy it already holds. |
 | **Firestore** | `myself-research`, europe-west2 | One document per sitting, plus chunks for an unusually long one. |
 | **Researcher view** | A laptop browser | Pulls sittings, derives the dataset, exports BIDS, and can stop a device. |
+| **MyStory** | Inside the survey, on the iPad | The conversation, when the version includes it. Its model calls go through **`llmRelay`**, which holds the key, under daily limits (§10). |
 
-A device never reads the study back. A person never writes a sitting. A device that
-can file a sitting still cannot make a model call. All three are enforced
-server-side, not by the apps.
+A device never reads the study back. A person never writes a sitting. A device's
+model calls, for MyStory, are capped per iPad and across the study each day. All
+three are enforced server-side, not by the apps.
 
 ---
 
@@ -100,6 +102,10 @@ one, so a stray one can be told apart in the dataset; an upload ceiling per devi
 stops a runaway client, which is the likely accident; and a specific device can be
 stopped (§8). If the URL ever circulates further than intended, **App Check** is the
 real control and is a project setting rather than a code change.
+
+The same credential also lets MyStory make model calls (D-55), and those cost
+money, so they have a daily limit per iPad and a ceiling across the whole study
+(§10). The ceiling is what bounds a stranger who registers many devices.
 
 **Adding a device mid-study needs no action at all.** Open the URL on it — and add
 it to the Home Screen, for the reason above.
@@ -256,8 +262,9 @@ by the route the data-sharing agreement sets out.
 A device filing something it should not — a stray iPad, an obvious test run from
 outside the room — is dealt with by taking its identity away. Its device id is on
 every sitting in the table. Paste it into **Data → Stop a device** (owners only).
-It cannot post again; nothing it already filed is removed, because deciding what
-to do with that is a judgement rather than a button.
+It cannot post again, and its MyStory calls stop too. Nothing it already filed
+is removed, because deciding what to do with that is a judgement rather than a
+button.
 
 ---
 
@@ -275,3 +282,62 @@ to do with that is a judgement rather than a button.
 | A name looks like nonsense | Wrong passphrase. It should have been refused; report it. |
 | A sitting is dated to the wrong day | That iPad's clock was wrong. Every upload records what the device believed the time was alongside when the study received it, so the offset is in the audit trail (`sittings.received` rows carry `sentAt`, the study's `receivedAt` for the same moment, and the `clockSkewMs` between them), and a device more than five minutes out is logged as a warning. Response *timings* are unaffected — those come from a monotonic clock and never from the wall clock. Correct the iPad's date and report the offset so the affected sittings can be adjusted. |
 | A device has been holding data for days | Get it on a network today. See §2: a Safari tab loses everything at seven days. |
+| "This device has used MyStory as much as it can for today" | That iPad reached its own daily limit (§10). The participant carries on without MyStory. If an iPad will carry more conversations than that in a day, raise the limit. |
+| "MyStory has had as many conversations as it can for today" | The whole study reached its daily ceiling (§10). Check the counts: more than a day's fielding is a reason to look for a stranger, not to raise the ceiling. |
+| "MyStory is switched off at the moment" | A limit is set to `0` (§10), on purpose or by a typo in the setting. |
+
+---
+
+## 10. MyStory: its daily limits, and switching it off
+
+From D-55 (docs/09 §5) any participant's iPad may use the model for MyStory,
+with nobody signed in. Model calls cost money and anyone with the URL can make
+a new installation, so two limits apply to iPads. They do not apply to
+researchers or tester links.
+
+| Limit | Repository variable | Default |
+|---|---|---|
+| Model calls **one iPad** may make in a day | `MYSELF_RELAY_DEVICE_DAILY_LIMIT` | 120 |
+| Model calls **all iPads together** may make in a day | `MYSELF_RELAY_DEVICES_DAILY_LIMIT` | 2,000 |
+
+- A **day** is a UTC day: it turns over at midnight GMT, 1am in summer.
+- A **transcription** (a spoken answer) counts as one call.
+- **What one conversation takes.** A typical one is 12–15 calls; the longest,
+  every answer spoken and the story revised twice, about 40. So 120 is eight to
+  ten typical conversations per iPad per day. **An iPad shared by more children
+  than that in a day needs more:** about 15 a conversation, so 300 for twenty
+  children.
+- **What a participant sees** when a limit is reached: MyStory says so in plain
+  words, and the survey offers "Skip this part" (or "Finish without it") at
+  once. Nothing already answered is affected.
+- **The counts** are in the Firestore console, `studies/ybm/audit_relayDevices`:
+  `{YYYY-MM-DD}` for the whole study and `{YYYY-MM-DD}_{installId}` for one
+  iPad. Each has `calls` (let through) and `refused`.
+
+**To change a limit.** In GitHub: **Settings → Secrets and variables → Actions →
+Variables**, add or edit the variable. Then **Actions → Deploy to Firebase →
+Run workflow**, with **Deploy the functions as well** ticked. The packaging step
+writes the variable into the functions' environment. From a laptop, set the
+variable in the shell instead, for example
+`MYSELF_RELAY_DEVICE_DAILY_LIMIT=300 firebase deploy --only functions --project myself-research`
+from `infra/firebase`. An empty or missing variable means the default.
+
+**To switch MyStory's model calls off for every iPad,** set either variable to
+`0` and deploy as above. Every iPad's call is then refused with "MyStory is
+switched off at the moment"; researchers and tester links are unaffected.
+Anything that is not a whole number of zero or more also reads as `0`, so a typo
+switches it off rather than removing the limit.
+
+- **In a hurry**, the same variable can be set on the running functions without
+  a deploy: Google Cloud console → **Cloud Run** → `llmrelay`, then
+  `transcribe` → **Edit and deploy new revision** → **Variables and secrets**.
+  Set the repository variable as well: the next functions deploy sets the
+  environment from it.
+- **One iPad** misbehaving: stop it (§8). That stops its calls too.
+- **Everything at once**, researchers included: revoke the OpenAI key.
+
+**Before fielding: a budget limit on the OpenAI project.** The ceiling bounds
+how many calls iPads make in a day, not how large each one is. A typical full
+day is a few pounds, but a stranger crafting oversized calls could make the
+worst day cost hundreds. Set a monthly budget limit and alerts on the OpenAI
+project; that is the last line, and it is the provider's, not this platform's.

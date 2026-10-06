@@ -18,6 +18,14 @@ export class RelayError extends Error {
     readonly kind: string,
     message: string,
     readonly retryable = false,
+    /**
+     * Which of a participant's device limits refused this, when one did (D-55).
+     *
+     * Sent with the refusal so the module can tell "this is over for today" from
+     * a model that is merely busy — the first ends MyStory for the day and the
+     * survey should offer the way past at once, the second is worth a retry.
+     */
+    readonly limit?: DeviceLimit,
   ) {
     super(message);
     this.name = "RelayError";
@@ -54,6 +62,22 @@ export interface Caller {
    * which "everybody is anonymous" would lose.
    */
   anonymous: boolean;
+}
+
+/**
+ * A participant's iPad on the credential it issued itself — the caller D-55's
+ * limits govern.
+ *
+ * Both flags, because each alone means something else: `device` alone is also an
+ * iPad an owner enrolled, which keeps its old rules, and `anonymous` is only ever
+ * set on a device. The model-spending endpoints admit an anonymous device only
+ * through the `Device` scheme (`authenticate`), never on an anonymous sign-in
+ * token, so this is exactly "an installation anybody with the URL could have
+ * made" — the one caller a per-caller limit cannot bound, because a new one is
+ * free.
+ */
+export function isParticipantDevice(caller: Caller): boolean {
+  return caller.device && caller.anonymous;
 }
 
 /**
@@ -147,7 +171,13 @@ export type ReleaseLookup = (hash: string) => Promise<ReleaseManifest | null>;
  * with the hash re-verified — and nothing else, whoever is calling. A release
  * the study never published, or a key it did not freeze, is refused.
  *
- * A call that names no release is decided as before (`configFor`).
+ * A call that names no release is decided as before (`configFor`) — EXCEPT from
+ * a participant's iPad (D-55), which must name one. Its credential reaches the
+ * module only through the survey, which always knows the release its sitting is
+ * running, so a device call without a hash is not a survey's call. Refusing it
+ * means an installation anybody could have made runs a configuration a release
+ * froze for the sitting in front of it, and can never pick one of the shipped
+ * configs `configFor` would otherwise look through.
  */
 export async function configForCall(
   key: string,
@@ -155,7 +185,16 @@ export async function configForCall(
   releaseHash: string | undefined,
   lookup: ReleaseLookup,
 ): Promise<ModelConfig> {
-  if (releaseHash === undefined) return configFor(key, caller);
+  if (releaseHash === undefined) {
+    if (isParticipantDevice(caller)) {
+      throw new RelayError(
+        400,
+        "unknown",
+        "a participant's device runs only what its survey version froze, and this call did not say which version that is",
+      );
+    }
+    return configFor(key, caller);
+  }
   let release: ReleaseManifest | null;
   try {
     release = await lookup(releaseHash);
@@ -228,6 +267,141 @@ export const ALLOWED_ORIGIN = allowedOrigins(
 
 /** A spending ceiling per caller per day — a blast radius, not a boundary. */
 export const CALLS_PER_CALLER_PER_DAY = Number(process.env["MYSELF_RELAY_DAILY_LIMIT"] ?? 600);
+
+/**
+ * A participant's iPad's limits (D-55, docs/09 §5).
+ *
+ * The research team decided any participant's iPad may use the model for
+ * MyStory, with a daily cap. The per-caller ceiling above is no cap on that:
+ * anybody with the survey URL can register a new installation, the first writer
+ * of an installation id wins, and a new one is free — so a limit per device
+ * alone bounds a stranger by nothing. Two numbers, then, counted together:
+ *
+ *   PER DEVICE, so one iPad left looping on a windowsill — or one stranger with
+ *   one credential — cannot use up the day for every school in the study.
+ *
+ *   ACROSS ALL DEVICES, which is the one that actually bounds the day's spend.
+ *   When a stranger reaches it, MyStory is unavailable for the rest of the day
+ *   and the survey goes on without it. That is the trade: availability is given
+ *   up to keep the bill bounded, and never the other way round.
+ *
+ * A TRANSCRIPTION COUNTS AS ONE CALL against both. It spends OpenAI money like a
+ * model call, and the per-caller counter already treats the two alike — a loop
+ * that records instead of prompting is the same bill.
+ *
+ * Neither applies to researchers, to iPads an owner enrolled, or to tester
+ * links, which keep the ceiling above and their own caps.
+ */
+export interface DeviceLimits {
+  /** Model calls one participant's device may make in a UTC day. */
+  perDevice: number;
+  /** Model calls all participants' devices together may make in a UTC day. */
+  allDevices: number;
+}
+
+/**
+ * One limit from the environment, failing CLOSED.
+ *
+ * Absent or blank is the default: an unset repository variable reaches the
+ * function as an empty string, and that must mean "not chosen", not zero.
+ * Anything else that is not a whole number of zero or more — "2,000", "-1",
+ * "lots" — reads as 0, which switches devices off. `Number("lots")` is NaN, and
+ * every comparison with NaN is false, so a limit read naively from a typo would
+ * never refuse anything; a spending limit that a typo removes is worse than one
+ * that a typo trips, because the second is noticed the same morning.
+ */
+export function readLimit(raw: string | undefined, fallback: number): number {
+  if (raw === undefined || raw.trim() === "") return fallback;
+  const n = Number(raw.trim());
+  return Number.isSafeInteger(n) && n >= 0 ? n : 0;
+}
+
+/**
+ * The defaults, and how they were sized.
+ *
+ * One conversation of the full protocols (np.phone_wellbeing,
+ * np.micro_narrative_full) makes one interviewer call to open and one per answer
+ * until the interview is done or reaches its turn limit (14 and 12) — usually
+ * five to eight — then one extraction, three retellings at once, and one per
+ * revision the participant asks for. Typed, that is usually 10–13 calls, and
+ * about 20 at the turn limit with two revisions. Speaking adds a transcription
+ * per recorded answer, up to about 14 more, and a retried call counts again. So
+ * the heaviest conversation is about 40 calls and a typical one 12–15.
+ *
+ * 120 is three of the heaviest, or eight to ten typical ones, per device per day.
+ * 2,000 is about 150 typical conversations a day across the study — more than a
+ * day of fielding at this study's size, and a few pounds at 1–3p a journey.
+ */
+export const DEVICE_LIMITS: DeviceLimits = {
+  perDevice: readLimit(process.env["MYSELF_RELAY_DEVICE_DAILY_LIMIT"], 120),
+  allDevices: readLimit(process.env["MYSELF_RELAY_DEVICES_DAILY_LIMIT"], 2_000),
+};
+
+/** Which limit refused a device's call: its own, the study's, or devices switched off. */
+export type DeviceLimit = "device" | "study" | "off";
+
+/**
+ * Whether one more call fits, given what was already let through today.
+ *
+ * Null when it does. Either limit at 0 is the off switch — no code change, one
+ * setting — and is reported as such rather than as a limit reached, because
+ * "try again tomorrow" would be untrue. The device's own limit is checked before
+ * the study's, so a device that has used its own day is told about its own day
+ * and never counted against everybody else's.
+ *
+ * The counts are of calls LET THROUGH, not of attempts: a device refused for its
+ * own limit keeps asking, and if those attempts counted towards the study's
+ * ceiling one stuck iPad could close MyStory for every school.
+ */
+export function deviceLimitReached(limits: DeviceLimits, usedByDevice: number, usedByAll: number): DeviceLimit | null {
+  if (limits.perDevice <= 0 || limits.allDevices <= 0) return "off";
+  if (usedByDevice >= limits.perDevice) return "device";
+  if (usedByAll >= limits.allDevices) return "study";
+  return null;
+}
+
+/**
+ * What a participant reads when a limit refuses the call.
+ *
+ * The module shows it in the conversation, so it is written for whoever is
+ * holding the iPad — the same rules as a tester link's refusals: no "relay", no
+ * "credential", and a way forward. That way forward is always the same and
+ * always true: the survey can be finished without MyStory, and nothing already
+ * answered is lost.
+ */
+export function deviceLimitMessage(limit: DeviceLimit): string {
+  const forward = "You can carry on without it, and nothing you have already answered is lost.";
+  switch (limit) {
+    case "device":
+      return `This device has used MyStory as much as it can for today. ${forward} It will be available again tomorrow.`;
+    case "study":
+      return `MyStory has had as many conversations as it can for today. ${forward} It will be available again tomorrow.`;
+    case "off":
+      return `MyStory is switched off at the moment. ${forward}`;
+  }
+}
+
+/**
+ * The refusal itself: 429, a rate limit, and NOT retryable now.
+ *
+ * `retryable: false` is what keeps the gateway from asking again at once — a
+ * retry a second later meets the same count — while the message and the
+ * `Retry-After` the endpoints add say when it is worth asking: tomorrow.
+ */
+export function deviceLimitError(limit: DeviceLimit): RelayError {
+  return new RelayError(429, "rate_limit", deviceLimitMessage(limit), false, limit);
+}
+
+/**
+ * Seconds until the counts start again: the next UTC midnight.
+ *
+ * At least one, because `Retry-After: 0` reads as "now", which is exactly what
+ * it is not.
+ */
+export function secondsUntilTomorrow(now: Date): number {
+  const tomorrow = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1);
+  return Math.max(1, Math.ceil((tomorrow - now.getTime()) / 1000));
+}
 
 /**
  * A tester link: access carried by the URL, with no account behind it.

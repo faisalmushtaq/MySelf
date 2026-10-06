@@ -7,8 +7,9 @@ import { onRequest } from "firebase-functions/v2/https";
 import { z } from "zod";
 import { paths } from "@myself/firebase";
 import { STUDY, research } from "./apps.js";
-import { RelayError, type Caller } from "./relay-policy.js";
-import { authenticate, cors, meter } from "./relay.js";
+import { sessionClaimRefusal } from "./narratives.js";
+import { RelayError, isParticipantDevice, type Caller } from "./relay-policy.js";
+import { authenticate, cors, meter, refuse } from "./relay.js";
 
 /**
  * Speaking instead of typing.
@@ -228,10 +229,8 @@ export const transcribe = onRequest(
     let caller: Caller | null = null;
     let bytes = 0;
     try {
-      caller = await authenticate(req.headers.authorization);
-      // The same daily ceiling as a model call, and deliberately the same
-      // counter: a loop that records instead of prompting is the same bill.
-      await meter(caller);
+      // A participant's iPad too, on its own credential, within its limits (D-55).
+      caller = await authenticate(req.headers.authorization, { allowDeviceCredential: true });
 
       const parsed = request.safeParse(req.body);
       if (!parsed.success) {
@@ -254,6 +253,40 @@ export const transcribe = onRequest(
       bytes = audio.byteLength;
       if (bytes === 0) throw new RelayError(400, "unknown", "I didn\u2019t catch any sound there. Try again, or type your answer instead.");
       if (bytes > MAX_BYTES) throw new RelayError(413, "unknown", "That was a bit too long to send. Try a shorter one, or type your answer.");
+
+      /**
+       * A participant's iPad files recordings only under its own session (D-55).
+       *
+       * The bucket path is the session id, and a recording is the most sensitive
+       * thing the study keeps: a stranger's installation must not be able to put
+       * a voice into somebody else's session, where it would be exported and
+       * deleted as theirs. The same rule as the run itself
+       * (`sessionClaimRefusal`) — whoever stored the conversation, and whichever
+       * device filed the sitting. The run is stored from the conversation's
+       * first screen, so by the first recording it is there to check against.
+       */
+      if (isParticipantDevice(caller)) {
+        const db = research();
+        const [run, sitting] = await db.getAll(
+          db.doc(paths.narrative(STUDY, parsed.data.sessionId)),
+          db.doc(paths.session(STUDY, parsed.data.sessionId)),
+        );
+        if (sessionClaimRefusal(caller, run?.data()?.["uid"], sitting?.data()?.["deviceId"])) {
+          throw new RelayError(409, "auth", "That recording could not be sent. You can type your answer instead.");
+        }
+      }
+
+      /**
+       * The same daily limits as a model call, and deliberately the same
+       * counters: a loop that records instead of prompting is the same bill. So
+       * a transcription is ONE CALL — against the per-caller ceiling, or, for a
+       * participant's iPad, against its own day and the study's (D-55).
+       *
+       * Counted once the clip is known to be one worth sending, as the relay
+       * counts once the call is known to be one it will make: a recording
+       * refused for its container or its size spent nothing.
+       */
+      await meter(caller);
 
       /**
        * Both at once.
@@ -310,7 +343,7 @@ export const transcribe = onRequest(
     } catch (error) {
       if (caller) void recordTranscription(caller, { bytes, ms: Date.now() - started, ok: false, characters: 0 });
       if (error instanceof RelayError) {
-        res.status(error.status).json({ error: { kind: error.kind, message: error.message, retryable: error.retryable } });
+        refuse(res, error);
         return;
       }
       logger.error("transcribe: the call failed");

@@ -54,12 +54,23 @@ const buildStamp = new Date().toISOString().slice(0, 16).replace("T", " ");
  */
 const firebaseConfig = firebaseConfigRaw;
 
+/**
+ * Surveys on other origins that may hand this module an iPad's credential (D-55).
+ *
+ * Comma-separated origins, such as `http://localhost:5173` for a survey on a
+ * development server. The module's own origin is always trusted and needs no
+ * entry: on GitHub Pages the survey and the module are one site. Baked in, like
+ * the relay, so the page cannot be told by whoever frames it whom to believe.
+ */
+const hostOrigins = process.env["MYSELF_MYSTORY_HOST_ORIGINS"] ?? "";
+
 export default defineConfig({
   base,
   define: {
     __RELAY_URL__: JSON.stringify(relayUrl),
     __FIREBASE_CONFIG__: JSON.stringify(firebaseConfig),
     __BUILD_STAMP__: JSON.stringify(buildStamp),
+    __HOST_ORIGINS__: JSON.stringify(hostOrigins),
   },
   root: "web",
   build: { outDir: "../dist", emptyOutDir: true },
