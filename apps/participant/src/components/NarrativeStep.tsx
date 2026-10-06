@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { PROTOCOL_MESSAGE, handoverUrl, readModuleMessage } from "../lib/narrative.js";
+import { syncTarget } from "../lib/device.js";
+import { answerReady, handoverUrl, moduleCredential, readModuleMessage } from "../lib/narrative.js";
 
 /**
  * MyStory, inside MyThoughts.
@@ -33,6 +34,11 @@ import { PROTOCOL_MESSAGE, handoverUrl, readModuleMessage } from "../lib/narrati
  * THE PROTOCOL ITSELF IS SENT TOO, once the module says it is ready: the
  * one frozen into this release, which may have been edited in Studio and
  * so be in no list the module carries. See `lib/narrative.ts`.
+ *
+ * AND THIS iPAD'S CREDENTIAL WITH IT (D-55), so the module can call the model
+ * as this iPad, under its daily limits, without anybody signing in. By message
+ * to the module's origin and only to this step's own frame — never in the URL.
+ * See `lib/narrative.ts` for why each of those matters.
  */
 
 export interface NarrativeStepProps {
@@ -71,6 +77,13 @@ export function NarrativeStep(props: NarrativeStepProps) {
   const [refused, setRefused] = useState(false);
   const started = useRef(false);
   const frame = useRef<HTMLIFrameElement | null>(null);
+  /**
+   * This iPad's credential for the module, read once for the step. Null in a
+   * build that files nowhere (the public preview), and then the module behaves
+   * as it always did. Never rejects: a credential that cannot be read is no
+   * reason to withhold the protocol.
+   */
+  const [credential] = useState(() => syncTarget().then(moduleCredential, () => null));
 
   const source = handoverUrl({
     moduleUrl,
@@ -100,17 +113,22 @@ export function NarrativeStep(props: NarrativeStepProps) {
       if (!message) return;
       if (message.kind === "ready") {
         // Every time it says so, so a module that reloads is sent it again.
-        // Addressed to the module's origin, so nothing else in the frame can
-        // read it.
-        if (definition !== undefined) {
-          frame.current?.contentWindow?.postMessage({ type: PROTOCOL_MESSAGE, protocol: definition }, origin);
-        }
+        // Addressed to the module's origin and only to this step's own frame,
+        // so nothing else can read it — it carries this iPad's credential.
+        void answerReady({
+          asker: event.source,
+          frame: () => frame.current?.contentWindow,
+          moduleOrigin: origin,
+          definition,
+          credential,
+        });
         return;
       }
       if (message.kind === "refused") {
         // It will not run what this release froze, and says so rather than run
-        // something else. The way past is offered at once: waiting would change
-        // nothing.
+        // something else — or this iPad's MyStory is over for today (D-55),
+        // which can be said mid-conversation. Either way the way past is
+        // offered at once: waiting would change nothing.
         setRefused(true);
         setPatient(false);
         onEvent("narrative_refused", { protocol, protocolVersion, problem: message.problem });
@@ -121,7 +139,7 @@ export function NarrativeStep(props: NarrativeStepProps) {
     };
     window.addEventListener("message", onMessage);
     return () => window.removeEventListener("message", onMessage);
-  }, [onEvent, protocol, protocolVersion, sessionId, source, definition]);
+  }, [onEvent, protocol, protocolVersion, sessionId, source, definition, credential]);
 
   return (
     <div className="narrative-step">
@@ -152,7 +170,7 @@ export function NarrativeStep(props: NarrativeStepProps) {
         !patient && (
           <div className="narrative-after">
             <p className="note">
-              {refused ? "The conversation cannot start on this device. You" : "If the conversation will not load, you"}{" "}
+              {refused ? "The conversation cannot go ahead on this device. You" : "If the conversation will not load, you"}{" "}
               {last ? "can finish without it" : "can carry on with the rest of the survey"} — nothing you have already
               answered is affected.
             </p>

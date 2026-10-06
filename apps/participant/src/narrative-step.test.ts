@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { handoverUrl as buildHandoverUrl, readModuleMessage } from "./lib/narrative.js";
+import {
+  answerReady,
+  handoverUrl as buildHandoverUrl,
+  moduleCredential,
+  protocolMessage,
+  readModuleMessage,
+  type ModuleFrame,
+} from "./lib/narrative.js";
 
 /**
  * The hand-over from the survey to the module.
@@ -128,5 +135,120 @@ describe("the rest of the conversation with the module", () => {
     expect(
       readModuleMessage({ origin: expected.origin, data: { type: "mystory:finished", reason: "stopped" } }, expected),
     ).toEqual({ kind: "finished", reason: "stopped" });
+  });
+});
+
+describe("handing the module this iPad's credential (D-55)", () => {
+  /**
+   * The module needs something the relay accepts, and a child has no account.
+   * The survey has the credential it files sittings with, so it hands that over
+   * — by message, to the module's origin, and only to its own frame. These are
+   * the things the hand-over gets wrong silently: a secret in a URL, a secret
+   * posted to whatever asked, or a protocol withheld because the secret could
+   * not be read.
+   */
+  const SECRET = "s".repeat(43);
+  const target = { url: "https://example.test/saveSitting", credential: `Device ipad_01ABC.${SECRET}`, installId: "ipad_01ABC" };
+  const MODULE = "https://faisalmushtaq.github.io";
+  const definition = { key: "np.phone_wellbeing", version: "0.1.0" };
+
+  /** A frame that records what it was sent, and where. */
+  function frameRecording(): ModuleFrame & { sent: { message: unknown; origin: string }[] } {
+    const sent: { message: unknown; origin: string }[] = [];
+    return { sent, postMessage: (message, origin) => void sent.push({ message, origin }) };
+  }
+
+  it("is the secret the survey files sittings with, without the scheme the module adds itself", () => {
+    expect(moduleCredential(target)).toBe(`ipad_01ABC.${SECRET}`);
+    // A build that files nowhere has none, and the module asks for sign-in as before.
+    expect(moduleCredential(null)).toBeNull();
+    expect(moduleCredential({ credential: "Bearer something" })).toBeNull();
+    expect(moduleCredential({ credential: "Device " })).toBeNull();
+  });
+
+  it("travels with the protocol, and is left out when there is none", () => {
+    expect(protocolMessage(definition, "ipad_01ABC.x")).toEqual({
+      type: "myself:narrative-protocol",
+      protocol: definition,
+      deviceCredential: "ipad_01ABC.x",
+    });
+    expect(protocolMessage(definition, null)).toEqual({ type: "myself:narrative-protocol", protocol: definition });
+    expect(protocolMessage(undefined, "ipad_01ABC.x")).toBeNull();
+  });
+
+  it("is sent to the module's origin, in answer to its own frame saying it is ready", async () => {
+    const frame = frameRecording();
+    const sent = await answerReady({
+      asker: frame,
+      frame: () => frame,
+      moduleOrigin: MODULE,
+      definition,
+      credential: Promise.resolve(moduleCredential(target)),
+    });
+    expect(sent).toBe(true);
+    expect(frame.sent).toEqual([
+      {
+        message: { type: "myself:narrative-protocol", protocol: definition, deviceCredential: `ipad_01ABC.${SECRET}` },
+        origin: MODULE,
+      },
+    ]);
+  });
+
+  it("is not sent to anything else that says it is ready", async () => {
+    // On GitHub Pages the survey and the module share an origin, so the origin
+    // check alone would let any other page of the site ask for it.
+    const frame = frameRecording();
+    const stranger = frameRecording();
+    const sent = await answerReady({
+      asker: stranger,
+      frame: () => frame,
+      moduleOrigin: MODULE,
+      definition,
+      credential: Promise.resolve("ipad_01ABC.x"),
+    });
+    expect(sent).toBe(false);
+    expect(frame.sent).toEqual([]);
+    expect(stranger.sent).toEqual([]);
+  });
+
+  it("is not sent to a frame that was replaced while the credential was being read", async () => {
+    const first = frameRecording();
+    const second = frameRecording();
+    let current: ModuleFrame = first;
+    let release: (value: string | null) => void = () => undefined;
+    const pending = answerReady({
+      asker: first,
+      frame: () => current,
+      moduleOrigin: MODULE,
+      definition,
+      credential: new Promise((resolve) => (release = resolve)),
+    });
+    current = second;
+    release("ipad_01ABC.x");
+    expect(await pending).toBe(false);
+    expect(first.sent).toEqual([]);
+    expect(second.sent).toEqual([]);
+  });
+
+  it("still sends the protocol when the credential cannot be read", async () => {
+    const frame = frameRecording();
+    await answerReady({
+      asker: frame,
+      frame: () => frame,
+      moduleOrigin: MODULE,
+      definition,
+      credential: Promise.reject(new Error("storage unavailable")),
+    });
+    expect(frame.sent).toEqual([{ message: { type: "myself:narrative-protocol", protocol: definition }, origin: MODULE }]);
+  });
+
+  it("is never in the address the module is opened at", () => {
+    // Pinned as the whole list, so a parameter added later is a decision somebody
+    // makes here rather than a secret that drifts into history and logs.
+    const url = buildHandoverUrl({ ...base, firstName: "Amara", sendsProtocol: true });
+    expect([...url.searchParams.keys()].sort()).toEqual(
+      ["embed", "name", "protocol", "protocolFromHost", "releaseHash", "sessionId", "start", "view"].sort(),
+    );
+    expect(url.toString()).not.toContain(SECRET);
   });
 });
