@@ -179,9 +179,21 @@ export function moduleProblems(fragment: StudioFragment): Issue[] {
   throw new Error("moduleProblems: not implemented yet");
 }
 
-/** The canonical JSON a module version stores, and its `sha256:` hash. */
-export async function moduleContent(fragment: StudioFragment): Promise<{ content: string; contentHash: string }> {
+/**
+ * The canonical JSON a module version stores, and its `sha256:` hash.
+ *
+ * The stored piece's origin is `{ kind: "module", moduleId, version,
+ * contentHash: "" }` — the hash cannot be inside what it hashes — and the
+ * functions fill `contentHash` in when they hand a version out. Whatever origin
+ * the saving editor sent is replaced, so the hash depends only on the content,
+ * the module and the version.
+ */
+export async function moduleContent(
+  fragment: StudioFragment,
+  module: { moduleId: string; version: number },
+): Promise<{ content: string; contentHash: string }> {
   void fragment;
+  void module;
   throw new Error("moduleContent: not implemented yet");
 }
 
@@ -189,6 +201,23 @@ export async function moduleContent(fragment: StudioFragment): Promise<{ content
 export function questionCount(fragment: StudioFragment): number {
   void fragment;
   throw new Error("questionCount: not implemented yet");
+}
+
+/**
+ * After a block is saved to the library: record in the saving draft that its
+ * questions are now that module's version, so a later version of the module
+ * gives this survey an update notice too. `fragment` is the saved piece with
+ * its module origin (contentHash filled in).
+ */
+export function recordSavedModule(
+  draft: StudioDraft,
+  fragment: StudioFragment,
+  opts: { by: string; byEmail: string; at: string; importId?: string },
+): { draft: StudioDraft } {
+  void draft;
+  void fragment;
+  void opts;
+  throw new Error("recordSavedModule: not implemented yet");
 }
 
 /** A module copy with a newer version available and not dismissed. */
