@@ -52,6 +52,25 @@ describe("restoring a version into the draft", () => {
     expect(merged.draft.retiredCodes["scale.kept_for_ever"]).toEqual([{ code: 7, label: "Old answer", retiredAt: AT }]);
   });
 
+  it("keeps where copied questions came from: the draft's records and the restored version's, each once (D-57)", () => {
+    const record = (id: string, hash: string) => ({
+      id,
+      at: AT,
+      by: "u_ed",
+      byEmail: "ed@example.org",
+      origin: { kind: "release" as const, study: "future", surveyId: "future_main", version: "1.0.0", hash },
+      items: { "ybm_gaming.hours_week": "ybm_gaming.hours_week" },
+    });
+    const now = { ...current(), imports: [record("imp_now", "sha256:" + "1".repeat(64)), record("imp_both", "sha256:" + "2".repeat(64))] };
+    const fromVersion = [record("imp_both", "sha256:" + "2".repeat(64)), record("imp_then", "sha256:" + "3".repeat(64))];
+    const merged = mergeRestore(draftOf("7.0.1"), now, { at: AT, by: "u_pub", publishedCodes: new Map(), imports: fromVersion });
+    expect(merged.draft.imports?.map((r) => r.id)).toEqual(["imp_now", "imp_both", "imp_then"]);
+    // Neither side has any: the draft gains no empty list.
+    expect(mergeRestore(draftOf("7.0.1"), current(), { at: AT, by: "u_pub", publishedCodes: new Map() }).draft.imports).toBeUndefined();
+    // An unreadable draft still gets the version's own.
+    expect(mergeRestore(draftOf("7.0.1"), null, { at: AT, by: "u_pub", publishedCodes: new Map(), imports: fromVersion }).draft.imports).toHaveLength(2);
+  });
+
   it("keeps the current scoring rules, so going back to older wording never brings back scoring that was put right", () => {
     // r7.0.1 predates the SWEMWBS and STAI-5 fixes of r7.2.0.
     const merged = mergeRestore(draftOf("7.0.1"), current(), { at: AT, by: "u_pub", publishedCodes: new Map() });

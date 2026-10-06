@@ -1066,6 +1066,62 @@ describe("two study spaces", () => {
   });
 });
 
+// ─────────────────────────────────────────────────────────────────────────────
+// The item library (D-57, docs/16 §12.6)
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("the item library", () => {
+  const MODULE = paths.studioLibraryModule("sleep_habits");
+  const VERSION_1 = paths.studioLibraryVersion("sleep_habits", 1);
+  const seedLibrary = () =>
+    seed(async (db) => {
+      await setDoc(doc(db, MODULE), { moduleId: "sleep_habits", title: "Sleep habits", latestVersion: 1, retired: false, createdBy: "u_editor" });
+      await setDoc(doc(db, VERSION_1), { moduleId: "sleep_habits", version: 1, content: "{}", contentHash: `sha256:${"0".repeat(64)}` });
+    });
+
+  /** Everybody who might try: every Studio role, an owner, the project's people, an iPad, a stranger and nobody. */
+  const everyone = (): Array<[string, Db]> => [
+    ...STUDIO_ROLES.map((role) => [role, member(role).db] as [string, Db]),
+    ["owner", caller("u_owner", { role: "owner", email: "owner@leeds.test" }).db],
+    ["researcher", caller("u_r", { role: "researcher" }).db],
+    ["an iPad", caller("ipad_1", { device: true, study: STUDY }).db],
+    ["a stranger", google("u_stranger", "stranger@example.org").db],
+    ["signed out", nobody()],
+  ];
+
+  it("is closed to every browser for reading: functions alone hand it out, checking access and hashes", async () => {
+    await seedLibrary();
+    for (const [who, db] of everyone()) {
+      await refused(`${who}: get a module`, () => getDoc(doc(db, MODULE)));
+      await refused(`${who}: list the modules`, () => getDocs(collection(db, paths.studioLibrary())));
+      await refused(`${who}: get a version`, () => getDoc(doc(db, VERSION_1)));
+      await refused(`${who}: list the versions`, () => getDocs(collection(db, paths.studioLibraryVersions("sleep_habits"))));
+      await refused(`${who}: query the shelf`, () => getDocs(query(collection(db, paths.studioLibrary()), where("retired", "==", false))));
+    }
+  });
+
+  it("is closed to every browser for writing: a save is a function's, checked and audited", async () => {
+    await seedLibrary();
+    for (const [who, db] of everyone()) {
+      await refused(`${who}: create a module`, () => setDoc(doc(db, paths.studioLibraryModule("forged")), { title: "Forged", latestVersion: 1 }));
+      await refused(`${who}: retitle a module`, () => updateDoc(doc(db, MODULE), { title: "Renamed" }));
+      await refused(`${who}: retire a module`, () => updateDoc(doc(db, MODULE), { retired: true }));
+      await refused(`${who}: delete a module`, () => deleteDoc(doc(db, MODULE)));
+      await refused(`${who}: add a version`, () => setDoc(doc(db, paths.studioLibraryVersion("sleep_habits", 2)), { content: "{}" }));
+      await refused(`${who}: rewrite a version`, () => updateDoc(doc(db, VERSION_1), { content: '{"evil":true}' }));
+      await refused(`${who}: delete a version`, () => deleteDoc(doc(db, VERSION_1)));
+    }
+  });
+
+  it("cannot be enumerated with a collection-group query either", async () => {
+    await seedLibrary();
+    for (const [who, db] of everyone()) {
+      await refused(`${who}: collection group studioLibrary`, () => getDocs(collectionGroup(db, "studioLibrary")));
+      await refused(`${who}: collection group versions`, () => getDocs(collectionGroup(db, "versions")));
+    }
+  });
+});
+
 // Review addition. The emulator ignores firestore.indexes.json, so nothing else
 // would notice these going missing; production would. The fieldOverrides are
 // the task's (docs/16 §5.2: the big strings and the audit detail are never
@@ -1083,6 +1139,8 @@ describe("firestore.indexes.json", () => {
       ["draft", "content"],
       ["publicReleases", "manifest"],
       ["studioAudit", "detail"],
+      // A saved module's piece, up to 200,000 characters (D-57).
+      ["versions", "content"],
     ]) {
       const override = spec.fieldOverrides.find((o) => o.collectionGroup === group && o.fieldPath === field);
       expect(override, `${group}.${field}`).toBeDefined();

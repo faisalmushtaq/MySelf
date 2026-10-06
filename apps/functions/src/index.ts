@@ -33,5 +33,10 @@ export {
   studioResponseStats,
   studioCreateStudy,
   studioSetStudy,
+  studioLibraryCatalogue,
+  studioLibraryModules,
+  studioLibraryModule,
+  studioLibrarySaveModule,
+  studioLibrarySetModule,
   onStudioDraftWritten,
 } from "./studio/functions.js";

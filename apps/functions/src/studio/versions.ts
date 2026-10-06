@@ -8,6 +8,7 @@ import {
   serialiseDraft,
   type ActivateVersionResponse,
   type ArchivedQuestion,
+  type ImportRecord,
   type InstrumentOrModule,
   type PublishedPointerDoc,
   type RestoreVersionResponse,
@@ -75,6 +76,11 @@ function shellOf(def: InstrumentOrModule): InstrumentOrModule {
  * - UNLOCKS ARE NOT KEPT. An unlock is an acknowledgement for a change to
  *   protected content; restoring a published version returns that content to
  *   an approved state, and a further change needs a fresh acknowledgement.
+ * - PROVENANCE IS KEPT (D-57, docs/16 §12.5): the current draft's records of
+ *   where copied questions came from, and the restored version's own, each
+ *   once. A release lists questions, not where they were copied from, so
+ *   without this a restore would forget it — and a copied validated
+ *   questionnaire would lose the release that vouches for it at publish.
  *
  * When the current draft cannot be read at all, the version is restored as it
  * is: restoring is how a broken draft is recovered, so it cannot depend on the
@@ -83,11 +89,14 @@ function shellOf(def: InstrumentOrModule): InstrumentOrModule {
 export function mergeRestore(
   restored: StudioDraft,
   current: StudioDraft | null,
-  opts: { at: string; by: string; publishedCodes: Map<string, Map<number, string>> },
+  opts: { at: string; by: string; publishedCodes: Map<string, Map<number, string>>; imports?: ImportRecord[] | undefined },
 ): RestoreMerge {
   const d = structuredClone(restored);
   d.unlocked = {};
   const archivedNow: string[] = [];
+  const imports = [...(current?.imports ?? [])];
+  for (const record of opts.imports ?? []) if (!imports.some((r) => r.id === record.id)) imports.push(structuredClone(record));
+  if (imports.length > 0) d.imports = structuredClone(imports);
 
   if (current) {
     d.notes = structuredClone(current.notes ?? {});
@@ -185,6 +194,7 @@ export async function restoreVersion(db: Firestore, args: RestoreArgs): Promise<
       at: now().toISOString(),
       by: actor.uid,
       publishedCodes: publishedScaleCodes([...releases.values()].map((r) => r.raw)),
+      imports: Array.isArray(target.imports) ? target.imports : undefined,
     });
     const content = serialiseDraft(merged.draft);
     if (content.length > MAX_DRAFT_CHARS) {

@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { STUDY_ID_PATTERN } from "@myself/schema";
-import { STUDIO_ROLES, STUDY_STATUSES } from "@myself/studio";
+import { MODULE_ID_PATTERN, STUDIO_ROLES, STUDY_STATUSES } from "@myself/studio";
 import { domainKey, emailKey, isDomainKey, isEmailKey } from "./domains.js";
 
 /**
@@ -46,10 +46,21 @@ export const sessionRequest = z.object({});
 
 export const importLiveRequest = z.object({ surveyId: surveyIdField });
 
+/**
+ * A study space's id (D-56): the participant link's pattern, so a study the
+ * Studio creates is one a link can name. Its own document id, so it is held to
+ * the pattern before anything is read.
+ */
+export const studyField = z
+  .string()
+  .regex(STUDY_ID_PATTERN, "must be a study id: 2 to 40 lower-case letters, numbers and underscores, starting with a letter");
+
 export const createSurveyRequest = z.object({
   surveyId: newSurveyIdField,
   title: z.string().trim().min(1, "give the survey a title").max(200, "must be at most 200 characters"),
-  from: z.object({ surveyId: surveyIdField, version: versionField }).nullable().optional(),
+  // `study` copies from another study space's published version (D-57, docs/16
+  // §12.7); absent means this one. Checked against the registry by the core.
+  from: z.object({ surveyId: surveyIdField, version: versionField, study: studyField.optional() }).nullable().optional(),
 });
 
 export const publishRequest = z.object({
@@ -96,15 +107,6 @@ export const setDomainRequest = z.object({
 
 export const responseStatsRequest = z.object({ surveyId: surveyIdField });
 
-/**
- * A study space's id (D-56): the participant link's pattern, so a study the
- * Studio creates is one a link can name. Its own document id, so it is held to
- * the pattern before anything is read.
- */
-export const studyField = z
-  .string()
-  .regex(STUDY_ID_PATTERN, "must be a study id: 2 to 40 lower-case letters, numbers and underscores, starting with a letter");
-
 const studyTitleField = z.string().trim().min(1, "give the study space a title").max(120, "must be at most 120 characters");
 
 export const createStudyRequest = z.object({ study: studyField, title: studyTitleField });
@@ -113,7 +115,81 @@ export const setStudyRequest = z
   .object({ study: studyField, title: studyTitleField.optional(), status: z.enum(STUDY_STATUSES).optional() })
   .refine((r) => r.title !== undefined || r.status !== undefined, "say what to change: the title, or open or closed");
 
+// ---------------------------------------------------------------------------
+// The item library (D-57, docs/16 §12)
+// ---------------------------------------------------------------------------
+
+/** A saved module's id: its document id under `studioLibrary`, held to the contract's pattern. */
+export const moduleIdField = z
+  .string()
+  .regex(MODULE_ID_PATTERN, "must be a module ID: up to 64 lower-case letters, numbers and underscores, starting with a letter");
+
+const moduleVersionField = z.number().int("must be a whole number").min(1, "must be 1 or more").max(1_000_000);
+
+export const MAX_MODULE_TAGS = 12;
+export const MAX_TAG_CHARS = 40;
+
+/**
+ * A module's tags, as the shelf searches them: trimmed, single-spaced,
+ * lower-cased and each once, so "Sleep" and " sleep " are one tag. At most
+ * twelve, each at most forty characters, once tidied.
+ */
+export const tagsField = z
+  .array(z.string().max(200, "a tag must be at most 200 characters"))
+  .max(50, "must be at most 50 tags")
+  .transform((tags) => [...new Set(tags.map((t) => t.replace(/\s+/g, " ").trim().toLowerCase()).filter((t) => t.length > 0))])
+  .refine((tags) => tags.length <= MAX_MODULE_TAGS, `must be at most ${MAX_MODULE_TAGS} tags`)
+  .refine((tags) => tags.every((t) => t.length <= MAX_TAG_CHARS), `each tag must be at most ${MAX_TAG_CHARS} characters`);
+
+const moduleTitleField = z.string().trim().min(1, "give the module a title").max(120, "must be at most 120 characters");
+const moduleDescriptionField = z.string().trim().max(1_000, "must be at most 1,000 characters");
+
+export const libraryCatalogueRequest = z.object({});
+
+export const libraryModulesRequest = z.object({ includeRetired: z.boolean().optional() });
+
+export const libraryModuleRequest = z.object({ moduleId: moduleIdField, version: moduleVersionField.optional() });
+
+/**
+ * Save a piece as a new module (`create`) or as the next version of one
+ * (`moduleId` and the `baseVersion` it was made from). The piece itself is
+ * only required to be an object here: what it holds is checked by
+ * `moduleProblems`, which says what is wrong in the researcher's terms.
+ */
+export const librarySaveModuleRequest = z
+  .object({
+    surveyId: surveyIdField,
+    draftRevision: revisionField.nullable().optional(),
+    create: z
+      .object({ moduleId: moduleIdField, title: moduleTitleField, description: moduleDescriptionField, tags: tagsField })
+      .nullable()
+      .optional(),
+    moduleId: moduleIdField.nullable().optional(),
+    baseVersion: moduleVersionField.nullable().optional(),
+    note: z.string().trim().max(500, "must be at most 500 characters"),
+    fragment: z.record(z.string(), z.unknown()),
+  })
+  .refine(
+    (r) => (r.create ? r.moduleId == null && r.baseVersion == null : r.moduleId != null && r.baseVersion != null),
+    "say either which new module to create, or which module and version this is the next version of",
+  );
+
+export const librarySetModuleRequest = z
+  .object({
+    moduleId: moduleIdField,
+    title: moduleTitleField.optional(),
+    description: moduleDescriptionField.optional(),
+    tags: tagsField.optional(),
+    retired: z.boolean().optional(),
+  })
+  .refine(
+    (r) => r.title !== undefined || r.description !== undefined || r.tags !== undefined || r.retired !== undefined,
+    "say what to change: the title, description, tags, or whether it is retired",
+  );
+
 export type CreateSurveyInput = z.output<typeof createSurveyRequest>;
+export type LibrarySaveModuleInput = z.output<typeof librarySaveModuleRequest>;
+export type LibrarySetModuleInput = z.output<typeof librarySetModuleRequest>;
 export type PublishInput = z.output<typeof publishRequest>;
 export type RestoreVersionInput = z.output<typeof restoreVersionRequest>;
 export type ActivateVersionInput = z.output<typeof activateVersionRequest>;

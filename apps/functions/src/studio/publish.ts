@@ -1,4 +1,4 @@
-import { FieldValue, type Firestore } from "firebase-admin/firestore";
+import { FieldValue, type Firestore, type Transaction } from "firebase-admin/firestore";
 import { buildRelease, PublishGateError } from "@myself/release";
 import { requiredEngineVersion } from "@myself/release/gate";
 import { verifyRawManifestHash, type ReleaseManifest } from "@myself/schema";
@@ -7,7 +7,11 @@ import {
   compileDraft,
   describeError,
   diffDrafts,
+  importedReleases,
+  importsForVersion,
+  lockVouchers,
   manifestIndex,
+  MAX_IMPORTED_RELEASES,
   parseDraft,
   publishedProtocols,
   publishedScaleCodes,
@@ -22,6 +26,7 @@ import {
   type VersionDoc,
 } from "@myself/studio";
 import { bundledManifests } from "../releases.js";
+import { lookupStudy } from "../studies.js";
 import { auditRow, newAuditRef, type AuditActor } from "./audit.js";
 import { problem, refuse } from "./errors.js";
 import {
@@ -33,8 +38,11 @@ import {
   licenceEscapes,
   lockBaseline,
   readReleases,
+  readReleasesAt,
   readSurveyState,
+  releaseAtKey,
   surveyRefs,
+  type ReleaseAt,
   type VerifiedRelease,
 } from "./store.js";
 
@@ -181,13 +189,13 @@ export async function publish(db: Firestore, args: PublishArgs): Promise<Publish
     if (existing) throw refuse.versionTaken(version);
 
     // Every release this survey has published, verified, plus the one a
-    // never-published survey was created from.
+    // never-published survey was created from — in its own study's store,
+    // which for a copy from another study space is that study's (D-57).
     const releases = await readReleases(tx, refs, historyHashes(state));
     const activeRelease: VerifiedRelease | null = state.survey.active ? releases.get(state.survey.active.hash) ?? null : null;
+    const basedOnAt: ReleaseAt | null = state.draft.basedOn ? { study: state.draft.basedOn.study ?? study, hash: state.draft.basedOn.hash } : null;
     let origin: VerifiedRelease | null = null;
-    if (!activeRelease && state.draft.basedOn) {
-      origin = (await readReleases(tx, refs, [state.draft.basedOn.hash])).get(state.draft.basedOn.hash) ?? null;
-    }
+    if (!activeRelease && basedOnAt) origin = await readOrigin(tx, db, refs, study, basedOnAt);
 
     let draft: StudioDraft;
     try {
@@ -198,15 +206,38 @@ export async function publish(db: Firestore, args: PublishArgs): Promise<Publish
       ]);
     }
 
+    // The releases the draft says it copied from (docs/16 §12.4), each read
+    // from its own study's store and verified against its hash. Naming one
+    // proves nothing by itself: it vouches only for content that matches
+    // what it froze, exactly, and only once it has been read and verified.
+    const known = new Map<string, VerifiedRelease>();
+    for (const r of releases.values()) known.set(releaseAtKey({ study, hash: r.hash }), r);
+    if (origin && basedOnAt) known.set(releaseAtKey(basedOnAt), origin);
+    const imported = await readImported(tx, db, study, draft, known);
+    const vouching = imported.map((i) => i.release);
+    const vouchingDrafts = vouching.flatMap((r) => {
+      // A release too old for today's schema (docs/16 R12) is not one the
+      // Studio could have copied from, and so vouches for nothing.
+      try {
+        return [draftOf(r)];
+      } catch {
+        return [];
+      }
+    });
+
     // The same validation the editor runs, with the same context — the live
     // version as the baseline, every ID, code and MyStory protocol ever
-    // published — plus the checks only the server can be trusted with.
+    // published, and the same vouchers for copied questionnaires (the
+    // instrument library and the releases above) — plus the checks only the
+    // server can be trusted with.
     const baseline = activeRelease ? draftOf(activeRelease) : null;
     const versions = [...state.versions.values()];
     const published = [...releases.values()].map((r) => r.raw);
+    const copiedFrom = vouching.map((r) => r.raw);
     const issues: Issue[] = [
       ...identityIssues(draft, surveyId, study),
-      ...licenceEscapes(draft, origin ? [...published, origin.raw] : published),
+      // A licence is the library's and the releases', never the draft's.
+      ...licenceEscapes(draft, [...published, ...(origin ? [origin.raw] : []), ...copiedFrom, { instruments: LIBRARY.reference }]),
       ...validateDraft(draft, {
         reserved: reservedFrom(versions),
         baseline: baseline ?? lockBaseline(origin ? draftOf(origin) : null, draft),
@@ -214,6 +245,7 @@ export async function publish(db: Firestore, args: PublishArgs): Promise<Publish
         // A survey copied from another's version may republish the protocol
         // that version froze, exactly as it froze it.
         publishedProtocols: publishedProtocols(origin ? [origin.raw, ...published] : published),
+        ...lockVouchers({ releases: vouchingDrafts, library: true, draft }),
       }),
     ];
     if (issues.some((i) => i.severity === "error")) throw refuse.invalid(describeRefusedDraft(issues, draft), issues);
@@ -265,12 +297,11 @@ export async function publish(db: Firestore, args: PublishArgs): Promise<Publish
     // The files the release pins must be ones a release already pinned (D-52):
     // this survey's history, the version it was copied from, or a release in
     // the repository.
-    const basedOn = state.draft.basedOn
-      ? (origin ?? (await readReleases(tx, refs, [state.draft.basedOn.hash])).get(state.draft.basedOn.hash) ?? null)
-      : null;
+    const basedOn = basedOnAt ? (origin ?? (await readOrigin(tx, db, refs, study, basedOnAt))) : null;
     const pinIssues = assetEscapes(manifest.assets, [
       ...published,
       ...(basedOn ? [basedOn.raw] : []),
+      ...copiedFrom,
       ...bundledManifests.map((b) => b.raw as Record<string, unknown>),
     ]);
     if (pinIssues.length > 0) throw refuse.invalid(describeRefusedDraft(pinIssues, draft), pinIssues);
@@ -301,6 +332,8 @@ export async function publish(db: Firestore, args: PublishArgs): Promise<Publish
     const generation = (state.pointer?.generation ?? 0) + 1;
     const index = manifestIndex(JSON.parse(json));
     const taken = bumpTaken(latest, version, required);
+    // Provenance for the questions this version asks (docs/16 §12.5).
+    const imports = importsForVersion(draft);
 
     // ── Writes: all of them, or (if anything above threw) none ────────────
     if (!storedRelease.exists) {
@@ -331,6 +364,7 @@ export async function publish(db: Firestore, args: PublishArgs): Promise<Publish
       source: "studio",
       draftRevision: expectedRevision,
       basedOnVersion: state.draft.basedOn?.version ?? null,
+      ...(imports.length > 0 ? { imports } : {}),
       authors: authorsOf(state.survey.draftEditors, state.draft),
       publishedAt: FieldValue.serverTimestamp(),
       publishedBy: actor.uid,
@@ -377,9 +411,78 @@ export async function publish(db: Firestore, args: PublishArgs): Promise<Publish
         counts: summary.counts,
         draftRevision: expectedRevision,
         generation,
+        copiedFrom: imported.map((i) => i.at),
       }),
     );
 
     return { surveyId, version, hash, releaseKey, generation, alreadyPublished: false };
   });
+}
+
+// ---------------------------------------------------------------------------
+// Releases from other study spaces (D-57, docs/16 §12.4, §12.7)
+// ---------------------------------------------------------------------------
+
+/** The instrument library as `freezeRelease` freezes it: what a licence is checked against beside the releases. */
+const LIBRARY = lockVouchers({ releases: [], library: true });
+
+/**
+ * The release a draft was copied from: in this study's store, or — for a copy
+ * from another study space — in that one's, once the study is shown to be one
+ * this project runs. Verified against its hash either way.
+ */
+async function readOrigin(tx: Transaction, db: Firestore, refs: ReturnType<typeof surveyRefs>, study: string, at: ReleaseAt): Promise<VerifiedRelease | null> {
+  if (at.study === study) return (await readReleases(tx, refs, [at.hash])).get(at.hash) ?? null;
+  await requireStudy(db, at.study, "was copied from");
+  const read = await readReleasesAt(tx, db, [at], (a, why) =>
+    refuse.invalid(
+      `This survey was copied from a published version in the study space “${a.study}” (${a.hash.slice(0, 19)}…), and that version can't be checked: ${why}. Nothing was published. Tell the study's technical lead.`,
+      [problem("store.release_unreadable", `The release ${a.hash} in “${a.study}” can't be used: ${why}.`)],
+    ),
+  );
+  return read.get(releaseAtKey(at)) ?? null;
+}
+
+/** A study space a draft names must be one this project runs; a request or a draft naming one makes nothing so. */
+async function requireStudy(db: Firestore, other: string, what: string): Promise<void> {
+  const found = await lookupStudy(db, other);
+  if (found.kind === "registered") return;
+  const why = found.kind === "malformed" ? "isn't a study id" : "doesn't exist";
+  const message = `This draft says it ${what} the study space “${found.kind === "malformed" ? found.raw : found.study}”, which ${why}, so it can't be checked. Nothing was published. Remove what was copied from it, or copy it again from the library.`;
+  throw refuse.invalid(message, [problem("imports.unknown_study", message)]);
+}
+
+/**
+ * The releases the draft's provenance names (`importedReleases`), verified —
+ * at most MAX_IMPORTED_RELEASES of them, read in one round trip, each from its
+ * own study's store. A release already read for this publish is not read
+ * again. Refuses the publish, saying which, if any is over the cap, names a
+ * study this project does not run, or is missing or fails its hash: a voucher
+ * that cannot be checked vouches for nothing, and the researcher needs to know
+ * which copy to redo.
+ */
+async function readImported(
+  tx: Transaction,
+  db: Firestore,
+  study: string,
+  draft: StudioDraft,
+  known: Map<string, VerifiedRelease>,
+): Promise<{ at: ReleaseAt; release: VerifiedRelease }[]> {
+  const { releases: named, overLimit } = importedReleases(draft);
+  if (overLimit > 0) {
+    const message =
+      `This draft copies questions from ${named.length + overLimit} different published versions, and one publish can check at most ${MAX_IMPORTED_RELEASES}. ` +
+      `Nothing was published. Copy the questions again from fewer versions, or publish part of the change first.`;
+    throw refuse.invalid(message, [problem("imports.too_many", message)]);
+  }
+  for (const other of new Set(named.map((r) => r.study))) if (other !== study) await requireStudy(db, other, "copied questions from");
+  const missing = named.filter((at) => !known.has(releaseAtKey(at)));
+  const read = await readReleasesAt(tx, db, missing, (at, why) =>
+    refuse.invalid(
+      `This draft copied questions from a published version that can't be checked (study space “${at.study}”, release ${at.hash.slice(0, 19)}…): ${why}. ` +
+        `Nothing was published. Remove what was copied from it, or copy it again from the library.`,
+      [problem("imports.release_unreadable", `The release ${at.hash} in “${at.study}” can't be used: ${why}.`)],
+    ),
+  );
+  return named.map((at) => ({ at, release: known.get(releaseAtKey(at)) ?? read.get(releaseAtKey(at))! }));
 }

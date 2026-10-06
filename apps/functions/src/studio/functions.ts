@@ -8,6 +8,7 @@ import type { RegisteredStudy } from "../studies.js";
 import { requireStudio, type StudioActor, type StudioToken } from "./access.js";
 import { recordDraftWrite, type DraftSide } from "./draft-trigger.js";
 import { parseRequest, problem, refuse } from "./errors.js";
+import { getModule, libraryCatalogue, listModules, saveModule, setModule } from "./library.js";
 import { setDomain, setMember } from "./members.js";
 import { publish } from "./publish.js";
 import {
@@ -15,6 +16,11 @@ import {
   createStudyRequest,
   createSurveyRequest,
   importLiveRequest,
+  libraryCatalogueRequest,
+  libraryModuleRequest,
+  libraryModulesRequest,
+  librarySaveModuleRequest,
+  librarySetModuleRequest,
   publishRequest,
   responseStatsRequest,
   restoreVersionRequest,
@@ -132,6 +138,59 @@ export const studioSetDomain = studioCall("admin", (request, actor, study) => {
 export const studioResponseStats = studioCall("viewer", (request, _actor, study) => {
   const { surveyId } = parseRequest(responseStatsRequest, request.data);
   return responseStats(research(), { study: study.study, surveyId });
+});
+
+// ── The item library (D-57, docs/16 §12) ──────────────────────────────────
+// Every shelf is for anyone with Studio access to the study they are working
+// in (§12.8); saving and describing a module is an editor's, as any edit is.
+// `studioLibrary` is closed to browsers, so these are its only way in.
+
+/** Every study's published surveys and their versions — never a draft. */
+export const studioLibraryCatalogue = studioCall("viewer", (request) => {
+  parseRequest(libraryCatalogueRequest, request.data);
+  return libraryCatalogue(research());
+});
+
+/** The saved modules on the shelf. */
+export const studioLibraryModules = studioCall("viewer", (request) => {
+  const req = parseRequest(libraryModulesRequest, request.data);
+  return listModules(research(), { includeRetired: req.includeRetired === true });
+});
+
+/** One saved module at one version, with its piece, checked against its hash. */
+export const studioLibraryModule = studioCall("viewer", (request) => {
+  const req = parseRequest(libraryModuleRequest, request.data);
+  return getModule(research(), { moduleId: req.moduleId, ...(req.version !== undefined ? { version: req.version } : {}) });
+});
+
+/** Save a piece as a new module, or as the next version of one; audited in the caller's study. */
+export const studioLibrarySaveModule = studioCall("editor", (request, actor, study) => {
+  const req = parseRequest(librarySaveModuleRequest, request.data);
+  return saveModule(research(), {
+    study: study.study,
+    surveyId: req.surveyId,
+    draftRevision: req.draftRevision ?? null,
+    create: req.create ?? null,
+    moduleId: req.moduleId ?? null,
+    baseVersion: req.baseVersion ?? null,
+    note: req.note,
+    fragment: req.fragment,
+    actor,
+  });
+});
+
+/** Describe a module (an editor), or retire it or bring it back (its creator, or an owner). */
+export const studioLibrarySetModule = studioCall("editor", (request, actor, study) => {
+  const req = parseRequest(librarySetModuleRequest, request.data);
+  return setModule(research(), {
+    study: study.study,
+    moduleId: req.moduleId,
+    ...(req.title !== undefined ? { title: req.title } : {}),
+    ...(req.description !== undefined ? { description: req.description } : {}),
+    ...(req.tags !== undefined ? { tags: req.tags } : {}),
+    ...(req.retired !== undefined ? { retired: req.retired } : {}),
+    actor,
+  });
 });
 
 /**

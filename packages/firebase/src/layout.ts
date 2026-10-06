@@ -122,6 +122,21 @@ export const paths = {
   studioAccessConfig: (study: string) => `studies/${study}/studioAccess/config`,
   studioAudit: (study: string) => `studies/${study}/studioAudit`,
 
+  /**
+   * The Studio's item library: saved modules (D-57, docs/16 §12.6).
+   *
+   * PROJECT-WIDE, beside the studies rather than inside one, because the point
+   * is reuse across study spaces: a module saved in one study's Studio is on
+   * the shelf in every other. A module's versions are immutable and numbered
+   * from 1; saving again makes the next. CLOSED TO BROWSERS in the rules:
+   * functions alone read and write it, checking the caller's Studio access in
+   * the study they are working in, and audit each save in that study's trail.
+   */
+  studioLibrary: () => "studioLibrary",
+  studioLibraryModule: (moduleId: string) => `studioLibrary/${moduleId}`,
+  studioLibraryVersions: (moduleId: string) => `studioLibrary/${moduleId}/versions`,
+  studioLibraryVersion: (moduleId: string, version: number) => `studioLibrary/${moduleId}/versions/${version}`,
+
   /** identity project — a different Firebase project entirely */
   participants: (study: string) => `studies/${study}/participants`,
   participant: (study: string, code: string) => `studies/${study}/participants/${code}`,
