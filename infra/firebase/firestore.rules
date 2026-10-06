@@ -30,6 +30,12 @@ rules_version = '2';
  * `get`: the pointer to the live release and the release it points at, which
  * is what a participant's iPad used to receive compiled into the app.
  *
+ * Study spaces (D-56, docs/16 §11) add a third public document: the study's
+ * own, `studies/{study}`, its title and whether it is open. Everything below
+ * is scoped by the study in the path, so a place on one study's list is no
+ * place on another's; the `owner`, `researcher` and `analyst` claims are the
+ * project's, and reach every study, as they reached the only one before.
+ *
  * Participants never authenticate at all: the iPad is the authenticated party,
  * not the child using it.
  */
@@ -161,6 +167,20 @@ service cloud.firestore {
     }
 
     match /studies/{study} {
+
+      // ── The study itself: the registry (D-56, docs/16 §11.4) ─────────────
+      // Its title, whether it is open, and when. PUBLIC BY `get`, so an iPad
+      // given a link can tell a closed or unknown study before anybody types a
+      // code — which is why it holds nothing a poster could not: the creator
+      // is a uid here and an address only in the Studio audit trail. LISTED
+      // only by the project's people, so the dashboard can find every study
+      // and a stranger with the survey's URL cannot enumerate them. Written
+      // only by the owner-only functions that create, rename, close and
+      // reopen a study; nobody deletes one. These rules apply to the document
+      // alone: every collection beneath it keeps its own rules below.
+      allow get: if true;
+      allow list: if isPerson();
+      allow write: if false;
 
       // ── Sittings ────────────────────────────────────────────────────────
       match /sessions/{sessionId} {
@@ -360,13 +380,16 @@ service cloud.firestore {
       // That manifest is exactly what every participant already downloads
       // inside the app today, so making it readable discloses nothing new.
       //
-      // `get` only, never `list`. A device asks for the one survey it runs and
-      // the one hash that pointer names; nobody needs to enumerate what else
-      // exists, so nobody can. Written only by the publish, rollback and
-      // import functions, in the transaction that audits them.
+      // `get` only, never `list`, for the public. A device asks for the one
+      // survey it runs and the one hash that pointer names; nobody needs to
+      // enumerate what else exists, so a stranger cannot. The project's people
+      // may list a study's pointers (D-56): that is how the dashboard finds
+      // the surveys with a live version in each study, and they already read
+      // every sitting filed under them. Written only by the publish, rollback
+      // and import functions, in the transaction that audits them.
       match /published/{surveyId} {
         allow get: if true;
-        allow list: if false;
+        allow list: if isPerson();
         allow write: if false;
       }
 
