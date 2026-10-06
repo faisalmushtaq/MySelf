@@ -1,4 +1,4 @@
-import { choiceKey, sameChoice, type LinkReading, type SurveyChoice } from "@myself/schema";
+import { choiceKey, isStudyId, isSurveyId, sameChoice, type LinkReading, type SurveyChoice } from "@myself/schema";
 import {
   getCachedRelease,
   getReleaseState,
@@ -219,10 +219,16 @@ export interface StoredChoice {
   row: SelectionRow | undefined;
 }
 
-/** The survey this iPad is set to, from its own storage: the default when nothing was ever chosen. */
+/**
+ * The survey this iPad is set to, from its own storage: the default when
+ * nothing was ever chosen — or when what is stored is not two ids a link could
+ * have carried, which only a damaged row could be. It is held to the same
+ * patterns as a link because it becomes part of an address the same way.
+ */
 export async function storedChoice(): Promise<StoredChoice> {
   const row = await getSelection();
-  return { choice: row ? { study: row.study, surveyId: row.surveyId } : DEFAULT_CHOICE, row };
+  const usable = row !== undefined && isStudyId(row.study) && isSurveyId(row.surveyId);
+  return { choice: usable ? { study: row.study, surveyId: row.surveyId } : DEFAULT_CHOICE, row: usable ? row : undefined };
 }
 
 /** Set this iPad to a survey. `lastLink` is kept unless a link is what set it. */
