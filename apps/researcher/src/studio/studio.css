@@ -972,12 +972,17 @@
   display: grid;
   gap: 8px;
   width: min(440px, calc(100vw - 32px));
+  /* The live regions are there, empty, all the time: only a toast takes a click,
+     never the gap between them, which sat over whatever was at the bottom of
+     the window (the library drawer's Add button). */
+  pointer-events: none;
 }
 .st-toasts > div {
   display: grid;
   gap: 8px;
 }
 .st-toast {
+  pointer-events: auto;
   display: flex;
   gap: 10px;
   align-items: flex-start;

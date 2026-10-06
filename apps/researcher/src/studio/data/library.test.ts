@@ -57,6 +57,23 @@ describe("shared library answers", () => {
     expect(keys.map((k) => cache.has(k))).toEqual([false, false, false, true]);
   });
 
+  it("asks again once an answer is older than a reader allows, showing the last one meanwhile", async () => {
+    const cache = new LibraryCache();
+    const load = vi.fn().mockResolvedValueOnce("first").mockResolvedValueOnce("second");
+    expect(cache.peek("catalogue|ybm")).toBeNull();
+    await cache.get("catalogue|ybm", load, 15_000, 1_000);
+    await cache.get("catalogue|ybm", load, 15_000, 10_000);
+    expect(load).toHaveBeenCalledTimes(1);
+    const fresher = cache.get("catalogue|ybm", load, 15_000, 20_000);
+    expect(cache.peek("catalogue|ybm")).toEqual({ value: "first" });
+    await expect(fresher).resolves.toBe("second");
+    expect(cache.peek("catalogue|ybm")).toEqual({ value: "second" });
+    // Forgotten on invalidation, but still shown until the next answer arrives.
+    cache.invalidate();
+    expect(cache.has("catalogue|ybm")).toBe(false);
+    expect(cache.peek("catalogue|ybm")).toEqual({ value: "second" });
+  });
+
   it("names a release by its study and hash", () => {
     expect(releaseRefKey({ study: "future", hash: "sha256:ab" })).toBe("future/sha256:ab");
   });

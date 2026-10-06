@@ -35,27 +35,43 @@ import type { Loadable } from "./types.js";
 // ── One answer per question, shared ───────────────────────────────────────
 
 /**
- * Answers in flight or arrived, by key. A failure is not kept, so asking again
- * asks the server again. `invalidate` forgets what can change (the lists, a
- * module's latest version) and tells every reader, which then asks again while
- * still showing what it had: a notice does not blink out while the list is
- * re-read. A module at a numbered version never changes (versions are
- * immutable), so that is kept.
+ * Answers in flight or arrived, by key, each with when it was asked for. A
+ * failure is not kept, so asking again asks the server again.
+ *
+ * FRESH ENOUGH, NOT FOREVER. Other people publish and save modules in their
+ * own tabs, so an answer older than the age a reader allows is asked for
+ * again — while the reader goes on showing the one it had (`peek`), so a list
+ * or a notice never blinks out to a skeleton. `invalidate`, after anything is
+ * saved to the library or published from here, forgets what can change and
+ * tells every reader at once. A module at a numbered version never changes
+ * (versions are immutable), so that is kept.
  */
 export class LibraryCache {
-  private readonly entries = new Map<string, Promise<unknown>>();
+  private readonly entries = new Map<string, { promise: Promise<unknown>; at: number }>();
+  /** The last answer each key settled on, kept across invalidation for `peek`. */
+  private readonly settled = new Map<string, unknown>();
   private readonly listeners = new Set<() => void>();
   private generation = 0;
 
-  get<T>(key: string, load: () => Promise<T>): Promise<T> {
-    const hit = this.entries.get(key) as Promise<T> | undefined;
-    if (hit) return hit;
+  get<T>(key: string, load: () => Promise<T>, maxAgeMs = Number.POSITIVE_INFINITY, now = Date.now()): Promise<T> {
+    const hit = this.entries.get(key);
+    if (hit && now - hit.at < maxAgeMs) return hit.promise as Promise<T>;
     const promise = load();
-    this.entries.set(key, promise);
-    promise.catch(() => {
-      if (this.entries.get(key) === promise) this.entries.delete(key);
-    });
+    this.entries.set(key, { promise, at: now });
+    promise.then(
+      (value) => {
+        if (this.entries.get(key)?.promise === promise) this.settled.set(key, value);
+      },
+      () => {
+        if (this.entries.get(key)?.promise === promise) this.entries.delete(key);
+      },
+    );
     return promise;
+  }
+
+  /** The last answer for a key, if one ever arrived — to show while a fresher one is asked for. */
+  peek<T>(key: string): { value: T } | null {
+    return this.settled.has(key) ? { value: this.settled.get(key) as T } : null;
   }
 
   /** Forget one answer (a retry after a failure, which is never kept anyway). */
@@ -65,7 +81,7 @@ export class LibraryCache {
 
   /** Forget every answer that can change, and ask the readers to read again. */
   invalidate(): void {
-    for (const key of [...this.entries.keys()]) if (!FIXED.test(key)) this.entries.delete(key);
+    for (const key of [...this.entries.keys()]) if (!isFixed(key)) this.entries.delete(key);
     this.generation += 1;
     for (const listener of this.listeners) listener();
   }
@@ -82,8 +98,11 @@ export class LibraryCache {
   readonly version = (): number => this.generation;
 }
 
-/** A module at a numbered version: immutable, so never forgotten. */
-const FIXED = /^module\|[^|]+\|[^|]+\|\d+$/;
+/** A module at a numbered version: immutable, so never forgotten or asked for again. */
+const isFixed = (key: string) => /^module\|[^|]+\|[^|]+\|\d+$/.test(key);
+
+/** How old a shelf may be before a reader that opens asks for it again. */
+export const FRESH_MS = 15_000;
 
 export const libraryKeys = {
   catalogue: (study: string) => `catalogue|${study}`,
@@ -93,7 +112,7 @@ export const libraryKeys = {
 
 const cache = new LibraryCache();
 
-/** After a save or a change to a module: every shelf and notice reads again. */
+/** After a save, a change to a module or a publish from here: every shelf and notice reads again. */
 export function refreshLibrary(): void {
   cache.invalidate();
 }
@@ -103,8 +122,8 @@ function messageOf(error: unknown, what: string): string {
 }
 
 /**
- * One shared answer as a Loadable. `key` null asks nothing (loading). After an
- * invalidation the answer it had stands until the new one arrives.
+ * One shared answer as a Loadable. `key` null asks nothing (loading). While a
+ * fresher answer is on its way, the last one stands.
  */
 function useLibraryAnswer<T>(key: string | null, load: () => Promise<T>, what: string): Loadable<T> {
   const generation = useSyncExternalStore(cache.subscribe, cache.version, cache.version);
@@ -120,7 +139,7 @@ function useLibraryAnswer<T>(key: string | null, load: () => Promise<T>, what: s
       cache.forget(key);
       setAttempt((a) => a + 1);
     };
-    cache.get(key, () => loadRef.current()).then(
+    cache.get(key, () => loadRef.current(), isFixed(key) ? Number.POSITIVE_INFINITY : FRESH_MS).then(
       (data) => {
         if (live) setState({ key, value: { status: "ready", data } });
       },
@@ -133,8 +152,10 @@ function useLibraryAnswer<T>(key: string | null, load: () => Promise<T>, what: s
     };
   }, [key, generation, attempt, what]);
 
-  if (key === null || state?.key !== key) return { status: "loading" };
-  return state.value;
+  if (key === null) return { status: "loading" };
+  if (state?.key === key) return state.value;
+  const last = cache.peek<T>(key);
+  return last ? { status: "ready", data: last.value } : { status: "loading" };
 }
 
 /**

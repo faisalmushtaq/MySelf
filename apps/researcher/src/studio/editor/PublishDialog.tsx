@@ -1,6 +1,7 @@
 import { useEffect, useId, useMemo, useReducer, useRef, useState, type ReactNode, type RefObject } from "react";
 import { diffDrafts, outline, validateDraft, type Issue } from "@myself/studio";
 import { StudioCallError, studio } from "../data/index.js";
+import { refreshLibrary } from "../data/library.js";
 import { versionLabel } from "../format.js";
 import { Link } from "../router.js";
 import { ChangeList, changeHeadline } from "../shell/common.js";
@@ -128,7 +129,11 @@ function PublishFlow() {
     if (!version) return;
     studio
       .publish({ surveyId: ctxRef.current.surveyId, expectedRevision: s.inputs.revision, version, releaseNote: s.note.trim() })
-      .then((res) => dispatch({ type: "published", result: { version: res.version, hash: res.hash, alreadyPublished: res.alreadyPublished } }))
+      .then((res) => {
+        // A new version is on the library's "Published surveys" shelf now.
+        refreshLibrary();
+        dispatch({ type: "published", result: { version: res.version, hash: res.hash, alreadyPublished: res.alreadyPublished } });
+      })
       .catch((error: unknown) => {
         const e = error instanceof StudioCallError ? error : null;
         dispatch({
