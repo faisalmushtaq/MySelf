@@ -168,7 +168,9 @@ preview never runs the module.
 **What it costs at worst, said plainly.** The ceiling bounds the number of
 calls, not their size. Each call is bounded by the relay's request shape and the
 release's frozen output ceiling, but a crafted call can fill the model's context
-window and cost tens of pence. So the worst day under the default ceiling is in
+window and cost tens of pence. A counted call is one request to the relay, which
+may try the provider up to the release's `maxAttempts` (3) times when it times
+out. So the worst day under the default ceiling is in
 the hundreds of pounds, not unbounded. **The last line is the provider's**: set
 a monthly budget limit and alerts on the OpenAI project before fielding.
 

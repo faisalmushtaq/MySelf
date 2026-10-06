@@ -4,8 +4,8 @@ import { onRequest } from "firebase-functions/v2/https";
 import { z } from "zod";
 import { paths } from "@myself/firebase";
 import { STUDY, research } from "./apps.js";
-import { RelayError, type Caller } from "./relay-policy.js";
-import { authenticate, cors } from "./relay.js";
+import { RelayError, isParticipantDevice, type Caller } from "./relay-policy.js";
+import { authenticate, cors, refuse } from "./relay.js";
 
 /**
  * Storing a narrative run.
@@ -94,6 +94,112 @@ export function provenanceOf(caller: Caller): "test" | "study" {
   return caller.uid.startsWith("link_") ? "test" : "study";
 }
 
+export type NarrativeRun = z.infer<typeof narrativeSave>;
+
+/**
+ * Whose session this is, and whether this caller may write to it.
+ *
+ * Null when it may. Opening `saveNarrative` (and the transcriber) to any
+ * participant's iPad (D-55) is what makes this matter: the write used to be
+ * reachable only by people the study knew, and is now reachable by any
+ * installation somebody with the URL makes. Two rules, the sittings' own:
+ *
+ *   A RUN BELONGS TO WHOEVER FIRST STORED IT. A run already stored under one
+ *   caller is never replaced by another — first writer wins, as for an
+ *   installation id and for a sitting. The legitimate writer of a run is always
+ *   the same caller: one iPad's credential, one tester link, one account.
+ *
+ *   A DEVICE'S RUN BELONGS TO ITS OWN SITTING. A device may not attach a run to
+ *   a sitting another device filed. The narrative usually arrives first — the
+ *   sitting is checkpointed every two minutes — so this catches the case where
+ *   it does not; the first rule catches the rest.
+ *
+ * Both are about the session id, which the module only has because the survey
+ * put it in the frame's URL. Neither is a reason to doubt the honest case: an
+ * iPad running its own sitting passes both every time.
+ */
+export function sessionClaimRefusal(
+  caller: Caller,
+  storedRunUid: unknown,
+  sittingDeviceId: unknown,
+): string | null {
+  if (typeof storedRunUid === "string" && storedRunUid !== caller.uid) {
+    return "this conversation is already stored from another device or account, and is not replaced";
+  }
+  if (caller.device && typeof sittingDeviceId === "string" && sittingDeviceId !== caller.uid) {
+    return "this conversation belongs to a sitting another device filed";
+  }
+  return null;
+}
+
+/**
+ * What a run must carry before it is stored, from who is storing it.
+ *
+ * A participant's iPad must say which release its sitting is running (D-55): its
+ * credential only reaches the module through the survey, which always knows, so a
+ * device's run without one did not come through a survey and has no place in the
+ * study's data.
+ */
+export function narrativeRefusal(caller: Caller, run: NarrativeRun): string | null {
+  if (isParticipantDevice(caller) && run.releaseHash === undefined) {
+    return "a participant's device must say which version of the survey this conversation belongs to";
+  }
+  return null;
+}
+
+/**
+ * Store one run, and refuse one that would replace somebody else's.
+ *
+ * Exported, with the database passed in, for the integration suite: the
+ * ownership rule is decided inside a transaction, and only a real database can
+ * show two callers racing for one session id resolve to one owner.
+ */
+export async function storeNarrative(
+  db: FirebaseFirestore.Firestore,
+  study: string,
+  caller: Caller,
+  run: NarrativeRun,
+): Promise<void> {
+  const refusal = narrativeRefusal(caller, run);
+  if (refusal) throw new RelayError(400, "unknown", refusal);
+
+  const ref = db.doc(paths.narrative(study, run.sessionId));
+  const sitting = db.doc(paths.session(study, run.sessionId));
+
+  await db.runTransaction(async (tx) => {
+    const [held, sat] = await tx.getAll(ref, sitting);
+    const claim = sessionClaimRefusal(caller, held?.data()?.["uid"], sat?.data()?.["deviceId"]);
+    if (claim) throw new RelayError(409, "auth", claim);
+
+    /**
+     * Written whole on every turn rather than appended to.
+     *
+     * The records are an ordered log the runner already holds complete, so
+     * one `set` is idempotent and a retry cannot interleave. It also means a
+     * participant who closes the tab halfway has left everything they said
+     * up to that point, which append-on-finish would have lost — and half a
+     * run abandoned at the rating screen is itself a finding.
+     */
+    tx.set(
+      ref,
+      {
+        sessionId: run.sessionId,
+        protocolKey: run.protocolKey,
+        protocolVersion: run.protocolVersion,
+        provenance: provenanceOf(caller),
+        uid: caller.uid,
+        records: run.records,
+        recordCount: run.records.length,
+        finished: run.finished,
+        ...(run.elapsedSeconds === undefined ? {} : { elapsedSeconds: run.elapsedSeconds }),
+        ...(run.releaseHash === undefined ? {} : { releaseHash: run.releaseHash }),
+        updatedAt: FieldValue.serverTimestamp(),
+      },
+      { merge: true },
+    );
+  });
+}
+
 export const saveNarrative = onRequest(
   { cors: false, maxInstances: 20, timeoutSeconds: 60 },
   async (req, res) => {
@@ -104,45 +210,24 @@ export const saveNarrative = onRequest(
     }
 
     try {
-      const caller = await authenticate(req.headers.authorization);
+      /**
+       * A participant's iPad too, on its own credential (D-55). Storing a run is a
+       * Firestore write like filing a sitting, so it spends none of the model
+       * limits; what it needs instead is the ownership rule in `storeNarrative`.
+       */
+      const caller = await authenticate(req.headers.authorization, { allowDeviceCredential: true });
       const parsed = narrativeSave.safeParse(req.body);
       if (!parsed.success) {
         throw new RelayError(400, "unknown", `that is not a narrative run: ${parsed.error.issues[0]?.message ?? ""}`);
       }
       const run = parsed.data;
 
-      /**
-       * Written whole on every turn rather than appended to.
-       *
-       * The records are an ordered log the runner already holds complete, so
-       * one `set` is idempotent and a retry cannot interleave. It also means a
-       * participant who closes the tab halfway has left everything they said
-       * up to that point, which append-on-finish would have lost — and half a
-       * run abandoned at the rating screen is itself a finding.
-       */
-      await research()
-        .doc(paths.narrative(STUDY, run.sessionId))
-        .set(
-          {
-            sessionId: run.sessionId,
-            protocolKey: run.protocolKey,
-            protocolVersion: run.protocolVersion,
-            provenance: provenanceOf(caller),
-            uid: caller.uid,
-            records: run.records,
-            recordCount: run.records.length,
-            finished: run.finished,
-            ...(run.elapsedSeconds === undefined ? {} : { elapsedSeconds: run.elapsedSeconds }),
-            ...(run.releaseHash === undefined ? {} : { releaseHash: run.releaseHash }),
-            updatedAt: FieldValue.serverTimestamp(),
-          },
-          { merge: true },
-        );
+      await storeNarrative(research(), STUDY, caller, run);
 
       res.status(200).json({ saved: run.records.length, sessionId: run.sessionId });
     } catch (error) {
       if (error instanceof RelayError) {
-        res.status(error.status).json({ error: { kind: error.kind, message: error.message } });
+        refuse(res, error);
         return;
       }
       logger.error("saveNarrative failed", error);

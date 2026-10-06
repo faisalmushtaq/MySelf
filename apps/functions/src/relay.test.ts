@@ -212,7 +212,9 @@ describe("who may spend the study's model budget", () => {
    * identity must not buy one. `mayCall` is what the relay and the transcriber
    * ask, and an anonymous token satisfies none of its clauses — it carries no
    * `device` claim and no role. The sittings endpoint gets past this by passing
-   * `allowAnonymous`, which nothing else does.
+   * `allowAnonymous`, which nothing else does. The one way an unenrolled iPad
+   * reaches a model is its own credential under D-55's daily limits
+   * (`participant-devices.test.ts`), never an anonymous token.
    */
   it("still refuses a device that merely signed itself in", () => {
     expect(mayCall({})).toBe(false);

@@ -10,12 +10,18 @@ import { resolveRelease } from "./releases.js";
 import {
   ALLOWED_ORIGIN,
   CALLS_PER_CALLER_PER_DAY,
+  DEVICE_LIMITS,
+  deviceLimitError,
+  deviceLimitReached,
+  isParticipantDevice,
   linkRefusal,
+  type DeviceLimits,
   type LinkRecord,
   RelayError,
   configForCall,
   mayCall,
   relayRequest,
+  secondsUntilTomorrow,
   type Caller,
 } from "./relay-policy.js";
 
@@ -84,6 +90,34 @@ export function cors(
     return true;
   }
   return false;
+}
+
+/**
+ * A refusal, as every page-facing endpoint sends one.
+ *
+ * Shared for the same reason `cors` is. The `limit` and the `Retry-After` are
+ * what let the module tell a participant's day being over (D-55) from a model
+ * that is merely busy, and an endpoint that dropped them would have the module
+ * retry, or blame the network, for something that will not change until
+ * tomorrow. `Retry-After` only for the daily limits: "switched off" has no time
+ * at which it is worth asking again.
+ */
+export function refuse(
+  res: { set(key: string, value: string): unknown; status(code: number): { json(body: unknown): unknown } },
+  error: RelayError,
+  now = new Date(),
+): void {
+  if (error.limit === "device" || error.limit === "study") {
+    res.set("Retry-After", String(secondsUntilTomorrow(now)));
+  }
+  res.status(error.status).json({
+    error: {
+      kind: error.kind,
+      message: error.message,
+      retryable: error.retryable,
+      ...(error.limit ? { limit: error.limit } : {}),
+    },
+  });
 }
 
 /**
@@ -233,6 +267,25 @@ export interface AuthOptions {
    * file a sitting is not thereby a caller who may spend anything.
    */
   allowAnonymous?: boolean;
+  /**
+   * Whether a participant's iPad may pass on the credential it issued itself
+   * (`Authorization: Device …`) — and ONLY that, not an anonymous sign-in token.
+   *
+   * D-55 (docs/09 §5). The asymmetry above was right, and this does not undo
+   * it so much as put a price on it. No participant's iPad could run MyStory at
+   * all: devices are no longer enrolled, and a Home-Screen app cannot sign in
+   * with a popup. The research team decided any participant's iPad may use the
+   * model for MyStory, with a daily cap — so the relay, the transcriber and
+   * `saveNarrative` pass this, and the caller it admits is held to what its
+   * release froze (`configForCall`) and to `DEVICE_LIMITS` (`meter`). The
+   * first-writer rule still decides who an installation is, and an owner who
+   * stops a device stops its calls too.
+   *
+   * An anonymous Firebase token still buys nothing here. It is the older route
+   * an iPad used to file sittings, no participant app uses it now, and widening
+   * the decision to it would admit a caller nobody decided to admit.
+   */
+  allowDeviceCredential?: boolean;
 }
 
 /**
@@ -242,21 +295,23 @@ export interface AuthOptions {
  * and belongs to nobody. A signed-in account, where a verified token is still
  * not a permission: Google sign-in is open to the world by design, so anyone can
  * arrive holding a valid token for this project, and a role is how the study says
- * it knows you. Or — where the caller is allowed to be anonymous — an iPad that
- * signed itself in, which is how a participant with the URL takes part.
+ * it knows you. Or — where the endpoint admits one — an iPad presenting the
+ * credential it issued itself, which is how a participant with the URL takes
+ * part: to file a sitting, and from D-55 to talk to MyStory within its limits.
  */
 export async function authenticate(header: string | undefined, options: AuthOptions = {}): Promise<Caller> {
   if (header?.startsWith("Link ")) return spendLink(header.slice(5).trim());
 
   /**
-   * A self-registered device, and only where anonymous callers are permitted.
+   * A self-registered device, and only where the endpoint admits one.
    *
-   * The relay does not permit them, so this scheme cannot buy a model call however
-   * well-formed the credential is: filing a sitting costs a Firestore write, and a
-   * model call spends the study's money.
+   * Filing a sitting admits it as an anonymous caller. The model-spending
+   * endpoints admit it under D-55's limits, which they apply once they know who
+   * is asking (`meter`). Anywhere else this scheme gets nothing, however
+   * well-formed the credential.
    */
   if (header?.startsWith("Device ")) {
-    if (!options.allowAnonymous) {
+    if (!options.allowAnonymous && !options.allowDeviceCredential) {
       throw new RelayError(403, "auth", "a device credential cannot be used for this");
     }
     return registerDevice(research(), STUDY, header.slice(7).trim());
@@ -306,6 +361,11 @@ export async function authenticate(header: string | undefined, options: AuthOpti
  * without this, and the first anyone hears of it is the invoice.
  */
 export async function meter(caller: Caller): Promise<void> {
+  // A participant's iPad has limits of its own (D-55), and a counter of its own:
+  // its installation id is a string the caller chose, and sharing this
+  // collection would let one name its installation after somebody's account and
+  // spend that person's day.
+  if (isParticipantDevice(caller)) return meterDevice(research(), STUDY, caller, DEVICE_LIMITS);
   const day = new Date().toISOString().slice(0, 10);
   const ref = research().doc(`${paths.audit(STUDY)}_relay/${day}_${caller.uid}`);
   const used = await research().runTransaction(async (tx) => {
@@ -316,6 +376,80 @@ export async function meter(caller: Caller): Promise<void> {
   });
   if (used > CALLS_PER_CALLER_PER_DAY) {
     throw new RelayError(429, "rate_limit", `${used - 1} calls today is the limit for one caller`);
+  }
+}
+
+/**
+ * A participant's iPad's two limits, counted together (D-55).
+ *
+ * The device's own count and the study's are read and written in ONE
+ * transaction, so a hall of iPads calling at the same instant cannot each be
+ * told there is one call left in the study's day and all take it. The ceiling is
+ * the only thing standing between a URL that circulated and an unbounded bill,
+ * so it has to hold under concurrency rather than usually — the same reasoning
+ * as a tester link's cap.
+ *
+ * ONLY A CALL LET THROUGH IS COUNTED. A refusal adds to `refused` on the count
+ * that refused it, and to nothing else: a stuck iPad asking a thousand times past
+ * its own limit must not use up the study's ceiling for every other school.
+ *
+ * SWITCHED OFF TOUCHES NOTHING. Either limit at 0 is refused before anything is
+ * read or written, so "off" means off for the database as well as the bill.
+ *
+ * Where: `studies/{study}/audit_relayDevices`, `{day}` for the study and
+ * `{day}_{installId}` for one device — a collection of its own, because an
+ * installation id is a name the caller chose (see `meter`). A day id and a
+ * day-plus-device id cannot collide: an installation id is at least four
+ * characters. Every device call writes the study's document, which Firestore
+ * serialises; at a few calls a second across a study that is far inside what one
+ * document takes, and it is the price of a ceiling that cannot be overshot.
+ *
+ * Exported, with the database passed in, for the integration suite, which needs
+ * real transaction contention to show the ceiling holds.
+ */
+export async function meterDevice(
+  db: FirebaseFirestore.Firestore,
+  study: string,
+  caller: Caller,
+  limits: DeviceLimits,
+  now = new Date(),
+): Promise<void> {
+  if (deviceLimitReached(limits, 0, 0) === "off") throw deviceLimitError("off");
+
+  const day = now.toISOString().slice(0, 10);
+  const counts = `${paths.audit(study)}_relayDevices`;
+  const mine = db.doc(`${counts}/${day}_${caller.uid}`);
+  const everyone = db.doc(`${counts}/${day}`);
+
+  const verdict = await db.runTransaction(async (tx) => {
+    const [own, all] = await tx.getAll(mine, everyone);
+    const usedByDevice = (own?.data()?.["calls"] as number | undefined) ?? 0;
+    const usedByAll = (all?.data()?.["calls"] as number | undefined) ?? 0;
+    const limit = deviceLimitReached(limits, usedByDevice, usedByAll);
+    const at = FieldValue.serverTimestamp();
+    if (limit === "device") {
+      tx.set(mine, { refused: FieldValue.increment(1), uid: caller.uid, day, at }, { merge: true });
+      return { limit, first: false };
+    }
+    if (limit) {
+      tx.set(everyone, { refused: FieldValue.increment(1), day, at }, { merge: true });
+      return { limit, first: all?.data()?.["refused"] === undefined };
+    }
+    tx.set(mine, { calls: usedByDevice + 1, uid: caller.uid, day, at }, { merge: true });
+    tx.set(everyone, { calls: usedByAll + 1, day, at }, { merge: true });
+    return { limit: null, first: false };
+  });
+
+  if (verdict.limit) {
+    /**
+     * Said once a day in the log when the study's ceiling is reached, because
+     * the morning it happens is when somebody can still do something about it:
+     * a stranger with the URL, or a fielding day bigger than the ceiling was
+     * sized for. Without this, the first anyone hears is a teacher saying MyStory
+     * stopped working. No credential and nothing anybody said is in it.
+     */
+    if (verdict.first) logger.warn("relay: the study's daily ceiling for participants' devices is reached", { day });
+    throw deviceLimitError(verdict.limit);
   }
 }
 
@@ -375,8 +509,8 @@ export const llmRelay = onRequest(
     const started = Date.now();
     let caller: Caller | null = null;
     try {
-      caller = await authenticate(req.headers.authorization);
-      await meter(caller);
+      // A participant's iPad too, on its own credential, within its limits (D-55).
+      caller = await authenticate(req.headers.authorization, { allowDeviceCredential: true });
 
       const parsed = relayRequest.safeParse(req.body);
       if (!parsed.success) {
@@ -395,6 +529,14 @@ export const llmRelay = onRequest(
       if (config.provider !== "openai") {
         throw new RelayError(400, "unknown", `this relay serves OpenAI; '${modelConfigKey}' asks for ${config.provider}`);
       }
+
+      /**
+       * Counted here, the last step before the provider is paid, rather than on
+       * arrival. A request refused for its shape, its release or its config
+       * spent nothing, and must not use up anybody's day — least of all a
+       * participant's iPad, whose day is 120 calls rather than 600.
+       */
+      await meter(caller);
 
       const calls: ModelCall[] = [];
       const gateway = new Gateway({
@@ -424,7 +566,7 @@ export const llmRelay = onRequest(
       });
     } catch (error) {
       if (error instanceof RelayError) {
-        res.status(error.status).json({ error: { kind: error.kind, message: error.message, retryable: error.retryable } });
+        refuse(res, error);
         return;
       }
       // A provider failure the gateway gave up on. The message is passed
