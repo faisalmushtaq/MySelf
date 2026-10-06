@@ -52,6 +52,12 @@ export interface SurveyScreenProps {
         protocols?: Record<string, unknown> | undefined;
         /** A preview of a draft (Studio's preview), which never starts the module. */
         preview?: boolean | undefined;
+        /**
+         * Reads this iPad's credential for the module (D-55). Supplied by the app,
+         * which owns the device's identity; never by a preview, which must not
+         * reach it.
+         */
+        credential?: (() => Promise<string | null>) | undefined;
       }
     | undefined;
   scales: Map<string, ResponseScale>;
@@ -214,6 +220,7 @@ export function SurveyScreen(props: SurveyScreenProps) {
           sessionId={handover.sessionId}
           releaseHash={handover.releaseHash}
           firstName={handover.firstName}
+          credential={handover.credential}
           onEvent={props.onEvent}
           onDone={() => props.onAdvance(index, "next")}
         />

@@ -25,7 +25,8 @@ import {
   type AccessibilityPreferences,
 } from "./lib/accessibility.js";
 import { checkpointRunningSessions, synchroniseCompletedSessions } from "./lib/sync.js";
-import { currentDevice, syncAvailable } from "./lib/device.js";
+import { currentDevice, syncAvailable, syncTarget } from "./lib/device.js";
+import { moduleCredential } from "./lib/narrative.js";
 import { updates } from "./lib/updates.js";
 import { deviceSpace, readableBytes, type Space } from "./lib/space.js";
 import {
@@ -962,6 +963,9 @@ export default function App({ initialRuntime }: { initialRuntime: Runtime }) {
             // The frozen protocols, sent to the module so it runs exactly what
             // this version published, which Studio may have edited.
             protocols: manifest.narrativeProtocols,
+            // This iPad's own credential, which the module calls the model with
+            // under its daily limits (D-55). Sent by message, never in the URL.
+            credential: () => syncTarget().then(moduleCredential),
           }}
           onRecord={(u, v) => void record(u, v)}
           onAdvance={(f, k) => void advance(f, k)}

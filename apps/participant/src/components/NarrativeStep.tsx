@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { syncTarget } from "../lib/device.js";
-import { answerReady, handoverUrl, moduleCredential, readModuleMessage } from "../lib/narrative.js";
+import { answerReady, handoverUrl, readModuleMessage } from "../lib/narrative.js";
 
 /**
  * MyStory, inside MyThoughts.
@@ -54,6 +53,17 @@ export interface NarrativeStepProps {
   releaseHash: string;
   /** Shown to the participant by the module, when the study collects one. */
   firstName?: string | undefined;
+  /**
+   * Reads this iPad's credential for the module (D-55): `<installId>.<secret>`,
+   * or null in a build that files nowhere.
+   *
+   * Passed in rather than read here, so this component never reaches the
+   * device's storage itself: Studio's preview renders the same survey screen,
+   * and its frame is proved to load none of the participant's storage or
+   * identity code (docs/16 R7). The app passes it; a preview never runs the
+   * module and passes nothing.
+   */
+  credential?: (() => Promise<string | null>) | undefined;
   onEvent: (type: string, payload?: Record<string, unknown>) => void;
   onDone: () => void;
 }
@@ -71,6 +81,7 @@ const PATIENCE_MS = 20_000;
 export function NarrativeStep(props: NarrativeStepProps) {
   const { moduleUrl, protocol, protocolVersion, definition, last, sessionId, releaseHash, firstName, onEvent, onDone } =
     props;
+  const readCredential = props.credential;
   const [loaded, setLoaded] = useState(false);
   const [patient, setPatient] = useState(true);
   const [finished, setFinished] = useState(false);
@@ -83,7 +94,9 @@ export function NarrativeStep(props: NarrativeStepProps) {
    * as it always did. Never rejects: a credential that cannot be read is no
    * reason to withhold the protocol.
    */
-  const [credential] = useState(() => syncTarget().then(moduleCredential, () => null));
+  const [credential] = useState(() =>
+    readCredential ? readCredential().catch(() => null) : Promise.resolve<string | null>(null),
+  );
 
   const source = handoverUrl({
     moduleUrl,
