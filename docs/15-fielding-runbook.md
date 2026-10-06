@@ -282,8 +282,8 @@ button.
 | A name looks like nonsense | Wrong passphrase. It should have been refused; report it. |
 | A sitting is dated to the wrong day | That iPad's clock was wrong. Every upload records what the device believed the time was alongside when the study received it, so the offset is in the audit trail (`sittings.received` rows carry `sentAt`, the study's `receivedAt` for the same moment, and the `clockSkewMs` between them), and a device more than five minutes out is logged as a warning. Response *timings* are unaffected — those come from a monotonic clock and never from the wall clock. Correct the iPad's date and report the offset so the affected sittings can be adjusted. |
 | A device has been holding data for days | Get it on a network today. See §2: a Safari tab loses everything at seven days. |
-| "This iPad has used MyStory as much as it can for today" | That iPad reached its own daily limit (§10). The participant carries on without MyStory. If an iPad will carry more conversations than that in a day, raise the limit. |
-| "MyStory has had as many conversations as it can today" | The whole study reached its daily ceiling (§10). Check the counts: more than a day's fielding is a reason to look for a stranger, not to raise the ceiling. |
+| "This device has used MyStory as much as it can for today" | That iPad reached its own daily limit (§10). The participant carries on without MyStory. If an iPad will carry more conversations than that in a day, raise the limit. |
+| "MyStory has had as many conversations as it can for today" | The whole study reached its daily ceiling (§10). Check the counts: more than a day's fielding is a reason to look for a stranger, not to raise the ceiling. |
 | "MyStory is switched off at the moment" | A limit is set to `0` (§10), on purpose or by a typo in the setting. |
 
 ---
