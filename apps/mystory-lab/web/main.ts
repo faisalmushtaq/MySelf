@@ -9,7 +9,14 @@ import {
   type RunnerSnapshot,
   type Screen,
 } from "@myself/narrative";
-import { REFUSED, receiveHostProtocol, sameProtocol, type HostProtocol } from "./host-protocol.js";
+import {
+  REFUSED,
+  belongsHere,
+  receiveHostProtocol,
+  sameProtocol,
+  trustedHostOrigins,
+  type HostProtocol,
+} from "./host-protocol.js";
 import { session } from "./session.js";
 
 /**
@@ -87,12 +94,75 @@ const relayRelease = hostReleaseHash ? { releaseHash: hostReleaseHash } : {};
  */
 const protocolFromHost =
   embedded && new URL(window.location.href).searchParams.get("protocolFromHost") === "1";
+declare const __HOST_ORIGINS__: string;
 const hostProtocol: Promise<HostProtocol | null> = protocolFromHost
   ? receiveHostProtocol(window, {
       sessionId: hostSessionId,
       expectedKey: new URL(window.location.href).searchParams.get("protocol"),
+      trustedOrigins: trustedHostOrigins(window.location.origin, __HOST_ORIGINS__),
     })
   : Promise.resolve(null);
+
+/**
+ * The participant's iPad's own credential, when the survey handed it over (D-55).
+ *
+ * `<installId>.<secret>`, sent with the protocol by a survey on a trusted origin
+ * (host-protocol.ts). With it, this page acts as that iPad: the relay, the
+ * transcriber and `saveNarrative` all take it, under that iPad's daily limits,
+ * and nobody is asked to sign in — a child in a school hall has no account, and
+ * a Home-Screen app cannot open a sign-in popup.
+ *
+ * IN MEMORY ONLY, and deliberately. It is a key that files sittings as this
+ * iPad, so it is not written to storage (the saved run does not carry it), not
+ * put in the URL, not put in a record, and not logged. A reload asks the survey
+ * for it again, which is what `mystory:ready` already does.
+ */
+let deviceCredential: string | null = null;
+
+/** Who this page is acting as, for `RelayAdapter`, or null when nobody. */
+async function relayIdentity(): Promise<{ linkKey: string } | { deviceCredential: string } | { token: string } | null> {
+  // The order the adapter uses: a link, then the iPad, then whoever signed in.
+  if (linkKey) return { linkKey };
+  if (deviceCredential) return { deviceCredential };
+  const token = await session.token();
+  return token ? { token } : null;
+}
+
+/** The same, as the `Authorization` header the study's other endpoints read. */
+async function authorizationHeader(): Promise<string | null> {
+  const identity = await relayIdentity();
+  if (!identity) return null;
+  if ("linkKey" in identity) return `Link ${identity.linkKey}`;
+  if ("deviceCredential" in identity) return `Device ${identity.deviceCredential}`;
+  return `Bearer ${identity.token}`;
+}
+
+/**
+ * MyStory is over for today on this iPad, or switched off (D-55).
+ *
+ * The relay said so in words written for the participant, and the adapter passed
+ * them on. They go where a participant reads them — above the conversation — and,
+ * inside the survey, the survey is told at once, so the way past is offered now
+ * rather than after its usual wait. Waiting would change nothing until tomorrow.
+ *
+ * The refused call still fails, and the protocol's own fallback still applies:
+ * nothing the participant said is lost, and the run is still stored as far as
+ * it went. Said once, however many calls are refused after it.
+ */
+let limitReached = false;
+function dailyLimitReached(message: string): void {
+  if (limitReached) return;
+  limitReached = true;
+  $("bootNote").innerHTML = `<div class="alert">${escapeHtml(message)}</div>`;
+  if (!embedded) return;
+  try {
+    // The relay's message, which is the same for every iPad: nothing about the
+    // participant or the conversation is in it.
+    window.parent?.postMessage({ type: REFUSED, sessionId: hostSessionId, problem: message }, "*");
+  } catch {
+    // The page says so either way, and the survey offers a way past in time.
+  }
+}
 
 /**
  * Tell the survey the module is done.
@@ -1411,7 +1481,7 @@ function wireMic(): void {
       micTrouble("That recording could not be sent. You can type your answer instead.", "no relay configured in this build");
       return;
     }
-    const credential = linkKey ? `Link ${linkKey}` : await session.token().then((t) => (t ? `Bearer ${t}` : null));
+    const credential = await authorizationHeader();
     if (!credential) {
       release();
       micTrouble(
@@ -2560,21 +2630,30 @@ async function restore(): Promise<boolean> {
   const saved = savedRun();
   if (!saved) return false;
 
+  // Inside the survey, only this sitting's own run (host-protocol.ts,
+  // `belongsHere`). Anybody else's is dropped, not kept for later: on an iPad
+  // passed from child to child there is no later in which showing it is right,
+  // and this run's first turn would overwrite it anyway.
+  if (!belongsHere(saved.runner.sessionId, hostSessionId)) {
+    forget();
+    return false;
+  }
+
   const protocol = available.find((p) => p.key === saved.protocolKey);
   if (!protocol) {
     forget();
     return false;
   }
 
-  const token = linkKey ? null : await session.token();
+  const identity = await relayIdentity();
   // Not signed in yet. The run is left where it is rather than discarded —
   // signing in retries this, and throwing away an interview because the auth
   // state had not settled would be the same bug wearing a different hat.
-  if (!linkKey && !token) return false;
+  if (!identity) return false;
 
   const calls: ModelCall[] = [...saved.calls];
   const gateway = new Gateway({
-    adapters: [new RelayAdapter({ url: relayUrl, ...(linkKey ? { linkKey } : { token: token! }), ...relayRelease })],
+    adapters: [new RelayAdapter({ url: relayUrl, ...identity, ...relayRelease, onLimit: dailyLimitReached })],
     onCall: (call) => {
       const at = calls.findIndex((c) => c.callId === call.callId);
       if (at >= 0) calls[at] = call;
@@ -2648,7 +2727,7 @@ async function restore(): Promise<boolean> {
  */
 async function store(runner: NarrativeRunner, finished: boolean): Promise<boolean> {
   if (!relay) return false;
-  const credential = linkKey ? `Link ${linkKey}` : await session.token().then((t) => (t ? `Bearer ${t}` : null));
+  const credential = await authorizationHeader();
   if (!credential) return false;
 
   const records = runner.all;
@@ -2836,16 +2915,22 @@ $("start").addEventListener("click", () => {
     }
 
     /**
-     * A tester link stands in for signing in.
+     * A tester link stands in for signing in, and so does the iPad's own
+     * credential when the survey handed it over.
      *
      * Somebody sent this link to try the module. Asking them to make a Google
      * account first loses most of them before the first screen, and the ones
      * it does not lose have stopped being a fair test of what a participant
      * would do. The key in the URL is the credential; the relay bounds what it
      * can cost and can switch it off.
+     *
+     * A participant inside the survey is never asked either (D-55): the iPad's
+     * credential is theirs to use, under its daily limits, and "Sign in first"
+     * is a closed door to a child with no account. Only a page with none of the
+     * three says it.
      */
-    const token = linkKey ? null : await session.token();
-    if (!linkKey && !token) {
+    const identity = await relayIdentity();
+    if (!identity) {
       $("bootNote").innerHTML =
         `<div class="alert">Sign in first — the relay will not spend the study's money for somebody it
          cannot name. If you were sent a link to test this, use that link: it needs no account.</div>`;
@@ -2854,7 +2939,7 @@ $("start").addEventListener("click", () => {
 
     localCalls = [];
     const gateway = new Gateway({
-      adapters: [new RelayAdapter({ url: relay, ...(linkKey ? { linkKey } : { token: token! }), ...relayRelease })],
+      adapters: [new RelayAdapter({ url: relay, ...identity, ...relayRelease, onLimit: dailyLimitReached })],
       onCall: (call) => {
         const at = localCalls.findIndex((c) => c.callId === call.callId);
         if (at >= 0) localCalls[at] = call;
@@ -3082,22 +3167,13 @@ void detectServer().then(async () => {
   wireTesterLink();
 
   /**
-   * Sign-in is lab furniture right up until it is the only thing between a
-   * tester and the page working. When this build talks to the relay and
-   * nobody is signed in, the button has to be reachable even in the
-   * participant view — otherwise the link written for testers is the one
-   * link on which they cannot begin.
-   */
-  if (relay && session.available && !linkKey) {
-    session.onChange((user) => {
-      $("signIn").classList.toggle("lab-only", user !== null);
-    });
-  }
-
-  /**
    * The survey's protocol, before the link is read or a saved run restored:
    * both look the protocol up, and must find the one the survey sent. One
    * that fails its checks, or never comes, stops everything here.
+   *
+   * And before sign-in is offered: the same message can carry the iPad's own
+   * credential (D-55), and a participant holding one must never be shown a
+   * button asking them to sign in.
    */
   const host = await hostProtocol;
   if (host && !host.ok) {
@@ -3106,7 +3182,26 @@ void detectServer().then(async () => {
   }
   if (host?.ok) {
     adoptHostProtocol(host.protocol);
+    deviceCredential = host.deviceCredential;
     if (live || relay) ($("start") as HTMLButtonElement).disabled = false;
+    if (deviceCredential && relay && !live && !linkKey) {
+      $("mode").textContent =
+        "Running on this iPad's own credential, which the survey handed over. The relay accepts it within the study's daily limits.";
+    }
+  }
+
+  /**
+   * Sign-in is lab furniture right up until it is the only thing between a
+   * tester and the page working. When this build talks to the relay and
+   * nobody is signed in, the button has to be reachable even in the
+   * participant view — otherwise the link written for testers is the one
+   * link on which they cannot begin. Not when the page already has a link or
+   * the iPad's credential to act on.
+   */
+  if (relay && session.available && !linkKey && !deviceCredential) {
+    session.onChange((user) => {
+      $("signIn").classList.toggle("lab-only", user !== null);
+    });
   }
 
   const { start } = applyLinkedRun();
@@ -3136,7 +3231,7 @@ void detectServer().then(async () => {
    * gateway with. Rather than discard the run, it waits — and this is the
    * wait ending.
    */
-  if (relay && session.available && !linkKey) {
+  if (relay && session.available && !linkKey && !deviceCredential) {
     session.onChange((user) => {
       if (user && !localRunner) void resumeSavedRun();
     });
