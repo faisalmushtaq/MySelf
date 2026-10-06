@@ -2,6 +2,7 @@ import { useId, useMemo, useState } from "react";
 import {
   describeInsert,
   fragmentFromDraft,
+  MIN_UNLOCK_REASON,
   outline,
   questionCount,
   shortText,
@@ -172,21 +173,33 @@ export function LibraryDrawer({
       ? "Checking what this survey has published, so copies are never given an ID it has used…"
       : null;
 
+  const optionsFor = (reason: string | null): InsertOptions => ({
+    by: ctx.user.uid,
+    byEmail: ctx.user.email ?? "",
+    at: new Date().toISOString(),
+    ...(ctx.reserved ? { reserved: ctx.reserved } : {}),
+    ...(reason ? { protectedReason: reason } : {}),
+  });
+
+  /** Why these pieces can't go there, or null when they can. Nothing is changed by asking. */
+  const refusalOf = (fragments: StudioFragment[], reason: string | null): string | null => {
+    if (!target) return "Choose where to add it.";
+    try {
+      insertPieces(ctx.draft, fragments, target, optionsFor(reason));
+      return null;
+    } catch (error) {
+      return error instanceof Error ? error.message : String(error);
+    }
+  };
+
   const insert = (fragments: StudioFragment[], reason: string | null) => {
     if (!target || !ready) return;
-    const opts: InsertOptions = {
-      by: ctx.user.uid,
-      byEmail: ctx.user.email ?? "",
-      at: new Date().toISOString(),
-      ...(ctx.reserved ? { reserved: ctx.reserved } : {}),
-      ...(reason ? { protectedReason: reason } : {}),
-    };
+    const opts = optionsFor(reason);
     // Tried first, so a refusal is said here, beside what was chosen, rather
-    // than in a toast behind the drawer. Nothing is changed by trying.
-    try {
-      insertPieces(ctx.draft, fragments, target, opts);
-    } catch (error) {
-      setProblem(error instanceof Error ? error.message : String(error));
+    // than in a toast behind the drawer.
+    const refused = refusalOf(fragments, reason);
+    if (refused) {
+      setProblem(refused);
       return;
     }
     const out: { reports?: InsertReport[] } = {};
@@ -216,13 +229,20 @@ export function LibraryDrawer({
       setProblem(error instanceof Error ? error.message : String(error));
       return;
     }
+    if (!refusalOf(fragments, null)) {
+      insert(fragments, null);
+      return;
+    }
+    // A consent or identity module that would be added needs its reason
+    // (§12.2) — asked only when that is all that stands in the way.
     const guarded = new Map<string, string>();
     for (const f of fragments) for (const m of protectedInFragment(f)) guarded.set(m.instrument, m.name);
-    if (guarded.size > 0) {
+    const otherwise = guarded.size > 0 ? refusalOf(fragments, "x".repeat(MIN_UNLOCK_REASON)) : refusalOf(fragments, null);
+    if (guarded.size > 0 && !otherwise) {
       setAsking({ fragments, modules: [...guarded].map(([instrument, name]) => ({ instrument, name })) });
       return;
     }
-    insert(fragments, null);
+    setProblem(otherwise);
   };
 
   const count = ready?.count ?? 0;
