@@ -19,9 +19,18 @@ export interface ShellTab {
   current: boolean;
 }
 
+/** A study space's own pages, as the header's tabs: its surveys, and the item library (D-57). */
+export function studyTabs(current: "surveys" | "library"): ShellTab[] {
+  return [
+    { label: "Surveys", to: { name: "surveys" }, current: current === "surveys" },
+    { label: "Library", to: { name: "library" }, current: current === "library" },
+  ];
+}
+
 export function Shell({
   crumb,
   tabs,
+  navLabel = "Survey",
   banner,
   children,
   wide = false,
@@ -30,6 +39,8 @@ export function Shell({
   /** Where you are, after the mark: a survey's title, "Playground". */
   crumb?: ReactNode;
   tabs?: ShellTab[];
+  /** What the tabs are the pages of, for screen readers: a survey's, or the study space's. */
+  navLabel?: string;
   /** Page-wide messages under the header (the playground label, a conflict). */
   banner?: ReactNode;
   children: ReactNode;
@@ -75,7 +86,7 @@ export function Shell({
             ) : null}
           </div>
           {tabs && tabs.length > 0 ? (
-            <nav className="stp-nav" aria-label="Survey">
+            <nav className="stp-nav" aria-label={navLabel}>
               {tabs.map((t) => (
                 <Link key={t.label} to={t.to} className={`stp-nav-link${t.current ? " on" : ""}`} aria-current={t.current ? "page" : undefined}>
                   <span>{t.label}</span>

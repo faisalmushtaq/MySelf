@@ -33,6 +33,7 @@ import { ConfirmDialog } from "../ui/dialog.js";
 import { Icon } from "../ui/icons.js";
 import { Button, IconButton, Kbd, MenuButton, Tooltip, VisuallyHidden, type MenuItem } from "../ui/kit.js";
 import { useEditor } from "./context.js";
+import { useLibraryUi } from "./library/LibraryContext.js";
 import { actionsFor, archivedTierOf, type ActionId, type ActionSpec } from "./outline/actions.js";
 import {
   applyMove,
@@ -161,6 +162,9 @@ export function Outline() {
   const ctx = useEditor();
   const ctxRef = useRef(ctx);
   ctxRef.current = ctx;
+  const library = useLibraryUi();
+  const libraryRef = useRef(library);
+  libraryRef.current = library;
   const { draft, canEdit } = ctx;
 
   const o = useMemo(() => outlineOf(draft), [draft]);
@@ -411,6 +415,12 @@ export function Outline() {
             const block = o.sections.find((x) => x.key === q.sectionKey)?.blocks.find((x) => x.componentIndex === q.componentIndex);
             setPending({ kind: "picker", sectionKey: q.sectionKey, afterItemKey: q.itemKey, where: addAfterWhere(q.text, q.tier, block?.name ?? "its block") });
           } else if (b?.lastItemKey) setPending({ kind: "picker", sectionKey: b.sectionKey, afterItemKey: b.lastItemKey, where: `after “${shortText(b.name, 40)}”` });
+          return;
+        case "add-from-library":
+          if (s) libraryRef.current.openDrawer({ kind: "section", sectionKey: s.key, afterItemKey: null });
+          return;
+        case "save-to-library":
+          if (b) libraryRef.current.openSave({ sectionKey: b.sectionKey, componentIndex: b.componentIndex });
           return;
         case "add-section-after":
           if (s) addSectionAt(s.index + 1);
@@ -1040,6 +1050,11 @@ export function Outline() {
             const target = pending;
             setPending(null);
             addQuestionOf(typeId, target);
+          }}
+          onLibrary={() => {
+            const target = pending;
+            setPending(null);
+            library.openDrawer({ kind: "section", sectionKey: target.sectionKey, afterItemKey: target.afterItemKey });
           }}
         />
       ) : null}

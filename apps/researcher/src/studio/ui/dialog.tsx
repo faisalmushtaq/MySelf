@@ -33,6 +33,8 @@ export function Dialog({
   closeLabel = "Close",
   dismissable = true,
   initialFocus,
+  placement = "centre",
+  className,
 }: {
   title: string;
   description?: ReactNode;
@@ -45,6 +47,12 @@ export function Dialog({
   dismissable?: boolean;
   /** Selector for the element to focus first; defaults to the first focusable. */
   initialFocus?: string;
+  /**
+   * "side" is a sheet the full height of the window on its right (the editor's
+   * library drawer): the same modal dialog, for work that wants room.
+   */
+  placement?: "centre" | "side";
+  className?: string;
 }) {
   const titleId = useId();
   const descId = useId();
@@ -97,14 +105,17 @@ export function Dialog({
   };
 
   return createPortal(
-    <div className="studio st-overlay" onMouseDown={(e) => e.target === e.currentTarget && dismissable && onClose()}>
+    <div
+      className={`studio st-overlay${placement === "side" ? " st-overlay-side" : ""}`}
+      onMouseDown={(e) => e.target === e.currentTarget && dismissable && onClose()}
+    >
       <div
         ref={panel}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
         aria-describedby={description ? descId : undefined}
-        className="st-dialog"
+        className={`st-dialog${placement === "side" ? " st-drawer" : ""}${className ? ` ${className}` : ""}`}
         style={{ maxWidth: width }}
         onKeyDown={onKeyDown}
       >

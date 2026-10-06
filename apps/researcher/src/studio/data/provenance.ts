@@ -1,13 +1,13 @@
 import { compareVersions } from "@myself/release/gate";
-import type { ActiveVersion, AuditDoc, Bump, StoredTime, VersionDoc } from "@myself/studio";
+import type { ActiveVersion, AuditDoc, Bump, FragmentOrigin, ImportRecord, StoredTime, VersionDoc } from "@myself/studio";
 import { toMillis } from "../format.js";
 
 /**
  * The provenance of a survey's versions, for download as CSV or JSON
  * (docs/16 §10.2): for each version, what it is, who made and published it,
  * what it was based on, what changed and how big a change that was, whether it
- * ran MyStory and which protocol, how many sittings it collected, and when it
- * was live.
+ * ran MyStory and which protocol, how many sittings it collected, when it was
+ * live, and which of its questions were copied from elsewhere (D-57).
  *
  * Nothing new is stored for this. It is read from what the Studio already
  * keeps — the version records, their releases, the audit trail and the
@@ -51,6 +51,19 @@ export interface ProvenanceRow {
   mystory: { on: boolean; protocol: string | null } | null;
   sittings: { complete: number; partial: number } | null;
   livePeriods: LivePeriod[];
+  /** Each question the version asks that was copied from the library or another survey (docs/16 §12.5). */
+  copiedFrom: CopiedQuestion[];
+}
+
+/** One copied question of a version, and where it came from. */
+export interface CopiedQuestion {
+  /** Its question ID in this survey. */
+  itemKey: string;
+  /** Its question ID where it came from: the same unless it was renamed on the way in. */
+  sourceKey: string;
+  origin: FragmentOrigin;
+  /** The origin in a few words, as the spreadsheet has it. */
+  from: string;
 }
 
 export interface ProvenanceInput {
@@ -150,6 +163,29 @@ function restoredBefore(trail: TrailEvent[], version: string): string | null {
   return null;
 }
 
+/** Where a piece came from, in a few words: "survey ybm/ybm_nd2026_standard r8.0.0", "validated sdq25_s@2.0/…", "module sleep_habits v3". */
+export function originText(origin: FragmentOrigin): string {
+  switch (origin.kind) {
+    case "release":
+      return `survey ${origin.study}/${origin.surveyId} r${origin.version}`;
+    case "validated":
+      return `validated questionnaire ${origin.refKey}`;
+    case "module":
+      return `module ${origin.moduleId} v${origin.version}`;
+  }
+}
+
+/** The copied questions a version's provenance records name, in the order they were added. */
+export function copiedQuestions(imports: readonly ImportRecord[] | undefined): CopiedQuestion[] {
+  const out: CopiedQuestion[] = [];
+  for (const record of imports ?? []) {
+    for (const [itemKey, sourceKey] of Object.entries(record.items ?? {})) {
+      out.push({ itemKey, sourceKey, origin: record.origin, from: originText(record.origin) });
+    }
+  }
+  return out;
+}
+
 /** One row per version, newest first. */
 export function provenanceRows(input: ProvenanceInput): ProvenanceRow[] {
   const trail = trailOf(input.audit);
@@ -175,6 +211,7 @@ export function provenanceRows(input: ProvenanceInput): ProvenanceRow[] {
       mystory: input.releases.has(v.hash) ? releaseMyStory(input.releases.get(v.hash)) : null,
       sittings: input.sittings ? (input.sittings[v.hash] ?? { complete: 0, partial: 0 }) : null,
       livePeriods: periods.get(v.version) ?? [],
+      copiedFrom: copiedQuestions(v.imports),
     }));
 }
 
@@ -203,6 +240,7 @@ export const PROVENANCE_COLUMNS = [
   "sittings_complete",
   "sittings_partial",
   "live_periods",
+  "copied_from",
 ] as const;
 
 /**
@@ -222,6 +260,10 @@ export function csvCell(value: string | number | null | undefined): string {
 
 function periodWords(p: LivePeriod): string {
   return `${p.from} to ${p.to ?? "now"} (${p.how})`;
+}
+
+function copiedWords(c: CopiedQuestion): string {
+  return `${c.itemKey} from ${c.from}${c.sourceKey !== c.itemKey ? ` (was ${c.sourceKey})` : ""}`;
 }
 
 /** The rows as CSV: UTF-8 with a byte-order mark, so spreadsheets read accents right, and CRLF lines. */
@@ -249,6 +291,7 @@ export function provenanceCsv(rows: readonly ProvenanceRow[]): string {
       r.sittings?.complete ?? null,
       r.sittings?.partial ?? null,
       r.livePeriods.map(periodWords).join("; "),
+      r.copiedFrom.map(copiedWords).join("; "),
     ];
     lines.push(cells.map(csvCell).join(","));
   }
@@ -287,6 +330,7 @@ export function provenanceDocument(
     notes: [
       "Live periods come from the Studio's audit trail: each publish, each “make live again”, and the set-up from the live survey. A version published before the Studio existed was live before the trail began, so those earlier periods are not listed.",
       "Sittings are counts of sittings recorded under each version's hash; no participant data is included.",
+      "Copied from lists the questions each version asks that were copied from the library or another survey, from the draft's records; a question renamed on the way in shows the ID it had there.",
     ],
     versions: rows,
   };

@@ -8,6 +8,7 @@ describe("Studio addresses", () => {
     expect(parseHash("#/surveys/")).toEqual({ name: "surveys" });
     expect(parseHash("#/login")).toEqual({ name: "login", next: null });
     expect(parseHash("#/access")).toEqual({ name: "access" });
+    expect(parseHash("#/library")).toEqual({ name: "library" });
     expect(parseHash("#/playground")).toEqual({ name: "playground", tab: "edit", q: null });
     expect(parseHash("#/playground/preview?q=kss.q1")).toEqual({ name: "playground", tab: "preview", q: "kss.q1" });
     expect(parseHash("#/surveys/ybm_nd2026_standard/edit")).toEqual({
@@ -45,6 +46,7 @@ describe("Studio addresses", () => {
     const routes: Route[] = [
       { name: "surveys" },
       { name: "access" },
+      { name: "library" },
       { name: "login", next: "#/surveys/s1/versions" },
       { name: "survey", surveyId: "s1", tab: "edit", q: "ybm_studio.q_1" },
       { name: "survey", surveyId: "s1", tab: "settings", q: null },
@@ -96,6 +98,7 @@ describe("addresses in a study space (D-56)", () => {
     const routes: Route[] = [
       { name: "surveys" },
       { name: "access" },
+      { name: "library" },
       { name: "survey", surveyId: "future_main", tab: "edit", q: "future_studio.q_1" },
       { name: "survey", surveyId: "future_main", tab: "settings", q: null },
     ];

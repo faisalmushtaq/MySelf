@@ -5,6 +5,7 @@ import { Icon } from "../ui/icons.js";
 import { EmptyState, Skeleton } from "../ui/kit.js";
 import { EditorProvider, useEditor } from "./context.js";
 import { Inspector } from "./Inspector.js";
+import { LibraryProvider } from "./library/LibraryContext.js";
 import { NodeEditor } from "./NodeEditor.js";
 import { focusSoon } from "./node/focus.js";
 import { Outline } from "./Outline.js";
@@ -55,12 +56,14 @@ export function EditorPage({ surveyId, survey, editor, context, role, user }: Ed
   }
   return (
     <EditorProvider surveyId={surveyId} survey={survey} editor={editor} draft={draft} context={context} role={role} user={user}>
-      <div className="ste-workspace">
-        <Toolbar />
-        <Columns />
-        <ValidationPanel />
-        <PublishDialog />
-      </div>
+      <LibraryProvider>
+        <div className="ste-workspace">
+          <Toolbar />
+          <Columns />
+          <ValidationPanel />
+          <PublishDialog />
+        </div>
+      </LibraryProvider>
     </EditorProvider>
   );
 }

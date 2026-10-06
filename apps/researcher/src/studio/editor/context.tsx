@@ -11,9 +11,11 @@ import {
   type StudioDraft,
   type StudioRole,
   type SurveyDoc,
+  type LockedOptions,
   type ValidationContext,
 } from "@myself/studio";
 import { usePublishedManifest, type DraftEditor, type Loadable, type PublishedContext, type StudioUser } from "../data/index.js";
+import { useVoucherSources, vouchersFor } from "../data/library.js";
 import { usePlaygroundMode } from "../mode.js";
 import { useSelectedQuestion } from "../router.js";
 import { useToast } from "../ui/toast.js";
@@ -76,6 +78,8 @@ export interface EditorContextValue {
   issues: Issue[];
   /** False while a change is waiting to be validated. */
   issuesFresh: boolean;
+  /** What a draft is validated against, as the server will validate it (vouchers included). */
+  validationContextFor: (draft: StudioDraft) => ValidationContext;
 
   /** Who is doing something now, for the draft's own records (archive, unlock). */
   actor: () => OpActor;
@@ -135,23 +139,35 @@ export function EditorProvider({
   // A survey that has never been published is checked, as on the server, against
   // the release it was copied from (its `basedOn`), so a copy with a reworded
   // licensed questionnaire is flagged here rather than first at Publish.
+  // A copy of another study space's version is checked against that study's
+  // release, read from its own store (D-57).
   const originHash = published && !published.baseline ? (editor.basedOn?.hash ?? null) : null;
-  const originManifest = usePublishedManifest(originHash);
+  const originManifest = usePublishedManifest(originHash, editor.basedOn?.study ?? null);
   const origin = useMemo(
     () => (originManifest.status === "ready" && originManifest.data ? extractDraft(originManifest.data) : null),
     [originManifest],
   );
 
+  // What vouches for a licensed questionnaire copied in from the library or
+  // another survey (docs/16 §12.4): the instrument library, and each release
+  // the draft names as a source, verified — the same two the server applies,
+  // chosen for the draft being checked, so worked out when it is checked.
+  const voucherReleases = useVoucherSources(draft).releases;
+  const validationContextFor = useCallback(
+    (d: StudioDraft) => contextFor(published, origin, d, vouchersFor(voucherReleases, d)),
+    [published, origin, voucherReleases],
+  );
+
   // ── Validation, debounced, with the context the server will use ──────────
-  const [issues, setIssues] = useState<Issue[]>(() => validateDraft(draft, contextFor(published, origin, draft)));
+  const [issues, setIssues] = useState<Issue[]>(() => validateDraft(draft, validationContextFor(draft)));
   const [validatedDraft, setValidatedDraft] = useState<StudioDraft>(draft);
   useEffect(() => {
     const timer = window.setTimeout(() => {
-      setIssues(validateDraft(draft, contextFor(published, origin, draft)));
+      setIssues(validateDraft(draft, validationContextFor(draft)));
       setValidatedDraft(draft);
     }, VALIDATE_DELAY_MS);
     return () => window.clearTimeout(timer);
-  }, [draft, published, origin]);
+  }, [draft, validationContextFor]);
 
   // ── Permissions ──────────────────────────────────────────────────────────
   const conflict = editor.save.kind === "conflict";
@@ -231,6 +247,7 @@ export function EditorProvider({
       clearPendingFocus: () => setPendingFocus(null),
       issues,
       issuesFresh: validatedDraft === draft,
+      validationContextFor,
       actor,
       run,
       announce,
@@ -258,6 +275,7 @@ export function EditorProvider({
       pendingFocus,
       issues,
       validatedDraft,
+      validationContextFor,
       actor,
       run,
       announce,
@@ -282,15 +300,24 @@ const EMPTY: ReadonlySet<string> = new Set();
  * The validation context, built exactly as `studioPublish` builds it: the live
  * version when there is one, otherwise the locked and protected content of the
  * release the survey was copied from (or nothing at all for a blank survey),
- * so licensed text cannot enter a first release unnoticed.
+ * so licensed text cannot enter a first release unnoticed — and the vouchers
+ * for licensed questionnaires copied in from the library (D-57).
  */
-function contextFor(published: PublishedContext | null, origin: StudioDraft | null, draft: StudioDraft): ValidationContext {
+export function contextFor(
+  published: PublishedContext | null,
+  origin: StudioDraft | null,
+  draft: StudioDraft,
+  vouchers: LockedOptions = {},
+): ValidationContext {
   if (!published) return {};
   return {
     reserved: published.reserved,
     baseline: published.baseline ?? lockBaseline(origin, draft),
     publishedScaleCodes: published.publishedScaleCodes,
     publishedProtocols: protocolsWithOrigin(published, origin),
+    ...(vouchers.reference ? { reference: vouchers.reference } : {}),
+    ...(vouchers.referenceScales ? { referenceScales: vouchers.referenceScales } : {}),
+    ...(vouchers.referenceScoring ? { referenceScoring: vouchers.referenceScoring } : {}),
   };
 }
 

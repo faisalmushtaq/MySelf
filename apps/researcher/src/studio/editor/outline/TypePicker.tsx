@@ -2,6 +2,7 @@ import { type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { NOT_YET_SUPPORTED, QUESTION_TYPES, type QuestionType, type QuestionTypeId } from "@myself/studio";
 import { Dialog } from "../../ui/dialog.js";
 import { Icon } from "../../ui/icons.js";
+import { Button } from "../../ui/kit.js";
 import { Disclosure } from "../node/controls.js";
 import { TYPE_ICONS } from "./Row.js";
 
@@ -22,7 +23,18 @@ const GROUPS: { id: QuestionType["group"]; title: string }[] = [
   { id: "other", title: "Other" },
 ];
 
-export function TypePicker({ where, onChoose, onClose }: { where: string; onChoose: (typeId: QuestionTypeId) => void; onClose: () => void }) {
+export function TypePicker({
+  where,
+  onChoose,
+  onClose,
+  onLibrary,
+}: {
+  where: string;
+  onChoose: (typeId: QuestionTypeId) => void;
+  onClose: () => void;
+  /** "Add from library…" instead, to the same place (D-57). */
+  onLibrary?: () => void;
+}) {
   const creatable = QUESTION_TYPES.filter((t) => t.canCreate);
   const existingOnly = QUESTION_TYPES.filter((t) => !t.canCreate);
 
@@ -39,7 +51,20 @@ export function TypePicker({ where, onChoose, onClose }: { where: string; onChoo
   };
 
   return (
-    <Dialog title="Add a question" description={<p className="stp-flush">It goes {where}.</p>} onClose={onClose} width={640} initialFocus=".sto-type-option">
+    <Dialog
+      title="Add a question"
+      description={<p className="stp-flush">It goes {where}.</p>}
+      onClose={onClose}
+      width={640}
+      initialFocus=".sto-type-option"
+      footer={
+        onLibrary ? (
+          <Button variant="secondary" icon="library" onClick={onLibrary}>
+            Add from library…
+          </Button>
+        ) : undefined
+      }
+    >
       <div className="sto-types" onKeyDown={onKeyDown}>
         {GROUPS.map((g) => {
           const types = creatable.filter((t) => t.group === g.id);

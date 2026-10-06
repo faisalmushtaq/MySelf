@@ -31,6 +31,7 @@ export type ActionId =
   | "rename"
   | "add-question"
   | "add-question-after"
+  | "add-from-library"
   | "add-section-after"
   | "duplicate"
   | "move-up"
@@ -40,6 +41,7 @@ export type ActionId =
   | "delete"
   | "remove-section"
   | "remove-block"
+  | "save-to-library"
   | "restore"
   | "restore-into"
   | "delete-archived";
@@ -178,6 +180,7 @@ export function sectionActions(sectionKey: string, facts: ActionFacts): ActionSp
   return [
     { id: "rename", label: "Rename", icon: "section" },
     { id: "add-question", label: "Add a question here", icon: "plus" },
+    { id: "add-from-library", label: "Add from library…", icon: "library" },
     { id: "add-section-after", label: "Add a section after this", icon: "plus" },
     {
       id: "move-up",
@@ -208,6 +211,7 @@ export function blockActions(sectionKey: string, componentIndex: number, facts: 
   }
   return [
     { id: "add-question-after", label: "Add a question after this block", icon: "plus", ...disabledIf(block.questions.length === 0 ? "This block has no questions to add after." : undefined) },
+    { id: "save-to-library", label: "Save to library…", icon: "library", ...disabledIf(saveRefusal(draft, block.instrument, tier, block.questions.length)) },
     {
       id: "move-up",
       label: "Move block up",
@@ -223,6 +227,18 @@ export function blockActions(sectionKey: string, componentIndex: number, facts: 
     { id: "move-to-section", label: "Move block to section…", icon: "section", ...disabledIf(fixed) },
     remove,
   ];
+}
+
+/**
+ * Why a block can't be saved to the library (docs/16 §12.6): only editable
+ * content can. A validated questionnaire is a shelf of its own already, and
+ * the consent and identity modules belong to their study, unlocked or not.
+ */
+export function saveRefusal(draft: StudioDraft, instrument: string, tier: EditTier, questionCount: number): string | undefined {
+  if (protectedModule(instrument)) return `“${instrumentName(draft, instrument)}” belongs to this study’s ethics approval, so it isn’t saved to the library.`;
+  if (tier === "locked") return "A validated questionnaire is in the library already, exactly as licensed.";
+  if (questionCount === 0) return "This block has no questions to save.";
+  return undefined;
 }
 
 /**

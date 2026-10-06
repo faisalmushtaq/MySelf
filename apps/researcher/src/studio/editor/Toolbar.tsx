@@ -8,6 +8,7 @@ import { Icon } from "../ui/icons.js";
 import { IconButton, Kbd, Spinner, StatusDot, Tooltip, VisuallyHidden, type MenuItem } from "../ui/kit.js";
 import { useToast } from "../ui/toast.js";
 import { useEditor } from "./context.js";
+import { useLibraryUi } from "./library/LibraryContext.js";
 import { isTextEntry, modKey } from "./outline/keys.js";
 import "./toolbar.css";
 
@@ -70,6 +71,7 @@ export function Toolbar() {
         <UndoRedo />
         <span className="sto-tb-sep" aria-hidden="true" />
         <ValidationBadge />
+        <LibraryButton />
         <PreviewLink />
         <PublishButton />
       </div>
@@ -434,6 +436,21 @@ function Presence() {
         <VisuallyHidden>Also editing: {described}</VisuallyHidden>
       )}
     </span>
+  );
+}
+
+// ── The library ──────────────────────────────────────────────────────────
+
+/** The item library (D-57): saved modules, validated questionnaires and every published survey, to add from. */
+function LibraryButton() {
+  const lib = useLibraryUi();
+  return (
+    <Tooltip text="Add questions from saved modules, validated questionnaires or published surveys">
+      <button type="button" className="st-btn st-btn-secondary st-btn-sm sto-library" aria-haspopup="dialog" onClick={() => lib.openDrawer()}>
+        <Icon name="library" size={16} />
+        <span>Library</span>
+      </button>
+    </Tooltip>
   );
 }
 

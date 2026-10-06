@@ -3,6 +3,7 @@ import { useStudioSession } from "./data/index.js";
 import { formatRoute, NavigationPrompt, samePage, useRoute, useStudy, type Route } from "./router.js";
 import { AccessScreen } from "./screens/Access.js";
 import { CheckingScreen, LoginScreen, Redirect, SessionErrorScreen, UnauthorisedScreen } from "./screens/Auth.js";
+import { LibraryScreen } from "./screens/Library.js";
 import { PlaygroundScreen } from "./screens/Playground.js";
 import { SurveyLayout } from "./screens/SurveyLayout.js";
 import { SurveysScreen } from "./screens/Surveys.js";
@@ -63,6 +64,8 @@ function Page({ route, study, status: sessionStatus }: { route: Route; study: st
       return <SurveysScreen />;
     case "access":
       return <AccessScreen />;
+    case "library":
+      return <LibraryScreen />;
     case "survey":
       // Keyed by survey, so opening another survey starts a fresh draft editor
       // rather than carrying one survey's state into the next.
@@ -127,7 +130,9 @@ function usePageChrome(route: Route) {
             ? "Surveys"
             : route.name === "access"
               ? "Who has access"
-              : route.name === "login"
+              : route.name === "library"
+                ? "Library"
+                : route.name === "login"
                 ? "Sign in"
                 : "Not found";
     document.title = `${page} — MySelf Studio`;

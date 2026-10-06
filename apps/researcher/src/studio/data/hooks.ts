@@ -146,9 +146,13 @@ export function useAccessConfig(): Loadable<AccessConfigDoc | null> {
   return useLiveDoc(paths.studioAccessConfig(useStudy()), asAccess, "the domain rules");
 }
 
-/** A published release, fetched from the release store and verified against its hash. */
-export function usePublishedManifest(hash: string | null): Loadable<ReleaseManifest | null> {
-  const release = useRelease(hash);
+/**
+ * A published release, fetched from the release store and verified against its
+ * hash: this study's, or `study`'s when it names another (a survey copied from
+ * another study space was based on a release in that study's store, D-57).
+ */
+export function usePublishedManifest(hash: string | null, study?: string | null): Loadable<ReleaseManifest | null> {
+  const release = useRelease(hash, study);
   return useMemo(() => (release.status === "ready" ? { status: "ready", data: release.data?.manifest ?? null } : release), [release]);
 }
 

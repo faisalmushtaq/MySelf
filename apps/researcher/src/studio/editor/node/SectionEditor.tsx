@@ -3,6 +3,7 @@ import { editTier, outline, removeSection, updateSection, type StudioDraft } fro
 import { Icon } from "../../ui/icons.js";
 import { Button, InfoTip } from "../../ui/kit.js";
 import { useEditor } from "../context.js";
+import { useLibraryUi } from "../library/LibraryContext.js";
 import { AddQuestionDialog } from "./AddQuestion.js";
 import { ConditionBuilder } from "./ConditionBuilder.js";
 import { IssueMessages, Panel, TextField } from "./controls.js";
@@ -32,6 +33,7 @@ export function SectionEditor({ sectionKey }: { sectionKey: string }) {
   const issues = useMemo(() => sectionIssues(ctx.issues, sectionKey), [ctx.issues, sectionKey]);
   const blocks = useMemo(() => outline(draft).sections.find((s) => s.key === sectionKey)?.blocks ?? [], [draft, sectionKey]);
   const [adding, setAdding] = useState(false);
+  const library = useLibraryUi();
   const guarded = protectedIn(draft, sectionKey);
   const validateTitle = useCallback((text: string) => (text.trim() ? null : "A section needs a title: participants see it in the progress bar."), []);
   const empty = section.components.length === 0;
@@ -83,9 +85,20 @@ export function SectionEditor({ sectionKey }: { sectionKey: string }) {
         title={`Questions · ${questionCount}`}
         field="components"
         actions={
-          <Button size="sm" variant="ghost" icon="plus" onClick={() => setAdding(true)} disabled={!ctx.canEdit}>
-            Add question
-          </Button>
+          <>
+            <Button
+              size="sm"
+              variant="ghost"
+              icon="library"
+              onClick={() => library.openDrawer({ kind: "section", sectionKey, afterItemKey: null })}
+              disabled={!ctx.canEdit}
+            >
+              Add from library
+            </Button>
+            <Button size="sm" variant="ghost" icon="plus" onClick={() => setAdding(true)} disabled={!ctx.canEdit}>
+              Add question
+            </Button>
+          </>
         }
       >
         <IssueMessages issues={issues.byField.get("components")} />

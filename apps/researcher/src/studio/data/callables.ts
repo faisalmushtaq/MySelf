@@ -13,6 +13,16 @@ import {
   type CreateSurveyResponse,
   type ImportLiveRequest,
   type ImportLiveResponse,
+  type LibraryCatalogueRequest,
+  type LibraryCatalogueResponse,
+  type LibraryModuleRequest,
+  type LibraryModuleResponse,
+  type LibraryModulesRequest,
+  type LibraryModulesResponse,
+  type LibrarySaveModuleRequest,
+  type LibrarySaveModuleResponse,
+  type LibrarySetModuleRequest,
+  type LibrarySetModuleResponse,
   type PublishRequest,
   type PublishResponse,
   type PublishedPointerDoc,
@@ -91,6 +101,19 @@ export const studio: {
    * publish dialog reports success only once this is true (docs/16 §5.5).
    */
   confirmLive: (surveyId: string, hash: string) => Promise<boolean>;
+  /**
+   * The item library (D-57, docs/16 §12). Asked in the study the Studio is in,
+   * which is where the caller's access is checked; what comes back is
+   * project-wide (every study's published surveys, every saved module).
+   * Browsers never read `studioLibrary` themselves: the rules close it.
+   */
+  libraryCatalogue: (req: LibraryCatalogueRequest) => Promise<LibraryCatalogueResponse>;
+  libraryModules: (req: LibraryModulesRequest) => Promise<LibraryModulesResponse>;
+  libraryModule: (req: LibraryModuleRequest) => Promise<LibraryModuleResponse>;
+  /** Save a piece as a new module, or as the next version of one (refused if someone saved a newer one first). */
+  librarySaveModule: (req: LibrarySaveModuleRequest) => Promise<LibrarySaveModuleResponse>;
+  /** Change a module's title, description or tags, or retire or restore it. */
+  librarySetModule: (req: LibrarySetModuleRequest) => Promise<LibrarySetModuleResponse>;
 } = {
   importLive: (req) => call(CALLABLES.importLive, req),
   createSurvey: (req) => call(CALLABLES.createSurvey, req),
@@ -111,6 +134,11 @@ export const studio: {
   activateVersion: (req) => call(CALLABLES.activateVersion, req),
   setMember: (req) => call(CALLABLES.setMember, req),
   setDomain: (req) => call(CALLABLES.setDomain, req),
+  libraryCatalogue: (req) => call(CALLABLES.libraryCatalogue, req),
+  libraryModules: (req) => call(CALLABLES.libraryModules, req),
+  libraryModule: (req) => call(CALLABLES.libraryModule, req),
+  librarySaveModule: (req) => call(CALLABLES.librarySaveModule, req),
+  librarySetModule: (req) => call(CALLABLES.librarySetModule, req),
   createStudy: (req) => callAsIs(CALLABLES.createStudy, req),
   setStudy: (req) => callAsIs(CALLABLES.setStudy, req),
   confirmLive: async (surveyId, hash) => {
