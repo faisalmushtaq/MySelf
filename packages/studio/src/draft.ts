@@ -4,6 +4,8 @@ import {
   DRAFT_FORMAT,
   DRAFT_FORMAT_VERSION,
   type CompositionInput,
+  type FragmentOrigin,
+  type ImportRecord,
   type InstrumentOrModule,
   type ModuleInput,
   type ScaleInput,
@@ -161,7 +163,78 @@ export function parseDraft(json: string): StudioDraft {
     notes: d.notes ?? {},
     ...(d.assets ? { assets: d.assets } : {}),
     ...(d.narrativeProtocols ? { narrativeProtocols: d.narrativeProtocols } : {}),
+    ...(Array.isArray(d.imports) ? { imports: readImports(d.imports) } : {}),
   };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === "object" && !Array.isArray(value);
+}
+
+/** A map of strings to strings, or null when it is anything else. */
+function stringMap(value: unknown): Record<string, string> | null {
+  if (!isRecord(value)) return null;
+  const entries = Object.entries(value);
+  return entries.every(([, v]) => typeof v === "string") ? (Object.fromEntries(entries) as Record<string, string>) : null;
+}
+
+function readOrigin(value: unknown): FragmentOrigin | null {
+  if (!isRecord(value)) return null;
+  const s = (k: string) => (typeof value[k] === "string" ? (value[k] as string) : null);
+  switch (value["kind"]) {
+    case "release": {
+      const [study, surveyId, version, hash] = [s("study"), s("surveyId"), s("version"), s("hash")];
+      return study && surveyId && version && hash ? { kind: "release", study, surveyId, version, hash } : null;
+    }
+    case "validated": {
+      const [instrument, refKey] = [s("instrument"), s("refKey")];
+      return instrument && refKey ? { kind: "validated", instrument, refKey } : null;
+    }
+    case "module": {
+      const moduleId = s("moduleId");
+      const version = value["version"];
+      const contentHash = s("contentHash") ?? "";
+      return moduleId && typeof version === "number" && Number.isInteger(version) && version > 0
+        ? { kind: "module", moduleId, version, contentHash }
+        : null;
+    }
+    default:
+      return null;
+  }
+}
+
+/**
+ * The draft's provenance records (D-57, docs/16 §12.5), read leniently: a
+ * record that is not one is dropped rather than refusing the whole draft,
+ * since provenance describes how a survey was built and a damaged entry must
+ * not stop anyone opening it. What is kept has exactly the record's fields.
+ * The server still verifies every release a record names before it vouches
+ * for anything (§12.4), so nothing here is trusted.
+ */
+function readImports(raw: unknown[]): ImportRecord[] {
+  const out: ImportRecord[] = [];
+  for (const r of raw) {
+    if (!isRecord(r)) continue;
+    const { id, at, by, byEmail } = r;
+    const origin = readOrigin(r["origin"]);
+    const items = stringMap(r["items"]);
+    if (typeof id !== "string" || typeof at !== "string" || typeof by !== "string" || typeof byEmail !== "string" || !origin || !items) continue;
+    const renamed = stringMap(r["renamed"]);
+    const variablesRenamed = stringMap(r["variablesRenamed"]);
+    const dismissed = r["dismissed"];
+    out.push({
+      id,
+      at,
+      by,
+      byEmail,
+      origin,
+      items,
+      ...(renamed ? { renamed } : {}),
+      ...(variablesRenamed ? { variablesRenamed } : {}),
+      ...(typeof dismissed === "number" && Number.isInteger(dismissed) ? { dismissed } : {}),
+    });
+  }
+  return out;
 }
 
 export function serialiseDraft(draft: StudioDraft): string {

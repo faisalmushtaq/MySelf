@@ -137,7 +137,12 @@ export interface FragmentBlock {
    * questionnaire, which is always its whole licensed form.
    */
   definition: InstrumentOrModule;
-  /** The block's display condition, kept only when every question it tests is in the piece. */
+  /**
+   * The block's display condition, as the source had it. Adding the piece keeps
+   * it only when every question it tests is in the draft after the copy, and
+   * says when it does not (§12.3 rule 7); a saved module may test only
+   * questions inside itself (`moduleProblems`).
+   */
   displayIf?: unknown;
 }
 
