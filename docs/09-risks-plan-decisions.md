@@ -177,3 +177,79 @@ a monthly budget limit and alerts on the OpenAI project before fielding.
 **Not settled by this.** A safeguarding flag still reaches nobody (docs/14 §4),
 and App Check is still the control for a URL that circulates too far (runbook
 §2). Both come before MyStory is fielded with participants.
+
+### Participant links and study spaces (2026-10-06, D-56)
+
+**What was asked (the research team's words).** "Can we now also make it so
+that this page allows us to create live links to different versions of the
+study? Eg I want to run a standalone study on participants perspectives of the
+future? Or perhaps I want links for different stages of the MyPhone MyBrain
+study? Is there a way to divorce all of that? Or do we create separate projects
+for each case?"
+
+**Decision.** No separate Firebase projects. Two things inside the one project:
+
+1. **One live participant link per Studio survey.** Every survey with a live
+   version has a link, shown in the Studio with a copy button and a QR code:
+
+   `https://faisalmushtaq.github.io/MySelf/?study=<studyId>&survey=<surveyId>`
+
+   An iPad opened on it checks the survey is published, downloads and verifies
+   it, and remembers the choice, so it stays on that survey offline and after a
+   reload. Stages of MyPhone MyBrain are surveys in the `ybm` study, each with
+   its own link.
+2. **Study spaces.** A standalone study (participants' perspectives of the
+   future) is a study space: `studies/{studyId}`, beside `ybm`, with its own
+   Studio access list, surveys, devices, sittings, narratives and audit. Only a
+   project owner creates one; the creator becomes its Studio admin.
+
+**Why not separate projects.** A project each would mean a Firebase project,
+service accounts, an OpenAI secret, a deploy, a Pages build and a set of
+repository variables per study, all kept in step by hand, and a dashboard that
+signs in to each. Everything was already filed under `studies/{study}/…`;
+what tied it to one study was a build constant. Making the study a validated
+part of each request costs far less and keeps one deploy, one set of rules
+and one set of tests.
+
+**What stays exactly as it is.** Every existing path, document, link and iPad.
+`ybm` is registered implicitly: it needs no registry document, and nothing is
+migrated. An iPad that has never been given a link runs
+`ybm` / `ybm_nd2026_standard` as before, with its built-in fallback. The bare
+survey URL gives no instruction: an iPad keeps whatever survey it is on, which
+for every iPad today is the default. (It cannot mean "go back to the default":
+a Home-Screen app always opens at the bare URL, so it would undo every choice.)
+
+**The rules the design keeps** (docs/16 §11 has the detail, and is the
+contract the companion dashboard is built from):
+
+- **The URL is never trusted.** Ids are lower-case slugs checked against a
+  strict pattern; an unknown or closed study, or a survey with no live
+  version, is refused with a plain message; a downloaded release is verified
+  (hash, schema, engine, survey and study) before it is used. A link holds no
+  identifying data.
+- **A survey other than the default has no built-in fallback.** It must be
+  loaded online once; then it is cached and runs offline. The start screen
+  says so plainly if it cannot be loaded.
+- **A sitting finishes on the survey and version it started**, and is filed
+  into the study it started in, whatever the iPad has been switched to since.
+- **Separation is enforced by the rules and the functions**, not the UI. A
+  Studio member of study A reads nothing of study B. Every function that takes
+  a study checks it against the registry, and checks the caller against that
+  study's list. Reading sittings stays with the project-wide `owner`,
+  `researcher` and `analyst` claims, as before (a per-study reader is for the
+  team to decide; docs/16 §11.11).
+- **Closing a study** stops new devices, new sittings started on an iPad that
+  can see it is closed, and MyStory's model calls. It never refuses a sitting
+  from an iPad the study already knows, so nothing collected is lost. A study
+  is never deleted.
+- **MyStory knows its study.** The survey tells the module which study the
+  sitting belongs to (beside the release hash, in the frame's address; the
+  credential still travels only by message, D-55). The relay, `transcribe`
+  and `saveNarrative` register and verify the iPad, resolve the release and
+  count the limits in that study.
+- **Device limits are per study.** 120 calls per iPad per day, counted per
+  study registration, and the 2,000-call daily ceiling **per study**, so a link
+  circulating in one study cannot close MyStory in another. The worst day is
+  therefore the ceiling times the number of open studies with MyStory live,
+  which only an owner can add to; the OpenAI budget limit (D-55) remains the
+  last line.

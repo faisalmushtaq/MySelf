@@ -1091,3 +1091,305 @@ side is the fielding runbook (docs/15 §10). In short:
   words for the participant, and the survey offers the way past at once.
 - **Off.** Either limit set to `0`, with no code change.
 - **The preview** never runs the module, as before (§10.1).
+
+---
+
+## 11. Participant links and study spaces (D-56, designed 2026-10-06)
+
+The research team asked whether the Studio could make "live links to different
+versions of the study", for a standalone study on participants' perspectives
+of the future or for the stages of MyPhone MyBrain, and whether that needs a
+Firebase project each. The decision (D-56, docs/09 §5) is no: **one live
+participant link per Studio survey, and study spaces inside the one project,
+each with its own access list and its own data.**
+
+This section was written as the design before the change was built. The
+companion dashboard is built from §11.6, so that part is a contract: a change
+to a path or a field there is a change to the dashboard too.
+
+### 11.1 Two words
+
+- A **study** (a *study space* in the Studio) is everything under
+  `studies/{study}/`: its surveys, Studio access list, devices, sittings,
+  narratives, audit and exports. `ybm` is one; a standalone study is another.
+- A **survey** is a Studio survey in one study: its draft, its versions and its
+  live pointer, `published/{surveyId}`. A study can have several (the stages of
+  MyPhone MyBrain are surveys in `ybm`).
+
+### 11.2 The participant link
+
+```
+https://faisalmushtaq.github.io/MySelf/?study=<studyId>&survey=<surveyId>
+```
+
+- **Ids.** A study id is 2 to 40 characters, `^[a-z][a-z0-9_]{1,39}$`. A survey
+  id is a Studio survey id, `^[a-z][a-z0-9_]{0,63}$`. Nothing is lower-cased,
+  trimmed or decoded into shape: anything else is refused, so an id can never
+  carry a `/`, `.`, `%`, `?` or `#` into a path.
+- **`study` may be left out** and means the deployment's default study (`ybm`).
+  `survey` is required whenever there is a link at all. A parameter given
+  twice is refused as ambiguous. Other parameters are ignored.
+- **No identifying data.** A link names a study and a survey and nothing about
+  anybody. The participant code is typed on the iPad, as before.
+- **The Studio builds the link** from the participant app's address (the
+  researcher view is served from its `researcher/` folder) and always writes
+  both parameters, the default survey included, so a link to the default survey
+  can move an iPad back to it.
+- **The bare URL gives no instruction.** An iPad keeps the survey it is on. An
+  iPad that has never been given a link is on `ybm` / `ybm_nd2026_standard`,
+  so every iPad and link in use today behaves exactly as it does now. (A
+  Home-Screen app always opens at the bare URL, so "bare means the default"
+  would undo every choice made on it.)
+- **The QR code** is drawn in the browser by a small, well-known library, from
+  the same link, with no service involved. It works offline.
+
+### 11.3 How an iPad chooses its survey and keeps it
+
+**What it remembers.** In the device database beside the release cache
+(`release_state`, which is keyed by `id`):
+
+| Row | Holds |
+|---|---|
+| `selection` | `{ study, surveyId, chosenAt, chosenBy: "link" \| "staff", previous, lastLink }`. Absent means the default. |
+| `active` | The default survey's active release and last check, exactly as today. |
+| `active:<study>/<surveyId>` | The same for any other survey. |
+
+No table is added or re-keyed (the reason is in `db.ts`, version 4). Each
+sitting row also records its `study` and `surveyId`; a row without them is the
+default's, which is what every sitting before this change was.
+
+**Reading a link, once.** At start-up the app reads `study` and `survey`:
+
+1. Anything that does not match the patterns: a plain message ("This link
+   isn't one MySelf can use"), and the iPad stays where it was.
+2. The same as the survey the iPad is on, or the same as the last link it
+   followed (`lastLink`): nothing to do. That is what makes the link "read
+   once": a Home-Screen app saved from a link opens on it every time, and must
+   not undo a change staff made since in the handover panel.
+3. Otherwise the app checks, online, in this order: the study's registry
+   document exists and is open (§11.4; the default study needs no document);
+   `published/{surveyId}` exists in that study; the release it names downloads
+   and verifies (hash, schema, engine version, and that it is this survey of
+   this study). Then it caches the release, saves the selection, records the
+   link as followed, and the start screen shows the survey.
+4. A definite refusal (no such study, the study is closed, nothing published,
+   a release that fails verification) is said plainly on the start screen, and
+   the iPad stays on the survey it was on.
+5. **Offline, or the study cannot be reached:** a survey other than the default
+   has no built-in fallback, so the start screen says so in words ("This iPad
+   has been given a link to … It has to be downloaded once, and this iPad is
+   offline. Connect it to the internet."), and Start is not offered. The app
+   tries again by itself when the network returns, and on every launch while
+   the link is in the address. Nothing is half-adopted.
+
+**Staff change it in the handover panel** (five taps on the build line, as
+today; a participant never sees it). The panel says which study and survey the
+iPad is on, and offers:
+
+- paste a participant link, or type `study/survey`, then **Check**: the same
+  online check as a link;
+- then **Use this survey on this iPad**, with a confirmation that says what
+  happens to unfinished sittings (below);
+- **Back to the default survey**, which works offline because the default has
+  its built-in release.
+
+**A sitting finishes where it started.** A sitting is stamped with its release
+(as before) and now with its study and survey. Typing a code resumes only an
+unfinished sitting of the survey the iPad is on, so after a switch a returning
+participant is never put back into another study's questionnaire. An
+unfinished sitting of the previous survey stays on the iPad, keeps uploading
+its checkpoints to its own study, and can be finished after switching back.
+The confirmation says how many there are.
+
+**Uploads carry the study.** A sitting is posted to `saveSitting` with
+`study` beside it, one sitting per request as now, so sittings of two studies
+waiting on one iPad each land in their own study whichever survey the iPad is
+on when they are sent. A handover file records each sitting's study.
+
+**A closed study** (§11.4), once the start screen has seen it, starts no new
+sitting: Start resumes an unfinished one and otherwise says the study is
+closed.
+
+### 11.4 Study spaces: the registry and their lifecycle
+
+**The registry is one document per study**, `studies/{studyId}`:
+
+| Field | Type | Meaning |
+|---|---|---|
+| `study` | string | the id, again |
+| `title` | string | a name for people, e.g. "Perspectives of the future" |
+| `status` | `"open"` \| `"closed"` | whether it takes new devices, new sittings and model calls |
+| `createdAt` | timestamp | server time |
+| `createdBy` | string | the creator's uid (their address is in the audit trail, not here) |
+| `updatedAt`, `updatedBy` | timestamp, string | the last change of title or status |
+| `closedAt` | timestamp or null | when it was last closed |
+
+- **Public by `get`**, so an iPad can tell a closed study from an open one
+  before anybody types a code. That is why it holds nothing but the id, a
+  title and dates: **a study's title is visible to anyone who knows its id.**
+  `list` is for the project's people (owner, researcher and analyst claims),
+  so the dashboard can find every study. Nobody writes it from a browser.
+- **`ybm` is registered implicitly.** The deployment's default study
+  (`MYSELF_STUDY`, `ybm`) counts as registered and open whether or not it has
+  a document, so nothing has to be written for it. An owner may give it a
+  document from the Studio (to set its title, or to close it); that is the
+  only way one appears, it is idempotent, and it changes no existing document.
+- **Who creates one.** Only a project owner (the `owner` claim), in the Studio:
+  **New study space**, with an id and a title. The function refuses an id
+  already registered, the default's id, and an id with data already under it
+  (a leftover from a test, say), so a new study always starts empty. The
+  creator is added to its access list as **admin**, and the creation is the
+  first row of its audit trail.
+- **Closing and reopening.** An owner can close a study and reopen it, with an
+  audit row each time. Closed means: no new device can register, an iPad that
+  sees it is closed starts no new sitting, and MyStory makes no model calls
+  for its iPads. The Studio still works on it. **A sitting from an iPad the
+  study already knows is always accepted**, open or closed, so nothing
+  collected before the closure is refused. A study is never deleted.
+- **What each study has of its own.** Its `studioMembers` list and domain rules
+  (already per study), its surveys and their links, its devices (an iPad is
+  registered separately in each study it files into, first writer wins in
+  each), its sittings, quarantine, narratives, voice recordings, audit trails,
+  model-call counts and exports.
+
+### 11.5 Access and data separation
+
+**Who may do what in a study space:**
+
+| | project owner (claim) | Studio member of the study | Studio member of another study only | researcher / analyst claim |
+|---|---|---|---|---|
+| create a study space | ✓ | ✗ | ✗ | ✗ |
+| close or reopen it | ✓ | ✗ | ✗ | ✗ |
+| use its Studio (by role) | ✓ (admin) | ✓ | ✗ | ✗ |
+| manage its access list | ✓ | admin | ✗ | ✗ |
+| read its sittings and narratives | ✓ | ✗ | ✗ | ✓ |
+| get its registry document, live pointers and releases | ✓ (anyone) | ✓ | ✓ | ✓ |
+
+- **Enforced by the rules** for everything a browser reads: every Studio rule
+  is `studioLevel(study)` of the path's own study, so a role in A is nothing in
+  B. The rules tests hold this for every Studio collection.
+- **Enforced by the functions** for everything else. Each request that carries
+  a study (`saveSitting`, the relay, `transcribe`, `saveNarrative`, the
+  identity and export callables, every Studio callable) has it checked against
+  the pattern and the registry before anything else is read, and a Studio
+  callable then reads **that** study's list for the caller. A request with no
+  study means the default, as every request did until now.
+- **The Studio's study switcher** lists the studies where the signed-in person
+  has a role (`studioSession` works it out on the server); an owner sees all.
+- **Reading sittings stays project-wide.** The `owner`, `researcher` and
+  `analyst` claims read sittings in every study, as they read `ybm` today; that
+  is the dashboard's access. A Studio role never reads a sitting, in any study
+  (counts only, as before). A per-study reader is a decision for the team
+  (§11.11).
+
+### 11.6 What the dashboard reads (the data contract)
+
+All in the `(default)` Firestore database of `myself-research`.
+
+**Listing studies.** `collection("studies")` (role claims may list), plus
+`ybm`, which is a study whether or not it has a document. Use each document's
+`title` and `status` (§11.4); `ybm` with no document is open, and its title is
+its live survey's `composition.title`.
+
+**Listing a study's surveys.** `collection("studies/{study}/published")`
+(role claims may now list it; it was get-only). One document per survey with a
+live version:
+
+| Field | Meaning |
+|---|---|
+| `surveyId`, `study` | the survey and its study |
+| `hash` | the live release, `sha256:<hex>` |
+| `version`, `releaseKey`, `engineVersion` | of the live release |
+| `generation` | increases on every publish or rollback |
+| `publishedAt` | timestamp |
+
+A survey's title is its release's `composition.title`. The Studio's own
+summary, `studies/{study}/surveys/{surveyId}`, is for Studio members; the
+dashboard does not need it. A survey that never went live has no pointer and,
+by construction, no sittings.
+
+**Reading a release by hash.** Bundled releases (`releases/*.manifest.json` in
+the repository) belong to `ybm`. Anything else is
+`studies/{study}/publicReleases/{hex}` (`get`, public), where `{hex}` is the
+hash without `sha256:`: the `manifest` field is the exact JSON, whose
+canonical SHA-256 must equal the hash before it is used (the same check as
+`readStoredRelease`). A release is looked up in **its sitting's own study**:
+the functions no longer resolve a bundled `ybm` release for another study.
+
+**Sittings.** `studies/{study}/sessions/{sessionId}`, plus
+`…/chunks/{0000…}` when `chunkCount > 0`. Unchanged:
+
+| Field | Meaning |
+|---|---|
+| `study` | always the study in the path |
+| `sessionId`, `deviceId`, `studyCode` | as before |
+| `releaseHash`, `releaseKey` | the release it was collected under |
+| `startedAt`, `completedAt?`, `complete` | as before |
+| `quarantined`, `provenance`, `eventCount`, `chunkCount`, `events`, `receivedAt` | as before |
+
+- **Its study** is the path's (equal to `study`).
+- **Its survey** is `release.assessment` of the release `releaseHash` names,
+  resolved in that study. (`releaseKey` is `<surveyId>_r<M>_<m>_<p>`, which is
+  a display fallback, never the source.)
+- **Its version** is that release's `release.version`.
+
+**Also per study:** `narratives/{sessionId}` (the run, with `releaseHash`),
+`quarantine`, `corrections`, `assignments`, `devices`,
+`audit_relayDevices/{day}` and `{day}_{installId}` (MyStory's counts), and in
+Storage `studies/{study}/voice/{sessionId}/…`. The identity project mirrors
+the study in its own paths (`studies/{study}/participants`, `claims`, …).
+
+**Nightly exports** (Cloud Storage): `exports/{YYYY-MM-DD}/…` for `ybm`,
+unchanged, and `exports/studies/{study}/{YYYY-MM-DD}/…` for every other study
+that has sittings. `exportNow` takes an optional `study`.
+
+### 11.7 Offline
+
+- **The default survey** is unchanged: it never waits on the network and falls
+  back to its built-in release.
+- **Any other survey** needs one online load. After that it runs offline for
+  as long as the iPad keeps its storage (on the Home Screen, indefinitely),
+  picks up a new version at the start screen when it can, and re-checks its
+  study's status at the same time.
+- **A link opened offline** says so on the start screen and starts nothing
+  until it has been checked.
+- **Sittings, checkpoints and uploads** behave as before; each carries its
+  study. A sitting refused because its study cannot be found stays on the iPad,
+  like any refused upload.
+- **On an iPad, Safari and the Home-Screen app keep separate storage.** A link
+  opened in Safari sets Safari's copy; for the Home-Screen app, open the link
+  and add *that page* to the Home Screen, or paste the link into the handover
+  panel inside the app (the runbook says so).
+
+### 11.8 Security
+
+| Threat | Handling |
+|---|---|
+| **A forged or mistyped link** | Ids match a strict pattern before any request; the study's registry and live pointer are checked; the release is verified over its raw JSON against the pointer's hash and must be this survey of this study. A link can choose only among surveys published in registered, open studies, and it cannot point the app at another host: the address is the build's, and only the two checked ids come from the link. |
+| **Filing into a study that does not exist** | `saveSitting` refuses (404) before anything is read or written; the iPad keeps the sitting. An iPad can only be set to a study it has checked exists. |
+| **Filing into a closed study** | A new installation is refused, so a link that circulates after a study closes files nothing. An installation the study already knows is accepted, so nothing collected is lost (§11.4). |
+| **A request naming another study** | The study in a request is checked against the registry, and then everything else is checked **in that study**: the device credential (first writer wins per study), the Studio list, the release, the counts. A role, a registration or a count in one study is nothing in another. |
+| **MyStory's study** | The survey puts the study in the module's address beside the release hash, which the module only acts on with a credential it was given by message from a trusted origin (D-55). The relay, `transcribe` and `saveNarrative` validate it, register and verify the iPad in it, resolve the release in its store only, and count against its limits; a closed study refuses an iPad's model calls as "switched off". |
+| **Device limits** | Per iPad, per study registration: 120 a day each. The ceiling is per study (2,000 a day each), so one study's circulating link cannot close MyStory in another. The cost is that the worst day is the ceiling times the number of open studies with MyStory live; only an owner can create a study, and the OpenAI budget limit is the last line (D-55). |
+| **Learning what studies exist** | Nobody without a role claim can list the registry. Anyone can `get` a study whose id they know, which shows its title and status, so titles are written for the public. |
+| **Studio member of A in B** | Rules and functions read B's list for anything in B (§11.5). |
+| **Privacy** | Links carry no identifying data; nothing logs an answer; the selection on the iPad is two ids. |
+
+### 11.9 Migration
+
+None. No document is written, moved or rewritten by the change; `ybm` needs
+no registry document; existing iPads (no `selection` row) run what they run
+today; existing links (the bare URL) mean what they mean today; existing
+sittings, narratives and counts stay where they are; the dashboard's current
+reading of `studies/ybm/…` is unchanged. Rolling back is redeploying the
+previous functions, rules and Pages build: the registry documents and the new
+`release_state` rows are additive, and an older build ignores them (it then
+runs the default survey, and files into `ybm`, which is what it always did).
+
+### 11.10 Where it is
+
+Filled in as it is built.
+
+### 11.11 Decisions for the research team to confirm
+
+Filled in as it is built.
