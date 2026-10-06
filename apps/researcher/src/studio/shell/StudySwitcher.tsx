@@ -4,7 +4,7 @@ import type { StudyStatus, StudySummary } from "@myself/studio";
 import { studio, StudioCallError, useStudioSession } from "../data/index.js";
 import { DEFAULT_STUDY, navigate, useStudy } from "../router.js";
 import { Dialog } from "../ui/dialog.js";
-import { Button, Field, MenuButton, Notice, type MenuItem } from "../ui/kit.js";
+import { Button, Field, MenuButton, Notice, VisuallyHidden, type MenuItem } from "../ui/kit.js";
 import { useToast } from "../ui/toast.js";
 
 /**
@@ -30,10 +30,11 @@ export function StudySwitcher() {
   const shown = session.status === "ready" && (session.studies.length > 1 || session.owner || study !== DEFAULT_STUDY);
   if (!shown) return null;
 
+  // Labelled with the id as well as the title: titles can repeat, ids can't,
+  // and the id is what a participant link and every data path carry.
   const items: MenuItem[] = session.studies.map((s) => ({
-    label: s.title,
+    label: `${s.title} · ${s.study}${s.status === "closed" ? " · closed" : ""}`,
     icon: s.study === study ? "check" : "folder",
-    hint: s.status === "closed" ? `${s.study} · closed` : s.study,
     onSelect: () => void navigate({ name: "surveys" }, { study: s.study }),
   }));
   if (session.owner) {
@@ -49,15 +50,19 @@ export function StudySwitcher() {
         /
       </span>
       <span className="stp-study-switch">
+        {/* A button with visible text takes its name from that text, so what a
+            screen reader needs beyond the title is said in hidden text. */}
         <MenuButton
-          label={`Study space: ${here?.title ?? study}. Change`}
+          label="Study spaces"
           icon="folder"
           align="start"
           items={items}
           buttonLabel={
             <>
+              <VisuallyHidden>Study space: </VisuallyHidden>
               {here?.title ?? study}
               {here?.status === "closed" ? <span className="stp-study-closed">Closed</span> : null}
+              <VisuallyHidden>. Change</VisuallyHidden>
             </>
           }
         />
