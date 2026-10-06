@@ -51,6 +51,8 @@ export interface NarrativeStepProps {
   last: boolean;
   sessionId: string;
   releaseHash: string;
+  /** The sitting's study (D-56), for the module's calls; absent means the default. */
+  study?: string | undefined;
   /** Shown to the participant by the module, when the study collects one. */
   firstName?: string | undefined;
   /**
@@ -79,7 +81,7 @@ export interface NarrativeStepProps {
 const PATIENCE_MS = 20_000;
 
 export function NarrativeStep(props: NarrativeStepProps) {
-  const { moduleUrl, protocol, protocolVersion, definition, last, sessionId, releaseHash, firstName, onEvent, onDone } =
+  const { moduleUrl, protocol, protocolVersion, definition, last, sessionId, releaseHash, study, firstName, onEvent, onDone } =
     props;
   const readCredential = props.credential;
   const [loaded, setLoaded] = useState(false);
@@ -103,6 +105,7 @@ export function NarrativeStep(props: NarrativeStepProps) {
     protocol,
     sessionId,
     releaseHash,
+    study,
     firstName,
     sendsProtocol: definition !== undefined,
   }).toString();

@@ -12,7 +12,26 @@ import { EVICTION_CAP_DAYS, type Durability } from "../lib/durability.js";
  * through a callback, so a sitting that starts and ends in between leaves the
  * code, the settings and an open handover panel exactly as they were.
  */
+/**
+ * What the start screen says to staff about the survey (D-56, docs/16 §11.3).
+ *
+ * `blocking` when there is nothing this iPad should start: a link it has been
+ * given and has not yet been able to check, or a survey with nothing on the
+ * device to run. Then the message stands where the code and Start would be, and
+ * nothing of another survey's (its label, its instructions, its contact) is
+ * shown under this one's name. Otherwise it sits above the code, and can be put
+ * away once read.
+ */
+export interface StartNotice {
+  blocking: boolean;
+  text: string;
+  dismiss?: () => void;
+}
+
 export interface StartScreenProps {
+  notice?: StartNotice | null;
+  /** `study/survey` when the iPad runs a survey other than this build's default, for the build line. */
+  surveyLabel?: string | null;
   /** The release's short label for participants ("Notre Dame · 2026"), if it has one. */
   studyLabel: string | undefined;
   /** The release's rule for the study code: its format, label and instructions. */
@@ -41,6 +60,8 @@ export interface StartScreenProps {
 }
 
 export function StartScreen({
+  notice = null,
+  surveyLabel = null,
   studyLabel,
   codeRule,
   contact,
@@ -60,11 +81,24 @@ export function StartScreen({
   onBuildLineTap,
   children,
 }: StartScreenProps) {
+  const blocked = notice?.blocking === true;
   return (
     <div className="screen start">
       <h1 className="brand">MySelf</h1>
       <p className="subbrand">MyThoughts</p>
-      {studyLabel && <p className="study-title">{studyLabel}</p>}
+      {!blocked && studyLabel && <p className="study-title">{studyLabel}</p>}
+      {notice && (
+        <div className={`survey-notice${blocked ? " blocking" : ""}`} role="status">
+          <p>{notice.text}</p>
+          {notice.dismiss && (
+            <button type="button" className="secondary" onClick={notice.dismiss}>
+              OK
+            </button>
+          )}
+        </div>
+      )}
+      {!blocked && (
+        <>
       {/* The code the research team issued, entered once before anything
           else. It used to be asked again mid-survey; now it is captured
           here and carried through, so nobody types it twice. */}
@@ -98,6 +132,8 @@ export function StartScreen({
       <button type="button" className="next big" disabled={code.trim().length < 2 || busy} onClick={() => void onStart()}>
         Start
       </button>
+        </>
+      )}
       <details className="reading-settings">
         <summary>Reading settings</summary>
         <p className="reading-settings-intro">Choose the display that feels clearest. These preferences stay on this device and are never included in study data.</p>
@@ -156,12 +192,13 @@ export function StartScreen({
         </p>
       )}
       <p className="hint demo-note" onClick={() => onBuildLineTap()}>
-        Preview build · release {releaseVersion} ({releaseBuiltIn ? "built in" : "downloaded"}) · {releaseHash?.slice(7, 19)} ·{" "}
+        Preview build · {surveyLabel ? <>survey {surveyLabel} · </> : null}
+        {blocked && surveyLabel ? "not loaded" : <>release {releaseVersion} ({releaseBuiltIn ? "built in" : "downloaded"}) · {releaseHash?.slice(7, 19)}</>} ·{" "}
         {counts.awaitingSync + counts.syncFailed} session{counts.awaitingSync + counts.syncFailed === 1 ? "" : "s"} awaiting sync · {counts.syncedVerified} verified · build{" "}
         {__BUILD_STAMP__}
       </p>
       {children}
-      {contact && (
+      {!blocked && contact && (
         <p className="start-footer">
           {contact.ethicsReference && <>Ethics reference {contact.ethicsReference}. </>}
           Any questions, email <a href={`mailto:${contact.email}`}>{contact.email}</a>.

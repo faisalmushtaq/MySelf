@@ -21,6 +21,15 @@ export interface SessionRow {
   participantCode: string;
   releaseKey: string;
   releaseHash: string;
+  /**
+   * The study and survey this sitting was started on (D-56, docs/16 §11.3).
+   * Fixed when the sitting is created, whatever the iPad is switched to later:
+   * the sitting is resumed only on this survey and uploaded into this study.
+   * Absent on a row written before study spaces, which is the default's —
+   * the only survey any build before them could run.
+   */
+  study?: string;
+  surveyId?: string;
   state: SessionState;
   currentIndex: number;
   startedAt: string;
@@ -120,11 +129,41 @@ export interface CachedReleaseRow {
  * `lastResult` is whatever `lib/releases.ts` recorded, stored as it was given.
  */
 export interface ReleaseStateRow {
-  id: "active";
-  /** The release a new sitting starts under. Null means the built-in one. */
+  /**
+   * `active` for the default survey, exactly as before study spaces, and
+   * `active:<study>/<surveyId>` for any other (D-56). One row per survey, so a
+   * survey this iPad was moved away from keeps its own active release and last
+   * check for when it is moved back.
+   */
+  id: ReleaseStateKey;
+  /** The release a new sitting starts under. Null means the built-in one — or, for a survey that has none, nothing yet. */
   activeHash: string | null;
   checkedAt: string | null;
   lastResult: unknown;
+}
+
+export type ReleaseStateKey = "active" | `active:${string}`;
+
+/**
+ * Which survey of which study this iPad runs (D-56, docs/16 §11.3), in the
+ * same table as the release state, keyed `selection`. Absent means the
+ * default, which is what every iPad ran before study spaces, so an iPad that
+ * has never been given a link has no such row and behaves as it always did.
+ */
+export interface SelectionRow {
+  id: "selection";
+  study: string;
+  surveyId: string;
+  chosenAt: string;
+  chosenBy: "link" | "staff";
+  /** What it ran before, so staff can be offered the way back. */
+  previous: { study: string; surveyId: string } | null;
+  /**
+   * The last participant link this iPad followed, `<study>/<surveyId>`. A link
+   * is followed once: a Home-Screen app saved from a link opens on it every
+   * time, and must not undo a change staff have made since.
+   */
+  lastLink: string | null;
 }
 
 /** How the handover panel names this device. */
@@ -145,7 +184,13 @@ export interface Enrolment {
  * something the server refuses.
  */
 export type SyncEvent = DeviceEventUpload;
-export type SyncSession = SittingUploadItem;
+/**
+ * One sitting as it is queued for upload: the wire item, and the study it is
+ * filed into (D-56), which travels beside the item in the request rather than
+ * inside it. Optional, so a sitting built by a test of the older shape still
+ * means the default.
+ */
+export type SyncSession = SittingUploadItem & { study?: string };
 
 export interface StoredSessionCounts {
   inProgress: number;
@@ -167,7 +212,8 @@ class MySelfDb extends Dexie {
   checkpoints!: EntityTable<CheckpointRow, "sessionId">;
   accessibility!: EntityTable<AccessibilityRow, "id">;
   releases!: EntityTable<CachedReleaseRow, "hash">;
-  release_state!: EntityTable<ReleaseStateRow, "id">;
+  /** Release state rows and the selection row: both keyed by `id`, no index added (see version 5). */
+  release_state!: EntityTable<ReleaseStateRow | SelectionRow, "id">;
 
   constructor() {
     super("myself");
@@ -288,13 +334,20 @@ export async function saveAccessibilityPreferences(preferences: AccessibilityPre
   return normalised;
 }
 
-export async function createSession(participantCode: string, releaseKey: string, releaseHash: string): Promise<SessionRow> {
+export async function createSession(
+  participantCode: string,
+  releaseKey: string,
+  releaseHash: string,
+  choice: { study: string; surveyId: string },
+): Promise<SessionRow> {
   const now = new Date().toISOString();
   const row: SessionRow = {
     sessionId: `ses_${ulid()}`,
     participantCode,
     releaseKey,
     releaseHash,
+    study: choice.study,
+    surveyId: choice.surveyId,
     state: "in_progress",
     currentIndex: 0,
     startedAt: now,
@@ -314,23 +367,65 @@ export async function createSession(participantCode: string, releaseKey: string,
  * older rule — only sittings of the release running now — which is what the app
  * falls back to when a sitting's own release cannot be loaded.
  */
-export type ResumeScope = { anyRelease: true } | { releaseHash: string };
+export type ResumeScope = ({ anyRelease: true } | { releaseHash: string }) & {
+  /**
+   * Only sittings of this survey of this study (D-56). After an iPad is moved
+   * to another survey, a returning participant typing their code is never put
+   * back into a different study's questionnaire — in a longitudinal study the
+   * same code is used at every stage. Absent means no restriction, which is
+   * only ever the case in a test of the older rule.
+   */
+  choice?: { study: string; surveyId: string };
+};
+
+/** The study and survey a row was started on; the default's for a row from before study spaces. */
+export function choiceOfRow(row: Pick<SessionRow, "study" | "surveyId">, defaults: { study: string; surveyId: string }) {
+  return { study: row.study ?? defaults.study, surveyId: row.surveyId ?? defaults.surveyId };
+}
+
+declare const __STUDY__: string;
+declare const __SURVEY_ID__: string;
+/** What a row without a study was started on: the build's default, the only survey a build before study spaces ran. */
+const ROW_DEFAULTS = { study: __STUDY__ || "ybm", surveyId: __SURVEY_ID__ || "ybm_nd2026_standard" };
 
 /**
  * The sitting a code resumes, chosen from that code's rows: the most recently
  * touched one still in progress, within the scope asked for. Pure, so the rule
  * can be tested without a database.
  */
-export function pickResumable(rows: readonly SessionRow[], scope: ResumeScope): SessionRow | undefined {
+export function pickResumable(
+  rows: readonly SessionRow[],
+  scope: ResumeScope,
+  defaults: { study: string; surveyId: string } = ROW_DEFAULTS,
+): SessionRow | undefined {
+  const choice = scope.choice;
   return rows
     .filter((session) => session.state === "in_progress")
     .filter((session) => "anyRelease" in scope || session.releaseHash === scope.releaseHash)
+    .filter((session) => {
+      if (!choice) return true;
+      const own = choiceOfRow(session, defaults);
+      return own.study === choice.study && own.surveyId === choice.surveyId;
+    })
     .sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1))[0];
 }
 
 export async function findResumableSession(participantCode: string, scope: ResumeScope): Promise<SessionRow | undefined> {
   const rows = await db.sessions.where("participantCode").equals(participantCode).toArray();
   return pickResumable(rows, scope);
+}
+
+/**
+ * Unfinished sittings on this iPad of any survey but `choice`, for the handover
+ * panel's warning before a switch: they stay here, keep uploading their
+ * checkpoints into their own study, and can be finished after switching back.
+ */
+export async function unfinishedElsewhere(choice: { study: string; surveyId: string }): Promise<number> {
+  const running = await db.sessions.where("state").equals("in_progress").toArray();
+  return running.filter((row) => {
+    const own = choiceOfRow(row, ROW_DEFAULTS);
+    return own.study !== choice.study || own.surveyId !== choice.surveyId;
+  }).length;
 }
 
 // Serialise writes so rapid successive answers can never race on sequence.
@@ -486,6 +581,8 @@ async function materialise(rows: readonly SessionRow[], complete: boolean): Prom
     }
     out.push({
       sessionId: session.sessionId,
+      // Where it is filed: the study it started in (D-56), not the one the iPad is on now.
+      study: choiceOfRow(session, ROW_DEFAULTS).study,
       studyCode: session.participantCode,
       releaseKey: session.releaseKey,
       releaseHash: session.releaseHash,
@@ -668,22 +765,31 @@ export async function putCachedRelease(row: CachedReleaseRow): Promise<void> {
   await db.releases.put(row);
 }
 
-export async function getReleaseState(): Promise<ReleaseStateRow | undefined> {
-  return db.release_state.get("active");
+export async function getReleaseState(id: ReleaseStateKey = "active"): Promise<ReleaseStateRow | undefined> {
+  return (await db.release_state.get(id)) as ReleaseStateRow | undefined;
 }
 
-/** Change some of the release state, leaving the rest as it was. */
-export async function saveReleaseState(patch: Partial<Omit<ReleaseStateRow, "id">>): Promise<void> {
+/** Change some of one survey's release state, leaving the rest as it was. */
+export async function saveReleaseState(patch: Partial<Omit<ReleaseStateRow, "id">>, id: ReleaseStateKey = "active"): Promise<void> {
   await db.transaction("rw", db.release_state, async () => {
-    const previous = await db.release_state.get("active");
+    const previous = (await db.release_state.get(id)) as ReleaseStateRow | undefined;
     await db.release_state.put({
-      id: "active",
+      id,
       activeHash: previous?.activeHash ?? null,
       checkedAt: previous?.checkedAt ?? null,
       lastResult: previous?.lastResult ?? null,
       ...patch,
     });
   });
+}
+
+/** Which survey this iPad runs; undefined means the default (D-56). */
+export async function getSelection(): Promise<SelectionRow | undefined> {
+  return (await db.release_state.get("selection")) as SelectionRow | undefined;
+}
+
+export async function saveSelection(row: Omit<SelectionRow, "id">): Promise<void> {
+  await db.release_state.put({ id: "selection", ...row });
 }
 
 /**
@@ -710,8 +816,12 @@ export async function pruneCachedReleases(keep: readonly string[]): Promise<stri
   return db.transaction("rw", db.sessions, db.releases, db.release_state, async () => {
     const needed = new Set<string>(keep);
     for (const session of await db.sessions.toArray()) needed.add(session.releaseHash);
-    const state = await db.release_state.get("active");
-    if (state?.activeHash) needed.add(state.activeHash);
+    // Every survey's active release, not only the one on screen (D-56): an iPad
+    // moved back to a survey it ran before should not have to download it again.
+    for (const row of await db.release_state.toArray()) {
+      const activeHash = (row as Partial<ReleaseStateRow>).activeHash;
+      if (typeof activeHash === "string") needed.add(activeHash);
+    }
     const cached = (await db.releases.toCollection().primaryKeys()) as string[];
     const drop = releasesToPrune(cached, needed);
     if (drop.length > 0) await db.releases.bulkDelete(drop);

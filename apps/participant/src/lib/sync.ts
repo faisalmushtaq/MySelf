@@ -281,6 +281,7 @@ async function post(
   const transport = options.transport ?? fetch;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), options.timeoutMs ?? 30_000);
+  const { study, ...item } = session;
   try {
     const response = await transport(target.url, {
       method: "POST",
@@ -298,10 +299,18 @@ async function post(
        * a long time behind a retry backoff, and a stale reading would manufacture the
        * skew it exists to detect.
        */
+      /**
+       * The study goes beside the sitting, not inside it (D-56): one sitting per
+       * request, so one study per request, and it is the study the sitting was
+       * STARTED in — an iPad moved to another survey still has the last one's
+       * sittings to send, and each lands where it began. A sitting with no study
+       * is the default's, and is sent without one, exactly as before.
+       */
       body: JSON.stringify({
         deviceId: target.installId,
         sentAt: new Date().toISOString(),
-        sittings: [session],
+        ...(study === undefined ? {} : { study }),
+        sittings: [item],
       } satisfies SittingUpload),
       signal: controller.signal,
     });

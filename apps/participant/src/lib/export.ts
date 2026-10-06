@@ -1,4 +1,4 @@
-import { db, deviceKey } from "./db.js";
+import { choiceOfRow, db, deviceKey } from "./db.js";
 import { unseal } from "./crypto.js";
 import { sealExport, type EncryptedEnvelope } from "@myself/store";
 import { deviceCredential } from "./identity.js";
@@ -26,6 +26,10 @@ import { deviceCredential } from "./identity.js";
 
 export const EXPORT_FORMAT = "myself.device.export.v1";
 
+declare const __STUDY__: string;
+declare const __SURVEY_ID__: string;
+const EXPORT_DEFAULTS = { study: __STUDY__ || "ybm", surveyId: __SURVEY_ID__ || "ybm_nd2026_standard" };
+
 export interface DeviceExport {
   format: typeof EXPORT_FORMAT;
   exportedAt: string;
@@ -46,6 +50,13 @@ export interface DeviceExport {
   deviceId: string;
   sessions: {
     sessionId: string;
+    /**
+     * The study and survey the sitting was started on (D-56), so a file from an
+     * iPad that ran two studies says which sitting belongs to which. Absent in
+     * files written before study spaces, whose sittings are the default's.
+     */
+    study?: string;
+    surveyId?: string;
     studyCode: string;
     releaseKey: string;
     releaseHash: string;
@@ -103,6 +114,7 @@ export async function buildDeviceExport(options: ExportOptions = {}): Promise<De
     }
     sessions.push({
       sessionId: row.sessionId,
+      ...choiceOfRow(row, EXPORT_DEFAULTS),
       studyCode: row.participantCode,
       releaseKey: row.releaseKey,
       releaseHash: row.releaseHash,

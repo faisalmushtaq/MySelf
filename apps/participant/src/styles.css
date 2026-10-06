@@ -431,6 +431,33 @@ textarea {
   max-width: 34rem;
 }
 
+/* Which survey this iPad is on, said to staff (D-56): a link it was given, a
+   survey not yet downloaded, a study that has closed. Addressed to whoever set
+   the iPad up, like the setup note, and left-aligned to be read rather than
+   glanced at. `blocking` stands where the code and Start would be. */
+.survey-notice {
+  margin: 1.25rem 0 0.5rem;
+  max-width: 34rem;
+  padding: 0.85rem 1rem;
+  border-left: 3px solid var(--muted);
+  text-align: left;
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.survey-notice.blocking {
+  border-left-color: var(--warn);
+  font-weight: 600;
+}
+
+.survey-notice p {
+  margin: 0 0 0.5rem;
+}
+
+.survey-notice p:last-child {
+  margin-bottom: 0;
+}
+
 /* Who to ask, at the foot of the first screen: quiet, always there, never in
    the way of starting. */
 .start-footer {
@@ -1815,6 +1842,21 @@ input[type="range"] {
   border: 1px solid var(--hairline);
   border-radius: 10px;
   background: var(--off-white);
+}
+
+/* Which survey the iPad runs, and changing it (D-56): a sub-section of the
+   panel, ruled off so the change of survey is not mistaken for a sync. */
+.survey-choice {
+  margin: 1rem 0;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--hairline);
+}
+
+.survey-choice h3 {
+  font-family: var(--font-ui);
+  font-size: 0.95rem;
+  font-weight: 600;
+  margin: 0 0 0.4rem;
 }
 
 .handover h2 {

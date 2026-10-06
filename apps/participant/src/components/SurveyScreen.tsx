@@ -47,6 +47,8 @@ export interface SurveyScreenProps {
         moduleUrl: string | null;
         sessionId: string;
         releaseHash: string;
+        /** The sitting's study (D-56), which the module acts in. Absent means the default. */
+        study?: string | undefined;
         firstName?: string | undefined;
         /** The release's frozen protocols, by `key@version`; the module is sent its own. */
         protocols?: Record<string, unknown> | undefined;
@@ -219,6 +221,7 @@ export function SurveyScreen(props: SurveyScreenProps) {
           last={last}
           sessionId={handover.sessionId}
           releaseHash={handover.releaseHash}
+          study={handover.study}
           firstName={handover.firstName}
           credential={handover.credential}
           onEvent={props.onEvent}

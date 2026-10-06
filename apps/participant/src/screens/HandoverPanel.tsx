@@ -4,6 +4,7 @@ import { syncAvailable } from "../lib/device.js";
 import { EVICTION_CAP_DAYS, HELD_TOO_LONG_DAYS, type Durability } from "../lib/durability.js";
 import { buildSealedExport, downloadExport } from "../lib/export.js";
 import { readableBytes, type Space } from "../lib/space.js";
+import { SurveyChoiceSection, type SurveyChoiceSectionProps } from "./SurveyChoiceSection.js";
 
 /**
  * The researcher's panel on the start screen: what this iPad is holding, and the
@@ -39,6 +40,10 @@ export interface HandoverPanelProps {
    * change was published this morning and this iPad is still showing yesterday's.
    */
   releaseNote: string;
+  /** Which survey this iPad runs, and the way to change it (D-56). */
+  survey: SurveyChoiceSectionProps["survey"];
+  onCheckSurvey: SurveyChoiceSectionProps["onCheck"];
+  onUseSurvey: SurveyChoiceSectionProps["onUse"];
   syncNote: string | null;
   handoverNote: string | null;
 }
@@ -58,6 +63,9 @@ export function HandoverPanel({
   onCleared,
   onSittingsErased,
   releaseNote,
+  survey,
+  onCheckSurvey,
+  onUseSurvey,
   syncNote,
   handoverNote,
 }: HandoverPanelProps) {
@@ -99,6 +107,7 @@ export function HandoverPanel({
       </p>
       {/* An unfinished sitting keeps the version it started with, whatever this says. */}
       <p className="hint release-note">{releaseNote}</p>
+      <SurveyChoiceSection survey={survey} online={online} onCheck={onCheckSurvey} onUse={onUseSurvey} />
       <div className="handover-actions">
         <button
           type="button"
