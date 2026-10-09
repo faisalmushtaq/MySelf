@@ -348,3 +348,31 @@ expressive."
 
 The repository's r9.0.0 candidate is re-cut with the same change so the
 library and the candidate agree; it remains a candidate.
+
+**Addendum, same day (D-58): consent, and the live survey catching up.**
+The team found the live survey still titled "Citizen Neuroscience", with
+consent that does not move on by itself and questions emailed to m.faizah@.
+These were fixed in the repository by D-53, but the live survey is the
+Studio's 9.0.0 — r8.0.0 plus one edit made in the Studio (end labels on the
+gaming slider) — and D-53 was never published. Decided:
+
+1. **Linkage with health and education records is a condition of taking part**
+   (the team's choice). It is a seventh consent statement every participant
+   ticks — "…shared securely with Connected Yorkshire so that my answers can
+   be linked with my health records (such as GP and hospital visits) and
+   education records (such as attendance and exam results)…" — with the
+   Connected Yorkshire explanation above the statements. The separate optional
+   Yes/No question drafted in D-53 is removed (never fielded), and the
+   "kept separately" statement and the privacy text say how the identifiers
+   are used. **This changes consent wording approved under PSCETHS-1449: the
+   team must confirm the amendment covers it before fielding.**
+2. The "Citizen Neuroscience" subtitle is dropped; the contact is
+   brainpop@leeds.ac.uk; consent moves on once every statement is ticked.
+3. The team's Studio edit (the slider end labels) is written into the library.
+4. **The live survey is brought up to the repository's version** by the
+   "Studio: publish the repository's survey" workflow (`apps/functions/studio-adopt.mjs`),
+   through the Studio's own publish, with the reasons for opening the consent
+   and identity modules recorded. It refuses if the Studio draft has
+   unpublished edits; a refused publish restores the draft. A Studio publish
+   may now pin a file exactly as a repository candidate does (the street list,
+   D-53), since those files are built and hashed in the repository.

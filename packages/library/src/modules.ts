@@ -53,8 +53,8 @@ const est = (a: number, b: number) =>
 
 // The title is a title, not the first line of a wall of text. The body keeps
 // the approved wording verbatim; only its arrangement on screen changes.
+// The "Citizen Neuroscience" subtitle was dropped at the team's request (D-58).
 const introTitle = "Yorkshire Brain Map School Workshop";
-const introSubtitle = "Citizen Neuroscience";
 
 const introText = `Thank you for taking part in this workshop.
 
@@ -87,7 +87,7 @@ YOUR ADDRESS
 We ask for the address you live at most of the time. With your name and date of birth, it helps us keep your answers together if you take part more than once. It is never published or shared.
 
 LINKING WITH OTHER RECORDS
-Only if you say yes. Connected Yorkshire uses your name, date of birth and address to join your answers to your health and education records, then takes them off and replaces them with a code before any researcher sees the data. You can stop this at any time.
+Taking part includes this. Connected Yorkshire uses your name, date of birth and address to join your answers to your health and education records, then takes them off and replaces them with a code before any researcher sees the data. You can ask us to stop at any time.
 
 CHANGING YOUR MIND
 You can stop at any time, and you don't have to give a reason. If you want your answers taken out afterwards, contact the research team within 24 hours of finishing and tell them your name and date of birth.
@@ -96,19 +96,19 @@ QUESTIONS
 Email the research team at brainpop@leeds.ac.uk. Ethics reference PSCETHS-1449.`;
 
 /**
- * Linkage with Connected Yorkshire (D-53). A draft in plain words for the team
- * to check against the approved documents (PSCETHS-1449) before fielding: what
- * is linked, how it avoids identifying anyone, how long it lasts, how to stop.
+ * Linkage with Connected Yorkshire (D-53; a condition of taking part from
+ * D-58). Shown above the consent statements so the statement about linkage is
+ * read with its explanation: what is linked, how it avoids identifying anyone,
+ * how long it lasts, how to stop. To be checked against the approved
+ * documents (PSCETHS-1449) before fielding.
  */
 const linkageText = `Connected Yorkshire is a secure research service that brings together information from the NHS, schools and councils in Yorkshire, so researchers can study what helps young people's health and learning.
 
-If you agree, we will send your name, date of birth and address to Connected Yorkshire. They use them only to find your health records (like GP and hospital visits) and education records (like attendance and exam results) and join them to your answers.
+Taking part in this study includes this: we will send your name, date of birth and address to Connected Yorkshire. They use them only to find your health records (like GP and hospital visits) and education records (like attendance and exam results) and join them to your answers.
 
 Before any researcher sees the joined-up information, your name, date of birth and address are taken off and replaced with a code. Researchers only ever see the code, so they cannot tell who you are.
 
-The link continues for as long as the research goes on, unless you ask us to stop. You can stop it at any time by emailing brainpop@leeds.ac.uk — you don't have to give a reason.
-
-Saying no is completely fine. It doesn't change anything else about taking part.`;
+The link continues for as long as the research goes on, unless you ask us to stop. You can stop it at any time by emailing brainpop@leeds.ac.uk — you don't have to give a reason.`;
 
 
 export const ybmIntroConsent: ModuleInput = {
@@ -128,7 +128,7 @@ export const ybmIntroConsent: ModuleInput = {
           variable: "study_intro",
           legacyVariable: "Introduction",
           stem: { text: introTitle },
-          lede: { text: `${introSubtitle}\n\n${introText}` },
+          lede: { text: introText },
           moreInfo: { label: "How we look after your information", body: { text: privacyText } },
         },
         {
@@ -146,6 +146,7 @@ export const ybmIntroConsent: ModuleInput = {
           stem: {
             text: "Please tap each statement to show you understand and agree to it, and that you consent to take part. We'll move on once they're all ticked.",
           },
+          lede: { text: linkageText },
           autoAdvance: true,
           statements: [
             {
@@ -157,7 +158,7 @@ export const ybmIntroConsent: ModuleInput = {
             {
               key: "no_identification",
               text: {
-                text: "I understand that my name, date of birth and address will be kept separately from my answers, and I will not be identified or identifiable in the report or reports that result from the research.",
+                text: "I understand that my name, date of birth and address will be kept separately from my answers, used only to link my answers with my health and education records as described above, and that I will not be identified or identifiable in the report or reports that result from the research.",
               },
             },
             {
@@ -179,23 +180,16 @@ export const ybmIntroConsent: ModuleInput = {
                 text: "I have read and understood the information about the study shown at the start of this survey and have been offered the opportunity to ask the research team questions via email (brainpop@leeds.ac.uk)",
               },
             },
+            // Linkage is a condition of taking part (D-58), so it is one of the
+            // statements every participant ticks, said in full.
+            {
+              key: "record_linkage",
+              text: {
+                text: "I understand and agree that my name, date of birth and address will be shared securely with Connected Yorkshire so that my answers can be linked with my health records (such as GP and hospital visits) and education records (such as attendance and exam results), and that researchers will only see the linked information with my name, date of birth and address removed.",
+              },
+            },
             { key: "agree", text: { text: "I agree to take part in this study" } },
           ],
-        },
-        // Its own question, not a seventh tick box: taking part does not depend
-        // on it, so it cannot sit in a list where every box must be ticked (D-53).
-        {
-          responseType: "single_choice",
-          key: "linkage_consent",
-          revision: 1,
-          variable: "linkage_consent",
-          required: "hard",
-          stem: { text: "Can we link your answers with your health and education records?" },
-          lede: { text: linkageText },
-          scale: "scale.linkage_consent",
-          scaleVersion: "1.0.0",
-          researcherNote:
-            "Optional consent to pseudonymised linkage through the Connected Yorkshire research data platform (D-53). 1 = agrees, 2 = does not. Must be checked before any record is sent for linkage; an unanswered or 'No' sitting is never linked. Draft wording — to be checked against the approved documents (PSCETHS-1449) before fielding.",
         },
         // Placed after consent and before the first question: the last thing
         // read before answering starts (D-30). Deliberately short — a wall of
@@ -963,6 +957,9 @@ export const ybmGaming: ModuleInput = {
           },
           min: 0,
           max: 100,
+          // End labels added by the team in the Studio (9.0.0), kept here.
+          minLabel: "No time",
+          maxLabel: "All of it",
           displayIf: { op: "not_selected", target: { item: gamingHoursRef }, code: 1 },
         },
       ],

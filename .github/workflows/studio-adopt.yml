@@ -1,0 +1,82 @@
+name: "Studio: publish the repository's survey"
+
+# Publishes the repository's version of the survey (releases/candidates/…, built
+# from packages/library) as the next live version, from MySelf Studio (D-58).
+# Run by hand only. It refuses, changing nothing, if the Studio draft has
+# unpublished edits; it goes through the Studio's own publish, with every check
+# the Publish button runs; and a refused publish puts the draft back as it was.
+# Start with a dry run: it lists every change from the live version.
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to publish (Studio says which bump the changes need)"
+        type: string
+        default: "10.0.0"
+      note:
+        description: "Release note"
+        type: string
+        default: "D-53 and D-58: consent that includes record linkage and moves on by itself, brainpop@ contact, no 'Citizen Neuroscience' subtitle, Sleep Quality Scale, languages understood and spoken, street search, social-media checks, slider labels kept."
+      consent_reason:
+        description: "Why the consent module may change (recorded with the version)"
+        type: string
+        default: "Requested by the PI on 2026-10-09: record linkage with health and education records stated in the consent statements, 'Citizen Neuroscience' subtitle removed, consent moves on once every statement is ticked, contact email brainpop@leeds.ac.uk."
+      identity_reason:
+        description: "Why the identity module may change (recorded with the version)"
+        type: string
+        default: "D-53: a participant who doesn't know their postcode can find their street; the participant ID is still derived from name and date of birth."
+      dry_run:
+        description: "Only list the changes; publish nothing"
+        type: boolean
+        default: true
+
+concurrency:
+  group: studio-adopt
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    if: github.repository == 'faisalmushtaq/MySelf'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm -r build
+
+      - name: Authenticate
+        env:
+          SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          if [ -z "$SERVICE_ACCOUNT" ]; then
+            echo "::error::No FIREBASE_SERVICE_ACCOUNT secret (docs/13-firebase.md section 5.2.1)."
+            exit 1
+          fi
+          printf '%s' "$SERVICE_ACCOUNT" > "$RUNNER_TEMP/sa.json"
+          echo "GOOGLE_APPLICATION_CREDENTIALS=$RUNNER_TEMP/sa.json" >> "$GITHUB_ENV"
+
+      - name: Publish from the Studio
+        working-directory: apps/functions
+        env:
+          VERSION: ${{ inputs.version }}
+          NOTE: ${{ inputs.note }}
+          CONSENT_REASON: ${{ inputs.consent_reason }}
+          IDENTITY_REASON: ${{ inputs.identity_reason }}
+          DRY_RUN: ${{ inputs.dry_run && '--dry-run' || '' }}
+        run: |
+          node studio-adopt.mjs --project myself-research \
+            --release ../../releases/candidates/ybm_nd2026_standard_r9.0.0.manifest.json \
+            --version "$VERSION" --note "$NOTE" \
+            --unlock "ybm_intro_consent=$CONSENT_REASON" \
+            --unlock "ybm_identity=$IDENTITY_REASON" $DRY_RUN
+
+      - name: Shred the credential
+        if: always()
+        run: rm -f "$RUNNER_TEMP/sa.json"

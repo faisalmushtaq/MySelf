@@ -25,7 +25,7 @@ import {
   type StudioDraft,
   type VersionDoc,
 } from "@myself/studio";
-import { bundledManifests } from "../releases.js";
+import { bundledManifests, repositoryCandidates } from "../releases.js";
 import { lookupStudy } from "../studies.js";
 import { auditRow, newAuditRef, type AuditActor } from "./audit.js";
 import { problem, refuse } from "./errors.js";
@@ -295,14 +295,16 @@ export async function publish(db: Firestore, args: PublishArgs): Promise<Publish
     }
 
     // The files the release pins must be ones a release already pinned (D-52):
-    // this survey's history, the version it was copied from, or a release in
-    // the repository.
+    // this survey's history, the version it was copied from, or a release or
+    // release candidate in the repository.
     const basedOn = basedOnAt ? (origin ?? (await readOrigin(tx, db, refs, study, basedOnAt))) : null;
     const pinIssues = assetEscapes(manifest.assets, [
       ...published,
       ...(basedOn ? [basedOn.raw] : []),
       ...copiedFrom,
       ...bundledManifests.map((b) => b.raw as Record<string, unknown>),
+      // Files the repository builds and a candidate pins (D-58).
+      ...repositoryCandidates,
     ]);
     if (pinIssues.length > 0) throw refuse.invalid(describeRefusedDraft(pinIssues, draft), pinIssues);
 

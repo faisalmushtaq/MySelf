@@ -179,18 +179,6 @@ export const languageAbility5: ResponseScale = {
 };
 
 /**
- * Consent to linkage through Connected Yorkshire (D-53). Worded as an
- * agreement, so either answer is a complete one.
- */
-export const linkageConsent: ResponseScale = {
-  key: "scale.linkage_consent",
-  version: "1.0.0",
-  name: "Linkage consent (Yes, I agree / No, I don't agree)",
-  direction: "unordered",
-  options: [opt(1, "Yes, I agree"), opt(2, "No, I don't agree")],
-};
-
-/**
  * Sleep Quality Scale (Snyder et al., 2018): 0-10, with the published
  * groupings drawn beneath the numbers (D-53). The number is the answer and
  * the score; the band is shown, never stored.
@@ -793,7 +781,6 @@ export const allScales: ResponseScale[] = [
   firstLanguageEnglish,
   otherLanguages,
   languageAbility5,
-  linkageConsent,
   sqs11,
   smFamilyControlHow,
   hairType12,

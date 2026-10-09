@@ -29,7 +29,7 @@ const registries: Registries = {
  * It also replaces the secret code with the home address (D-52), checked
  * against a West Yorkshire postcode list the release pins by hash.
  *
- * r9.0.0 (D-53): consent that moves on by itself, optional linkage consent,
+ * r9.0.0 (D-53, D-58): consent that moves on by itself and includes record linkage,
  * ethnic origins in West Yorkshire order, the Sleep Quality Scale, new
  * handedness pictures, checks on social-media answers, and a street search
  * for someone who doesn't know their postcode. MAJOR: all participant-visible.
@@ -279,14 +279,12 @@ describe("shorter consent, sleep quality and sanity checks (D-53)", () => {
   const itemsOf = (key: string) => (manifest.instruments[key] as { forms: { items: Item[] }[] }).forms[0]!.items;
   const consent = itemsOf("ybm_intro_consent@1.0/en-GB/self/standard");
 
-  it("consent moves on by itself, then asks about linkage on its own", () => {
-    expect(consent.map((i) => i.key)).toEqual(["intro", "consent", "linkage_consent", "why_it_matters"]);
+  it("consent includes record linkage and moves on by itself (D-58)", () => {
+    expect(consent.map((i) => i.key)).toEqual(["intro", "consent", "why_it_matters"]);
     expect(consent.find((i) => i.key === "consent")).toMatchObject({ autoAdvance: true });
-    expect(consent.find((i) => i.key === "linkage_consent")).toMatchObject({
-      responseType: "single_choice",
-      scale: "scale.linkage_consent",
-      required: "hard",
-    });
+    const statements = (consent.find((i) => i.key === "consent") as unknown as { statements: { key: string }[] }).statements;
+    expect(statements.map((s) => s.key)).toContain("record_linkage");
+    expect(JSON.stringify(manifest)).not.toContain("Citizen Neuroscience");
     expect(consent.find((i) => i.key === "why_it_matters")).toMatchObject({ advanceLabel: "I understand" });
     expect(JSON.stringify(manifest)).not.toContain("m.faizah@");
   });

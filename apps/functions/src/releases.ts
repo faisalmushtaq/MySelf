@@ -11,6 +11,7 @@ import r710 from "../../../releases/ybm_nd2026_standard_r7.1.0.manifest.json" wi
 import r720 from "../../../releases/ybm_nd2026_standard_r7.2.0.manifest.json" with { type: "json" };
 import r730 from "../../../releases/ybm_nd2026_standard_r7.3.0.manifest.json" with { type: "json" };
 import r800 from "../../../releases/ybm_nd2026_standard_r8.0.0.manifest.json" with { type: "json" };
+import r900candidate from "../../../releases/candidates/ybm_nd2026_standard_r9.0.0.manifest.json" with { type: "json" };
 
 /**
  * Every published release, by content hash.
@@ -43,6 +44,16 @@ export const bundledManifests: { raw: unknown; manifest: ReleaseManifest }[] = p
   const parsed = releaseManifest.safeParse(raw);
   return parsed.success ? [{ raw, manifest: parsed.data }] : [];
 });
+
+/**
+ * Releases cut in the repository and not yet fielded (releases/candidates/).
+ * They are NOT releases a sitting can be collected under, so they are kept out
+ * of everything above. Their one use is to vouch for the files they pin (the
+ * postcode and street lists, D-52, D-53): those files are built and hashed in
+ * the repository, so a Studio publish may pin them exactly as a candidate does
+ * (D-58), which is how the repository's version of a survey reaches the Studio.
+ */
+export const repositoryCandidates: Record<string, unknown>[] = [r900candidate as Record<string, unknown>];
 
 export const releasesByHash = new Map<string, ReleaseManifest>(
   bundledManifests.map(({ manifest }) => [manifest.hash ?? "", manifest]),
