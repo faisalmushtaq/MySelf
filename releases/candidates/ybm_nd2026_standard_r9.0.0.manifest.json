@@ -833,7 +833,7 @@
                     "revision": 1
                   }
                 },
-                "code": 15
+                "code": 16
               },
               "responseType": "text_short",
               "minChars": 0,
@@ -1076,11 +1076,11 @@
               "autoAdvance": true
             },
             {
-              "key": "understand_chinese",
+              "key": "understand_mandarin",
               "revision": 1,
-              "variable": "understand_chinese",
+              "variable": "understand_mandarin",
               "stem": {
-                "text": "How well do you understand Chinese (Mandarin or Cantonese) when someone speaks it?"
+                "text": "How well do you understand Mandarin Chinese when someone speaks it?"
               },
               "required": "soft",
               "allowDecline": false,
@@ -1104,11 +1104,11 @@
               "autoAdvance": true
             },
             {
-              "key": "speak_chinese",
+              "key": "speak_mandarin",
               "revision": 1,
-              "variable": "speak_chinese",
+              "variable": "speak_mandarin",
               "stem": {
-                "text": "How well can you speak Chinese (Mandarin or Cantonese)?"
+                "text": "How well can you speak Mandarin Chinese?"
               },
               "lede": {
                 "text": "Think about having a conversation in it, not just understanding it."
@@ -1126,6 +1126,65 @@
                   }
                 },
                 "code": 5
+              },
+              "responseType": "single_choice",
+              "scale": "scale.language_ability_5",
+              "scaleVersion": "1.0.0",
+              "presentation": "cards",
+              "spectrumReverse": false,
+              "autoAdvance": true
+            },
+            {
+              "key": "understand_cantonese",
+              "revision": 1,
+              "variable": "understand_cantonese",
+              "stem": {
+                "text": "How well do you understand Cantonese Chinese when someone speaks it?"
+              },
+              "required": "soft",
+              "allowDecline": false,
+              "identifying": false,
+              "displayIf": {
+                "op": "selected",
+                "target": {
+                  "item": {
+                    "instrument": "ybm_demographics",
+                    "item": "other_languages",
+                    "revision": 1
+                  }
+                },
+                "code": 6
+              },
+              "responseType": "single_choice",
+              "scale": "scale.language_ability_5",
+              "scaleVersion": "1.0.0",
+              "presentation": "cards",
+              "spectrumReverse": false,
+              "autoAdvance": true
+            },
+            {
+              "key": "speak_cantonese",
+              "revision": 1,
+              "variable": "speak_cantonese",
+              "stem": {
+                "text": "How well can you speak Cantonese Chinese?"
+              },
+              "lede": {
+                "text": "Think about having a conversation in it, not just understanding it."
+              },
+              "required": "soft",
+              "allowDecline": false,
+              "identifying": false,
+              "displayIf": {
+                "op": "selected",
+                "target": {
+                  "item": {
+                    "instrument": "ybm_demographics",
+                    "item": "other_languages",
+                    "revision": 1
+                  }
+                },
+                "code": 6
               },
               "responseType": "single_choice",
               "scale": "scale.language_ability_5",
@@ -1153,7 +1212,7 @@
                     "revision": 1
                   }
                 },
-                "code": 6
+                "code": 7
               },
               "responseType": "single_choice",
               "scale": "scale.language_ability_5",
@@ -1184,7 +1243,7 @@
                     "revision": 1
                   }
                 },
-                "code": 6
+                "code": 7
               },
               "responseType": "single_choice",
               "scale": "scale.language_ability_5",
@@ -1212,7 +1271,7 @@
                     "revision": 1
                   }
                 },
-                "code": 7
+                "code": 8
               },
               "responseType": "single_choice",
               "scale": "scale.language_ability_5",
@@ -1243,7 +1302,7 @@
                     "revision": 1
                   }
                 },
-                "code": 7
+                "code": 8
               },
               "responseType": "single_choice",
               "scale": "scale.language_ability_5",
@@ -1271,7 +1330,7 @@
                     "revision": 1
                   }
                 },
-                "code": 8
+                "code": 9
               },
               "responseType": "single_choice",
               "scale": "scale.language_ability_5",
@@ -1302,7 +1361,7 @@
                     "revision": 1
                   }
                 },
-                "code": 8
+                "code": 9
               },
               "responseType": "single_choice",
               "scale": "scale.language_ability_5",
@@ -1330,7 +1389,7 @@
                     "revision": 1
                   }
                 },
-                "code": 9
+                "code": 10
               },
               "responseType": "single_choice",
               "scale": "scale.language_ability_5",
@@ -1361,7 +1420,7 @@
                     "revision": 1
                   }
                 },
-                "code": 9
+                "code": 10
               },
               "responseType": "single_choice",
               "scale": "scale.language_ability_5",
@@ -1389,7 +1448,7 @@
                     "revision": 1
                   }
                 },
-                "code": 10
+                "code": 11
               },
               "responseType": "single_choice",
               "scale": "scale.language_ability_5",
@@ -1420,7 +1479,7 @@
                     "revision": 1
                   }
                 },
-                "code": 10
+                "code": 11
               },
               "responseType": "single_choice",
               "scale": "scale.language_ability_5",
@@ -1448,7 +1507,7 @@
                     "revision": 1
                   }
                 },
-                "code": 11
+                "code": 12
               },
               "responseType": "single_choice",
               "scale": "scale.language_ability_5",
@@ -1479,7 +1538,7 @@
                     "revision": 1
                   }
                 },
-                "code": 11
+                "code": 12
               },
               "responseType": "single_choice",
               "scale": "scale.language_ability_5",
@@ -1507,7 +1566,7 @@
                     "revision": 1
                   }
                 },
-                "code": 12
+                "code": 13
               },
               "responseType": "single_choice",
               "scale": "scale.language_ability_5",
@@ -1538,7 +1597,7 @@
                     "revision": 1
                   }
                 },
-                "code": 12
+                "code": 13
               },
               "responseType": "single_choice",
               "scale": "scale.language_ability_5",
@@ -1566,7 +1625,7 @@
                     "revision": 1
                   }
                 },
-                "code": 13
+                "code": 14
               },
               "responseType": "single_choice",
               "scale": "scale.language_ability_5",
@@ -1597,7 +1656,7 @@
                     "revision": 1
                   }
                 },
-                "code": 13
+                "code": 14
               },
               "responseType": "single_choice",
               "scale": "scale.language_ability_5",
@@ -1625,7 +1684,7 @@
                     "revision": 1
                   }
                 },
-                "code": 14
+                "code": 15
               },
               "responseType": "single_choice",
               "scale": "scale.language_ability_5",
@@ -1656,7 +1715,7 @@
                     "revision": 1
                   }
                 },
-                "code": 14
+                "code": 15
               },
               "responseType": "single_choice",
               "scale": "scale.language_ability_5",
@@ -1695,7 +1754,7 @@
                     "revision": 1
                   }
                 },
-                "code": 15
+                "code": 16
               },
               "responseType": "single_choice",
               "scale": "scale.language_ability_5",
@@ -1737,7 +1796,7 @@
                     "revision": 1
                   }
                 },
-                "code": 15
+                "code": 16
               },
               "responseType": "single_choice",
               "scale": "scale.language_ability_5",
@@ -6332,66 +6391,72 @@
         },
         {
           "code": 5,
-          "label": "Chinese (Mandarin or Cantonese)",
+          "label": "Mandarin Chinese",
           "kind": "substantive",
           "textEntry": false
         },
         {
           "code": 6,
-          "label": "Gujarati",
+          "label": "Cantonese Chinese",
           "kind": "substantive",
           "textEntry": false
         },
         {
           "code": 7,
-          "label": "Bengali (including Sylheti)",
+          "label": "Gujarati",
           "kind": "substantive",
           "textEntry": false
         },
         {
           "code": 8,
-          "label": "Portuguese",
+          "label": "Bengali (including Sylheti)",
           "kind": "substantive",
           "textEntry": false
         },
         {
           "code": 9,
-          "label": "Spanish",
+          "label": "Portuguese",
           "kind": "substantive",
           "textEntry": false
         },
         {
           "code": 10,
-          "label": "Russian",
+          "label": "Spanish",
           "kind": "substantive",
           "textEntry": false
         },
         {
           "code": 11,
-          "label": "French",
+          "label": "Russian",
           "kind": "substantive",
           "textEntry": false
         },
         {
           "code": 12,
-          "label": "Tamil",
+          "label": "French",
           "kind": "substantive",
           "textEntry": false
         },
         {
           "code": 13,
-          "label": "British Sign Language",
+          "label": "Tamil",
           "kind": "substantive",
           "textEntry": false
         },
         {
           "code": 14,
-          "label": "Turkish",
+          "label": "British Sign Language",
           "kind": "substantive",
           "textEntry": false
         },
         {
           "code": 15,
+          "label": "Turkish",
+          "kind": "substantive",
+          "textEntry": false
+        },
+        {
+          "code": 16,
           "label": "Another language",
           "kind": "other_specify",
           "textEntry": false
@@ -8675,5 +8740,5 @@
       "bytes": 589147
     }
   },
-  "hash": "sha256:09a83403c30a1c87ef249d6c518fc97f3a3bb3c5cc926339075094d0e9430043"
+  "hash": "sha256:7d7744ec09ede29175b6ffbd5fd49ca5d9b8d22653b80be4a2c173f1798596f0"
 }

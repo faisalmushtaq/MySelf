@@ -334,13 +334,18 @@ test("the address screen names a postcode's area, and keeps one outside it only 
 test.describe("on the r9.0.0 candidate", () => {
   test.use({ serviceWorkers: "block" });
 
-  test("consent moves on by itself once every statement is ticked, then asks about linkage (D-53)", async ({ page }) => {
+  test("consent states record linkage and moves on by itself once every statement is ticked (D-53, D-58)", async ({ page }) => {
     test.slow();
     dateOfBirth = "2012-05-14";
     const statements = page.locator(".consent-list input[type=checkbox]");
     await walk(page, [], async () => (await statements.count()) > 0, { candidate: true });
 
     await expect(page.locator(".survey-body h1")).toContainText("We'll move on once they're all ticked");
+    // Linkage is part of consent (D-58): explained above the statements, and one of them.
+    await expect(page.locator(".survey-body .lede")).toContainText("Connected Yorkshire");
+    await expect(page.locator(".survey-body .lede")).toContainText("brainpop@leeds.ac.uk");
+    await expect(page.locator(".consent-list")).toContainText("health records");
+    await expect(page.locator(".consent-list")).toContainText("education records");
     const total = await statements.count();
     for (let i = 0; i < total - 1; i += 1) await statements.nth(i).check();
     // Not yet: one statement is still unticked.
@@ -348,17 +353,10 @@ test.describe("on the r9.0.0 candidate", () => {
     await expect(statements).toHaveCount(total);
     // The last tick moves the screen on without Next being pressed.
     await statements.nth(total - 1).check();
-    await expect(page.locator(".survey-body h1")).toHaveText("Can we link your answers with your health and education records?");
-    await expect(page.locator(".survey-body .lede")).toContainText("Connected Yorkshire");
-    await expect(page.locator(".survey-body .lede")).toContainText("brainpop@leeds.ac.uk");
-
-    // Either answer is complete: saying no carries on as normal.
-    await page.getByRole("radio", { name: "No, I don't agree" }).click();
     await expect(page.locator(".survey-body h1")).toHaveText("Why your answers matter");
     await expect(page.locator("button.next:not(.big)")).toHaveText("I understand");
 
     // Coming back to the finished consent screen does not throw anyone forward.
-    await page.locator("button.back").click();
     await page.locator("button.back").click();
     await expect(statements.first()).toBeChecked();
     await page.waitForTimeout(1_200);

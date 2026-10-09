@@ -376,3 +376,9 @@ gaming slider) — and D-53 was never published. Decided:
    unpublished edits; a refused publish restores the draft. A Studio publish
    may now pin a file exactly as a repository candidate does (the street list,
    D-53), since those files are built and hashed in the repository.
+5. **Mandarin and Cantonese are separate options** in the language list
+   (codes 5 and 6), since one "Chinese" option cannot say which is meant;
+   "Another language" is now 16. Never fielded before, so no data changes
+   meaning.
+6. **The start screen shows the survey's version** under "MySelf" instead of
+   the "MyThoughts" line.
