@@ -93,9 +93,12 @@ const scenarios: Scenario[] = [
       [/any language other than English/, choose("Yes")],
       [/^Which other languages/, tick("Urdu", "Punjabi", "Another language")],
       [/^Which other language\?/, type("Pashto")],
-      [/understand Urdu\?/, choose("Very well")],
-      [/understand Punjabi\?/, choose("Well")],
-      [/understand Pashto\?/, choose("Only a few words")],
+      [/understand Urdu when/, choose("Very well")],
+      [/speak Urdu\?/, choose("Only a few words")],
+      [/understand Punjabi when/, choose("Well")],
+      [/speak Punjabi\?/, choose("Well")],
+      [/understand Pashto when/, choose("Only a few words")],
+      [/speak Pashto\?/, choose("Not at all")],
       [/sleep quality overall/, choose("7, Good")],
       [/own smartphone/, choose("Yes")],
       [/currently use social media/, choose("Yes")],
@@ -152,7 +155,8 @@ const scenarios: Scenario[] = [
       [/first language you learned/, choose("No")],
       [/any language other than English/, choose("Yes")],
       [/^Which other languages/, tick("Polish")],
-      [/understand Polish\?/, choose("Very well")],
+      [/understand Polish when/, choose("Very well")],
+      [/speak Polish\?/, choose("Well")],
       [/sleep quality overall/, choose("10, Excellent")],
       [/own smartphone/, choose("Yes")],
       [/currently use social media/, choose("Yes")],
@@ -347,6 +351,10 @@ test("the survey's own dataset says what each scenario answered", async () => {
   expect(value("SCN0001", "understand_urdu")?.value).toBe(1);
   expect(value("SCN0001", "understand_punjabi")?.value).toBe(2);
   expect(value("SCN0001", "understand_other_language")?.value).toBe(4);
+  // Understood very well, spoken only a few words: receptive, not expressive (D-58).
+  expect(value("SCN0001", "speak_urdu")?.value).toBe(4);
+  expect(value("SCN0001", "speak_punjabi")?.value).toBe(2);
+  expect(value("SCN0001", "speak_other_language")?.value).toBe(5);
   expect(value("SCN0001", "understand_polish")).toBeUndefined();
   expect(value("SCN0001", "sqs_q1")?.value).toBe(7);
   expect(value("SCN0001", "sm_abstain_days")?.value).toBe(400);
@@ -368,6 +376,7 @@ test("the survey's own dataset says what each scenario answered", async () => {
   // Charlie: declined ethnicity, Polish, a short break from social media.
   expect(value("SCN0003", "ethnicity")?.value).toBe(20);
   expect(value("SCN0003", "understand_polish")?.value).toBe(1);
+  expect(value("SCN0003", "speak_polish")?.value).toBe(2);
   expect(value("SCN0003", "sm_abstain_days")?.value).toBe(20);
 
   // Identifiers go to the identity partition only, never a response row.

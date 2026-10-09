@@ -161,17 +161,21 @@ export const otherLanguages: ResponseScale = {
 };
 
 /**
- * How well a language is understood (D-53). Worded after the Census question
- * on English ("very well / well / not well / not at all"), ending at "only a
- * few words" because anyone asked has said they understand some of it.
+ * How well a language is understood, or spoken (D-53, D-58). Worded after the
+ * Census question on English ("very well / well / not well / not at all"),
+ * with "only a few words" before "not at all". ONE scale for both questions,
+ * so understanding and speaking are directly comparable: someone who
+ * understands Urdu very well and speaks only a few words (receptive, not
+ * expressive, bilingualism) is 1 on one and 4 on the other.
  */
-export const languageUnderstanding4: ResponseScale = {
-  key: "scale.language_understanding_4",
+export const languageAbility5: ResponseScale = {
+  key: "scale.language_ability_5",
   version: "1.0.0",
-  name: "How well a language is understood (very well to only a few words)",
+  name: "How well a language is understood or spoken (very well to not at all)",
   direction: "descending",
-  options: [opt(1, "Very well"), opt(2, "Well"), opt(3, "Not very well"), opt(4, "Only a few words")],
-  scoringNote: "1 = very well … 4 = only a few words. Descending understanding.",
+  options: [opt(1, "Very well"), opt(2, "Well"), opt(3, "Not very well"), opt(4, "Only a few words"), opt(5, "Not at all")],
+  scoringNote:
+    "1 = very well … 5 = not at all. The same scale for understanding and speaking, so speak_<language> − understand_<language> > 0 marks a language understood better than it is spoken.",
 };
 
 /**
@@ -788,7 +792,7 @@ export const allScales: ResponseScale[] = [
   ethnicityUk20,
   firstLanguageEnglish,
   otherLanguages,
-  languageUnderstanding4,
+  languageAbility5,
   linkageConsent,
   sqs11,
   smFamilyControlHow,
