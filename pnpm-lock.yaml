@@ -78,6 +78,9 @@ importers:
       '@myself/firebase':
         specifier: workspace:*
         version: link:../../packages/firebase
+      '@myself/library':
+        specifier: workspace:*
+        version: link:../../packages/library
       '@myself/llm':
         specifier: workspace:*
         version: link:../../packages/llm

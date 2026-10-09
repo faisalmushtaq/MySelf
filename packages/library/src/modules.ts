@@ -347,10 +347,10 @@ export const ybmIdentity: ModuleInput = {
 // ---------------------------------------------------------------------------
 
 /**
- * Languages (D-53): English as a first language, any other languages, and how
- * well each is understood. One "how well" question per language ticked, each
- * shown only if that language was — so a child who speaks three languages is
- * asked about all three, and the data has one column per language.
+ * Languages (D-53, D-58): English as a first language, any other languages, and
+ * for each one ticked, how well it is understood and how well it is spoken —
+ * each pair shown only if that language was, so a child with three languages
+ * is asked about all three and the data has two columns per language.
  */
 const demographicsRef = (item: string) => ({ instrument: "ybm_demographics", item, revision: 1 });
 const languageItems: ItemInput[] = [
@@ -397,32 +397,57 @@ const languageItems: ItemInput[] = [
     lede: { text: "If there is more than one, name the one you use most." },
     maxChars: 60,
   },
-  ...LANGUAGES.map(
-    (l): ItemInput =>
-      single(`understand_${l.key}`, `understand_${l.key}`, "", `How well do you understand ${l.label}?`, "scale.language_understanding_4", {
-        displayIf: { op: "selected", target: { item: demographicsRef("other_languages") }, code: l.code },
-      }),
-  ),
-  single(
-    "understand_other_language",
-    "understand_other_language",
-    "",
-    "How well do you understand {language}?",
-    "scale.language_understanding_4",
-    {
-      displayIf: { op: "selected", target: { item: demographicsRef("other_languages") }, code: ANOTHER_LANGUAGE_CODE },
-      stem: {
-        text: "How well do you understand {language}?",
-        pipes: {
-          language: {
-            kind: "item_text_entry",
-            item: demographicsRef("other_language_named"),
-            fallback: "the other language you speak",
-          },
+  // Two questions per language, side by side (D-58): understanding and
+  // speaking, on the same scale. Many children here understand a family
+  // language (Urdu, Punjabi) far better than they speak it, and one "how well"
+  // question cannot tell receptive from expressive use.
+  ...LANGUAGES.flatMap((l): ItemInput[] => {
+    const shown = { op: "selected", target: { item: demographicsRef("other_languages") }, code: l.code } as const;
+    const signed = l.key === "bsl";
+    return [
+      single(
+        `understand_${l.key}`,
+        `understand_${l.key}`,
+        "",
+        signed ? `How well do you understand ${l.label} when someone signs it?` : `How well do you understand ${l.label} when someone speaks it?`,
+        "scale.language_ability_5",
+        { displayIf: shown },
+      ),
+      single(
+        `speak_${l.key}`,
+        `speak_${l.key}`,
+        "",
+        signed ? `How well can you sign in ${l.label}?` : `How well can you speak ${l.label}?`,
+        "scale.language_ability_5",
+        {
+          displayIf: shown,
+          lede: { text: signed ? "Think about having a conversation in it yourself." : "Think about having a conversation in it, not just understanding it." },
         },
+      ),
+    ];
+  }),
+  ...(["understand", "speak"] as const).map((what) => {
+    const language = {
+      kind: "item_text_entry",
+      item: demographicsRef("other_language_named"),
+      fallback: "the other language you speak",
+    } as const;
+    return single(
+      `${what}_other_language`,
+      `${what}_other_language`,
+      "",
+      what === "understand" ? "How well do you understand {language} when someone speaks it?" : "How well can you speak {language}?",
+      "scale.language_ability_5",
+      {
+        displayIf: { op: "selected", target: { item: demographicsRef("other_languages") }, code: ANOTHER_LANGUAGE_CODE },
+        stem: {
+          text: what === "understand" ? "How well do you understand {language} when someone speaks it?" : "How well can you speak {language}?",
+          pipes: { language },
+        },
+        ...(what === "speak" ? { lede: { text: "Think about having a conversation in it, not just understanding it." } } : {}),
       },
-    },
-  ),
+    );
+  }),
 ];
 
 export const ybmDemographics: ModuleInput = {

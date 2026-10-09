@@ -1,0 +1,60 @@
+name: Studio library
+
+# Puts questions written in the repository into MySelf Studio's library as a
+# saved module (D-58, docs/16 §12.6), so researchers can add them to a survey
+# from the Studio's Library drawer and publish them there. Run by hand only.
+# It writes one module version and one audit row, through the same server code
+# as the Studio's "Save to library", and does nothing if the library already
+# holds exactly this content. It never touches a survey, a draft or a sitting.
+
+on:
+  workflow_dispatch:
+    inputs:
+      seed:
+        description: "Which piece to put in the library"
+        type: choice
+        options: [languages]
+        default: languages
+      dry_run:
+        description: "Only say what would be saved"
+        type: boolean
+        default: false
+
+concurrency:
+  group: studio-library
+  cancel-in-progress: false
+
+jobs:
+  seed:
+    runs-on: ubuntu-latest
+    if: github.repository == 'faisalmushtaq/MySelf'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm -r build
+
+      - name: Authenticate
+        env:
+          SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          if [ -z "$SERVICE_ACCOUNT" ]; then
+            echo "::error::No FIREBASE_SERVICE_ACCOUNT secret (docs/13-firebase.md section 5.2.1)."
+            exit 1
+          fi
+          printf '%s' "$SERVICE_ACCOUNT" > "$RUNNER_TEMP/sa.json"
+          echo "GOOGLE_APPLICATION_CREDENTIALS=$RUNNER_TEMP/sa.json" >> "$GITHUB_ENV"
+
+      - name: Put it in the library
+        working-directory: apps/functions
+        run: node library-seed.mjs "${{ inputs.seed }}" --project myself-research ${{ inputs.dry_run && '--dry-run' || '' }}
+
+      - name: Shred the credential
+        if: always()
+        run: rm -f "$RUNNER_TEMP/sa.json"

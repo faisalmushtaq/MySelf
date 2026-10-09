@@ -1,4 +1,4 @@
-import { allInstruments, allScales } from "@myself/library";
+import { allInstruments, allModules, allScales } from "@myself/library";
 import { refKeyOf } from "@myself/release/gate";
 import { allScoring } from "@myself/scoring";
 import {
@@ -591,6 +591,57 @@ export function validatedFragment(refKey: string): StudioFragment {
     scoring,
     origin: { kind: "validated", instrument: def.instrument, refKey },
   };
+}
+
+/**
+ * Some or all questions of one of the study's own modules in the repository
+ * library (`packages/library`), as a piece, with the option lists they use:
+ * how questions written in the repository reach the Studio's library
+ * (`library-seed`, D-58). The module must be editable; locked content comes
+ * only from `validatedFragment`. Questions keep their module's instrument key,
+ * so added to a survey that has that module they join its block.
+ *
+ * Throws StudioOpError for a module, form or question that does not exist.
+ */
+export function repositoryModuleFragment(
+  instrument: string,
+  opts: { itemKeys?: readonly string[]; title: string; language?: string },
+): StudioFragment {
+  const raw = allModules.find((m) => m.instrument === instrument);
+  if (!raw) throw new StudioOpError(`There is no module “${instrument}” in the repository library.`, "not_found");
+  const def = moduleDefinition.parse(raw);
+  if (def.licence.modifiable !== "yes") throw new StudioOpError(`“${def.name}” is locked; add it from the validated questionnaires instead.`, "locked");
+  const language = opts.language ?? "en-GB";
+  const form = def.forms.find((f) => f.language === language);
+  if (!form) throw new StudioOpError(`“${def.name}” has no ${language} form.`, "not_found");
+  const wanted = opts.itemKeys ?? form.items.map((i) => i.key);
+  const items = wanted.map((key) => {
+    const item = form.items.find((i) => i.key === key);
+    if (!item) throw new StudioOpError(`“${def.name}” has no question “${key}”.`, "not_found");
+    return item;
+  });
+  const scales: Record<string, ScaleInput> = {};
+  for (const item of items) {
+    if (!("scale" in item)) continue;
+    const scale = libraryScales().get(item.scale);
+    if (!scale) throw new StudioOpError(`“${key(item)}” uses answer options (${item.scale}) that are missing from the library.`, "invalid");
+    scales[item.scale] = structuredClone(scale);
+  }
+  const refKey = refKeyOf({ instrument: def.instrument, version: def.version, variant: form.variant, language: form.language, informant: form.informant, readingLevel: form.readingLevel });
+  const definition = { ...def, forms: [{ ...form, items }] } as unknown as InstrumentOrModule;
+  return {
+    format: FRAGMENT_FORMAT,
+    formatVersion: FRAGMENT_FORMAT_VERSION,
+    title: opts.title,
+    blocks: [{ refKey, definition: structuredClone(definition) }],
+    scales,
+    scoring: {},
+    origin: { kind: "module", moduleId: "", version: 0, contentHash: "" },
+  };
+
+  function key(item: { key: string }): string {
+    return `${def.instrument}.${item.key}`;
+  }
 }
 
 // ---------------------------------------------------------------------------

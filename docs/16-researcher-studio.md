@@ -1724,6 +1724,7 @@ migrated.
 | The Library page (saved modules: details, versions, retire) | `screens/Library.tsx`; `#/library`, `#/study/<id>/library` (`route.ts`, `shell/Shell.tsx`) |
 | Copying a survey from any study space | `screens/CopySource.tsx`, `screens/Surveys.tsx` |
 | The provenance export's `copied_from` | `data/provenance.ts` |
+| Questions written in the repository, put in the library (D-58) | `repositoryModuleFragment` in `packages/studio/src/library.ts`; `apps/functions/library-seed.mjs`; the "Studio library" workflow (`.github/workflows/studio-library.yml`), run by hand |
 
 **Where it differs from the design above.**
 

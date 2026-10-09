@@ -5,11 +5,12 @@
     "version": "9.0.0",
     "assessment": "ybm_nd2026_standard",
     "study": "ybm",
-    "publishedAt": "2026-09-29T23:02:00.000Z",
+    "publishedAt": "2026-10-09T12:00:00.000Z",
     "publishedBy": "faisalmushtaq",
     "engineVersion": "0.3.0",
     "decisionRefs": [
-      "D-53"
+      "D-53",
+      "D-58"
     ]
   },
   "composition": {
@@ -854,7 +855,7 @@
               "revision": 1,
               "variable": "understand_urdu",
               "stem": {
-                "text": "How well do you understand Urdu?"
+                "text": "How well do you understand Urdu when someone speaks it?"
               },
               "required": "soft",
               "allowDecline": false,
@@ -871,7 +872,38 @@
                 "code": 1
               },
               "responseType": "single_choice",
-              "scale": "scale.language_understanding_4",
+              "scale": "scale.language_ability_5",
+              "scaleVersion": "1.0.0",
+              "presentation": "cards",
+              "spectrumReverse": false,
+              "autoAdvance": true
+            },
+            {
+              "key": "speak_urdu",
+              "revision": 1,
+              "variable": "speak_urdu",
+              "stem": {
+                "text": "How well can you speak Urdu?"
+              },
+              "lede": {
+                "text": "Think about having a conversation in it, not just understanding it."
+              },
+              "required": "soft",
+              "allowDecline": false,
+              "identifying": false,
+              "displayIf": {
+                "op": "selected",
+                "target": {
+                  "item": {
+                    "instrument": "ybm_demographics",
+                    "item": "other_languages",
+                    "revision": 1
+                  }
+                },
+                "code": 1
+              },
+              "responseType": "single_choice",
+              "scale": "scale.language_ability_5",
               "scaleVersion": "1.0.0",
               "presentation": "cards",
               "spectrumReverse": false,
@@ -882,7 +914,7 @@
               "revision": 1,
               "variable": "understand_punjabi",
               "stem": {
-                "text": "How well do you understand Punjabi?"
+                "text": "How well do you understand Punjabi when someone speaks it?"
               },
               "required": "soft",
               "allowDecline": false,
@@ -899,7 +931,38 @@
                 "code": 2
               },
               "responseType": "single_choice",
-              "scale": "scale.language_understanding_4",
+              "scale": "scale.language_ability_5",
+              "scaleVersion": "1.0.0",
+              "presentation": "cards",
+              "spectrumReverse": false,
+              "autoAdvance": true
+            },
+            {
+              "key": "speak_punjabi",
+              "revision": 1,
+              "variable": "speak_punjabi",
+              "stem": {
+                "text": "How well can you speak Punjabi?"
+              },
+              "lede": {
+                "text": "Think about having a conversation in it, not just understanding it."
+              },
+              "required": "soft",
+              "allowDecline": false,
+              "identifying": false,
+              "displayIf": {
+                "op": "selected",
+                "target": {
+                  "item": {
+                    "instrument": "ybm_demographics",
+                    "item": "other_languages",
+                    "revision": 1
+                  }
+                },
+                "code": 2
+              },
+              "responseType": "single_choice",
+              "scale": "scale.language_ability_5",
               "scaleVersion": "1.0.0",
               "presentation": "cards",
               "spectrumReverse": false,
@@ -910,7 +973,7 @@
               "revision": 1,
               "variable": "understand_polish",
               "stem": {
-                "text": "How well do you understand Polish?"
+                "text": "How well do you understand Polish when someone speaks it?"
               },
               "required": "soft",
               "allowDecline": false,
@@ -927,7 +990,38 @@
                 "code": 3
               },
               "responseType": "single_choice",
-              "scale": "scale.language_understanding_4",
+              "scale": "scale.language_ability_5",
+              "scaleVersion": "1.0.0",
+              "presentation": "cards",
+              "spectrumReverse": false,
+              "autoAdvance": true
+            },
+            {
+              "key": "speak_polish",
+              "revision": 1,
+              "variable": "speak_polish",
+              "stem": {
+                "text": "How well can you speak Polish?"
+              },
+              "lede": {
+                "text": "Think about having a conversation in it, not just understanding it."
+              },
+              "required": "soft",
+              "allowDecline": false,
+              "identifying": false,
+              "displayIf": {
+                "op": "selected",
+                "target": {
+                  "item": {
+                    "instrument": "ybm_demographics",
+                    "item": "other_languages",
+                    "revision": 1
+                  }
+                },
+                "code": 3
+              },
+              "responseType": "single_choice",
+              "scale": "scale.language_ability_5",
               "scaleVersion": "1.0.0",
               "presentation": "cards",
               "spectrumReverse": false,
@@ -938,7 +1032,7 @@
               "revision": 1,
               "variable": "understand_arabic",
               "stem": {
-                "text": "How well do you understand Arabic?"
+                "text": "How well do you understand Arabic when someone speaks it?"
               },
               "required": "soft",
               "allowDecline": false,
@@ -955,7 +1049,38 @@
                 "code": 4
               },
               "responseType": "single_choice",
-              "scale": "scale.language_understanding_4",
+              "scale": "scale.language_ability_5",
+              "scaleVersion": "1.0.0",
+              "presentation": "cards",
+              "spectrumReverse": false,
+              "autoAdvance": true
+            },
+            {
+              "key": "speak_arabic",
+              "revision": 1,
+              "variable": "speak_arabic",
+              "stem": {
+                "text": "How well can you speak Arabic?"
+              },
+              "lede": {
+                "text": "Think about having a conversation in it, not just understanding it."
+              },
+              "required": "soft",
+              "allowDecline": false,
+              "identifying": false,
+              "displayIf": {
+                "op": "selected",
+                "target": {
+                  "item": {
+                    "instrument": "ybm_demographics",
+                    "item": "other_languages",
+                    "revision": 1
+                  }
+                },
+                "code": 4
+              },
+              "responseType": "single_choice",
+              "scale": "scale.language_ability_5",
               "scaleVersion": "1.0.0",
               "presentation": "cards",
               "spectrumReverse": false,
@@ -966,7 +1091,7 @@
               "revision": 1,
               "variable": "understand_chinese",
               "stem": {
-                "text": "How well do you understand Chinese (Mandarin or Cantonese)?"
+                "text": "How well do you understand Chinese (Mandarin or Cantonese) when someone speaks it?"
               },
               "required": "soft",
               "allowDecline": false,
@@ -983,7 +1108,38 @@
                 "code": 5
               },
               "responseType": "single_choice",
-              "scale": "scale.language_understanding_4",
+              "scale": "scale.language_ability_5",
+              "scaleVersion": "1.0.0",
+              "presentation": "cards",
+              "spectrumReverse": false,
+              "autoAdvance": true
+            },
+            {
+              "key": "speak_chinese",
+              "revision": 1,
+              "variable": "speak_chinese",
+              "stem": {
+                "text": "How well can you speak Chinese (Mandarin or Cantonese)?"
+              },
+              "lede": {
+                "text": "Think about having a conversation in it, not just understanding it."
+              },
+              "required": "soft",
+              "allowDecline": false,
+              "identifying": false,
+              "displayIf": {
+                "op": "selected",
+                "target": {
+                  "item": {
+                    "instrument": "ybm_demographics",
+                    "item": "other_languages",
+                    "revision": 1
+                  }
+                },
+                "code": 5
+              },
+              "responseType": "single_choice",
+              "scale": "scale.language_ability_5",
               "scaleVersion": "1.0.0",
               "presentation": "cards",
               "spectrumReverse": false,
@@ -994,7 +1150,7 @@
               "revision": 1,
               "variable": "understand_gujarati",
               "stem": {
-                "text": "How well do you understand Gujarati?"
+                "text": "How well do you understand Gujarati when someone speaks it?"
               },
               "required": "soft",
               "allowDecline": false,
@@ -1011,7 +1167,38 @@
                 "code": 6
               },
               "responseType": "single_choice",
-              "scale": "scale.language_understanding_4",
+              "scale": "scale.language_ability_5",
+              "scaleVersion": "1.0.0",
+              "presentation": "cards",
+              "spectrumReverse": false,
+              "autoAdvance": true
+            },
+            {
+              "key": "speak_gujarati",
+              "revision": 1,
+              "variable": "speak_gujarati",
+              "stem": {
+                "text": "How well can you speak Gujarati?"
+              },
+              "lede": {
+                "text": "Think about having a conversation in it, not just understanding it."
+              },
+              "required": "soft",
+              "allowDecline": false,
+              "identifying": false,
+              "displayIf": {
+                "op": "selected",
+                "target": {
+                  "item": {
+                    "instrument": "ybm_demographics",
+                    "item": "other_languages",
+                    "revision": 1
+                  }
+                },
+                "code": 6
+              },
+              "responseType": "single_choice",
+              "scale": "scale.language_ability_5",
               "scaleVersion": "1.0.0",
               "presentation": "cards",
               "spectrumReverse": false,
@@ -1022,7 +1209,7 @@
               "revision": 1,
               "variable": "understand_bengali",
               "stem": {
-                "text": "How well do you understand Bengali (including Sylheti)?"
+                "text": "How well do you understand Bengali (including Sylheti) when someone speaks it?"
               },
               "required": "soft",
               "allowDecline": false,
@@ -1039,7 +1226,38 @@
                 "code": 7
               },
               "responseType": "single_choice",
-              "scale": "scale.language_understanding_4",
+              "scale": "scale.language_ability_5",
+              "scaleVersion": "1.0.0",
+              "presentation": "cards",
+              "spectrumReverse": false,
+              "autoAdvance": true
+            },
+            {
+              "key": "speak_bengali",
+              "revision": 1,
+              "variable": "speak_bengali",
+              "stem": {
+                "text": "How well can you speak Bengali (including Sylheti)?"
+              },
+              "lede": {
+                "text": "Think about having a conversation in it, not just understanding it."
+              },
+              "required": "soft",
+              "allowDecline": false,
+              "identifying": false,
+              "displayIf": {
+                "op": "selected",
+                "target": {
+                  "item": {
+                    "instrument": "ybm_demographics",
+                    "item": "other_languages",
+                    "revision": 1
+                  }
+                },
+                "code": 7
+              },
+              "responseType": "single_choice",
+              "scale": "scale.language_ability_5",
               "scaleVersion": "1.0.0",
               "presentation": "cards",
               "spectrumReverse": false,
@@ -1050,7 +1268,7 @@
               "revision": 1,
               "variable": "understand_portuguese",
               "stem": {
-                "text": "How well do you understand Portuguese?"
+                "text": "How well do you understand Portuguese when someone speaks it?"
               },
               "required": "soft",
               "allowDecline": false,
@@ -1067,7 +1285,38 @@
                 "code": 8
               },
               "responseType": "single_choice",
-              "scale": "scale.language_understanding_4",
+              "scale": "scale.language_ability_5",
+              "scaleVersion": "1.0.0",
+              "presentation": "cards",
+              "spectrumReverse": false,
+              "autoAdvance": true
+            },
+            {
+              "key": "speak_portuguese",
+              "revision": 1,
+              "variable": "speak_portuguese",
+              "stem": {
+                "text": "How well can you speak Portuguese?"
+              },
+              "lede": {
+                "text": "Think about having a conversation in it, not just understanding it."
+              },
+              "required": "soft",
+              "allowDecline": false,
+              "identifying": false,
+              "displayIf": {
+                "op": "selected",
+                "target": {
+                  "item": {
+                    "instrument": "ybm_demographics",
+                    "item": "other_languages",
+                    "revision": 1
+                  }
+                },
+                "code": 8
+              },
+              "responseType": "single_choice",
+              "scale": "scale.language_ability_5",
               "scaleVersion": "1.0.0",
               "presentation": "cards",
               "spectrumReverse": false,
@@ -1078,7 +1327,7 @@
               "revision": 1,
               "variable": "understand_spanish",
               "stem": {
-                "text": "How well do you understand Spanish?"
+                "text": "How well do you understand Spanish when someone speaks it?"
               },
               "required": "soft",
               "allowDecline": false,
@@ -1095,7 +1344,38 @@
                 "code": 9
               },
               "responseType": "single_choice",
-              "scale": "scale.language_understanding_4",
+              "scale": "scale.language_ability_5",
+              "scaleVersion": "1.0.0",
+              "presentation": "cards",
+              "spectrumReverse": false,
+              "autoAdvance": true
+            },
+            {
+              "key": "speak_spanish",
+              "revision": 1,
+              "variable": "speak_spanish",
+              "stem": {
+                "text": "How well can you speak Spanish?"
+              },
+              "lede": {
+                "text": "Think about having a conversation in it, not just understanding it."
+              },
+              "required": "soft",
+              "allowDecline": false,
+              "identifying": false,
+              "displayIf": {
+                "op": "selected",
+                "target": {
+                  "item": {
+                    "instrument": "ybm_demographics",
+                    "item": "other_languages",
+                    "revision": 1
+                  }
+                },
+                "code": 9
+              },
+              "responseType": "single_choice",
+              "scale": "scale.language_ability_5",
               "scaleVersion": "1.0.0",
               "presentation": "cards",
               "spectrumReverse": false,
@@ -1106,7 +1386,7 @@
               "revision": 1,
               "variable": "understand_russian",
               "stem": {
-                "text": "How well do you understand Russian?"
+                "text": "How well do you understand Russian when someone speaks it?"
               },
               "required": "soft",
               "allowDecline": false,
@@ -1123,7 +1403,38 @@
                 "code": 10
               },
               "responseType": "single_choice",
-              "scale": "scale.language_understanding_4",
+              "scale": "scale.language_ability_5",
+              "scaleVersion": "1.0.0",
+              "presentation": "cards",
+              "spectrumReverse": false,
+              "autoAdvance": true
+            },
+            {
+              "key": "speak_russian",
+              "revision": 1,
+              "variable": "speak_russian",
+              "stem": {
+                "text": "How well can you speak Russian?"
+              },
+              "lede": {
+                "text": "Think about having a conversation in it, not just understanding it."
+              },
+              "required": "soft",
+              "allowDecline": false,
+              "identifying": false,
+              "displayIf": {
+                "op": "selected",
+                "target": {
+                  "item": {
+                    "instrument": "ybm_demographics",
+                    "item": "other_languages",
+                    "revision": 1
+                  }
+                },
+                "code": 10
+              },
+              "responseType": "single_choice",
+              "scale": "scale.language_ability_5",
               "scaleVersion": "1.0.0",
               "presentation": "cards",
               "spectrumReverse": false,
@@ -1134,7 +1445,7 @@
               "revision": 1,
               "variable": "understand_french",
               "stem": {
-                "text": "How well do you understand French?"
+                "text": "How well do you understand French when someone speaks it?"
               },
               "required": "soft",
               "allowDecline": false,
@@ -1151,7 +1462,38 @@
                 "code": 11
               },
               "responseType": "single_choice",
-              "scale": "scale.language_understanding_4",
+              "scale": "scale.language_ability_5",
+              "scaleVersion": "1.0.0",
+              "presentation": "cards",
+              "spectrumReverse": false,
+              "autoAdvance": true
+            },
+            {
+              "key": "speak_french",
+              "revision": 1,
+              "variable": "speak_french",
+              "stem": {
+                "text": "How well can you speak French?"
+              },
+              "lede": {
+                "text": "Think about having a conversation in it, not just understanding it."
+              },
+              "required": "soft",
+              "allowDecline": false,
+              "identifying": false,
+              "displayIf": {
+                "op": "selected",
+                "target": {
+                  "item": {
+                    "instrument": "ybm_demographics",
+                    "item": "other_languages",
+                    "revision": 1
+                  }
+                },
+                "code": 11
+              },
+              "responseType": "single_choice",
+              "scale": "scale.language_ability_5",
               "scaleVersion": "1.0.0",
               "presentation": "cards",
               "spectrumReverse": false,
@@ -1162,7 +1504,7 @@
               "revision": 1,
               "variable": "understand_tamil",
               "stem": {
-                "text": "How well do you understand Tamil?"
+                "text": "How well do you understand Tamil when someone speaks it?"
               },
               "required": "soft",
               "allowDecline": false,
@@ -1179,7 +1521,38 @@
                 "code": 12
               },
               "responseType": "single_choice",
-              "scale": "scale.language_understanding_4",
+              "scale": "scale.language_ability_5",
+              "scaleVersion": "1.0.0",
+              "presentation": "cards",
+              "spectrumReverse": false,
+              "autoAdvance": true
+            },
+            {
+              "key": "speak_tamil",
+              "revision": 1,
+              "variable": "speak_tamil",
+              "stem": {
+                "text": "How well can you speak Tamil?"
+              },
+              "lede": {
+                "text": "Think about having a conversation in it, not just understanding it."
+              },
+              "required": "soft",
+              "allowDecline": false,
+              "identifying": false,
+              "displayIf": {
+                "op": "selected",
+                "target": {
+                  "item": {
+                    "instrument": "ybm_demographics",
+                    "item": "other_languages",
+                    "revision": 1
+                  }
+                },
+                "code": 12
+              },
+              "responseType": "single_choice",
+              "scale": "scale.language_ability_5",
               "scaleVersion": "1.0.0",
               "presentation": "cards",
               "spectrumReverse": false,
@@ -1190,7 +1563,7 @@
               "revision": 1,
               "variable": "understand_bsl",
               "stem": {
-                "text": "How well do you understand British Sign Language?"
+                "text": "How well do you understand British Sign Language when someone signs it?"
               },
               "required": "soft",
               "allowDecline": false,
@@ -1207,7 +1580,38 @@
                 "code": 13
               },
               "responseType": "single_choice",
-              "scale": "scale.language_understanding_4",
+              "scale": "scale.language_ability_5",
+              "scaleVersion": "1.0.0",
+              "presentation": "cards",
+              "spectrumReverse": false,
+              "autoAdvance": true
+            },
+            {
+              "key": "speak_bsl",
+              "revision": 1,
+              "variable": "speak_bsl",
+              "stem": {
+                "text": "How well can you sign in British Sign Language?"
+              },
+              "lede": {
+                "text": "Think about having a conversation in it yourself."
+              },
+              "required": "soft",
+              "allowDecline": false,
+              "identifying": false,
+              "displayIf": {
+                "op": "selected",
+                "target": {
+                  "item": {
+                    "instrument": "ybm_demographics",
+                    "item": "other_languages",
+                    "revision": 1
+                  }
+                },
+                "code": 13
+              },
+              "responseType": "single_choice",
+              "scale": "scale.language_ability_5",
               "scaleVersion": "1.0.0",
               "presentation": "cards",
               "spectrumReverse": false,
@@ -1218,7 +1622,7 @@
               "revision": 1,
               "variable": "understand_turkish",
               "stem": {
-                "text": "How well do you understand Turkish?"
+                "text": "How well do you understand Turkish when someone speaks it?"
               },
               "required": "soft",
               "allowDecline": false,
@@ -1235,7 +1639,38 @@
                 "code": 14
               },
               "responseType": "single_choice",
-              "scale": "scale.language_understanding_4",
+              "scale": "scale.language_ability_5",
+              "scaleVersion": "1.0.0",
+              "presentation": "cards",
+              "spectrumReverse": false,
+              "autoAdvance": true
+            },
+            {
+              "key": "speak_turkish",
+              "revision": 1,
+              "variable": "speak_turkish",
+              "stem": {
+                "text": "How well can you speak Turkish?"
+              },
+              "lede": {
+                "text": "Think about having a conversation in it, not just understanding it."
+              },
+              "required": "soft",
+              "allowDecline": false,
+              "identifying": false,
+              "displayIf": {
+                "op": "selected",
+                "target": {
+                  "item": {
+                    "instrument": "ybm_demographics",
+                    "item": "other_languages",
+                    "revision": 1
+                  }
+                },
+                "code": 14
+              },
+              "responseType": "single_choice",
+              "scale": "scale.language_ability_5",
               "scaleVersion": "1.0.0",
               "presentation": "cards",
               "spectrumReverse": false,
@@ -1246,7 +1681,7 @@
               "revision": 1,
               "variable": "understand_other_language",
               "stem": {
-                "text": "How well do you understand {language}?",
+                "text": "How well do you understand {language} when someone speaks it?",
                 "pipes": {
                   "language": {
                     "kind": "item_text_entry",
@@ -1274,7 +1709,49 @@
                 "code": 15
               },
               "responseType": "single_choice",
-              "scale": "scale.language_understanding_4",
+              "scale": "scale.language_ability_5",
+              "scaleVersion": "1.0.0",
+              "presentation": "cards",
+              "spectrumReverse": false,
+              "autoAdvance": true
+            },
+            {
+              "key": "speak_other_language",
+              "revision": 1,
+              "variable": "speak_other_language",
+              "stem": {
+                "text": "How well can you speak {language}?",
+                "pipes": {
+                  "language": {
+                    "kind": "item_text_entry",
+                    "item": {
+                      "instrument": "ybm_demographics",
+                      "item": "other_language_named",
+                      "revision": 1
+                    },
+                    "fallback": "the other language you speak"
+                  }
+                }
+              },
+              "lede": {
+                "text": "Think about having a conversation in it, not just understanding it."
+              },
+              "required": "soft",
+              "allowDecline": false,
+              "identifying": false,
+              "displayIf": {
+                "op": "selected",
+                "target": {
+                  "item": {
+                    "instrument": "ybm_demographics",
+                    "item": "other_languages",
+                    "revision": 1
+                  }
+                },
+                "code": 15
+              },
+              "responseType": "single_choice",
+              "scale": "scale.language_ability_5",
               "scaleVersion": "1.0.0",
               "presentation": "cards",
               "spectrumReverse": false,
@@ -5951,10 +6428,10 @@
       ],
       "direction": "unordered"
     },
-    "scale.language_understanding_4": {
-      "key": "scale.language_understanding_4",
+    "scale.language_ability_5": {
+      "key": "scale.language_ability_5",
       "version": "1.0.0",
-      "name": "How well a language is understood (very well to only a few words)",
+      "name": "How well a language is understood or spoken (very well to not at all)",
       "options": [
         {
           "code": 1,
@@ -5979,10 +6456,16 @@
           "label": "Only a few words",
           "kind": "substantive",
           "textEntry": false
+        },
+        {
+          "code": 5,
+          "label": "Not at all",
+          "kind": "substantive",
+          "textEntry": false
         }
       ],
       "direction": "descending",
-      "scoringNote": "1 = very well … 4 = only a few words. Descending understanding."
+      "scoringNote": "1 = very well … 5 = not at all. The same scale for understanding and speaking, so speak_<language> − understand_<language> > 0 marks a language understood better than it is spoken."
     },
     "scale.gender_4": {
       "key": "scale.gender_4",
@@ -8221,5 +8704,5 @@
       "bytes": 589147
     }
   },
-  "hash": "sha256:a48bff591ca5de73256a4b3322d07b1a954cc052d009c87f0541b2c8cd6b1c9f"
+  "hash": "sha256:6013205f12d33adce20b8167827122601405352bf239a6b510f70bc4695f37e7"
 }

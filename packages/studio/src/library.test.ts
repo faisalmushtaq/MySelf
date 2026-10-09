@@ -26,6 +26,7 @@ import {
   provenanceOf,
   questionCount,
   recordSavedModule,
+  repositoryModuleFragment,
   updateFromModule,
   validatedCatalogue,
   validatedFragment,
@@ -822,5 +823,47 @@ describe("updating a module copy, three ways", () => {
     expect(refusal(() => planModuleUpdate(d, "imp_test", v2, v1)).code).toBe("invalid");
     expect(refusal(() => planModuleUpdate(d, "imp_test", { ...v1, origin: { ...v1Origin, moduleId: "other" } }, v2)).code).toBe("invalid");
     expect(refusal(() => planModuleUpdate(d, "imp_nope", v1, v2)).code).toBe("not_found");
+  });
+});
+
+describe("a repository module as a library piece (D-58)", () => {
+  const LANGUAGE_KEYS = (() => {
+    const form = allModules.find((m) => m.instrument === "ybm_demographics")!.forms[0]!;
+    const keys = form.items.map((i) => i.key);
+    return keys.slice(keys.indexOf("first_language_english"), keys.indexOf("gender"));
+  })();
+  const languages = () =>
+    repositoryModuleFragment("ybm_demographics", { itemKeys: LANGUAGE_KEYS, title: "Languages: understanding and speaking" });
+
+  it("carries only the questions asked for, their option lists, and conditions inside the piece", () => {
+    const piece = languages();
+    expect(questionCount(piece)).toBe(LANGUAGE_KEYS.length);
+    expect(Object.keys(piece.scales).sort()).toEqual([
+      "scale.first_language_english",
+      "scale.language_ability_5",
+      "scale.other_languages",
+      "scale.yes_no",
+    ]);
+    expect(moduleProblems(piece)).toEqual([]);
+  });
+
+  it("drops into a published survey straight after Ethnicity, joining its block, and publishes", () => {
+    const base = extractDraft(r800);
+    const { draft, report } = insertFragment(base, languages(), { sectionKey: "about_you", afterItemKey: "ybm_demographics.ethnicity" }, opts);
+    expect(report.renamed).toEqual([]);
+    expect(report.variablesRenamed).toEqual([]);
+    expect(report.conditionsRemoved).toEqual([]);
+    const order = asked(draft).filter((k) => k.startsWith("ybm_demographics."));
+    expect(order.slice(0, 3)).toEqual(["ybm_demographics.ethnicity", "ybm_demographics.first_language_english", "ybm_demographics.speaks_other_language"]);
+    expect(order).toContain("ybm_demographics.understand_urdu");
+    expect(order.indexOf("ybm_demographics.speak_urdu")).toBe(order.indexOf("ybm_demographics.understand_urdu") + 1);
+    expect(order.at(-2)).toBe("ybm_demographics.gender");
+    expect(errors(draft, { baseline: extractDraft(r800) })).toEqual([]);
+    publishable(draft);
+  });
+
+  it("refuses a module or question that is not there", () => {
+    expect(refusal(() => repositoryModuleFragment("ybm_nothing", { title: "x" })).code).toBe("not_found");
+    expect(refusal(() => repositoryModuleFragment("ybm_demographics", { itemKeys: ["nope"], title: "x" })).code).toBe("not_found");
   });
 });

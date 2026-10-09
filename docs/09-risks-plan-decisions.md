@@ -299,3 +299,52 @@ not only the study they are created in.
   is read.
 
 Decisions for the team to confirm are in docs/16 §12.10.
+
+### Languages: understanding and speaking, and getting them into the live survey (2026-10-09, D-58)
+
+**What was asked (the research team's words).** "We need that question on
+bilingualism in the survey. Find a nice place to put it and some follow on
+question — we want to know if they understand and if they fluently speak that
+language because I reckon many will have receptive language for Urdu but not
+expressive."
+
+**Decision.**
+
+1. **Where.** In "About you", in the demographics block, straight after the
+   ethnicity question and before gender: the questions about background sit
+   together, early, and the language list follows the ethnic origin the
+   participant has just given. This is where D-53 put them.
+2. **What is asked.** Unchanged from D-53 up to the list: whether English was
+   the first language learned (yes / no / at the same time as another), whether
+   they speak or understand any other language, and which (West Yorkshire
+   Census order, Urdu first; "another language" named). Then, **for each
+   language ticked, two questions side by side**:
+   - "How well do you understand Urdu when someone speaks it?"
+   - "How well can you speak Urdu?" ("Think about having a conversation in
+     it, not just understanding it.")
+
+   Both on **one five-point scale**: very well, well, not very well, only a few
+   words, not at all (`scale.language_ability_5`, 1–5). The same scale for
+   both is what makes receptive and expressive use comparable: a child who
+   understands Urdu very well and speaks only a few words is
+   `understand_urdu = 1`, `speak_urdu = 4`. British Sign Language asks about
+   understanding it "when someone signs it" and how well they can sign.
+   Variables: `understand_<language>` and `speak_<language>` for each of the
+   fourteen languages, and `understand_other_language` /
+   `speak_other_language` for the one named.
+   The D-53 four-point "how well do you understand" scale is replaced; it was
+   never fielded, so nothing collected changes meaning.
+3. **How it reaches the live survey.** The survey participants run is now
+   published from MySelf Studio (9.0.0, 2026-10-06), which does not yet have
+   the language questions; the repository's r9.0.0 candidate, which did, was
+   never fielded. So the questions go into the Studio's library as a saved
+   module, "Languages: understanding and speaking"
+   (`languages_understand_speak`), put there by the "Studio library" workflow
+   through the same server code as the Studio's own "Save to library". A
+   researcher adds it in the Studio — Library → Saved modules → add after the
+   ethnicity question — and publishes. Its questions join the demographics
+   block with their own IDs and variables. Studio asks for a MAJOR version,
+   because required questions are added.
+
+The repository's r9.0.0 candidate is re-cut with the same change so the
+library and the candidate agree; it remains a candidate.
