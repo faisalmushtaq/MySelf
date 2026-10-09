@@ -434,12 +434,12 @@
                 "text": "Yorkshire Brain Map School Workshop"
               },
               "lede": {
-                "text": "Citizen Neuroscience\n\nThank you for taking part in this workshop.\n\nIn this study, we'll use a special tool called electroencephalography (EEG) to collect information about your brain. We'll put sensors on your head, and they'll record your brain activity. You'll also help collect brain data from another person. This new way helps us gather brain data quickly with help from people who aren't experts. The EEG headset should not feel uncomfortable, so if it does at any point, just let a member of the research team know. EEG is safe, pain free, and non-invasive.\n\nIn addition to EEG, we'll also ask questions about your life and how you feel. We made a list of questions that ask about things like who you are, how you feel, and how happy you are. We care about keeping your answers private. We'll ask for your name, date of birth and home address so we can keep your answers together if you take part again, and find them if you ask us to remove them. These are kept apart from your answers, and only the research team can see them.\n\nJoining this study is your choice, and you can leave at any time with no problems. If you want to leave, please let a member of the research team or a teacher know.\n\nOur study has permission from the School of Psychology Ethics Committee (Ethics Reference: PSCETHS-1449, Date of Approval: 5/6/25).\n\nThe questions you're about to answer should take about 10 minutes to answer. Please finish the survey quickly and carefully so we can stay on schedule. Thank you for joining our study! If you have questions or worries, please feel free to ask."
+                "text": "Thank you for taking part in this workshop.\n\nIn this study, we'll use a special tool called electroencephalography (EEG) to collect information about your brain. We'll put sensors on your head, and they'll record your brain activity. You'll also help collect brain data from another person. This new way helps us gather brain data quickly with help from people who aren't experts. The EEG headset should not feel uncomfortable, so if it does at any point, just let a member of the research team know. EEG is safe, pain free, and non-invasive.\n\nIn addition to EEG, we'll also ask questions about your life and how you feel. We made a list of questions that ask about things like who you are, how you feel, and how happy you are. We care about keeping your answers private. We'll ask for your name, date of birth and home address so we can keep your answers together if you take part again, and find them if you ask us to remove them. These are kept apart from your answers, and only the research team can see them.\n\nJoining this study is your choice, and you can leave at any time with no problems. If you want to leave, please let a member of the research team or a teacher know.\n\nOur study has permission from the School of Psychology Ethics Committee (Ethics Reference: PSCETHS-1449, Date of Approval: 5/6/25).\n\nThe questions you're about to answer should take about 10 minutes to answer. Please finish the survey quickly and carefully so we can stay on schedule. Thank you for joining our study! If you have questions or worries, please feel free to ask."
               },
               "moreInfo": {
                 "label": "How we look after your information",
                 "body": {
-                  "text": "WHAT WE COLLECT\nYour answers to these questions, the EEG recording from the session, and some details about how you used the app — such as how long you spent on each question. We also collect your name, date of birth and home address, so the research team can identify your session and keep your answers together if you take part again.\n\nWHERE IT IS KEPT\nEverything is saved on this iPad first, encrypted, so it works even with no internet. It is later transferred to secure University of Leeds storage. Your name, date of birth and address are stored apart from your answers, so they are not held together.\n\nWHO CAN SEE IT\nThe research team. When we publish or share the data, your name and address are never attached — only a study number and your answers.\n\nYOUR ADDRESS\nWe ask for the address you live at most of the time. With your name and date of birth, it helps us keep your answers together if you take part more than once. It is never published or shared.\n\nLINKING WITH OTHER RECORDS\nOnly if you say yes. Connected Yorkshire uses your name, date of birth and address to join your answers to your health and education records, then takes them off and replaces them with a code before any researcher sees the data. You can stop this at any time.\n\nCHANGING YOUR MIND\nYou can stop at any time, and you don't have to give a reason. If you want your answers taken out afterwards, contact the research team within 24 hours of finishing and tell them your name and date of birth.\n\nQUESTIONS\nEmail the research team at brainpop@leeds.ac.uk. Ethics reference PSCETHS-1449."
+                  "text": "WHAT WE COLLECT\nYour answers to these questions, the EEG recording from the session, and some details about how you used the app — such as how long you spent on each question. We also collect your name, date of birth and home address, so the research team can identify your session and keep your answers together if you take part again.\n\nWHERE IT IS KEPT\nEverything is saved on this iPad first, encrypted, so it works even with no internet. It is later transferred to secure University of Leeds storage. Your name, date of birth and address are stored apart from your answers, so they are not held together.\n\nWHO CAN SEE IT\nThe research team. When we publish or share the data, your name and address are never attached — only a study number and your answers.\n\nYOUR ADDRESS\nWe ask for the address you live at most of the time. With your name and date of birth, it helps us keep your answers together if you take part more than once. It is never published or shared.\n\nLINKING WITH OTHER RECORDS\nTaking part includes this. Connected Yorkshire uses your name, date of birth and address to join your answers to your health and education records, then takes them off and replaces them with a code before any researcher sees the data. You can ask us to stop at any time.\n\nCHANGING YOUR MIND\nYou can stop at any time, and you don't have to give a reason. If you want your answers taken out afterwards, contact the research team within 24 hours of finishing and tell them your name and date of birth.\n\nQUESTIONS\nEmail the research team at brainpop@leeds.ac.uk. Ethics reference PSCETHS-1449."
                 }
               },
               "required": "soft",
@@ -454,6 +454,9 @@
               "legacyVariable": "Consent",
               "stem": {
                 "text": "Please tap each statement to show you understand and agree to it, and that you consent to take part. We'll move on once they're all ticked."
+              },
+              "lede": {
+                "text": "Connected Yorkshire is a secure research service that brings together information from the NHS, schools and councils in Yorkshire, so researchers can study what helps young people's health and learning.\n\nTaking part in this study includes this: we will send your name, date of birth and address to Connected Yorkshire. They use them only to find your health records (like GP and hospital visits) and education records (like attendance and exam results) and join them to your answers.\n\nBefore any researcher sees the joined-up information, your name, date of birth and address are taken off and replaced with a code. Researchers only ever see the code, so they cannot tell who you are.\n\nThe link continues for as long as the research goes on, unless you ask us to stop. You can stop it at any time by emailing brainpop@leeds.ac.uk — you don't have to give a reason."
               },
               "required": "hard",
               "allowDecline": false,
@@ -470,7 +473,7 @@
                 {
                   "key": "no_identification",
                   "text": {
-                    "text": "I understand that my name, date of birth and address will be kept separately from my answers, and I will not be identified or identifiable in the report or reports that result from the research."
+                    "text": "I understand that my name, date of birth and address will be kept separately from my answers, used only to link my answers with my health and education records as described above, and that I will not be identified or identifiable in the report or reports that result from the research."
                   },
                   "required": true
                 },
@@ -502,6 +505,13 @@
                   "required": true
                 },
                 {
+                  "key": "record_linkage",
+                  "text": {
+                    "text": "I understand and agree that my name, date of birth and address will be shared securely with Connected Yorkshire so that my answers can be linked with my health records (such as GP and hospital visits) and education records (such as attendance and exam results), and that researchers will only see the linked information with my name, date of birth and address removed."
+                  },
+                  "required": true
+                },
+                {
                   "key": "agree",
                   "text": {
                     "text": "I agree to take part in this study"
@@ -509,27 +519,6 @@
                   "required": true
                 }
               ],
-              "autoAdvance": true
-            },
-            {
-              "key": "linkage_consent",
-              "revision": 1,
-              "variable": "linkage_consent",
-              "stem": {
-                "text": "Can we link your answers with your health and education records?"
-              },
-              "lede": {
-                "text": "Connected Yorkshire is a secure research service that brings together information from the NHS, schools and councils in Yorkshire, so researchers can study what helps young people's health and learning.\n\nIf you agree, we will send your name, date of birth and address to Connected Yorkshire. They use them only to find your health records (like GP and hospital visits) and education records (like attendance and exam results) and join them to your answers.\n\nBefore any researcher sees the joined-up information, your name, date of birth and address are taken off and replaced with a code. Researchers only ever see the code, so they cannot tell who you are.\n\nThe link continues for as long as the research goes on, unless you ask us to stop. You can stop it at any time by emailing brainpop@leeds.ac.uk — you don't have to give a reason.\n\nSaying no is completely fine. It doesn't change anything else about taking part."
-              },
-              "required": "hard",
-              "allowDecline": false,
-              "identifying": false,
-              "researcherNote": "Optional consent to pseudonymised linkage through the Connected Yorkshire research data platform (D-53). 1 = agrees, 2 = does not. Must be checked before any record is sent for linkage; an unanswered or 'No' sitting is never linked. Draft wording — to be checked against the approved documents (PSCETHS-1449) before fielding.",
-              "responseType": "single_choice",
-              "scale": "scale.linkage_consent",
-              "scaleVersion": "1.0.0",
-              "presentation": "cards",
-              "spectrumReverse": false,
               "autoAdvance": true
             },
             {
@@ -844,7 +833,7 @@
                     "revision": 1
                   }
                 },
-                "code": 15
+                "code": 16
               },
               "responseType": "text_short",
               "minChars": 0,
@@ -1087,11 +1076,11 @@
               "autoAdvance": true
             },
             {
-              "key": "understand_chinese",
+              "key": "understand_mandarin",
               "revision": 1,
-              "variable": "understand_chinese",
+              "variable": "understand_mandarin",
               "stem": {
-                "text": "How well do you understand Chinese (Mandarin or Cantonese) when someone speaks it?"
+                "text": "How well do you understand Mandarin Chinese when someone speaks it?"
               },
               "required": "soft",
               "allowDecline": false,
@@ -1115,11 +1104,11 @@
               "autoAdvance": true
             },
             {
-              "key": "speak_chinese",
+              "key": "speak_mandarin",
               "revision": 1,
-              "variable": "speak_chinese",
+              "variable": "speak_mandarin",
               "stem": {
-                "text": "How well can you speak Chinese (Mandarin or Cantonese)?"
+                "text": "How well can you speak Mandarin Chinese?"
               },
               "lede": {
                 "text": "Think about having a conversation in it, not just understanding it."
@@ -1137,6 +1126,65 @@
                   }
                 },
                 "code": 5
+              },
+              "responseType": "single_choice",
+              "scale": "scale.language_ability_5",
+              "scaleVersion": "1.0.0",
+              "presentation": "cards",
+              "spectrumReverse": false,
+              "autoAdvance": true
+            },
+            {
+              "key": "understand_cantonese",
+              "revision": 1,
+              "variable": "understand_cantonese",
+              "stem": {
+                "text": "How well do you understand Cantonese Chinese when someone speaks it?"
+              },
+              "required": "soft",
+              "allowDecline": false,
+              "identifying": false,
+              "displayIf": {
+                "op": "selected",
+                "target": {
+                  "item": {
+                    "instrument": "ybm_demographics",
+                    "item": "other_languages",
+                    "revision": 1
+                  }
+                },
+                "code": 6
+              },
+              "responseType": "single_choice",
+              "scale": "scale.language_ability_5",
+              "scaleVersion": "1.0.0",
+              "presentation": "cards",
+              "spectrumReverse": false,
+              "autoAdvance": true
+            },
+            {
+              "key": "speak_cantonese",
+              "revision": 1,
+              "variable": "speak_cantonese",
+              "stem": {
+                "text": "How well can you speak Cantonese Chinese?"
+              },
+              "lede": {
+                "text": "Think about having a conversation in it, not just understanding it."
+              },
+              "required": "soft",
+              "allowDecline": false,
+              "identifying": false,
+              "displayIf": {
+                "op": "selected",
+                "target": {
+                  "item": {
+                    "instrument": "ybm_demographics",
+                    "item": "other_languages",
+                    "revision": 1
+                  }
+                },
+                "code": 6
               },
               "responseType": "single_choice",
               "scale": "scale.language_ability_5",
@@ -1164,7 +1212,7 @@
                     "revision": 1
                   }
                 },
-                "code": 6
+                "code": 7
               },
               "responseType": "single_choice",
               "scale": "scale.language_ability_5",
@@ -1195,7 +1243,7 @@
                     "revision": 1
                   }
                 },
-                "code": 6
+                "code": 7
               },
               "responseType": "single_choice",
               "scale": "scale.language_ability_5",
@@ -1223,7 +1271,7 @@
                     "revision": 1
                   }
                 },
-                "code": 7
+                "code": 8
               },
               "responseType": "single_choice",
               "scale": "scale.language_ability_5",
@@ -1254,7 +1302,7 @@
                     "revision": 1
                   }
                 },
-                "code": 7
+                "code": 8
               },
               "responseType": "single_choice",
               "scale": "scale.language_ability_5",
@@ -1282,7 +1330,7 @@
                     "revision": 1
                   }
                 },
-                "code": 8
+                "code": 9
               },
               "responseType": "single_choice",
               "scale": "scale.language_ability_5",
@@ -1313,7 +1361,7 @@
                     "revision": 1
                   }
                 },
-                "code": 8
+                "code": 9
               },
               "responseType": "single_choice",
               "scale": "scale.language_ability_5",
@@ -1341,7 +1389,7 @@
                     "revision": 1
                   }
                 },
-                "code": 9
+                "code": 10
               },
               "responseType": "single_choice",
               "scale": "scale.language_ability_5",
@@ -1372,7 +1420,7 @@
                     "revision": 1
                   }
                 },
-                "code": 9
+                "code": 10
               },
               "responseType": "single_choice",
               "scale": "scale.language_ability_5",
@@ -1400,7 +1448,7 @@
                     "revision": 1
                   }
                 },
-                "code": 10
+                "code": 11
               },
               "responseType": "single_choice",
               "scale": "scale.language_ability_5",
@@ -1431,7 +1479,7 @@
                     "revision": 1
                   }
                 },
-                "code": 10
+                "code": 11
               },
               "responseType": "single_choice",
               "scale": "scale.language_ability_5",
@@ -1459,7 +1507,7 @@
                     "revision": 1
                   }
                 },
-                "code": 11
+                "code": 12
               },
               "responseType": "single_choice",
               "scale": "scale.language_ability_5",
@@ -1490,7 +1538,7 @@
                     "revision": 1
                   }
                 },
-                "code": 11
+                "code": 12
               },
               "responseType": "single_choice",
               "scale": "scale.language_ability_5",
@@ -1518,7 +1566,7 @@
                     "revision": 1
                   }
                 },
-                "code": 12
+                "code": 13
               },
               "responseType": "single_choice",
               "scale": "scale.language_ability_5",
@@ -1549,7 +1597,7 @@
                     "revision": 1
                   }
                 },
-                "code": 12
+                "code": 13
               },
               "responseType": "single_choice",
               "scale": "scale.language_ability_5",
@@ -1577,7 +1625,7 @@
                     "revision": 1
                   }
                 },
-                "code": 13
+                "code": 14
               },
               "responseType": "single_choice",
               "scale": "scale.language_ability_5",
@@ -1608,7 +1656,7 @@
                     "revision": 1
                   }
                 },
-                "code": 13
+                "code": 14
               },
               "responseType": "single_choice",
               "scale": "scale.language_ability_5",
@@ -1636,7 +1684,7 @@
                     "revision": 1
                   }
                 },
-                "code": 14
+                "code": 15
               },
               "responseType": "single_choice",
               "scale": "scale.language_ability_5",
@@ -1667,7 +1715,7 @@
                     "revision": 1
                   }
                 },
-                "code": 14
+                "code": 15
               },
               "responseType": "single_choice",
               "scale": "scale.language_ability_5",
@@ -1706,7 +1754,7 @@
                     "revision": 1
                   }
                 },
-                "code": 15
+                "code": 16
               },
               "responseType": "single_choice",
               "scale": "scale.language_ability_5",
@@ -1748,7 +1796,7 @@
                     "revision": 1
                   }
                 },
-                "code": 15
+                "code": 16
               },
               "responseType": "single_choice",
               "scale": "scale.language_ability_5",
@@ -5597,6 +5645,8 @@
               "min": 0,
               "max": 100,
               "step": 1,
+              "minLabel": "No time",
+              "maxLabel": "All of it",
               "showValue": true
             }
           ],
@@ -6114,26 +6164,6 @@
     }
   },
   "scales": {
-    "scale.linkage_consent": {
-      "key": "scale.linkage_consent",
-      "version": "1.0.0",
-      "name": "Linkage consent (Yes, I agree / No, I don't agree)",
-      "options": [
-        {
-          "code": 1,
-          "label": "Yes, I agree",
-          "kind": "substantive",
-          "textEntry": false
-        },
-        {
-          "code": 2,
-          "label": "No, I don't agree",
-          "kind": "substantive",
-          "textEntry": false
-        }
-      ],
-      "direction": "unordered"
-    },
     "scale.ethnicity_uk20": {
       "key": "scale.ethnicity_uk20",
       "version": "2.0.0",
@@ -6361,66 +6391,72 @@
         },
         {
           "code": 5,
-          "label": "Chinese (Mandarin or Cantonese)",
+          "label": "Mandarin Chinese",
           "kind": "substantive",
           "textEntry": false
         },
         {
           "code": 6,
-          "label": "Gujarati",
+          "label": "Cantonese Chinese",
           "kind": "substantive",
           "textEntry": false
         },
         {
           "code": 7,
-          "label": "Bengali (including Sylheti)",
+          "label": "Gujarati",
           "kind": "substantive",
           "textEntry": false
         },
         {
           "code": 8,
-          "label": "Portuguese",
+          "label": "Bengali (including Sylheti)",
           "kind": "substantive",
           "textEntry": false
         },
         {
           "code": 9,
-          "label": "Spanish",
+          "label": "Portuguese",
           "kind": "substantive",
           "textEntry": false
         },
         {
           "code": 10,
-          "label": "Russian",
+          "label": "Spanish",
           "kind": "substantive",
           "textEntry": false
         },
         {
           "code": 11,
-          "label": "French",
+          "label": "Russian",
           "kind": "substantive",
           "textEntry": false
         },
         {
           "code": 12,
-          "label": "Tamil",
+          "label": "French",
           "kind": "substantive",
           "textEntry": false
         },
         {
           "code": 13,
-          "label": "British Sign Language",
+          "label": "Tamil",
           "kind": "substantive",
           "textEntry": false
         },
         {
           "code": 14,
-          "label": "Turkish",
+          "label": "British Sign Language",
           "kind": "substantive",
           "textEntry": false
         },
         {
           "code": 15,
+          "label": "Turkish",
+          "kind": "substantive",
+          "textEntry": false
+        },
+        {
+          "code": 16,
           "label": "Another language",
           "kind": "other_specify",
           "textEntry": false
@@ -8704,5 +8740,5 @@
       "bytes": 589147
     }
   },
-  "hash": "sha256:6013205f12d33adce20b8167827122601405352bf239a6b510f70bc4695f37e7"
+  "hash": "sha256:7d7744ec09ede29175b6ffbd5fd49ca5d9b8d22653b80be4a2c173f1798596f0"
 }

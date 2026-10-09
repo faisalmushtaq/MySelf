@@ -9,8 +9,8 @@ import { CANDIDATE, openOnCandidate } from "./support/candidate.js";
  * other.
  *
  * Each scenario is a participant with a story: an age that picks one SDQ form or
- * the other, social media or none, a postcode known or not, linkage agreed or
- * declined, one language or three. The walk answers the screens that story is
+ * the other, social media or none, a postcode known or not, one language or
+ * three, understood and spoken. The walk answers the screens that story is
  * about on purpose and everything else sensibly, hands the sitting over as the
  * encrypted file a researcher would receive, and reads it back through the
  * survey's own ingest. Then the dataset must say what the participant did.
@@ -23,7 +23,7 @@ import { CANDIDATE, openOnCandidate } from "./support/candidate.js";
 
 const PASSPHRASE = "six brown otters reading";
 /**
- * The scenarios are the r9.0.0 survey's (linkage, street search, D-53), and r9.0.0
+ * The scenarios are the r9.0.0 survey's (street search, languages, D-53, D-58), and r9.0.0
  * is a candidate until it is approved — so each sitting is on it as a release
  * downloaded from the study (see support/candidate.ts), with the service worker
  * out of the way so the download reaches the stand-in study.
@@ -73,7 +73,7 @@ const common = (s: { first: string; last: string; dob: string }): [RegExp, Act][
 
 const scenarios: Scenario[] = [
   {
-    name: "fourteen, three languages, social media, linkage yes",
+    name: "fourteen, three languages, social media",
     code: "SCN0001",
     first: "Scenario",
     last: "Alpha",
@@ -87,7 +87,6 @@ const scenarios: Scenario[] = [
           await page.getByRole("textbox", { name: "Street" }).fill("Woodhouse Lane");
         },
       ],
-      [/^Can we link your answers/, choose("Yes, I agree")],
       [/ethnic origin/, choose("Pakistani")],
       [/first language you learned/, choose("I learned English and another language at the same time")],
       [/any language other than English/, choose("Yes")],
@@ -116,7 +115,7 @@ const scenarios: Scenario[] = [
     ],
   },
   {
-    name: "twenty, no social media, no postcode, linkage no",
+    name: "twenty, no social media, no postcode",
     code: "SCN0002",
     first: "Scenario",
     last: "Bravo",
@@ -132,7 +131,6 @@ const scenarios: Scenario[] = [
           await page.locator(".street-match", { hasText: "Woodhouse Lane" }).filter({ hasText: "LS2" }).click();
         },
       ],
-      [/^Can we link your answers/, choose("No, I don't agree")],
       [/ethnic origin/, choose("English, Welsh, Scottish, Northern Irish or British")],
       [/first language you learned/, choose("Yes")],
       [/any language other than English/, choose("No")],
@@ -150,7 +148,6 @@ const scenarios: Scenario[] = [
     dob: "2014-09-30",
     skipOptional: true,
     rules: [
-      [/^Can we link your answers/, choose("Yes, I agree")],
       [/ethnic origin/, choose("Prefer not to say")],
       [/first language you learned/, choose("No")],
       [/any language other than English/, choose("Yes")],
@@ -343,10 +340,12 @@ test("the survey's own dataset says what each scenario answered", async () => {
     return row;
   };
 
-  // Alpha: three languages, the third named; linkage yes; a long break from social media.
-  expect(value("SCN0001", "linkage_consent")?.value).toBe(1);
+  // Alpha: three languages, the third named; a long break from social media.
+  // Record linkage is one of the consent statements now (D-58), not a question.
+  expect(value("SCN0001", "linkage_consent")).toBeUndefined();
+  expect(value("SCN0001", "consent")?.text).toContain("record_linkage");
   expect(value("SCN0001", "first_language_english")?.value).toBe(3);
-  expect(value("SCN0001", "other_languages")?.text).toBe("1,2,15");
+  expect(value("SCN0001", "other_languages")?.text).toBe("1,2,16");
   expect(value("SCN0001", "other_language_named")?.text).toBe("Pashto");
   expect(value("SCN0001", "understand_urdu")?.value).toBe(1);
   expect(value("SCN0001", "understand_punjabi")?.value).toBe(2);
@@ -362,8 +361,7 @@ test("the survey's own dataset says what each scenario answered", async () => {
   expect(value("SCN0001", "sm_family_control_how")?.text).toBe("1,8");
   expect(value("SCN0001", "sm_family_control_other")?.text).toMatch(/^=HYPERLINK/);
 
-  // Bravo: 18+ SDQ, no social media, linkage no, street found without a postcode.
-  expect(value("SCN0002", "linkage_consent")?.value).toBe(2);
+  // Bravo: 18+ SDQ, no social media, street found without a postcode.
   expect(value("SCN0002", "speaks_other_language")?.value).toBe(2);
   expect(value("SCN0002", "other_languages")).toBeUndefined();
   expect(value("SCN0002", "sqs_q1")?.value).toBe(2);

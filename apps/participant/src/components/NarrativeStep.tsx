@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { answerReady, handoverUrl, readModuleMessage } from "../lib/narrative.js";
 
 /**
- * MyStory, inside MyThoughts.
+ * MyStory, inside the survey.
  *
  * The survey reaches a narrative component and hands over. `flatten` has
  * placed it as one position in the walk — with a marker item, so conditions,

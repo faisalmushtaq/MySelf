@@ -366,8 +366,7 @@ textarea {
   color: var(--text);
 }
 
-/* Set as written — MyThoughts, MyStory. Upper-casing it broke the internal
-   capital that makes the name read as one word. */
+/* The survey version under the name (D-58). Not upper-cased. */
 .subbrand {
   margin: 0.2rem 0 0;
   font-family: var(--font-body);

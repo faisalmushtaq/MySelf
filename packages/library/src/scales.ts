@@ -136,18 +136,23 @@ export const LANGUAGES: { code: number; label: string; key: string }[] = [
   { code: 2, label: "Punjabi", key: "punjabi" }, // 27,309
   { code: 3, label: "Polish", key: "polish" }, // 26,929
   { code: 4, label: "Arabic", key: "arabic" }, // 9,443
-  { code: 5, label: "Chinese (Mandarin or Cantonese)", key: "chinese" }, // 6,633
-  { code: 6, label: "Gujarati", key: "gujarati" }, // 5,998
-  { code: 7, label: "Bengali (including Sylheti)", key: "bengali" }, // 5,488
-  { code: 8, label: "Portuguese", key: "portuguese" }, // 4,610
-  { code: 9, label: "Spanish", key: "spanish" }, // 3,799
-  { code: 10, label: "Russian", key: "russian" }, // 2,865
-  { code: 11, label: "French", key: "french" }, // 2,273
-  { code: 12, label: "Tamil", key: "tamil" }, // 1,254
-  { code: 13, label: "British Sign Language", key: "bsl" }, // 1,106
-  { code: 14, label: "Turkish", key: "turkish" }, // 739
+  // Mandarin and Cantonese separately (D-58): not mutually intelligible as
+  // spoken languages, so one "Chinese" option could not say which is meant.
+  // Together 6,633 in West Yorkshire; kept side by side in the list.
+  { code: 5, label: "Mandarin Chinese", key: "mandarin" },
+  { code: 6, label: "Cantonese Chinese", key: "cantonese" },
+  { code: 7, label: "Gujarati", key: "gujarati" }, // 5,998
+  { code: 8, label: "Bengali (including Sylheti)", key: "bengali" }, // 5,488
+  { code: 9, label: "Portuguese", key: "portuguese" }, // 4,610
+  { code: 10, label: "Spanish", key: "spanish" }, // 3,799
+  { code: 11, label: "Russian", key: "russian" }, // 2,865
+  { code: 12, label: "French", key: "french" }, // 2,273
+  { code: 13, label: "Tamil", key: "tamil" }, // 1,254
+  { code: 14, label: "British Sign Language", key: "bsl" }, // 1,106
+  { code: 15, label: "Turkish", key: "turkish" }, // 739
 ];
-export const ANOTHER_LANGUAGE_CODE = 15;
+/** Renumbered from 15 when Mandarin and Cantonese were split (D-58); never fielded before. */
+export const ANOTHER_LANGUAGE_CODE = 16;
 
 export const otherLanguages: ResponseScale = {
   key: "scale.other_languages",
@@ -176,18 +181,6 @@ export const languageAbility5: ResponseScale = {
   options: [opt(1, "Very well"), opt(2, "Well"), opt(3, "Not very well"), opt(4, "Only a few words"), opt(5, "Not at all")],
   scoringNote:
     "1 = very well … 5 = not at all. The same scale for understanding and speaking, so speak_<language> − understand_<language> > 0 marks a language understood better than it is spoken.",
-};
-
-/**
- * Consent to linkage through Connected Yorkshire (D-53). Worded as an
- * agreement, so either answer is a complete one.
- */
-export const linkageConsent: ResponseScale = {
-  key: "scale.linkage_consent",
-  version: "1.0.0",
-  name: "Linkage consent (Yes, I agree / No, I don't agree)",
-  direction: "unordered",
-  options: [opt(1, "Yes, I agree"), opt(2, "No, I don't agree")],
 };
 
 /**
@@ -793,7 +786,6 @@ export const allScales: ResponseScale[] = [
   firstLanguageEnglish,
   otherLanguages,
   languageAbility5,
-  linkageConsent,
   sqs11,
   smFamilyControlHow,
   hairType12,

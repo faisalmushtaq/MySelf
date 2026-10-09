@@ -17,8 +17,8 @@ const everything = [...parsedInstruments, ...parsedModules];
 const scaleKeys = new Set(parsedScales.map((s) => s.key));
 
 describe("scales", () => {
-  it("all 41 scales parse", () => {
-    expect(parsedScales).toHaveLength(41);
+  it("all 40 scales parse", () => {
+    expect(parsedScales).toHaveLength(40);
   });
 
   it("scale keys are unique", () => {
@@ -396,7 +396,7 @@ describe("instruments and modules", () => {
     const consentModule = parsedModules.find((m) => m.instrument === "ybm_intro_consent")!;
     const consent = consentModule.forms[0]!.items.find((i) => i.key === "consent")!;
     if (consent.responseType !== "checkbox_set") throw new Error("wrong type");
-    expect(consent.statements).toHaveLength(6);
+    expect(consent.statements).toHaveLength(7);
     for (const s of consent.statements) expect(s.required).toBe(true);
     const withdrawal = consent.statements.find((s) => s.key === "withdrawal_window")!;
     expect(withdrawal.text.pipes?.["withdrawal_date"]).toMatchObject({ kind: "date_offset", offsetDays: 2 });
@@ -427,16 +427,25 @@ describe("D-53: shorter consent, sleep quality and sanity checks", () => {
     expect(text).toContain("brainpop@leeds.ac.uk");
   });
 
-  it("asks for linkage consent on its own, straight after the consent statements", () => {
+  it("makes linkage with health and education records part of consent, explained above the statements (D-58)", () => {
     const keys = consentItems.map((i) => i.key);
-    expect(keys.indexOf("linkage_consent")).toBe(keys.indexOf("consent") + 1);
-    const linkage = consentItems.find((i) => i.key === "linkage_consent")!;
-    if (linkage.responseType !== "single_choice") throw new Error("wrong type");
-    expect(linkage.scale).toBe("scale.linkage_consent");
-    expect(linkage.lede?.text).toMatch(/Connected Yorkshire/);
-    expect(linkage.lede?.text).toMatch(/replaced with a code/);
-    expect(linkage.lede?.text).toMatch(/brainpop@leeds\.ac\.uk/);
-    expect(linkage.identifying).toBe(false);
+    expect(keys).not.toContain("linkage_consent");
+    const consent = consentItems.find((i) => i.key === "consent")!;
+    if (consent.responseType !== "checkbox_set") throw new Error("wrong type");
+    expect(consent.autoAdvance).toBe(true);
+    expect(consent.lede?.text).toMatch(/Connected Yorkshire/);
+    expect(consent.lede?.text).toMatch(/replaced with a code/);
+    expect(consent.lede?.text).toMatch(/brainpop@leeds\.ac\.uk/);
+    const linkage = consent.statements.find((s) => s.key === "record_linkage")!;
+    expect(linkage.required).toBe(true);
+    expect(linkage.text.text).toMatch(/health records .* education records/);
+    expect(consent.statements.at(-1)!.key).toBe("agree");
+    const identity = consent.statements.find((s) => s.key === "no_identification")!;
+    expect(identity.text.text).toMatch(/link my answers with my health and education records/);
+  });
+
+  it("drops the 'Citizen Neuroscience' subtitle from the introduction (D-58)", () => {
+    expect(JSON.stringify(consentItems)).not.toContain("Citizen Neuroscience");
   });
 
   it("the why-it-matters screen is answered 'I understand'", () => {

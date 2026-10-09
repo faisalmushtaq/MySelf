@@ -499,9 +499,9 @@ describe("shorter consent, sleep quality and sanity checks (D-53, in the r9.0.0 
     expect(await streetList("no_such_list")).toBeNull();
   });
 
-  it("walks consent, then linkage, then 'why it matters'", () => {
+  it("walks consent, which includes record linkage, then 'why it matters'", () => {
     const keys = units.filter((u) => u.instrument === "ybm_intro_consent").map((u) => u.item.key);
-    expect(keys).toEqual(["intro", "consent", "linkage_consent", "why_it_matters"]);
+    expect(keys).toEqual(["intro", "consent", "why_it_matters"]);
     expect(find("ybm_intro_consent", "consent")).toMatchObject({ autoAdvance: true });
     expect(find("ybm_intro_consent", "why_it_matters")).toMatchObject({ advanceLabel: "I understand" });
   });
