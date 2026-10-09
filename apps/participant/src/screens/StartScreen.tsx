@@ -85,7 +85,9 @@ export function StartScreen({
   return (
     <div className="screen start">
       <h1 className="brand">MySelf</h1>
-      <p className="subbrand">MyThoughts</p>
+      {/* The survey version under the name, so staff can see at a glance which
+          one an iPad is running (it replaced the "MyThoughts" line, D-58). */}
+      <p className="subbrand">Version {releaseVersion}</p>
       {!blocked && studyLabel && <p className="study-title">{studyLabel}</p>}
       {notice && (
         <div className={`survey-notice${blocked ? " blocking" : ""}`} role="status">
