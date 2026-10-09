@@ -13,7 +13,7 @@ on:
       version:
         description: "Version to publish (Studio says which bump the changes need)"
         type: string
-        default: "10.0.0"
+        default: "11.0.0"
       note:
         description: "Release note"
         type: string

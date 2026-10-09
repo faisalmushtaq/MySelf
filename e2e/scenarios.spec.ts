@@ -345,7 +345,7 @@ test("the survey's own dataset says what each scenario answered", async () => {
   expect(value("SCN0001", "linkage_consent")).toBeUndefined();
   expect(value("SCN0001", "consent")?.text).toContain("record_linkage");
   expect(value("SCN0001", "first_language_english")?.value).toBe(3);
-  expect(value("SCN0001", "other_languages")?.text).toBe("1,2,16");
+  expect(value("SCN0001", "other_languages")?.text).toBe("1,2,15");
   expect(value("SCN0001", "other_language_named")?.text).toBe("Pashto");
   expect(value("SCN0001", "understand_urdu")?.value).toBe(1);
   expect(value("SCN0001", "understand_punjabi")?.value).toBe(2);

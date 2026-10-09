@@ -138,21 +138,26 @@ export const LANGUAGES: { code: number; label: string; key: string }[] = [
   { code: 4, label: "Arabic", key: "arabic" }, // 9,443
   // Mandarin and Cantonese separately (D-58): not mutually intelligible as
   // spoken languages, so one "Chinese" option could not say which is meant.
-  // Together 6,633 in West Yorkshire; kept side by side in the list.
-  { code: 5, label: "Mandarin Chinese", key: "mandarin" },
-  { code: 6, label: "Cantonese Chinese", key: "cantonese" },
-  { code: 7, label: "Gujarati", key: "gujarati" }, // 5,998
-  { code: 8, label: "Bengali (including Sylheti)", key: "bengali" }, // 5,488
-  { code: 9, label: "Portuguese", key: "portuguese" }, // 4,610
-  { code: 10, label: "Spanish", key: "spanish" }, // 3,799
-  { code: 11, label: "Russian", key: "russian" }, // 2,865
-  { code: 12, label: "French", key: "french" }, // 2,273
-  { code: 13, label: "Tamil", key: "tamil" }, // 1,254
-  { code: 14, label: "British Sign Language", key: "bsl" }, // 1,106
-  { code: 15, label: "Turkish", key: "turkish" }, // 739
+  // Together 6,633 in West Yorkshire; kept side by side where "Chinese" was.
+  // NEW CODES, 16 and 17: code 5 was "Chinese (Mandarin or Cantonese)" in
+  // the fielded 10.0.0, and a code never changes meaning once answers carry
+  // it. 5 is retired, not reused.
+  { code: 16, label: "Mandarin Chinese", key: "mandarin" },
+  { code: 17, label: "Cantonese Chinese", key: "cantonese" },
+  { code: 6, label: "Gujarati", key: "gujarati" }, // 5,998
+  { code: 7, label: "Bengali (including Sylheti)", key: "bengali" }, // 5,488
+  { code: 8, label: "Portuguese", key: "portuguese" }, // 4,610
+  { code: 9, label: "Spanish", key: "spanish" }, // 3,799
+  { code: 10, label: "Russian", key: "russian" }, // 2,865
+  { code: 11, label: "French", key: "french" }, // 2,273
+  { code: 12, label: "Tamil", key: "tamil" }, // 1,254
+  { code: 13, label: "British Sign Language", key: "bsl" }, // 1,106
+  { code: 14, label: "Turkish", key: "turkish" }, // 739
 ];
-/** Renumbered from 15 when Mandarin and Cantonese were split (D-58); never fielded before. */
-export const ANOTHER_LANGUAGE_CODE = 16;
+/** "Another language", as fielded in 10.0.0. */
+export const ANOTHER_LANGUAGE_CODE = 15;
+/** Fielded in 10.0.0 as "Chinese (Mandarin or Cantonese)"; retired when Mandarin and Cantonese were split (D-58). */
+export const RETIRED_LANGUAGE_CODES = [5];
 
 export const otherLanguages: ResponseScale = {
   key: "scale.other_languages",

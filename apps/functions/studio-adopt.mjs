@@ -81,12 +81,30 @@ const changes = diffDrafts(live, target);
 console.log(`Live ${active.version} → ${version}: ${JSON.stringify(changes.counts)}`);
 for (const e of changes.entries) console.log(`  ${e.kind} ${e.itemKey ?? e.refKey ?? ""} ${e.message ?? ""}`.trimEnd());
 
+// An answer code the live version has and the repository's version drops is
+// retired, as removing an option in the editor does, so it is never reused.
+// A code that stays but changes its label is refused: answers already carry it.
+const at = new Date().toISOString();
+const retiredCodes = structuredClone(draft.retiredCodes ?? {});
+for (const [scaleKey, scale] of Object.entries(live.scales)) {
+  const now = target.scales[scaleKey];
+  if (!now) continue;
+  for (const option of scale.options) {
+    const kept = now.options.find((o) => o.code === option.code);
+    if (kept && kept.label !== option.label) fail(`${scaleKey} code ${option.code} would change from “${option.label}” to “${kept.label}”. A published code never changes meaning.`);
+    if (kept) continue;
+    const list = (retiredCodes[scaleKey] ??= []);
+    if (!list.some((r) => r.code === option.code)) list.push({ code: option.code, label: option.label, retiredAt: at });
+    console.log(`  retires ${scaleKey} code ${option.code} (“${option.label}”)`);
+  }
+}
+
 // The repository's version, with the Studio's own records carried over: what
 // was archived, retired codes and notes stay the survey's history.
 const next = {
   ...target,
   archived: draft.archived,
-  retiredCodes: draft.retiredCodes,
+  retiredCodes,
   notes: draft.notes,
   imports: draft.imports ?? [],
   unlocked: Object.fromEntries(
