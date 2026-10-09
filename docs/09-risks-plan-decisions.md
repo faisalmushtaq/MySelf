@@ -370,15 +370,18 @@ gaming slider) — and D-53 was never published. Decided:
    brainpop@leeds.ac.uk; consent moves on once every statement is ticked.
 3. The team's Studio edit (the slider end labels) is written into the library.
 4. **The live survey is brought up to the repository's version** by the
-   "Studio: publish the repository's survey" workflow (`apps/functions/studio-adopt.mjs`),
+   "Studio: publish the repository's survey" workflow, as 11.0.0 (10.0.0
+   having been published from the Studio meanwhile), (`apps/functions/studio-adopt.mjs`),
    through the Studio's own publish, with the reasons for opening the consent
    and identity modules recorded. It refuses if the Studio draft has
    unpublished edits; a refused publish restores the draft. A Studio publish
    may now pin a file exactly as a repository candidate does (the street list,
    D-53), since those files are built and hashed in the repository.
-5. **Mandarin and Cantonese are separate options** in the language list
-   (codes 5 and 6), since one "Chinese" option cannot say which is meant;
-   "Another language" is now 16. Never fielded before, so no data changes
-   meaning.
+5. **Mandarin and Cantonese are separate options** in the language list,
+   since one "Chinese" option cannot say which is meant. The team had already
+   published 10.0.0 from the Studio with the languages module, so its codes
+   are kept exactly: "Chinese (Mandarin or Cantonese)" (5) is retired and
+   never reused, Mandarin is 16 and Cantonese 17, "Another language" stays 15.
+   `understand_chinese` / `speak_chinese` stop being asked and stay reserved.
 6. **The start screen shows the survey's version** under "MySelf" instead of
    the "MyThoughts" line.

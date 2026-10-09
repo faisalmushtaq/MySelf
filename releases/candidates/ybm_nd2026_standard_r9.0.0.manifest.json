@@ -833,7 +833,7 @@
                     "revision": 1
                   }
                 },
-                "code": 16
+                "code": 15
               },
               "responseType": "text_short",
               "minChars": 0,
@@ -1094,7 +1094,7 @@
                     "revision": 1
                   }
                 },
-                "code": 5
+                "code": 16
               },
               "responseType": "single_choice",
               "scale": "scale.language_ability_5",
@@ -1125,7 +1125,7 @@
                     "revision": 1
                   }
                 },
-                "code": 5
+                "code": 16
               },
               "responseType": "single_choice",
               "scale": "scale.language_ability_5",
@@ -1153,7 +1153,7 @@
                     "revision": 1
                   }
                 },
-                "code": 6
+                "code": 17
               },
               "responseType": "single_choice",
               "scale": "scale.language_ability_5",
@@ -1184,7 +1184,7 @@
                     "revision": 1
                   }
                 },
-                "code": 6
+                "code": 17
               },
               "responseType": "single_choice",
               "scale": "scale.language_ability_5",
@@ -1212,7 +1212,7 @@
                     "revision": 1
                   }
                 },
-                "code": 7
+                "code": 6
               },
               "responseType": "single_choice",
               "scale": "scale.language_ability_5",
@@ -1243,7 +1243,7 @@
                     "revision": 1
                   }
                 },
-                "code": 7
+                "code": 6
               },
               "responseType": "single_choice",
               "scale": "scale.language_ability_5",
@@ -1271,7 +1271,7 @@
                     "revision": 1
                   }
                 },
-                "code": 8
+                "code": 7
               },
               "responseType": "single_choice",
               "scale": "scale.language_ability_5",
@@ -1302,7 +1302,7 @@
                     "revision": 1
                   }
                 },
-                "code": 8
+                "code": 7
               },
               "responseType": "single_choice",
               "scale": "scale.language_ability_5",
@@ -1330,7 +1330,7 @@
                     "revision": 1
                   }
                 },
-                "code": 9
+                "code": 8
               },
               "responseType": "single_choice",
               "scale": "scale.language_ability_5",
@@ -1361,7 +1361,7 @@
                     "revision": 1
                   }
                 },
-                "code": 9
+                "code": 8
               },
               "responseType": "single_choice",
               "scale": "scale.language_ability_5",
@@ -1389,7 +1389,7 @@
                     "revision": 1
                   }
                 },
-                "code": 10
+                "code": 9
               },
               "responseType": "single_choice",
               "scale": "scale.language_ability_5",
@@ -1420,7 +1420,7 @@
                     "revision": 1
                   }
                 },
-                "code": 10
+                "code": 9
               },
               "responseType": "single_choice",
               "scale": "scale.language_ability_5",
@@ -1448,7 +1448,7 @@
                     "revision": 1
                   }
                 },
-                "code": 11
+                "code": 10
               },
               "responseType": "single_choice",
               "scale": "scale.language_ability_5",
@@ -1479,7 +1479,7 @@
                     "revision": 1
                   }
                 },
-                "code": 11
+                "code": 10
               },
               "responseType": "single_choice",
               "scale": "scale.language_ability_5",
@@ -1507,7 +1507,7 @@
                     "revision": 1
                   }
                 },
-                "code": 12
+                "code": 11
               },
               "responseType": "single_choice",
               "scale": "scale.language_ability_5",
@@ -1538,7 +1538,7 @@
                     "revision": 1
                   }
                 },
-                "code": 12
+                "code": 11
               },
               "responseType": "single_choice",
               "scale": "scale.language_ability_5",
@@ -1566,7 +1566,7 @@
                     "revision": 1
                   }
                 },
-                "code": 13
+                "code": 12
               },
               "responseType": "single_choice",
               "scale": "scale.language_ability_5",
@@ -1597,7 +1597,7 @@
                     "revision": 1
                   }
                 },
-                "code": 13
+                "code": 12
               },
               "responseType": "single_choice",
               "scale": "scale.language_ability_5",
@@ -1625,7 +1625,7 @@
                     "revision": 1
                   }
                 },
-                "code": 14
+                "code": 13
               },
               "responseType": "single_choice",
               "scale": "scale.language_ability_5",
@@ -1656,7 +1656,7 @@
                     "revision": 1
                   }
                 },
-                "code": 14
+                "code": 13
               },
               "responseType": "single_choice",
               "scale": "scale.language_ability_5",
@@ -1684,7 +1684,7 @@
                     "revision": 1
                   }
                 },
-                "code": 15
+                "code": 14
               },
               "responseType": "single_choice",
               "scale": "scale.language_ability_5",
@@ -1715,7 +1715,7 @@
                     "revision": 1
                   }
                 },
-                "code": 15
+                "code": 14
               },
               "responseType": "single_choice",
               "scale": "scale.language_ability_5",
@@ -1754,7 +1754,7 @@
                     "revision": 1
                   }
                 },
-                "code": 16
+                "code": 15
               },
               "responseType": "single_choice",
               "scale": "scale.language_ability_5",
@@ -1796,7 +1796,7 @@
                     "revision": 1
                   }
                 },
-                "code": 16
+                "code": 15
               },
               "responseType": "single_choice",
               "scale": "scale.language_ability_5",
@@ -6390,73 +6390,73 @@
           "textEntry": false
         },
         {
-          "code": 5,
+          "code": 16,
           "label": "Mandarin Chinese",
           "kind": "substantive",
           "textEntry": false
         },
         {
-          "code": 6,
+          "code": 17,
           "label": "Cantonese Chinese",
           "kind": "substantive",
           "textEntry": false
         },
         {
-          "code": 7,
+          "code": 6,
           "label": "Gujarati",
           "kind": "substantive",
           "textEntry": false
         },
         {
-          "code": 8,
+          "code": 7,
           "label": "Bengali (including Sylheti)",
           "kind": "substantive",
           "textEntry": false
         },
         {
-          "code": 9,
+          "code": 8,
           "label": "Portuguese",
           "kind": "substantive",
           "textEntry": false
         },
         {
-          "code": 10,
+          "code": 9,
           "label": "Spanish",
           "kind": "substantive",
           "textEntry": false
         },
         {
-          "code": 11,
+          "code": 10,
           "label": "Russian",
           "kind": "substantive",
           "textEntry": false
         },
         {
-          "code": 12,
+          "code": 11,
           "label": "French",
           "kind": "substantive",
           "textEntry": false
         },
         {
-          "code": 13,
+          "code": 12,
           "label": "Tamil",
           "kind": "substantive",
           "textEntry": false
         },
         {
-          "code": 14,
+          "code": 13,
           "label": "British Sign Language",
           "kind": "substantive",
           "textEntry": false
         },
         {
-          "code": 15,
+          "code": 14,
           "label": "Turkish",
           "kind": "substantive",
           "textEntry": false
         },
         {
-          "code": 16,
+          "code": 15,
           "label": "Another language",
           "kind": "other_specify",
           "textEntry": false
@@ -8740,5 +8740,5 @@
       "bytes": 589147
     }
   },
-  "hash": "sha256:7d7744ec09ede29175b6ffbd5fd49ca5d9b8d22653b80be4a2c173f1798596f0"
+  "hash": "sha256:065c85d51e22ab67139a5e8d1e2832176853e1a54948bfe885926e60c79f4133"
 }
