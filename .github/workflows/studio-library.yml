@@ -13,7 +13,7 @@ on:
       seed:
         description: "Which piece to put in the library"
         type: choice
-        options: [languages]
+        options: [languages, ai_use]
         default: languages
       dry_run:
         description: "Only say what would be saved"

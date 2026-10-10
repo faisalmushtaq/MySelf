@@ -849,6 +849,67 @@ export const ybmSocialMedia: ModuleInput = {
 
 // ---------------------------------------------------------------------------
 
+/**
+ * AI chatbots (D-59): how often, what for, and how it leaves them feeling.
+ * Asked of everyone, at the end of "Phones and social media", not only of
+ * social-media users. Study-written items: there is no short validated
+ * measure of adolescents' AI use. Products are named because many young
+ * people do not count Snapchat's My AI or Character.AI as "AI".
+ */
+const aiRef = (item: string) => ({ instrument: "ybm_ai_use", item, revision: 1 });
+const usesAi = { op: "not_selected", target: { item: aiRef("frequency") }, code: 1 } as const;
+
+export const ybmAiUse: ModuleInput = {
+  ...moduleBase,
+  instrument: "ybm_ai_use",
+  name: "YBM AI chatbot use",
+  construct: "Frequency and purposes of AI chatbot use, and how it feels",
+  forms: [
+    {
+      language: "en-GB",
+      label: "AI chatbot use (study-written, D-59)",
+      items: [
+        single("frequency", "ai_use_frequency", "", "How often do you use AI chatbots or assistants?", "scale.ai_use_frequency", {
+          lede: { text: "For example ChatGPT, Snapchat's My AI, Gemini, Copilot or Character.AI." },
+          researcherNote: "Study-written (D-59). Same steps as the social-media frequency questions. 1 = never; the follow-ups are asked of 2-5.",
+        }),
+        {
+          responseType: "multi_choice",
+          key: "purpose",
+          revision: 1,
+          variable: "ai_use_purpose",
+          displayIf: usesAi,
+          stem: { text: "What do you use them for?" },
+          lede: { text: "Choose all that apply." },
+          scale: "scale.ai_use_purpose",
+          scaleVersion: "1.0.0",
+          minSelections: 1,
+          researcherNote:
+            "Asked unless ai_use_frequency = Never (D-59). 6 (feelings) and 7 (friend or company) are kept apart from 5 (advice) to identify use as a confidant or companion; neither is a risk flag by itself. 8 = something else, described in ai_use_purpose_other.",
+        },
+        {
+          responseType: "text_short",
+          key: "purpose_other",
+          revision: 1,
+          variable: "ai_use_purpose_other",
+          displayIf: { op: "selected", target: { item: aiRef("purpose") }, code: 8 },
+          stem: { text: "What else do you use them for?" },
+          maxChars: 200,
+          researcherNote: "Free text, asked only when 'Something else' is chosen in ai_use_purpose (D-59).",
+        },
+        single("feeling", "ai_use_feeling", "", "After using AI chatbots, how do you usually feel?", "scale.ai_use_feeling", {
+          displayIf: usesAi,
+          researcherNote: "Asked unless ai_use_frequency = Never (D-59).",
+        }),
+      ],
+    },
+  ],
+  timeEstimates: est(30, 25),
+  changelog: "1.0 (D-59): three questions on AI chatbot use, with a describe box for 'something else'.",
+};
+
+// ---------------------------------------------------------------------------
+
 export const ybmScreenAttitudes: ModuleInput = {
   ...moduleBase,
   instrument: "ybm_screen_attitudes",
@@ -1010,6 +1071,7 @@ export const allModules: ModuleInput[] = [
   ybmSleepPriorities,
   ybmSmartphone,
   ybmSocialMedia,
+  ybmAiUse,
   ybmScreenAttitudes,
   ybmGaming,
   ybmFutureSelf,

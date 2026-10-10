@@ -5,12 +5,13 @@
     "version": "9.0.0",
     "assessment": "ybm_nd2026_standard",
     "study": "ybm",
-    "publishedAt": "2026-10-09T12:00:00.000Z",
+    "publishedAt": "2026-10-10T09:00:00.000Z",
     "publishedBy": "faisalmushtaq",
     "engineVersion": "0.3.0",
     "decisionRefs": [
       "D-53",
-      "D-58"
+      "D-58",
+      "D-59"
     ]
   },
   "composition": {
@@ -244,6 +245,16 @@
             "kind": "module",
             "ref": {
               "instrument": "ybm_smartphone",
+              "version": "1.0",
+              "language": "en-GB",
+              "informant": "self",
+              "readingLevel": "standard"
+            }
+          },
+          {
+            "kind": "module",
+            "ref": {
+              "instrument": "ybm_ai_use",
               "version": "1.0",
               "language": "en-GB",
               "informant": "self",
@@ -4339,6 +4350,152 @@
       "kind": "module",
       "study": "ybm"
     },
+    "ybm_ai_use@1.0/en-GB/self/standard": {
+      "instrument": "ybm_ai_use",
+      "version": "1.0",
+      "name": "YBM AI chatbot use",
+      "construct": "Frequency and purposes of AI chatbot use, and how it feels",
+      "citationVerified": false,
+      "licence": {
+        "status": "open",
+        "modifiable": "yes",
+        "verified": true
+      },
+      "forms": [
+        {
+          "language": "en-GB",
+          "readingLevel": "standard",
+          "informant": "self",
+          "label": "AI chatbot use (study-written, D-59)",
+          "items": [
+            {
+              "key": "frequency",
+              "revision": 1,
+              "variable": "ai_use_frequency",
+              "stem": {
+                "text": "How often do you use AI chatbots or assistants?"
+              },
+              "lede": {
+                "text": "For example ChatGPT, Snapchat's My AI, Gemini, Copilot or Character.AI."
+              },
+              "required": "soft",
+              "allowDecline": false,
+              "identifying": false,
+              "researcherNote": "Study-written (D-59). Same steps as the social-media frequency questions. 1 = never; the follow-ups are asked of 2-5.",
+              "responseType": "single_choice",
+              "scale": "scale.ai_use_frequency",
+              "scaleVersion": "1.0.0",
+              "presentation": "cards",
+              "spectrumReverse": false,
+              "autoAdvance": true
+            },
+            {
+              "key": "purpose",
+              "revision": 1,
+              "variable": "ai_use_purpose",
+              "stem": {
+                "text": "What do you use them for?"
+              },
+              "lede": {
+                "text": "Choose all that apply."
+              },
+              "required": "soft",
+              "allowDecline": false,
+              "identifying": false,
+              "displayIf": {
+                "op": "not_selected",
+                "target": {
+                  "item": {
+                    "instrument": "ybm_ai_use",
+                    "item": "frequency",
+                    "revision": 1
+                  }
+                },
+                "code": 1
+              },
+              "researcherNote": "Asked unless ai_use_frequency = Never (D-59). 6 (feelings) and 7 (friend or company) are kept apart from 5 (advice) to identify use as a confidant or companion; neither is a risk flag by itself. 8 = something else, described in ai_use_purpose_other.",
+              "responseType": "multi_choice",
+              "scale": "scale.ai_use_purpose",
+              "scaleVersion": "1.0.0",
+              "minSelections": 1
+            },
+            {
+              "key": "purpose_other",
+              "revision": 1,
+              "variable": "ai_use_purpose_other",
+              "stem": {
+                "text": "What else do you use them for?"
+              },
+              "required": "soft",
+              "allowDecline": false,
+              "identifying": false,
+              "displayIf": {
+                "op": "selected",
+                "target": {
+                  "item": {
+                    "instrument": "ybm_ai_use",
+                    "item": "purpose",
+                    "revision": 1
+                  }
+                },
+                "code": 8
+              },
+              "researcherNote": "Free text, asked only when 'Something else' is chosen in ai_use_purpose (D-59).",
+              "responseType": "text_short",
+              "minChars": 0,
+              "maxChars": 200
+            },
+            {
+              "key": "feeling",
+              "revision": 1,
+              "variable": "ai_use_feeling",
+              "stem": {
+                "text": "After using AI chatbots, how do you usually feel?"
+              },
+              "required": "soft",
+              "allowDecline": false,
+              "identifying": false,
+              "displayIf": {
+                "op": "not_selected",
+                "target": {
+                  "item": {
+                    "instrument": "ybm_ai_use",
+                    "item": "frequency",
+                    "revision": 1
+                  }
+                },
+                "code": 1
+              },
+              "researcherNote": "Asked unless ai_use_frequency = Never (D-59).",
+              "responseType": "single_choice",
+              "scale": "scale.ai_use_feeling",
+              "scaleVersion": "1.0.0",
+              "presentation": "cards",
+              "spectrumReverse": false,
+              "autoAdvance": true
+            }
+          ],
+          "presentationFidelity": "stepped_allowed"
+        }
+      ],
+      "timeEstimates": [
+        {
+          "ageBand": "11-13",
+          "medianSeconds": 30,
+          "provenance": "estimated-heuristic"
+        },
+        {
+          "ageBand": "14-16",
+          "medianSeconds": 25,
+          "provenance": "estimated-heuristic"
+        }
+      ],
+      "changelog": "1.0 (D-59): three questions on AI chatbot use, with a describe box for 'something else'.",
+      "approvalStatus": "draft",
+      "owner": "ybm",
+      "kind": "module",
+      "study": "ybm"
+    },
     "ybm_social_media@1.0/en-GB/self/standard": {
       "instrument": "ybm_social_media",
       "version": "1.0",
@@ -7386,6 +7543,133 @@
       "direction": "ascending",
       "scoringNote": "Each option carries the age it denotes in `value`; presentation may withhold ages above the participant's own (D-25). Codes and legacy codes are unaffected by that filtering."
     },
+    "scale.ai_use_frequency": {
+      "key": "scale.ai_use_frequency",
+      "version": "1.0.0",
+      "name": "How often AI chatbots are used (never to several times a day)",
+      "options": [
+        {
+          "code": 1,
+          "label": "Never",
+          "kind": "substantive",
+          "textEntry": false
+        },
+        {
+          "code": 2,
+          "label": "Less than once a week",
+          "kind": "substantive",
+          "textEntry": false
+        },
+        {
+          "code": 3,
+          "label": "A few times a week",
+          "kind": "substantive",
+          "textEntry": false
+        },
+        {
+          "code": 4,
+          "label": "Once a day",
+          "kind": "substantive",
+          "textEntry": false
+        },
+        {
+          "code": 5,
+          "label": "Several times a day",
+          "kind": "substantive",
+          "textEntry": false
+        }
+      ],
+      "direction": "ascending",
+      "scoringNote": "1 = never … 5 = several times a day."
+    },
+    "scale.ai_use_purpose": {
+      "key": "scale.ai_use_purpose",
+      "version": "1.0.0",
+      "name": "What AI chatbots are used for (select all)",
+      "options": [
+        {
+          "code": 1,
+          "label": "Schoolwork or homework",
+          "kind": "substantive",
+          "textEntry": false
+        },
+        {
+          "code": 2,
+          "label": "Looking things up or answering questions",
+          "kind": "substantive",
+          "textEntry": false
+        },
+        {
+          "code": 3,
+          "label": "Creative things, like stories, pictures or music",
+          "kind": "substantive",
+          "textEntry": false
+        },
+        {
+          "code": 4,
+          "label": "Just for fun or to pass the time",
+          "kind": "substantive",
+          "textEntry": false
+        },
+        {
+          "code": 5,
+          "label": "Advice about problems or decisions",
+          "kind": "substantive",
+          "textEntry": false
+        },
+        {
+          "code": 6,
+          "label": "Talking about my feelings or when I'm upset",
+          "kind": "substantive",
+          "textEntry": false
+        },
+        {
+          "code": 7,
+          "label": "Chatting to it as a friend or for company",
+          "kind": "substantive",
+          "textEntry": false
+        },
+        {
+          "code": 8,
+          "label": "Something else",
+          "kind": "other_specify",
+          "textEntry": false
+        }
+      ],
+      "direction": "unordered"
+    },
+    "scale.ai_use_feeling": {
+      "key": "scale.ai_use_feeling",
+      "version": "1.0.0",
+      "name": "How using AI chatbots usually feels afterwards",
+      "options": [
+        {
+          "code": 1,
+          "label": "Better",
+          "kind": "substantive",
+          "textEntry": false
+        },
+        {
+          "code": 2,
+          "label": "About the same",
+          "kind": "substantive",
+          "textEntry": false
+        },
+        {
+          "code": 3,
+          "label": "Worse",
+          "kind": "substantive",
+          "textEntry": false
+        },
+        {
+          "code": 4,
+          "label": "It depends",
+          "kind": "substantive",
+          "textEntry": false
+        }
+      ],
+      "direction": "unordered"
+    },
     "scale.yes_no_unsure": {
       "key": "scale.yes_no_unsure",
       "version": "1.0.0",
@@ -8740,5 +9024,5 @@
       "bytes": 589147
     }
   },
-  "hash": "sha256:065c85d51e22ab67139a5e8d1e2832176853e1a54948bfe885926e60c79f4133"
+  "hash": "sha256:9f419eb352585daba47029e3425fd3ff600650e687de906ae4c5d2bf7c6c3856"
 }

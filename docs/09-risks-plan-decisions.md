@@ -385,3 +385,28 @@ gaming slider) — and D-53 was never published. Decided:
    `understand_chinese` / `speak_chinese` stop being asked and stay reserved.
 6. **The start screen shows the survey's version** under "MySelf" instead of
    the "MyThoughts" line.
+
+### AI chatbot use (2026-10-10, D-59)
+
+**Asked.** "If we were to add a question or two on their use of AI what
+should we ask?" — then "Yep add them in."
+
+**Decision.** A small module, `ybm_ai_use`, at the end of "Phones and social
+media", so everyone is asked (not only social-media users):
+
+1. "How often do you use AI chatbots or assistants?" (products named: ChatGPT,
+   Snapchat's My AI, Gemini, Copilot, Character.AI) — never, less than once a
+   week, a few times a week, once a day, several times a day (`ai_use_frequency`).
+2. If used: "What do you use them for?" (tick all) — schoolwork; looking things
+   up; creative things; fun; advice about problems; **talking about feelings
+   or when upset**; **chatting as a friend or for company**; something else,
+   described (`ai_use_purpose`, `ai_use_purpose_other`). Emotional and
+   companion use are kept apart from practical use and from advice.
+3. If used: "After using AI chatbots, how do you usually feel?" — better,
+   about the same, worse, it depends (`ai_use_feeling`).
+
+Study-written: there is no short validated measure of adolescents' AI use.
+Using AI to talk about feelings is not a risk flag by itself and nothing treats
+it as one; the team may wish to mention the new questions in the ethics
+amendment alongside D-58. Published as 12.0.0 from the Studio, and saved in the
+Studio library as "AI chatbot use".

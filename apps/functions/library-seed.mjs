@@ -22,6 +22,15 @@ import { moduleContent, repositoryModuleFragment } from "@myself/studio";
 
 /** The pieces this command can seed. Each is one block of one repository module. */
 const SEEDS = {
+  ai_use: () => ({
+    moduleId: "ai_chatbot_use",
+    title: "AI chatbot use",
+    description:
+      "How often AI chatbots or assistants are used (ChatGPT, Snapchat's My AI, Gemini, Copilot, Character.AI), what for — including talking about feelings and company, kept apart from practical uses — and how using them usually feels. Study-written (D-59); follow-ups only for those who use them.",
+    tags: ["ai", "chatbots", "technology use"],
+    note: "From the repository library (D-59).",
+    fragment: repositoryModuleFragment("ybm_ai_use", { title: "AI chatbot use" }),
+  }),
   languages: () => {
     const keys = allModules.find((m) => m.instrument === "ybm_demographics").forms[0].items.map((i) => i.key);
     return {

@@ -101,6 +101,10 @@ const scenarios: Scenario[] = [
       [/sleep quality overall/, choose("7, Good")],
       [/own smartphone/, choose("Yes")],
       [/currently use social media/, choose("Yes")],
+      // AI chatbots (D-59): uses them, including to talk about feelings.
+      [/use AI chatbots or assistants/, choose("A few times a week")],
+      [/^What do you use them for/, tick("Schoolwork or homework", "Talking about my feelings or when I'm upset")],
+      [/After using AI chatbots/, choose("It depends")],
       [
         /could go without social media/,
         async (page) => {
@@ -354,6 +358,9 @@ test("the survey's own dataset says what each scenario answered", async () => {
   expect(value("SCN0001", "speak_urdu")?.value).toBe(4);
   expect(value("SCN0001", "speak_punjabi")?.value).toBe(2);
   expect(value("SCN0001", "speak_other_language")?.value).toBe(5);
+  expect(value("SCN0001", "ai_use_frequency")?.value).toBe(3);
+  expect(value("SCN0001", "ai_use_purpose")?.text).toBe("1,6");
+  expect(value("SCN0001", "ai_use_feeling")?.value).toBe(4);
   expect(value("SCN0001", "understand_polish")).toBeUndefined();
   expect(value("SCN0001", "sqs_q1")?.value).toBe(7);
   expect(value("SCN0001", "sm_abstain_days")?.value).toBe(400);
