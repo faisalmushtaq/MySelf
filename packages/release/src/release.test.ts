@@ -73,8 +73,8 @@ describe("YBM release r9.0.0", () => {
     const manifest = buildRelease(ybmComposition, registries, meta);
     // 18 from r6.0.0, when the two sleep-priority questions were dropped (D-31);
     // 19 from r8.0.0, when the SDQ became one form for under-18s and one for 18+ (D-51);
-    // 20 from r9.0.0, with the Sleep Quality Scale (D-53).
-    expect(Object.keys(manifest.instruments)).toHaveLength(20);
+    // 20 from r9.0.0, with the Sleep Quality Scale (D-53); 21 with AI chatbot use (D-59).
+    expect(Object.keys(manifest.instruments)).toHaveLength(21);
     expect(Object.keys(manifest.instruments).some((k) => k.includes("sleep_priorities"))).toBe(false);
     // canonical (variant-less) forms only (D-08)
     for (const key of Object.keys(manifest.instruments)) expect(key).not.toContain("+ybm-asadmin");

@@ -17,8 +17,8 @@ const everything = [...parsedInstruments, ...parsedModules];
 const scaleKeys = new Set(parsedScales.map((s) => s.key));
 
 describe("scales", () => {
-  it("all 40 scales parse", () => {
-    expect(parsedScales).toHaveLength(40);
+  it("all 43 scales parse", () => {
+    expect(parsedScales).toHaveLength(43);
   });
 
   it("scale keys are unique", () => {
@@ -259,9 +259,9 @@ describe("date of birth bounds", () => {
 });
 
 describe("instruments and modules", () => {
-  it("11 instruments and 10 modules parse", () => {
+  it("11 instruments and 11 modules parse", () => {
     expect(parsedInstruments).toHaveLength(11);
-    expect(parsedModules).toHaveLength(10);
+    expect(parsedModules).toHaveLength(11);
   });
 
   it("every scale reference resolves", () => {
@@ -446,6 +446,18 @@ describe("D-53: shorter consent, sleep quality and sanity checks", () => {
 
   it("drops the 'Citizen Neuroscience' subtitle from the introduction (D-58)", () => {
     expect(JSON.stringify(consentItems)).not.toContain("Citizen Neuroscience");
+  });
+
+  it("asks everyone how often they use AI chatbots, and the rest only of those who do (D-59)", () => {
+    const ai = parsedModules.find((m) => m.instrument === "ybm_ai_use")!.forms[0]!.items;
+    expect(ai.map((i) => i.key)).toEqual(["frequency", "purpose", "purpose_other", "feeling"]);
+    expect(ai[0]!.displayIf).toBeUndefined();
+    for (const i of [ai[1]!, ai[3]!]) expect(i.displayIf).toMatchObject({ op: "not_selected", code: 1 });
+    expect(ai[2]!.displayIf).toMatchObject({ op: "selected", code: 8 });
+    const purpose = parsedScales.find((s) => s.key === "scale.ai_use_purpose")!;
+    expect(purpose.options.map((o) => o.label)).toContain("Talking about my feelings or when I'm upset");
+    expect(purpose.options.at(-1)).toMatchObject({ code: 8, kind: "other_specify" });
+    expect(ai[0]!.lede?.text).toMatch(/My AI/);
   });
 
   it("the why-it-matters screen is answered 'I understand'", () => {

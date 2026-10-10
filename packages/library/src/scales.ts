@@ -237,6 +237,56 @@ export const smFamilyControlHow: ResponseScale = {
 };
 
 /**
+ * How often AI chatbots are used (D-59). The study's own wording, with the
+ * steps of the social-media frequency questions so the two sit side by side.
+ */
+export const aiUseFrequency: ResponseScale = {
+  key: "scale.ai_use_frequency",
+  version: "1.0.0",
+  name: "How often AI chatbots are used (never to several times a day)",
+  direction: "ascending",
+  options: [
+    opt(1, "Never"),
+    opt(2, "Less than once a week"),
+    opt(3, "A few times a week"),
+    opt(4, "Once a day"),
+    opt(5, "Several times a day"),
+  ],
+  scoringNote: "1 = never … 5 = several times a day.",
+};
+
+/**
+ * What AI chatbots are used for (D-59; select all). Emotional support (6) and
+ * company (7) are separate from advice (5) and from everything practical, so
+ * that use as a confidant or companion can be told apart.
+ */
+export const aiUsePurpose: ResponseScale = {
+  key: "scale.ai_use_purpose",
+  version: "1.0.0",
+  name: "What AI chatbots are used for (select all)",
+  direction: "unordered",
+  options: [
+    opt(1, "Schoolwork or homework"),
+    opt(2, "Looking things up or answering questions"),
+    opt(3, "Creative things, like stories, pictures or music"),
+    opt(4, "Just for fun or to pass the time"),
+    opt(5, "Advice about problems or decisions"),
+    opt(6, "Talking about my feelings or when I'm upset"),
+    opt(7, "Chatting to it as a friend or for company"),
+    opt(8, "Something else", undefined, "other_specify"),
+  ],
+};
+
+/** How using AI chatbots usually leaves someone feeling (D-59). */
+export const aiUseFeeling: ResponseScale = {
+  key: "scale.ai_use_feeling",
+  version: "1.0.0",
+  name: "How using AI chatbots usually feels afterwards",
+  direction: "unordered",
+  options: [opt(1, "Better"), opt(2, "About the same"), opt(3, "Worse"), opt(4, "It depends")],
+};
+
+/**
  * Hair type (1a-4c). Each option carries an illustration key so participants
  * choose by looking at the curl pattern rather than decoding a code; the
  * label stays authoritative and is shown with every tile.
@@ -791,6 +841,9 @@ export const allScales: ResponseScale[] = [
   firstLanguageEnglish,
   otherLanguages,
   languageAbility5,
+  aiUseFrequency,
+  aiUsePurpose,
+  aiUseFeeling,
   sqs11,
   smFamilyControlHow,
   hairType12,

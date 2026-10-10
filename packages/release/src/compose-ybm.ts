@@ -176,7 +176,11 @@ export const ybmComposition: AssessmentDraftInput = {
       key: "phones",
       title: "Phones and social media",
       transition: "Now some questions about phones and social media.",
-      components: [{ kind: "module", ref: { instrument: "ybm_smartphone", version: "1.0", ...en } }],
+      components: [
+        { kind: "module", ref: { instrument: "ybm_smartphone", version: "1.0", ...en } },
+        // AI chatbots (D-59): asked of everyone, so here and not under "Your social media".
+        { kind: "module", ref: { instrument: "ybm_ai_use", version: "1.0", ...en } },
+      ],
     },
     {
       key: "social_media",

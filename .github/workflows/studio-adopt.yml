@@ -13,19 +13,19 @@ on:
       version:
         description: "Version to publish (Studio says which bump the changes need)"
         type: string
-        default: "11.0.0"
+        default: "12.0.0"
       note:
         description: "Release note"
         type: string
-        default: "D-53 and D-58: consent that includes record linkage and moves on by itself, brainpop@ contact, no 'Citizen Neuroscience' subtitle, Sleep Quality Scale, languages understood and spoken, street search, social-media checks, slider labels kept."
+        default: "D-59: three questions on AI chatbot use, at the end of Phones and social media."
       consent_reason:
-        description: "Why the consent module may change (recorded with the version)"
+        description: "Why the consent module may change, if it does (recorded with the version; leave blank if it does not)"
         type: string
-        default: "Requested by the PI on 2026-10-09: record linkage with health and education records stated in the consent statements, 'Citizen Neuroscience' subtitle removed, consent moves on once every statement is ticked, contact email brainpop@leeds.ac.uk."
+        default: ""
       identity_reason:
-        description: "Why the identity module may change (recorded with the version)"
+        description: "Why the identity module may change, if it does (recorded with the version; leave blank if it does not)"
         type: string
-        default: "D-53: a participant who doesn't know their postcode can find their street; the participant ID is still derived from name and date of birth."
+        default: ""
       dry_run:
         description: "Only list the changes; publish nothing"
         type: boolean
@@ -74,8 +74,8 @@ jobs:
           node studio-adopt.mjs --project myself-research \
             --release ../../releases/candidates/ybm_nd2026_standard_r9.0.0.manifest.json \
             --version "$VERSION" --note "$NOTE" \
-            --unlock "ybm_intro_consent=$CONSENT_REASON" \
-            --unlock "ybm_identity=$IDENTITY_REASON" $DRY_RUN
+            ${CONSENT_REASON:+--unlock "ybm_intro_consent=$CONSENT_REASON"} \
+            ${IDENTITY_REASON:+--unlock "ybm_identity=$IDENTITY_REASON"} $DRY_RUN
 
       - name: Shred the credential
         if: always()
