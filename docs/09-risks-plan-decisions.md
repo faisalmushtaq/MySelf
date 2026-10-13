@@ -410,3 +410,30 @@ Using AI to talk about feelings is not a risk flag by itself and nothing treats
 it as one; the team may wish to mention the new questions in the ethics
 amendment alongside D-58. Published as 12.0.0 from the Studio, and saved in the
 Studio library as "AI chatbot use".
+
+### A permanent record of every published version (2026-10-13, D-60)
+
+**Asked.** "Every time a new version is published a PDF and JSON file are
+saved as an export so we always have a record? Or some other way too that
+would allow us to track."
+
+**Decision.** The "Survey archive" workflow keeps every published version of
+every survey in every study space:
+
+- on the **`survey-archive` branch** of this repository, one folder per version
+  (`<study>/<survey>/<version>/`): `manifest.json` (the release exactly as
+  fielded, verified against its hash), `questionnaire.pdf` and `.html` (every
+  section, question, variable, option code and display condition in words,
+  with the version, hash, publisher, date, release note and changes on the
+  first page), `version.json` (the Studio's version record) and `CHANGES.md`;
+  `README.md` lists every version with links. Git history shows when each
+  arrived.
+- a **GitHub Release per version** (tag `<study>-<survey>-v<version>`) with the
+  PDF and JSON attached and the changes as its notes: one page to scroll the
+  survey's history.
+
+It runs daily (05:47 UTC), straight after the "Studio: publish the repository's
+survey" workflow, and by hand; a version published with the Studio's button
+is archived by the next daily run, or at once by running it by hand.
+Read-only on Firebase; an archived version is never rewritten. The renderer is
+`packages/studio/src/questionnaire.ts`; the job is `apps/functions/survey-archive.mjs`.
