@@ -73,12 +73,14 @@ jobs:
           git push origin survey-archive
           echo "changed=true" >> "$GITHUB_OUTPUT"
 
-      - name: A release per new version
-        if: steps.commit.outputs.changed == 'true'
+      - name: A release per archived version
+        # Walks every archived folder, not just today's, so a release that was
+        # missed (or failed) is made on the next run. Existing releases are kept.
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          while IFS= read -r dir; do
+          find archive -mindepth 4 -maxdepth 4 -name version.json -printf '%h\n' | sed 's|^archive/||' | sort > "$RUNNER_TEMP/all.txt"
+          while IFS= read -r dir || [ -n "$dir" ]; do
             [ -z "$dir" ] && continue
             IFS=/ read -r study survey version <<< "$dir"
             tag="${study}-${survey}-v${version}"
@@ -86,4 +88,4 @@ jobs:
             gh release create "$tag" --target survey-archive --title "${survey} ${version} (${study})" \
               --notes-file "archive/$dir/CHANGES.md" --latest=false \
               "archive/$dir/questionnaire.pdf#Questionnaire (PDF)" "archive/$dir/manifest.json#Release (JSON)" "archive/$dir/version.json#Version record (JSON)"
-          done < "$RUNNER_TEMP/new.txt"
+          done < "$RUNNER_TEMP/all.txt"
