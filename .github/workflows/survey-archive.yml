@@ -1,0 +1,89 @@
+name: Survey archive
+
+# Keeps a permanent, readable record of every published survey version (D-60):
+# the release JSON, a questionnaire PDF/HTML and what changed, committed to the
+# `survey-archive` branch, plus a GitHub Release per version with the files
+# attached. Runs daily, after the repository's survey is published, and by hand.
+# Read-only on Firebase; an archived version is never rewritten.
+
+on:
+  schedule:
+    - cron: "47 5 * * *"
+  workflow_run:
+    workflows: ["Studio: publish the repository's survey"]
+    types: [completed]
+  workflow_dispatch:
+
+concurrency:
+  group: survey-archive
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  archive:
+    runs-on: ubuntu-latest
+    if: github.repository == 'faisalmushtaq/MySelf'
+    steps:
+      - uses: actions/checkout@v4
+      - name: The archive branch
+        run: |
+          if git ls-remote --exit-code --heads origin survey-archive >/dev/null; then
+            git fetch origin survey-archive
+            git worktree add archive origin/survey-archive
+            git -C archive checkout -B survey-archive
+          else
+            git worktree add --detach archive
+            git -C archive checkout --orphan survey-archive
+            git -C archive rm -rf --quiet .
+          fi
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter "@myself/functions..." build
+
+      - name: Authenticate
+        env:
+          SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          printf '%s' "$SERVICE_ACCOUNT" > "$RUNNER_TEMP/sa.json"
+          echo "GOOGLE_APPLICATION_CREDENTIALS=$RUNNER_TEMP/sa.json" >> "$GITHUB_ENV"
+
+      - name: Archive new versions
+        working-directory: apps/functions
+        run: node survey-archive.mjs --project myself-research --out ../../archive --chrome "$(command -v google-chrome || command -v chromium)" --new-list "$RUNNER_TEMP/new.txt"
+
+      - name: Shred the credential
+        if: always()
+        run: rm -f "$RUNNER_TEMP/sa.json"
+
+      - name: Commit
+        id: commit
+        run: |
+          cd archive
+          git add -A
+          if git diff --cached --quiet; then echo "changed=false" >> "$GITHUB_OUTPUT"; exit 0; fi
+          git -c user.name="survey-archive" -c user.email="survey-archive@users.noreply.github.com" commit -q -m "Archive published survey versions"
+          git push origin survey-archive
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+
+      - name: A release per new version
+        if: steps.commit.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          while IFS= read -r dir; do
+            [ -z "$dir" ] && continue
+            IFS=/ read -r study survey version <<< "$dir"
+            tag="${study}-${survey}-v${version}"
+            gh release view "$tag" >/dev/null 2>&1 && continue
+            gh release create "$tag" --target survey-archive --title "${survey} ${version} (${study})" \
+              --notes-file "archive/$dir/CHANGES.md" --latest=false \
+              "archive/$dir/questionnaire.pdf#Questionnaire (PDF)" "archive/$dir/manifest.json#Release (JSON)" "archive/$dir/version.json#Version record (JSON)"
+          done < "$RUNNER_TEMP/new.txt"
