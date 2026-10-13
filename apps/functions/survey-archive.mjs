@@ -110,5 +110,5 @@ writeFileSync(
   join(out, "README.md"),
   `# Published survey versions\n\nEvery version published from MySelf Studio, archived automatically (D-60). Each folder holds the release exactly as fielded (\`manifest.json\`, what its hash covers), a readable questionnaire (PDF and HTML), and who published it, when and what changed. Nothing here is ever rewritten.\n\n| Study | Survey | Version | Published | By | Note | Files |\n|---|---|---|---|---|---|---|\n${rows.map(line).join("\n")}\n`,
 );
-if (newList) writeFileSync(newList, added.join("\n"));
+if (newList) writeFileSync(newList, added.map((a) => `${a}\n`).join(""));
 console.log(`${added.length} new version(s) archived; ${rows.length} in the archive.`);
