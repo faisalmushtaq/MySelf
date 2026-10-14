@@ -1,0 +1,66 @@
+name: Grant a project role
+
+# Gives a signed-in Google account a project role (owner, researcher or
+# analyst) with the project's service account: the same as running
+# `pnpm --filter @myself/functions grant <email> <role>` on a laptop
+# (apps/functions/grant-role.mjs, docs/13 §5). Run by hand only. Each account
+# must have signed in to the Studio or the app once, and must sign out and back
+# in afterwards for the role to take effect. Owners can create study spaces.
+
+on:
+  workflow_dispatch:
+    inputs:
+      emails:
+        description: "Google account(s), comma-separated"
+        type: string
+        required: true
+      role:
+        description: "Role to grant"
+        type: choice
+        options: [owner, researcher, analyst]
+        default: owner
+
+concurrency:
+  group: grant-role
+  cancel-in-progress: false
+
+jobs:
+  grant:
+    runs-on: ubuntu-latest
+    if: github.repository == 'faisalmushtaq/MySelf'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile --filter @myself/functions
+
+      - name: Authenticate
+        env:
+          SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          printf '%s' "$SERVICE_ACCOUNT" > "$RUNNER_TEMP/sa.json"
+          echo "GOOGLE_APPLICATION_CREDENTIALS=$RUNNER_TEMP/sa.json" >> "$GITHUB_ENV"
+
+      - name: Grant
+        working-directory: apps/functions
+        env:
+          EMAILS: ${{ inputs.emails }}
+          ROLE: ${{ inputs.role }}
+        run: |
+          status=0
+          IFS=, read -ra list <<< "$EMAILS"
+          for email in "${list[@]}"; do
+            email="$(echo "$email" | xargs)"
+            [ -z "$email" ] && continue
+            node grant-role.mjs "$email" "$ROLE" --project myself-research || status=1
+          done
+          exit $status
+
+      - name: Shred the credential
+        if: always()
+        run: rm -f "$RUNNER_TEMP/sa.json"
