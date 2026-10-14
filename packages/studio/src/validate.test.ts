@@ -598,20 +598,31 @@ describe("licensed, protected and identifying content", () => {
     expect(errors(validateDraft(reworded))).toEqual([]);
   });
 
-  it("changing the consent wording without unlocking it", () => {
-    const reword = (d: StudioDraft) => {
+  it("changing the consent wording needs no unlock (D-61), but taking the consent out can't be published", () => {
+    const reworded = edit((d) => {
       item(d, "ybm_intro_consent.consent").statements[5].text.text = "I agree to take part";
+    });
+    expect(errors(validateDraft(reworded, { baseline: live }))).toEqual([]);
+    const removed = edit((d) => {
+      for (const [refKey, def] of Object.entries(d.instruments)) if (def.instrument === "ybm_intro_consent") delete d.instruments[refKey];
+    });
+    expectIssue(validateDraft(removed, { baseline: live }), "consent.removed", { kind: "survey" });
+  });
+
+  it("changing the identity wording without unlocking it", () => {
+    const reword = (d: StudioDraft) => {
+      item(d, "ybm_identity.first_name").stem.text = "Your given name";
     };
-    expectIssue(validateDraft(edit(reword), { baseline: live }), "protected.question", { itemKey: "ybm_intro_consent.consent" });
+    expectIssue(validateDraft(edit(reword), { baseline: live }), "protected.question", { itemKey: "ybm_identity.first_name" });
     // An unlock entry with nothing in it records no acknowledgement, so it unlocks nothing.
     const hollow = edit((d) => {
       reword(d);
-      (d.unlocked as Loose)["ybm_intro_consent"] = null;
+      (d.unlocked as Loose)["ybm_identity"] = null;
     });
-    expectIssue(validateDraft(hollow, { baseline: live }), "protected.question", { itemKey: "ybm_intro_consent.consent" });
+    expectIssue(validateDraft(hollow, { baseline: live }), "protected.question", { itemKey: "ybm_identity.first_name" });
     const unlocked = edit((d) => {
       reword(d);
-      d.unlocked["ybm_intro_consent"] = { instrument: "ybm_intro_consent", by: "a@b.c", at: "2026-09-28T00:00:00Z", reason: "Approved amendment 3" };
+      d.unlocked["ybm_identity"] = { instrument: "ybm_identity", by: "a@b.c", at: "2026-09-28T00:00:00Z", reason: "Wording only; linkage unaffected" };
     });
     expect(errors(validateDraft(unlocked, { baseline: live }))).toEqual([]);
   });

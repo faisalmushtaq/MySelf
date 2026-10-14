@@ -113,7 +113,7 @@ describe("what depends on a question", () => {
 describe("asking the model first", () => {
   it("returns the model's own refusal, or null when it would go ahead", () => {
     const d = liveDraft();
-    expect(refusal(() => moveSection(d, "welcome", 1))).toMatch(/protected/);
+    expect(refusal(() => moveSection(d, "welcome", 1))).toMatch(/asked before/);
     expect(refusal(() => moveSection(d, "gaming", 5))).toBeNull();
   });
 });

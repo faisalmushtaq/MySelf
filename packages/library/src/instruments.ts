@@ -303,7 +303,15 @@ export const macarthurSsy: InstrumentInput = {
   citation:
     "Goodman, E., Adler, N. E., Kawachi, I., Frazier, A. L., Huang, B., & Colditz, G. A. (2001). Adolescents' perceptions of social status: development and evaluation of a new indicator. Pediatrics, 108(2), e31.",
   ageRange: { min: 10, max: 18 },
-  licence: held("SPARQ / MacArthur Network toolkit, with attribution", "no"),
+  // Openly available, free for non-commercial research and clinical use, so the
+  // study may adapt its wording (D-61). It was recorded as "may not be modified".
+  licence: {
+    status: "open",
+    holder: "SPARQ / MacArthur Network toolkit, with attribution",
+    modifiable: "yes",
+    evidence: "Openly available and free to use for non-commercial research and clinical purposes (SPARQ toolkit); confirmed by the research team 2026-10-14 (D-61).",
+    verified: true,
+  },
   forms: [
     {
       language: "en-GB",

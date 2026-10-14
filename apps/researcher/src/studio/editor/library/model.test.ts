@@ -199,12 +199,16 @@ describe("ticking what to copy", () => {
   it("knows when a protected module is among the ticks, so it asks why", () => {
     const welcome = o.sections[0]!;
     const consent = welcome.blocks.find((b) => b.instrument === "ybm_intro_consent")!;
-    expect(protectedIn(o, piecesFor(o, new Set([pickKey.block(welcome.key, consent.componentIndex)])))).toEqual([
-      { instrument: "ybm_intro_consent", name: consent.name },
+    // The consent is the study's own (D-61); the identity module is protected.
+    expect(protectedIn(o, piecesFor(o, new Set([pickKey.block(welcome.key, consent.componentIndex)])))).toEqual([]);
+    const aboutYou = o.sections.find((s) => s.blocks.some((b) => b.instrument === "ybm_identity"))!;
+    const identity = aboutYou.blocks.find((b) => b.instrument === "ybm_identity")!;
+    expect(protectedIn(o, piecesFor(o, new Set([pickKey.block(aboutYou.key, identity.componentIndex)])))).toEqual([
+      { instrument: "ybm_identity", name: identity.name },
     ]);
     expect(protectedIn(o, piecesFor(o, new Set([pickKey.question(q1!.itemKey)])))).toEqual([]);
-    const f = fragmentFromDraft(d, { kind: "section", sectionKey: welcome.key }, FROM_R8);
-    expect(protectedInFragment(f).map((m) => m.instrument)).toContain("ybm_intro_consent");
+    const f = fragmentFromDraft(d, { kind: "section", sectionKey: aboutYou.key }, FROM_R8);
+    expect(protectedInFragment(f).map((m) => m.instrument)).toContain("ybm_identity");
   });
 
   it("lists a piece's questions, block by block", () => {

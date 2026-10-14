@@ -8,7 +8,7 @@ import type { StudioDraft } from "./contract.js";
 import { diffDrafts } from "./diff.js";
 import { compileDraft, extractDraft, parseDraft, previewRelease, serialiseDraft } from "./draft.js";
 import { publishedProtocols } from "./history.js";
-import { outline, StudioOpError } from "./model.js";
+import { CONSENT_MODULES, outline, StudioOpError } from "./model.js";
 import {
   myStoryMisplaced,
   myStoryOf,
@@ -56,7 +56,10 @@ function refusal(run: () => unknown): StudioOpError {
 
 /** A section with nothing protected or licensed in it, which may be moved freely. */
 function editableSection(draft: StudioDraft): string {
-  const found = outline(draft).sections.find((s) => s.blocks.length > 0 && s.blocks.every((b) => b.tier === "editable"));
+  // Not the consent section: nothing may move ahead of it, which is a different refusal.
+  const found = outline(draft).sections.find(
+    (s) => s.blocks.length > 0 && s.blocks.every((b) => b.tier === "editable" && !CONSENT_MODULES.includes(b.instrument)),
+  );
   if (!found) throw new Error("no editable section");
   return found.key;
 }

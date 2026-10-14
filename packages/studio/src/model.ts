@@ -52,18 +52,20 @@ export interface ProtectedModule {
 }
 
 /**
+ * The study's introduction and consent modules. They are not protected — the
+ * study team changes their wording as it needs to, and those changes do not
+ * need sign-off in the Studio (D-61) — but they always come first: nothing is
+ * asked before a participant has read them and consented (`keepConsentFirst`).
+ */
+export const CONSENT_MODULES: readonly string[] = ["ybm_intro_consent"];
+
+/**
  * Study modules that stay read-only until someone unlocks them and records why
  * (docs/16 R4, R5). Unlocking is recorded in the draft and audited; it is not a
  * licence to change the identity questions' keys, types or variables, which
  * stay fixed even when unlocked (see `identityRoleOf`).
  */
 export const PROTECTED_MODULES: Readonly<Record<string, ProtectedModule>> = {
-  ybm_intro_consent: {
-    reason: "ethics",
-    explanation:
-      "The introduction and consent wording was approved by the ethics committee under PSCETHS-1449. " +
-      "Participants consent to exactly this text, so changing it needs the committee's approval first.",
-  },
   ybm_identity: {
     reason: "linkage",
     explanation:
@@ -146,7 +148,7 @@ export function instrumentName(draft: StudioDraft, instrumentKey: string): strin
  *   (`licence.modifiable` is "no" or "with_permission"). Its block can move and
  *   be shown conditionally, and each question can be made required or optional,
  *   but its wording, options, order and type are fixed.
- * - "protected": the consent and identity modules, until unlocked.
+ * - "protected": the identity module, until unlocked.
  * - "editable": everything else, and protected modules once unlocked.
  */
 export function editTier(draft: StudioDraft, instrumentKey: string): EditTier {

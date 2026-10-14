@@ -173,8 +173,8 @@ describe("saving a module", () => {
     expect(locked.code).toBe("failed-precondition");
     expect(locked.message).toMatch(/can't be saved to the library: a validated questionnaire/);
     expect(locked.details).toMatchObject({ kind: "invalid", issues: [{ code: "piece.locked" }] });
-    const consent = fragmentFromDraft(extractDraft(R800.raw), { kind: "block", sectionKey: "welcome", componentIndex: 0 }, FROM);
-    expect((await refusal(save({ fragment: consent }))).details).toMatchObject({ issues: [{ code: "piece.protected" }] });
+    const identity = fragmentFromDraft(extractDraft(R800.raw), { kind: "block", sectionKey: "about_you", componentIndex: 0 }, FROM);
+    expect((await refusal(save({ fragment: identity }))).details).toMatchObject({ issues: expect.arrayContaining([expect.objectContaining({ code: "piece.protected" })]) });
     expect((await refusal(save({ fragment: { format: "nonsense" } }))).details).toMatchObject({ issues: [{ code: "piece.malformed" }] });
   });
 });

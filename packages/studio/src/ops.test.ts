@@ -290,33 +290,34 @@ describe("licensed questionnaires", () => {
 // ---------------------------------------------------------------------------
 
 describe("protected modules", () => {
-  const reason = "Wording change approved by the committee in amendment 3 (Sept 2026).";
+  const reason = "Rewording the name question; the answers and linkage stay the same.";
 
-  it("refuses the consent wording until unlocked with a reason", () => {
-    const error = refusal(() => ops.updateQuestion(live(), "ybm_intro_consent.intro", { stem: { text: "Hello" } }));
+  it("lets the consent wording change without an unlock (D-61), and refuses the identity wording until unlocked with a reason", () => {
+    publishable(ops.updateQuestion(live(), "ybm_intro_consent.intro", { stem: { text: "Yorkshire Brain Map workshop" } }).draft);
+    expect(refusal(() => ops.unlockModule(live(), "ybm_intro_consent", { ...actor, reason })).code).toBe("invalid");
+    const error = refusal(() => ops.updateQuestion(live(), "ybm_identity.first_name", { stem: { text: "Given name" } }));
     expect(error.code).toBe("protected");
-    expect(error.message).toMatch(/PSCETHS-1449/);
     expect(error.message).toMatch(/unlock it first/);
     // Notes for analysts change nothing a participant sees.
-    publishable(ops.updateQuestion(live(), "ybm_intro_consent.intro", { researcherNote: "Approved text." }).draft);
-    expect(refusal(() => ops.unlockModule(live(), "ybm_intro_consent", { ...actor, reason: "because" })).message).toMatch(/at least 20/);
+    publishable(ops.updateQuestion(live(), "ybm_identity.first_name", { researcherNote: "Checked." }).draft);
+    expect(refusal(() => ops.unlockModule(live(), "ybm_identity", { ...actor, reason: "because" })).message).toMatch(/at least 20/);
     expect(refusal(() => ops.unlockModule(live(), "ybm_smartphone", { ...actor, reason })).code).toBe("invalid");
-    const unlocked = ops.unlockModule(live(), "ybm_intro_consent", { ...actor, reason }).draft;
-    expect(unlocked.unlocked["ybm_intro_consent"]).toEqual({ instrument: "ybm_intro_consent", by: actor.by, at: actor.at, reason });
-    const edited = ops.updateQuestion(unlocked, "ybm_intro_consent.intro", { stem: { text: "Yorkshire Brain Map workshop" } }).draft;
+    const unlocked = ops.unlockModule(live(), "ybm_identity", { ...actor, reason }).draft;
+    expect(unlocked.unlocked["ybm_identity"]).toEqual({ instrument: "ybm_identity", by: actor.by, at: actor.at, reason });
+    const edited = ops.updateQuestion(unlocked, "ybm_identity.first_name", { stem: { text: "Your first name" } }).draft;
     publishable(edited);
-    const relocked = ops.relockModule(edited, "ybm_intro_consent").draft;
-    expect(refusal(() => ops.updateQuestion(relocked, "ybm_intro_consent.intro", { stem: { text: "Hi" } })).code).toBe("protected");
+    const relocked = ops.relockModule(edited, "ybm_identity").draft;
+    expect(refusal(() => ops.updateQuestion(relocked, "ybm_identity.first_name", { stem: { text: "Hi" } })).code).toBe("protected");
   });
 
-  it("refuses moving a protected block, or hiding the section it is in", () => {
+  it("refuses moving the consent anywhere but first, and moving or hiding a protected block", () => {
     expect(refusal(() => ops.moveBlock(live(), { sectionKey: "welcome", componentIndex: 0 }, { sectionKey: "gaming", index: 0 })).code).toBe(
       "protected",
     );
+    const identity = outline(live()).sections.find((x) => x.blocks.some((b) => b.instrument === "ybm_identity"))!;
     const condition = { op: "answered" as const, target: { item: { instrument: "ybm_smartphone", item: "own", revision: 1 } } };
-    expect(refusal(() => ops.updateSection(live(), "welcome", { displayIf: condition })).code).toBe("protected");
-    expect(refusal(() => ops.moveSection(live(), "about_you", 4)).code).toBe("protected");
-    expect(refusal(() => ops.removeBlock(live(), "welcome", 0, actor)).code).toBe("protected");
+    expect(refusal(() => ops.updateSection(live(), identity.key, { displayIf: condition })).code).toBe("protected");
+    expect(refusal(() => ops.removeBlock(live(), identity.key, identity.blocks.find((b) => b.instrument === "ybm_identity")!.componentIndex, actor)).code).toBe("protected");
   });
 
   it("keeps the identity questions' IDs, variables and types even when unlocked", () => {
@@ -654,7 +655,7 @@ describe("the edited survey as a whole", () => {
 // Holes found in review: each test failed before the fix it names.
 // ---------------------------------------------------------------------------
 
-describe("consent comes first while it is protected", () => {
+describe("consent comes first", () => {
   const consentFirst = (draft: StudioDraft) => {
     const order = administered(publishable(draft));
     const last = order.map((k) => k.startsWith("ybm_intro_consent.")).lastIndexOf(true);
@@ -678,12 +679,11 @@ describe("consent comes first while it is protected", () => {
     publishable(ops.restoreQuestion(ops.removeSection(archived, first.sectionKey).draft, "ybm_smartphone.own").draft);
   });
 
-  it("still allows anything after it, and anything at all once the consent is unlocked", () => {
+  it("still allows anything after it, and keeps the consent first though its wording is open (D-61)", () => {
     const after = ops.moveQuestion(live(), "ybm_smartphone.own", { sectionKey: "welcome", index: 3 }).draft;
     expect(consentFirst(after)).toBe(true);
-    const unlocked = ops.unlockModule(live(), "ybm_intro_consent", { ...actor, reason: "Amendment 4 lets the pupils see a warm-up question first." }).draft;
-    const moved = ops.moveSection(unlocked, "gaming", 0).draft;
-    expect(consentFirst(moved)).toBe(false);
+    expect(refusal(() => ops.unlockModule(live(), "ybm_intro_consent", { ...actor, reason: "Not needed any more for the consent." })).code).toBe("invalid");
+    expect(refusal(() => ops.moveSection(live(), "gaming", 0)).code).toBe("protected");
   });
 });
 
@@ -741,11 +741,8 @@ describe("the archive is not a way round the tiers", () => {
     expect(error.message).toMatch(/Strengths and Difficulties/);
     expect(ops.restoreQuestion(removed, "sdq25_s.q1").restored).toHaveLength(25);
 
-    const reason = "Amendment 4 removes the old introduction paragraph.";
-    const unlocked = ops.unlockModule(live(), "ybm_intro_consent", { ...actor, reason }).draft;
-    const archived = ops.archiveQuestion(unlocked, "ybm_intro_consent.intro", actor).draft;
-    const relocked = ops.relockModule(archived, "ybm_intro_consent").draft;
-    expect(refusal(() => ops.deleteQuestion(relocked, "ybm_intro_consent.intro", { published: new Set() })).code).toBe("protected");
+    // The consent is the study's own (D-61): its archived questions can be deleted without an unlock.
+    const archived = ops.archiveQuestion(live(), "ybm_intro_consent.intro", actor).draft;
     expect(ops.deleteQuestion(archived, "ybm_intro_consent.intro", { published: new Set() }).draft.archived).toEqual([]);
   });
 });
