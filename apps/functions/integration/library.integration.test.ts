@@ -203,11 +203,11 @@ describe("saved modules, through the callables", () => {
     expect((await db.collection(paths.studioAudit(FUTURE)).where("action", "==", "library.module_saved").get()).size).toBe(1);
   });
 
-  it("refuse a licensed questionnaire or the consent module, writing nothing", async () => {
+  it("refuse a licensed questionnaire or the identity module, writing nothing", async () => {
     const locked = await refusalOf(callAs(studioLibrarySaveModule, ED, saveRequest({ fragment: validatedFragment(SDQ2) })));
     expect(issueCodes(locked)).toEqual(["piece.locked"]);
-    const consent = fragmentFromDraft(extractDraft(R800.raw), { kind: "block", sectionKey: "welcome", componentIndex: 0 }, fromRelease(YBM, "8.0.0", R800.manifest.hash!));
-    expect(issueCodes(await refusalOf(callAs(studioLibrarySaveModule, ED, saveRequest({ fragment: consent }))))).toEqual(["piece.protected"]);
+    const identity = fragmentFromDraft(extractDraft(R800.raw), { kind: "block", sectionKey: "about_you", componentIndex: 0 }, fromRelease(YBM, "8.0.0", R800.manifest.hash!));
+    expect(issueCodes(await refusalOf(callAs(studioLibrarySaveModule, ED, saveRequest({ fragment: identity }))))).toContain("piece.protected");
     expect((await db.collection(paths.studioLibrary()).get()).empty).toBe(true);
   });
 

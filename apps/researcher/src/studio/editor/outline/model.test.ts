@@ -53,8 +53,8 @@ describe("the outline of the live survey", () => {
     const gaming = t.byId.get("section:gaming")!;
     expect(gaming.children.filter((c) => c.kind === "question")).toHaveLength(8);
     expect(gaming.children[0]!.level).toBe(2);
-    // The consent module is protected, so it has a header that says so.
-    expect(t.byId.get("block:welcome:0")!.label).toMatch(/protected — unlock to edit/);
+    // The identity module is protected, so it has a header that says so.
+    expect(t.byId.get("block:about_you:0")!.label).toMatch(/protected — unlock to edit/);
   });
 
   it("counts every question once and numbers them in the order participants meet them", () => {

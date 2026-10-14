@@ -10,12 +10,14 @@ import { MAX_IMPORTED_RELEASES, MAX_MODULE_CHARS } from "./contract.js";
 import { diffDrafts, suggestBump } from "./diff.js";
 import { emptyDraft, extractDraft, parseDraft, previewRelease, serialiseDraft } from "./draft.js";
 import {
+  adoptLibraryLicence,
   describeInsert,
   dismissModuleUpdate,
   fragmentFromDraft,
   importedReleases,
   importsForVersion,
   insertFragment,
+  libraryLicenceUpdate,
   lockVouchers,
   moduleContent,
   moduleContentHash,
@@ -128,9 +130,10 @@ describe("picking a piece", () => {
 
   it("refuses single questions of a validated questionnaire or a protected module", () => {
     expect(refusal(() => questions(source(), "wellbeing", 1, ["q1"])).message).toMatch(/licensed, validated questionnaire.*whole/);
-    expect(refusal(() => questions(source(), "welcome", 0, ["consent"])).message).toMatch(/consent.*whole, with the reason recorded/);
+    expect(refusal(() => questions(source(), "about_you", 0, ["first_name"])).message).toMatch(/whole, with the reason recorded/);
     expect(pickable(source(), "sdq25_s.q1")).toMatchObject({ ok: false });
-    expect(pickable(source(), "ybm_intro_consent.consent")).toMatchObject({ ok: false });
+    // The consent is the study's own (D-61).
+    expect(pickable(source(), "ybm_intro_consent.consent")).toEqual({ ok: true });
     expect(pickable(source(), "ybm_identity.dob")).toMatchObject({ ok: false });
     expect(pickable(source(), "ybm_gaming.top_games")).toEqual({ ok: true });
     expect(pickable(source(), "ybm_gaming.nothing")).toMatchObject({ ok: false });
@@ -447,16 +450,22 @@ describe("validated questionnaires", () => {
 // ---------------------------------------------------------------------------
 
 describe("consent and identity modules", () => {
-  it("are added only with a reason, which unlocks them and is recorded", () => {
-    const f = block(source(), "welcome", 0);
-    expect(refusal(() => insertFragment(blank(), f, { newSection: { title: "Consent", index: 0 } }, opts)).code).toBe("protected");
-    expect(refusal(() => insertFragment(blank(), f, { newSection: { title: "Consent", index: 0 } }, { ...opts, protectedReason: "ok" })).code).toBe("protected");
-    const { draft, report } = insertFragment(blank(), f, { newSection: { title: "Consent", index: 0 } }, { ...opts, protectedReason: REASON });
-    expect(report.unlocked).toEqual(["ybm_intro_consent"]);
-    expect(draft.unlocked["ybm_intro_consent"]).toEqual({ instrument: "ybm_intro_consent", by: opts.by, at: opts.at, reason: REASON });
-    expect(asked(draft)[0]).toBe("ybm_intro_consent.intro");
+  it("add the identity module only with a reason, which unlocks it and is recorded", () => {
+    const f = block(source(), "about_you", 0);
+    const at = { newSection: { title: "About you", index: 0 } };
+    expect(refusal(() => insertFragment(blank(), f, at, opts)).code).toBe("protected");
+    expect(refusal(() => insertFragment(blank(), f, at, { ...opts, protectedReason: "ok" })).code).toBe("protected");
+    const { draft, report } = insertFragment(blank(), f, at, { ...opts, protectedReason: REASON });
+    expect(report.unlocked).toEqual(["ybm_identity"]);
+    expect(draft.unlocked["ybm_identity"]).toEqual({ instrument: "ybm_identity", by: opts.by, at: opts.at, reason: REASON });
     expect(describeInsert(report)).toMatch(/unlocked with the reason you gave/);
-    // Validation accepts it: unlocked, it is the study's own to change.
+  });
+
+  it("add the consent like any study module, first in the survey (D-61)", () => {
+    const f = block(source(), "welcome", 0);
+    const { draft, report } = insertFragment(blank(), f, { newSection: { title: "Consent", index: 0 } }, opts);
+    expect(report.unlocked).toEqual([]);
+    expect(asked(draft)[0]).toBe("ybm_intro_consent.intro");
     expect(errors(draft, { baseline: lockBaseline(null, draft), ...lockVouchers({ releases: [], library: true }) })).toEqual([]);
   });
 
@@ -650,7 +659,8 @@ describe("saved modules", () => {
     expect(moduleProblems(block(source(), "gaming", 0))).toEqual([]);
     expect(moduleProblems(block(source(), "wellbeing", 1)).map((i) => i.code)).toContain("piece.locked");
     expect(moduleProblems(validatedFragment(SDQ2)).map((i) => i.code)).toEqual(["piece.locked"]);
-    expect(moduleProblems(block(source(), "welcome", 0)).map((i) => i.code)).toEqual(["piece.protected"]);
+    expect(moduleProblems(block(source(), "about_you", 0)).map((i) => i.code)).toContain("piece.protected");
+    expect(moduleProblems(block(source(), "welcome", 0))).toEqual([]); // the consent is the study's own (D-61)
     // A validated questionnaire relicensed in the piece is still one.
     const relicensed = validatedFragment(SDQ2);
     (relicensed.blocks[0]!.definition as Loose).licence = { status: "open", modifiable: "yes" };
@@ -865,5 +875,26 @@ describe("a repository module as a library piece (D-58)", () => {
   it("refuses a module or question that is not there", () => {
     expect(refusal(() => repositoryModuleFragment("ybm_nothing", { title: "x" })).code).toBe("not_found");
     expect(refusal(() => repositoryModuleFragment("ybm_demographics", { itemKeys: ["nope"], title: "x" })).code).toBe("not_found");
+  });
+});
+
+// ---------------------------------------------------------------------------
+
+describe("a licence the library has corrected (D-61)", () => {
+  it("lets the MacArthur ladders be reworded once the draft takes up the library's open licence", () => {
+    const live = source();
+    const licence = libraryLicenceUpdate(live, "macarthur_ssy");
+    expect(licence).toMatchObject({ status: "open", modifiable: "yes" });
+    // A licence the library still holds locked can't be taken up this way.
+    expect(libraryLicenceUpdate(live, "sdq25_s")).toBeNull();
+    expect(refusal(() => adoptLibraryLicence(live, "sdq25_s")).code).toBe("locked");
+    // Before: the wording is locked.
+    expect(refusal(() => ops.updateQuestion(live, "macarthur_ssy.family", { stem: { text: "Where is your family on this ladder?" } })).code).toBe("locked");
+    const adopted = adoptLibraryLicence(live, "macarthur_ssy").draft;
+    expect(libraryLicenceUpdate(adopted, "macarthur_ssy")).toBeNull();
+    const reworded = ops.updateQuestion(adopted, "macarthur_ssy.family", { stem: { text: "Where is your family on this ladder?" } }).draft;
+    expect(item(reworded, "macarthur_ssy.family")!.stem.text).toBe("Where is your family on this ladder?");
+    // Publishable against the version that recorded it as locked, as the server checks it.
+    expect(errors(reworded, { baseline: live, ...lockVouchers({ releases: [live], library: true, draft: reworded }) })).toEqual([]);
   });
 });

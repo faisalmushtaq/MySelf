@@ -1,8 +1,10 @@
 import { useMemo, useState } from "react";
 import {
+  adoptLibraryLicence,
   editTier,
   identityRoleOf,
   isUnlocked,
+  libraryLicenceUpdate,
   outline,
   placements,
   protectedModule,
@@ -93,6 +95,12 @@ export function BlockEditor({ sectionKey, componentIndex }: BlockRef) {
   const cantSave = saveRefusal(draft, p.instrument, tier, p.items.length);
   const linkage = p.items.some((item) => identityRoleOf(`${p.instrument}.${item.key}`, item) === "linkage");
   const name = def?.name ?? p.instrument;
+  const licenceUpdate = tier === "locked" ? libraryLicenceUpdate(draft, p.instrument) : null;
+  const adoptLicence = () => {
+    if (ctx.run(`Use the library's licence for “${name}”`, (d) => adoptLibraryLicence(d, p.instrument).draft)) {
+      ctx.announce(`“${name}” is openly licensed: its wording can now be edited.`);
+    }
+  };
 
   const remove = () => {
     setConfirmRemove(false);
@@ -119,8 +127,19 @@ export function BlockEditor({ sectionKey, componentIndex }: BlockRef) {
     tier === "locked" ? (
       <LockBanner
         title="Licensed questionnaire · wording locked"
-        info="Its wording, options, codes and question order are fixed by its licence and by the evidence it was validated on. You can move the whole block, show it only to some participants, remove it whole, and make each question required or not."
+        info={
+          licenceUpdate
+            ? "The instrument library now lists this questionnaire as openly licensed, so its wording may be changed. Use the library's licence to edit it here; the change is kept with the survey's history."
+            : "Its wording, options, codes and question order are fixed by its licence and by the evidence it was validated on. You can move the whole block, show it only to some participants, remove it whole, and make each question required or not."
+        }
         infoLabel="the licence"
+        actions={
+          licenceUpdate ? (
+            <Button size="sm" variant="secondary" icon="unlock" onClick={adoptLicence} disabled={!ctx.canEdit}>
+              Use the library's licence
+            </Button>
+          ) : undefined
+        }
       />
     ) : tier === "protected" && protection ? (
       <LockBanner

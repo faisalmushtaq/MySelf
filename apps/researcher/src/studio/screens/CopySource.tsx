@@ -102,8 +102,8 @@ export function CopySource({
       ) : null}
       {chosenStudy && !chosenStudy.here ? (
         <Notice tone="warn" title={`From another study space, “${chosenStudy.title}”`}>
-          The copy keeps that study&rsquo;s consent and identity modules unchanged and still protected. This study&rsquo;s ethics
-          approval must cover them — or unlock them (the reason is recorded) and change them before publishing.
+          The copy keeps that study&rsquo;s consent wording as it is — check it is right for this study and change it before
+          publishing — and its identity module still protected (unlock it, with the reason recorded, to change it).
         </Notice>
       ) : null}
     </>

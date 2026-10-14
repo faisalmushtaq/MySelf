@@ -865,14 +865,14 @@ describe("the draft trigger", () => {
 
   it("records an unlock on its own row, as the person who saved it", async () => {
     await setUp();
-    const reason = "Ethics amendment AM-3 approved the new consent wording on 20 September.";
-    await save(unlockModule((await currentDraft()).draft, "ybm_intro_consent", { by: "somebody.else@example.org", at: "2026-09-28T10:00:00Z", reason }).draft);
+    const reason = "Rewording the name hint on 20 September; linkage is unaffected.";
+    await save(unlockModule((await currentDraft()).draft, "ybm_identity", { by: "somebody.else@example.org", at: "2026-09-28T10:00:00Z", reason }).draft);
     const rows = await audit("draft.unlocked");
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({
       actor: EDITOR.uid,
       actorEmail: EDITOR.email,
-      subject: "ybm_intro_consent",
+      subject: "ybm_identity",
       detail: { reason, revision: 2, claimedBy: "somebody.else@example.org" },
     });
   });

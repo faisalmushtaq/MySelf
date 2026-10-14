@@ -19,28 +19,29 @@ function edit(change: (draft: StudioDraft) => void): StudioDraft {
 
 const SDQ = "sdq25_s@1.0/en-GB/self/standard";
 const CONSENT = "ybm_intro_consent@1.0/en-GB/self/standard";
+const IDENTITY = "ybm_identity@1.0/en-GB/self/standard";
 const sdqItems = (d: StudioDraft) => (d.instruments[SDQ] as Loose).forms[0].items as Loose[];
 
 describe("tiers", () => {
-  it("lock anything whose licence does not allow modification, and protect consent and identity until unlocked", () => {
+  it("lock anything whose licence does not allow modification, and protect identity until unlocked", () => {
     expect(editTier(baseline.instruments[SDQ], {})).toBe("locked");
     expect(editTier(baseline.instruments["bisbas12_ybm@1.0/en-GB/self/standard"], {})).toBe("locked"); // with_permission
-    expect(editTier(baseline.instruments[CONSENT], {})).toBe("protected");
-    expect(editTier(baseline.instruments[CONSENT], { ybm_intro_consent: { instrument: "ybm_intro_consent", by: "x", at: "y", reason: "z" } })).toBe(
-      "editable",
-    );
+    expect(editTier(baseline.instruments[IDENTITY], {})).toBe("protected");
+    expect(editTier(baseline.instruments[IDENTITY], { ybm_identity: { instrument: "ybm_identity", by: "x", at: "y", reason: "z" } })).toBe("editable");
+    // The consent wording is the study's own and edited freely (D-61).
+    expect(editTier(baseline.instruments[CONSENT], {})).toBe("editable");
     expect(editTier(baseline.instruments["ybm_gaming@1.0/en-GB/self/standard"], {})).toBe("editable");
   });
 
   it("count only a real unlock record: one with a reason, for that module", () => {
-    const record = { instrument: "ybm_intro_consent", by: "a@b.c", at: "2026-09-28T00:00:00Z", reason: "Amendment 3 approved" };
-    expect(isUnlocked({ ybm_intro_consent: record }, "ybm_intro_consent")).toBe(true);
-    expect(isUnlocked({ ybm_intro_consent: null as never }, "ybm_intro_consent")).toBe(false);
-    expect(isUnlocked({ ybm_intro_consent: { ...record, reason: "  " } }, "ybm_intro_consent")).toBe(false);
-    expect(isUnlocked({ ybm_intro_consent: { ...record, instrument: "ybm_identity" } }, "ybm_intro_consent")).toBe(false);
-    expect(isUnlocked(undefined, "ybm_intro_consent")).toBe(false);
+    const record = { instrument: "ybm_identity", by: "a@b.c", at: "2026-09-28T00:00:00Z", reason: "Hint reworded, linkage unaffected" };
+    expect(isUnlocked({ ybm_identity: record }, "ybm_identity")).toBe(true);
+    expect(isUnlocked({ ybm_identity: null as never }, "ybm_identity")).toBe(false);
+    expect(isUnlocked({ ybm_identity: { ...record, reason: "  " } }, "ybm_identity")).toBe(false);
+    expect(isUnlocked({ ybm_identity: { ...record, instrument: "ybm_intro_consent" } }, "ybm_identity")).toBe(false);
+    expect(isUnlocked(undefined, "ybm_identity")).toBe(false);
     // …so a hollow record leaves the module protected.
-    expect(editTier(baseline.instruments[CONSENT], { ybm_intro_consent: null as never })).toBe("protected");
+    expect(editTier(baseline.instruments[IDENTITY], { ybm_identity: null as never })).toBe("protected");
   });
 
   it("take a licence from the published version and the library, not from the draft's copy", () => {
@@ -53,6 +54,23 @@ describe("tiers", () => {
     // The library says so too, for a survey that has never published it.
     expect(lockedTest(undefined, { [SDQ]: baseline.instruments[SDQ]! })(relicensed, "sdq25_s@9.0/en-GB/self/standard", {})).toBe(true);
     expect(lockedTest(baseline)(baseline.instruments["ybm_gaming@1.0/en-GB/self/standard"], "ybm_gaming@1.0/en-GB/self/standard", {})).toBe(false);
+  });
+
+  it("follow the library when it corrects a licence to modifiable (D-61), once the draft's copy says so too", () => {
+    const MAC = Object.keys(baseline.instruments).find((k) => k.startsWith("macarthur_ssy@"))!;
+    const published = baseline.instruments[MAC]!;
+    // The published version still records the old, locked licence.
+    expect((published as Loose).licence.modifiable).not.toBe("yes");
+    // The draft's copy unchanged: still locked.
+    expect(lockedTest(baseline)(published, MAC, {})).toBe(true);
+    // With the library's licence, the published version no longer holds it locked…
+    const relicensed = { ...(structuredClone(published) as Loose), licence: { status: "open", modifiable: "yes" } };
+    expect(lockedTest(baseline, { [MAC]: published })(relicensed, MAC, {})).toBe(false);
+    // …and its wording can change without a locked-content difference.
+    const reworded = structuredClone(relicensed) as Loose;
+    reworded.forms[0].items[0].stem = { text: "Where is your family on this ladder?" };
+    const draft = edit((d) => (d.instruments[MAC] = reworded as never));
+    expect(lockedDifferences(draft, baseline).filter((x) => x.instrument === "macarthur_ssy")).toEqual([]);
   });
 });
 
@@ -182,31 +200,37 @@ describe("lockedDifferences", () => {
 });
 
 describe("protectedDifferences", () => {
+  const identityItems = (d: StudioDraft) => (d.instruments[IDENTITY] as Loose).forms[0].items as Loose[];
   const consentItems = (d: StudioDraft) => (d.instruments[CONSENT] as Loose).forms[0].items as Loose[];
 
-  it("reports consent changes until the module is unlocked", () => {
-    const draft = edit((d) => (consentItems(d)[1]!.required = "optional"));
-    expect(protectedDifferences(draft, baseline)).toMatchObject([{ change: "question", itemKey: "ybm_intro_consent.consent" }]);
-    draft.unlocked["ybm_intro_consent"] = { instrument: "ybm_intro_consent", by: "a@b.c", at: "2026-09-28T00:00:00Z", reason: "Amendment approved" };
+  it("reports identity changes until the module is unlocked", () => {
+    const draft = edit((d) => (identityItems(d)[0]!.required = "optional"));
+    expect(protectedDifferences(draft, baseline)).toMatchObject([{ change: "question", itemKey: "ybm_identity.first_name" }]);
+    draft.unlocked["ybm_identity"] = { instrument: "ybm_identity", by: "a@b.c", at: "2026-09-28T00:00:00Z", reason: "Linkage unaffected" };
     expect(protectedDifferences(draft, baseline)).toEqual([]);
     // An entry with no acknowledgement in it is not an unlock.
-    draft.unlocked["ybm_intro_consent"] = { ...draft.unlocked["ybm_intro_consent"], reason: "" };
-    expect(protectedDifferences(draft, baseline)).toMatchObject([{ change: "question", itemKey: "ybm_intro_consent.consent" }]);
+    draft.unlocked["ybm_identity"] = { ...draft.unlocked["ybm_identity"], reason: "" };
+    expect(protectedDifferences(draft, baseline)).toMatchObject([{ change: "question", itemKey: "ybm_identity.first_name" }]);
+  });
+
+  it("leaves the consent wording to the study team (D-61)", () => {
+    const draft = edit((d) => (consentItems(d)[0]!.stem = { text: "Reworded" }));
+    expect(protectedDifferences(draft, baseline)).toEqual([]);
   });
 
   it("allows researcher notes without an unlock", () => {
-    const draft = edit((d) => Object.assign(consentItems(d)[0]!, { researcherNote: "checked", reportingCategory: "Consent" }));
+    const draft = edit((d) => Object.assign(identityItems(d)[0]!, { researcherNote: "checked", reportingCategory: "Identity" }));
     expect(protectedDifferences(draft, baseline)).toEqual([]);
   });
 
   it("needs the unlock for help text too, which participants read", () => {
     // Matches the editing operations, and holds for a draft written without them.
-    const draft = edit((d) => Object.assign(consentItems(d)[0]!, { hint: "Read carefully" }));
+    const draft = edit((d) => Object.assign(identityItems(d)[0]!, { hint: "As on your passport" }));
     expect(protectedDifferences(draft, baseline)).not.toEqual([]);
   });
 
   it("reports a protected module taken out of the survey", () => {
-    const draft = edit((d) => delete d.instruments[CONSENT]);
-    expect(protectedDifferences(draft, baseline)).toMatchObject([{ change: "removed", instrument: "ybm_intro_consent" }]);
+    const draft = edit((d) => delete d.instruments[IDENTITY]);
+    expect(protectedDifferences(draft, baseline)).toMatchObject([{ change: "removed", instrument: "ybm_identity" }]);
   });
 });

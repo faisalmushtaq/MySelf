@@ -36,7 +36,7 @@ describe("restoring a version into the draft", () => {
     const section = d.composition.sections[1]!.key;
     d = addQuestion(d, { sectionKey: section, typeId: "short_text", text: "What is your favourite colour?" }).draft;
     d = setQuestionNotes(d, "ybm_studio.favourite_colour", { codingNotes: "Free text; code later." }).draft;
-    d = unlockModule(d, "ybm_intro_consent", { by: "u_ed", at: AT, reason: "Ethics amendment AM-3 approved the new wording." }).draft;
+    d = unlockModule(d, "ybm_identity", { by: "u_ed", at: AT, reason: "Rewording a hint only; linkage is unaffected." }).draft;
     d.retiredCodes = { "scale.kept_for_ever": [{ code: 7, label: "Old answer", retiredAt: AT }] };
     return d;
   };
@@ -143,15 +143,11 @@ describe("restoring a version into the draft", () => {
     expect(errors).toEqual([]);
   });
 
-  it("does not carry an unlock across, so going back over protected wording needs a fresh acknowledgement to publish", () => {
-    // r7.1.0 changed the consent introduction (r7.3.0 keeps it). Restoring r7.0.1 puts the old
-    // wording back, which is a change to ethics-approved text like any other:
-    // the publisher unlocks the module and says why before it can go live.
+  it("puts older consent wording back without an unlock, since the consent is the study's own (D-61)", () => {
+    // r7.1.0 changed the consent introduction (r7.3.0 keeps it). Restoring r7.0.1 puts the old wording back.
     const merged = mergeRestore(draftOf("7.0.1"), current(), { at: AT, by: "u_pub", publishedCodes: new Map() });
-    const errors = validateDraft(merged.draft, { baseline: draftOf("7.3.0") }).filter((i) => i.severity === "error");
-    expect(errors.map((i) => `${i.code} ${i.location.itemKey}`)).toEqual(["protected.question ybm_intro_consent.intro"]);
-    const unlocked = unlockModule(merged.draft, "ybm_intro_consent", { by: "u_pub", at: AT, reason: "Rolling back to the r7.0.1 wording, still approved." }).draft;
-    expect(validateDraft(unlocked, { baseline: draftOf("7.3.0") }).filter((i) => i.severity === "error")).toEqual([]);
+    expect(merged.draft.unlocked).toEqual({});
+    expect(validateDraft(merged.draft, { baseline: draftOf("7.3.0") }).filter((i) => i.severity === "error")).toEqual([]);
   });
 });
 
@@ -161,10 +157,11 @@ describe("the locks on a survey that has never been published", () => {
     const base = lockBaseline(origin, origin);
     expect(base.composition.sections).toEqual([]);
     const instruments = Object.values(base.instruments).map((d) => d.instrument);
-    expect(instruments).toContain("ybm_intro_consent");
+    expect(instruments).toContain("ybm_identity");
+    expect(instruments).not.toContain("ybm_intro_consent");
     expect(instruments).not.toContain("ybm_about_you");
     for (const def of Object.values(base.instruments)) {
-      expect(def.licence.modifiable !== "yes" || ["ybm_intro_consent", "ybm_identity"].includes(def.instrument)).toBe(true);
+      expect(def.licence.modifiable !== "yes" || def.instrument === "ybm_identity").toBe(true);
     }
     // Unchanged: nothing to report.
     expect(validateDraft(origin, { baseline: base }).filter((i) => i.severity === "error")).toEqual([]);

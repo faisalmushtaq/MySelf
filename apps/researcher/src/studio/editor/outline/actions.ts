@@ -67,7 +67,7 @@ export interface ActionFacts {
  * The model's own refusal of an operation, or undefined when it goes through.
  *
  * REVIEW FIX: the tier checks below are the common reasons, but not the only
- * ones. Moving anything in front of the ethics-protected consent
+ * ones. Moving anything in front of the consent
  * (ops `keepConsentFirst`) is refused too — "Move section up" on the section
  * just after "Welcome", or "Move up" on a question added to the Welcome
  * section — and restoring can be refused (a clashing variable, a section that
@@ -235,7 +235,7 @@ export function blockActions(sectionKey: string, componentIndex: number, facts: 
  * the consent and identity modules belong to their study, unlocked or not.
  */
 export function saveRefusal(draft: StudioDraft, instrument: string, tier: EditTier, questionCount: number): string | undefined {
-  if (protectedModule(instrument)) return `“${instrumentName(draft, instrument)}” belongs to this study’s ethics approval, so it isn’t saved to the library.`;
+  if (protectedModule(instrument)) return `“${instrumentName(draft, instrument)}” belongs to this study’s participant linkage, so it isn’t saved to the library.`;
   if (tier === "locked") return "A validated questionnaire is in the library already, exactly as licensed.";
   if (questionCount === 0) return "This block has no questions to save.";
   return undefined;

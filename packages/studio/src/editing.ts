@@ -5,11 +5,10 @@ import type { ReservedIds } from "./history.js";
 import {
   allItemKeys,
   allVariables,
-  editTier,
+  CONSENT_MODULES,
   findQuestion,
   instrumentName,
   itemsOf,
-  PROTECTED_MODULES,
   shortText,
   StudioOpError,
   type FoundQuestion,
@@ -185,13 +184,12 @@ export function placeNewItem(d: StudioDraft, refKey: string, item: ItemDefinitio
 }
 
 /**
- * The ethics-protected module (still locked) that some other question is now
- * asked before, or in the middle of; null if there is none.
+ * The consent module that some other question is now asked before, or in the
+ * middle of; null if there is none.
  */
 export function askedBeforeConsent(d: StudioDraft): string | null {
   const order = liveQuestions(d);
-  for (const [key, p] of Object.entries(PROTECTED_MODULES)) {
-    if (p.reason !== "ethics" || editTier(d, key) !== "protected") continue;
+  for (const key of CONSENT_MODULES) {
     let last = -1;
     order.forEach((q, i) => {
       if (q.instrument === key) last = i;
@@ -202,22 +200,22 @@ export function askedBeforeConsent(d: StudioDraft): string | null {
 }
 
 /**
- * Refuse an edit that would ask anything before the protected consent module.
+ * Refuse an edit that would ask anything before the consent module.
  *
  * Refusing to move the consent block itself is not enough on its own: moving
  * another section or block in front of it, adding a section before it, or
  * moving a question into its section ahead of it would all have participants
- * answer questions before they have read the approved introduction and given
- * consent (docs/16 R4). Only a change that newly does so is refused, so a draft
+ * answer questions before they have read the introduction and given consent
+ * (docs/16 R4). Only a change that newly does so is refused, so a draft
  * already in that state can still be edited back out of it.
  */
 export function keepConsentFirst(before: StudioDraft, after: StudioDraft, action: string): void {
   const key = askedBeforeConsent(after);
   if (!key || askedBeforeConsent(before) === key) return;
   throw new StudioOpError(
-    `You can't ${action}: it would be asked before “${instrumentName(after, key)}”. Participants read the ethics-approved ` +
-      `introduction and give their consent before they are asked anything else, so nothing may come before it while ` +
-      `it is protected. Put it after the consent instead.`,
+    `You can't ${action}: it would be asked before “${instrumentName(after, key)}”. Participants read the ` +
+      `introduction and give their consent before they are asked anything else, so nothing may come before it. ` +
+      `Put it after the consent instead.`,
     "protected",
   );
 }

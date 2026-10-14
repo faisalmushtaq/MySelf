@@ -80,10 +80,10 @@ describe("what counts as an edit", () => {
 
   it("an unlock, with the reason kept and the editor's own claim of who kept apart", () => {
     const before = base();
-    const reason = "Ethics amendment AM-3 approved the new consent wording on 20 September.";
-    const after = unlockModule(before, "ybm_intro_consent", { by: "someone-else@example.org", at: "2026-09-28T10:02:00Z", reason }).draft;
+    const reason = "Rewording the name hint on 20 September; linkage is unaffected.";
+    const after = unlockModule(before, "ybm_identity", { by: "someone-else@example.org", at: "2026-09-28T10:02:00Z", reason }).draft;
     const write = edit(describeDraftWrite(side(before, 4), side(after, 5)));
-    expect(write.unlocks).toEqual([{ instrument: "ybm_intro_consent", reason, claimedBy: "someone-else@example.org", claimedAt: "2026-09-28T10:02:00Z" }]);
+    expect(write.unlocks).toEqual([{ instrument: "ybm_identity", reason, claimedBy: "someone-else@example.org", claimedAt: "2026-09-28T10:02:00Z" }]);
     // Saving again with the unlock unchanged is not a second unlock.
     expect(edit(describeDraftWrite(side(after, 5), side(updateScreen(after, "finish", { title: "Thanks" }).draft, 6))).unlocks).toEqual([]);
   });
@@ -102,11 +102,11 @@ describe("what counts as an edit", () => {
   });
 
   it("an unlock in a save that mends an unreadable draft is still recorded", () => {
-    const reason = "Ethics amendment AM-3 approved the new consent wording on 20 September.";
-    const after = unlockModule(base(), "ybm_intro_consent", { by: "u_ed", at: "2026-09-28T10:02:00Z", reason }).draft;
+    const reason = "Rewording the name hint on 20 September; linkage is unaffected.";
+    const after = unlockModule(base(), "ybm_identity", { by: "u_ed", at: "2026-09-28T10:02:00Z", reason }).draft;
     const write = edit(describeDraftWrite(side("{not json", 4), side(after, 5)));
     expect(write.unparsable).toBe(true);
-    expect(write.unlocks.map((u) => u.instrument)).toEqual(["ybm_intro_consent"]);
+    expect(write.unlocks.map((u) => u.instrument)).toEqual(["ybm_identity"]);
   });
 });
 

@@ -80,7 +80,6 @@ describe("a question's menu offers exactly what the model allows", () => {
     const unlocked = unlockModule(live(), "ybm_identity", { ...actor, reason: "Checking linkage handling in a test." }).draft;
     for (const [d, itemKey] of [
       [live(), "sdq25_s.q3"],
-      [live(), liveQuestions(live())[0]!.itemKey],
       [unlocked, "ybm_identity.ps_house_digit"],
     ] as const) {
       const items = questionActions(itemKey, facts(d));
@@ -199,10 +198,9 @@ describe("a block's menu", () => {
 
   it("keeps a protected block where it is until it is unlocked", () => {
     const d = live();
-    const items = blockActions("welcome", 0, facts(d));
-    expect(find(items, "move-down").disabled).toMatch(/protected/);
+    const items = blockActions("about_you", 0, facts(d));
     expect(find(items, "remove-block").disabled).toMatch(/protected/);
-    expect(works(() => removeBlock(d, "welcome", 0, actor))).toBe(false);
+    expect(works(() => removeBlock(d, "about_you", 0, actor))).toBe(false);
   });
 
   it("never removes the participant-code questions, unlocked or not", () => {
@@ -247,8 +245,9 @@ describe("the library in the menus (D-57)", () => {
     const d = live();
     expect(find(blockActions("gaming", 0, facts(d)), "save-to-library").disabled).toBeUndefined();
     expect(find(blockActions("wellbeing", 1, facts(d)), "save-to-library").disabled).toMatch(/validated questionnaire is in the library already/);
-    expect(find(blockActions("welcome", 0, facts(d)), "save-to-library").disabled).toMatch(/ethics approval/);
-    // Unlocked or not, the consent and identity modules belong to their study.
+    // The consent is the study's own (D-61), so it can be saved like any module.
+    expect(find(blockActions("welcome", 0, facts(d)), "save-to-library").disabled).toBeUndefined();
+    // Unlocked or not, the identity module belongs to its study.
     const unlocked = unlockModule(d, "ybm_identity", { ...actor, reason: "Testing what the library menu offers here." }).draft;
     expect(find(blockActions("about_you", 0, facts(unlocked)), "save-to-library").disabled).toMatch(/isn’t saved to the library/);
   });

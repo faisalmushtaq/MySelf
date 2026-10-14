@@ -5,13 +5,14 @@
     "version": "9.0.0",
     "assessment": "ybm_nd2026_standard",
     "study": "ybm",
-    "publishedAt": "2026-10-10T09:00:00.000Z",
+    "publishedAt": "2026-10-14T09:00:00.000Z",
     "publishedBy": "faisalmushtaq",
     "engineVersion": "0.3.0",
     "decisionRefs": [
       "D-53",
       "D-58",
-      "D-59"
+      "D-59",
+      "D-61"
     ]
   },
   "composition": {
@@ -2127,10 +2128,10 @@
         "max": 18
       },
       "licence": {
-        "status": "permission_held",
+        "status": "open",
         "holder": "SPARQ / MacArthur Network toolkit, with attribution",
-        "modifiable": "no",
-        "evidence": "Permission held by the research team and filed in the study's licence register (D-10).",
+        "modifiable": "yes",
+        "evidence": "Openly available and free to use for non-commercial research and clinical purposes (SPARQ toolkit); confirmed by the research team 2026-10-14 (D-61).",
         "verified": true
       },
       "forms": [
@@ -9024,5 +9025,5 @@
       "bytes": 589147
     }
   },
-  "hash": "sha256:9f419eb352585daba47029e3425fd3ff600650e687de906ae4c5d2bf7c6c3856"
+  "hash": "sha256:f1224e6e28a5393617d956cc049c4d043f4448511baf2c253074acbcdea02173"
 }

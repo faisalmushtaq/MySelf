@@ -47,7 +47,7 @@ import {
 } from "./editing.js";
 import type { ReservedIds } from "./history.js";
 import { generateScaleKey, generateVariable, uniqueSlug } from "./keys.js";
-import { joinAnd, lockedFingerprint, type LockedOptions } from "./locked.js";
+import { joinAnd, lockedFingerprint, openInLibrary, type LockedOptions } from "./locked.js";
 import { allVariables, findQuestion, identityRoleOf, instrumentDef, isUnlocked, itemsOf, protectedModule, scaleUsage, StudioOpError } from "./model.js";
 import { isMyStorySection } from "./mystory.js";
 import { addSection, archiveQuestion, MIN_UNLOCK_REASON } from "./ops.js";
@@ -1351,6 +1351,32 @@ export function lockVouchers(sources: { releases: StudioDraft[]; library: boolea
     }
   }
   return { reference, referenceScales, referenceScoring };
+}
+
+/**
+ * The licence the instrument library now records for an instrument whose
+ * draft copy is still locked, when the library says its wording may be
+ * modified (D-61); null otherwise. The editor offers to take it up.
+ */
+export function libraryLicenceUpdate(draft: StudioDraft, instrument: string): InstrumentOrModule["licence"] | null {
+  if (!openInLibrary(instrument)) return null;
+  const copies = Object.values(draft.instruments ?? {}).filter((d) => d.instrument === instrument);
+  if (copies.length === 0 || copies.every((d) => d.licence.modifiable === "yes")) return null;
+  for (const { def } of libraryForms().values()) if (def.instrument === instrument) return def.licence as InstrumentOrModule["licence"];
+  return null;
+}
+
+/**
+ * Bring the draft's copies of an instrument up to the licence the library now
+ * records for it (D-61), so its wording can be edited. Only a licence the
+ * library itself marks as modifiable can be taken up this way.
+ */
+export function adoptLibraryLicence(draft: StudioDraft, instrument: string): { draft: StudioDraft } {
+  const licence = libraryLicenceUpdate(draft, instrument);
+  if (!licence) throw new StudioOpError(`The instrument library doesn't list “${instrument}” as one whose wording may be changed.`, "locked");
+  const d = clone(draft);
+  for (const def of Object.values(d.instruments)) if (def.instrument === instrument) def.licence = structuredClone(licence);
+  return { draft: d };
 }
 
 // ---------------------------------------------------------------------------

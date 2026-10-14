@@ -34,6 +34,7 @@ import {
   type LockedOptions,
 } from "./locked.js";
 import { myStoryMisplaced, narrativePlacements, nextProtocolVersion, protocolClash, protocolProblems } from "./mystory.js";
+import { CONSENT_MODULES } from "./model.js";
 import { formOf, liveQuestions, placements, type LiveQuestion, type Placement } from "./walk.js";
 
 /**
@@ -1610,6 +1611,20 @@ function checkAgainstBaseline(m: Model, c: Collector): void {
   }
   for (const d of lockedDifferences(m.draft, baseline, lockedOptions)) c.error(`locked.${d.change}`, d.summary, differenceAt(m, d), d.detail);
   for (const d of protectedDifferences(m.draft, baseline)) c.error(`protected.${d.change}`, d.summary, differenceAt(m, d), d.detail);
+
+  // The consent wording is the study team's to change (D-61), but a survey
+  // that asked for consent can't be published without it.
+  const has = (d: StudioDraft, key: string) => Object.values(d.instruments ?? {}).some((x) => x.instrument === key);
+  for (const key of CONSENT_MODULES) {
+    if (has(baseline, key) && !has(m.draft, key)) {
+      c.error(
+        "consent.removed",
+        "The consent has been removed",
+        { kind: "survey" },
+        "Participants must read the introduction and give their consent before anything else. Put the consent back before publishing.",
+      );
+    }
+  }
 
   // Participant linkage: no unlock permits breaking it.
   const unlocked = isUnlocked(m.draft.unlocked, "ybm_identity");

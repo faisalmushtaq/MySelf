@@ -313,9 +313,9 @@ test("a survey is copied from a published version in another study space", async
   await dialog.getByRole("radio", { name: /A published version of a survey/ }).check();
   await dialog.getByLabel("Survey", { exact: true }).selectOption({ label: "Library one (lib_one)" });
   await expect(dialog.getByLabel("Version", { exact: true })).toHaveValue("1.0.0");
-  // Said before anything is made: another study's consent and identity come with it, protected.
+  // Said before anything is made: another study's consent comes with it to check, and its identity module still protected.
   await expect(dialog.getByText(`From another study space, “${A_TITLE}”`)).toBeVisible();
-  await expect(dialog.getByText(/ethics approval must cover them/)).toBeVisible();
+  await expect(dialog.getByText(/check it is right for this study/)).toBeVisible();
   await dialog.getByRole("button", { name: "Create survey" }).click();
   await expectEditor(B, "lib_copy");
 

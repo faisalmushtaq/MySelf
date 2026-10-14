@@ -437,3 +437,43 @@ survey" workflow, and by hand; a version published with the Studio's button
 is archived by the next daily run, or at once by running it by hand.
 Read-only on Firebase; an archived version is never rewritten. The renderer is
 `packages/studio/src/questionnaire.ts`; the job is `apps/functions/survey-archive.mjs`.
+
+### Consent wording is the team's to edit; the MacArthur ladders are open (2026-10-14, D-61)
+
+**Asked.** "You seem to think we need ethics approval for any update in
+wording but that's not the case. Also SES scale is openly available — 'the
+MacArthur Scale of Subjective Social Status is openly available and free to
+use for non-commercial research and clinical purposes.' I want to make wording
+changes to the SES."
+
+**Decision.**
+
+1. **Consent.** The introduction and consent module (`ybm_intro_consent`) is no
+   longer protected in the Studio. Its wording is edited like any study module,
+   with no unlock and no reason to record, and it can be saved to the library.
+   Two rules stay, neither about wording: nothing may be asked before the
+   consent (`keepConsentFirst`, now applied whether or not anything is
+   unlocked), and a survey that asked for consent can't be published without it
+   (validation `consent.removed`). Whether a change needs an ethics amendment
+   is the team's judgement, not the Studio's.
+2. **Identity.** `ybm_identity` stays protected: the reason is participant
+   linkage (and keeping names and dates of birth out of the research data), not
+   ethics. Unlocking it still asks for a sentence on why linkage is unaffected.
+3. **MacArthur SSS-Y.** The library records it as `open`, wording may be
+   modified, with the team's statement as the evidence. It had been recorded
+   as "permission held, may not be modified".
+4. **How a corrected licence reaches the live survey.** A licence is decided
+   by the repository's instrument library, never by a draft: an editor still
+   can't unlock the SDQ by editing its copy's licence. When the library marks an
+   instrument modifiable, published versions and other releases holding the
+   old locked licence no longer hold it locked (`openInLibrary` in
+   `packages/studio/src/locked.ts`). The Studio offers **Use the library's
+   licence** on the block; that copies the library's licence onto the draft
+   (`adoptLibraryLicence`), after which its wording can be edited and published
+   as usual. Changing the wording of a validated measure means its scores are
+   no longer directly comparable with published norms; the team owns that call.
+
+Survey-side change: the Studio's rules and the library's licence record only.
+Nothing participants see changes until the team edits and publishes. The
+repository candidate (`releases/candidates/…r9.0.0`) is re-cut with D-61 for
+the MacArthur licence.

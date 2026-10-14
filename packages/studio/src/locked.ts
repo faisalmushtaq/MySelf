@@ -1,3 +1,4 @@
+import { allInstruments } from "@myself/library";
 import { canonicalJson, instrumentVersion, moduleDefinition, responseScale, scoringDefinition } from "@myself/schema";
 import type { InstrumentOrModule, ScaleInput, ScoringInput, StudioDraft } from "./contract.js";
 import { editTier as tierOf } from "./model.js";
@@ -12,10 +13,10 @@ import { editTier as tierOf } from "./model.js";
  * it. Only the things around it may change: where it sits, when it is shown,
  * whether answers are required, help text and layout.
  *
- * The consent and identity modules are protected rather than locked: they are
- * the study's own, so they can change, but only after someone has recorded why
- * (an ethics or linkage acknowledgement), because the consent wording is
- * ethics-approved and the identity items are what participant linkage rests on.
+ * The identity module is protected rather than locked: it is the study's own,
+ * so it can change, but only after someone has recorded why (a linkage
+ * acknowledgement), because participant linkage rests on it. The consent
+ * module is the study's own and edited freely (D-61).
  *
  * Both are enforced by comparing the draft with the published version it
  * started from. The comparison is over a canonical fingerprint, so key order or
@@ -50,7 +51,7 @@ export const LOCKED_ALLOWED_FIELDS = [
 export const PROTECTED_ALLOWED_FIELDS = ["researcherNote", "reportingCategory"] as const;
 
 /** Study modules that need an unlock before their content changes. */
-export const PROTECTED_INSTRUMENTS: readonly string[] = ["ybm_intro_consent", "ybm_identity"];
+export const PROTECTED_INSTRUMENTS: readonly string[] = ["ybm_identity"];
 
 /**
  * The four `ybm_identity` questions ingest derives the participant code from
@@ -131,6 +132,25 @@ function licenceLocked(def: unknown): boolean {
   return !!def && typeof def === "object" && (def as { licence?: { modifiable?: unknown } }).licence?.modifiable !== "yes";
 }
 
+let openInLibraryCache: Set<string> | null = null;
+
+/**
+ * Whether the repository's instrument library now says this instrument's
+ * wording may be modified (D-61). The library is the authority on licences —
+ * the draft is not — so when a licence is corrected there (the MacArthur
+ * ladders were recorded as "may not be modified" but are openly available),
+ * published versions and other releases holding the old, locked licence stop
+ * holding the instrument locked. Only the draft's own copy still counts, and
+ * `adoptLibraryLicence` brings that up to date.
+ */
+export function openInLibrary(instrument: string | null): boolean {
+  if (!instrument) return false;
+  openInLibraryCache ??= new Set(
+    allInstruments.filter((d) => (d.licence as { modifiable?: unknown } | undefined)?.modifiable === "yes").map((d) => d.instrument),
+  );
+  return openInLibraryCache.has(instrument);
+}
+
 /**
  * Which of a draft's definitions are locked.
  *
@@ -153,13 +173,14 @@ export function lockedTest(
   const instruments = new Set<string>();
   for (const [refKey, def] of Object.entries(baseline?.instruments ?? {})) {
     if (!licenceLocked(def)) continue;
+    if (openInLibrary(instrumentKeyOf(def))) continue;
     refKeys.add(refKey);
     const key = instrumentKeyOf(def);
     if (key) instruments.add(key);
   }
   for (const def of Object.values(reference ?? {})) {
     const key = instrumentKeyOf(def);
-    if (key && licenceLocked(def)) instruments.add(key);
+    if (key && licenceLocked(def) && !openInLibrary(key)) instruments.add(key);
   }
   return (def, refKey, unlocked) => {
     if (editTier(def, unlocked) === "locked" || refKeys.has(refKey)) return true;
@@ -356,7 +377,7 @@ function compareDefinitions(
   const why =
     options.tier === "locked"
       ? `${name} is a licensed, validated instrument, so it must be administered exactly as published`
-      : `${name} is protected (ethics-approved consent, or the details participant linkage relies on), so it can only change after it has been unlocked with a recorded reason`;
+      : `${name} is protected (the details participant linkage relies on), so it can only change after it has been unlocked with a recorded reason`;
   // Short lines don't name the instrument: its block, or its question, is the heading they sit under.
   const kind = options.tier === "locked" ? "a licensed instrument" : "a protected module";
   const fix =

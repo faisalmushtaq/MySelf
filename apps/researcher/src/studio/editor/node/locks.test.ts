@@ -18,7 +18,6 @@ describe("lock banners", () => {
   });
 
   it("explains protected modules by their reason", () => {
-    expect(protectedBanner(PROTECTED_MODULES["ybm_intro_consent"]!).title).toBe("Part of the ethics-approved consent");
     expect(protectedBanner(PROTECTED_MODULES["ybm_identity"]!).body).toMatch(/safe for participant linkage/);
   });
 

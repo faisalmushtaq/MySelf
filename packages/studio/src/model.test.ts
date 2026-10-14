@@ -32,14 +32,14 @@ describe("editability tiers", () => {
     expect(editTier(draft, "bisbas12_ybm")).toBe("locked"); // "with_permission"
   });
 
-  it("protects consent and identity until unlocked, and leaves the study's modules editable", () => {
-    expect(editTier(draft, "ybm_intro_consent")).toBe("protected");
+  it("protects identity until unlocked, and leaves consent and the study's modules editable", () => {
+    // The consent wording is the study team's to change (D-61).
+    expect(editTier(draft, "ybm_intro_consent")).toBe("editable");
     expect(editTier(draft, "ybm_identity")).toBe("protected");
     expect(editTier(draft, "ybm_smartphone")).toBe("editable");
     expect(editTier(draft, "ybm_studio")).toBe("editable"); // not created yet
-    const unlocked = unlockModule(draft, "ybm_intro_consent", { ...actor, reason: "Amendment 3 approved the new wording on 1 Sept." }).draft;
-    expect(editTier(unlocked, "ybm_intro_consent")).toBe("editable");
-    expect(editTier(unlocked, "ybm_identity")).toBe("protected");
+    const unlocked = unlockModule(draft, "ybm_identity", { ...actor, reason: "Rewording a hint; linkage is unaffected." }).draft;
+    expect(editTier(unlocked, "ybm_identity")).toBe("editable");
   });
 
   it("lets each tier change only what docs/16 §4.4 allows", () => {
@@ -51,8 +51,7 @@ describe("editability tiers", () => {
     expect(fieldAllowed("protected", "required")).toBe(false);
     expect(fieldAllowed("editable", "stem")).toBe(true);
     expect(ALLOWED_FIELDS_BY_TIER.protected).toEqual(["researcherNote", "reportingCategory"]);
-    expect(Object.keys(PROTECTED_MODULES)).toEqual(["ybm_intro_consent", "ybm_identity"]);
-    expect(PROTECTED_MODULES["ybm_intro_consent"]?.explanation).toMatch(/PSCETHS-1449/);
+    expect(Object.keys(PROTECTED_MODULES)).toEqual(["ybm_identity"]);
   });
 });
 
@@ -105,7 +104,8 @@ describe("outline", () => {
   it("marks each block and question with its tier and type", () => {
     const blocks = o.sections.flatMap((s) => s.blocks);
     expect(blocks.find((b) => b.instrument === "sdq25_s")).toMatchObject({ tier: "locked", kind: "instrument", componentIndex: 1 });
-    expect(blocks.find((b) => b.instrument === "ybm_intro_consent")?.tier).toBe("protected");
+    expect(blocks.find((b) => b.instrument === "ybm_intro_consent")?.tier).toBe("editable");
+    expect(blocks.find((b) => b.instrument === "ybm_identity")?.tier).toBe("protected");
     const q = (itemKey: string) => blocks.flatMap((b) => b.questions).find((x) => x.itemKey === itemKey)!;
     expect(q("ybm_smartphone.own")).toMatchObject({ studioType: "yes_no", tier: "editable", required: "soft", indexInPlacement: 0 });
     expect(q("ehi_sf.writing").studioType).toBe("rating");
