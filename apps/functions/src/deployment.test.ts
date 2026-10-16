@@ -25,8 +25,12 @@ const packaged = (): boolean => {
   }
 };
 
+// Loading the whole bundle takes about two seconds alone, and well over the
+// default five under a full parallel test run, where it used to time out.
+const BUNDLE_LOAD_MS = 30_000;
+
 describe("what the deploy tooling will see", () => {
-  it.runIf(packaged())("puts every function in europe-west2", async () => {
+  it.runIf(packaged())("puts every function in europe-west2", { timeout: BUNDLE_LOAD_MS }, async () => {
     // ES modules evaluate imports before the importing module's body, so
     // calling setGlobalOptions in index.ts ran AFTER every re-exported module
     // had defined its functions: the region silently did not apply and all
@@ -45,7 +49,7 @@ describe("what the deploy tooling will see", () => {
     }
   });
 
-  it.runIf(packaged())("binds the relay to the OpenAI secret rather than an environment variable", async () => {
+  it.runIf(packaged())("binds the relay to the OpenAI secret rather than an environment variable", { timeout: BUNDLE_LOAD_MS }, async () => {
     process.env["GCLOUD_PROJECT"] ??= "myself-research";
     const module_ = (await import(bundle)) as Record<string, { __endpoint?: { secretEnvironmentVariables?: { key: string }[] } }>;
     const secrets = module_["llmRelay"]?.__endpoint?.secretEnvironmentVariables ?? [];
