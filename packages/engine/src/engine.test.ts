@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { ItemDefinition, LogicExpr } from "@myself/schema";
 import { AnswerStore } from "./answers.js";
 import { evaluate } from "./evaluate.js";
-import { Walker, type PresentableUnit } from "./walker.js";
+import { computeVisibility, Walker, type PresentableUnit } from "./walker.js";
 
 /**
  * Engine tests built on the YBM structure with the decided corrections:
@@ -218,5 +218,122 @@ describe("age conditions (D-51)", () => {
       "ybm_identity",
       "sdq25_s",
     ]);
+  });
+});
+
+describe("cascading visibility", () => {
+  // The live repro: Yes to another language, tick Polish, answer the Polish
+  // questions, then go back and say No.
+  const speaks = ref("ybm_demographics", "speaks_other_language");
+  const languages = ref("ybm_demographics", "other_languages");
+  const understand = ref("ybm_demographics", "understand_polish");
+  const POLISH = 3;
+  const unitFor = (item: string, displayIf?: LogicExpr): PresentableUnit => ({
+    instrument: "ybm_demographics",
+    sectionKey: "about_you",
+    item: stubItem(item, item),
+    ...(displayIf ? { displayIf } : {}),
+  });
+  const chain: PresentableUnit[] = [
+    unitFor("speaks_other_language"),
+    unitFor("other_languages", { op: "selected", target: { item: speaks }, code: 1 }),
+    unitFor("understand_polish", { op: "selected", target: { item: languages }, code: POLISH }),
+    // A third level, and a condition that only asks whether there is an answer.
+    unitFor("speak_polish", { op: "selected", target: { item: understand }, code: 1 }),
+    unitFor("languages_note", { op: "answered", target: { item: languages } }),
+    unitFor("sleep_hours"),
+  ];
+  const keys = (w: Walker) => w.visibleUnits().map((i) => chain[i]!.item.key);
+  const yesPolish = () => {
+    const store = new AnswerStore();
+    store.set(speaks, answered(1));
+    store.set(languages, { status: "answered", value: { kind: "multi", codes: [POLISH] } });
+    store.set(understand, answered(1));
+    return store;
+  };
+
+  it("shows every level while the chain holds", () => {
+    expect(keys(new Walker(chain, yesPolish(), true))).toEqual([
+      "speaks_other_language",
+      "other_languages",
+      "understand_polish",
+      "speak_polish",
+      "languages_note",
+      "sleep_hours",
+    ]);
+  });
+
+  it("hides everything downstream when an earlier answer changes, however deep", () => {
+    const store = yesPolish();
+    // One walker across the change, as SurveyScreen memoises it: the answer
+    // written after it was built must still be seen.
+    const w = new Walker(chain, store, true);
+    expect(w.isVisible(2)).toBe(true);
+    store.set(speaks, answered(2)); // back, and No
+    expect(keys(w)).toEqual(["speaks_other_language", "sleep_hours"]);
+    expect(w.next(0)).toBe(5);
+    expect(w.back(5)).toBe(0);
+    expect(w.sectionProgress(5).sections).toEqual(["about_you"]);
+  });
+
+  it("leaves stale answers out of what pipes and checks read, without touching the store", () => {
+    const store = yesPolish();
+    store.set(speaks, answered(2));
+    const w = new Walker(chain, store, true);
+    const visible = w.visibleAnswers();
+    expect(visible.get(speaks)).toEqual(answered(2));
+    expect(visible.get(languages)).toBeUndefined();
+    expect(visible.isAnswered(understand)).toBe(false);
+    // What was said is not edited: change back, and it is all there again.
+    expect(store.get(understand)).toEqual(answered(1));
+    store.set(speaks, answered(1));
+    expect(keys(w)).toHaveLength(6);
+    expect(w.visibleAnswers().get(understand)).toEqual(answered(1));
+  });
+
+  it("reports the hidden items by key, and reads targets outside the walk as stored", () => {
+    const store = yesPolish();
+    store.set(speaks, answered(2));
+    const { visible, hidden } = computeVisibility(chain, store);
+    expect(visible).toEqual([true, false, false, false, false, true]);
+    expect([...hidden].sort()).toEqual([
+      "ybm_demographics.languages_note",
+      "ybm_demographics.other_languages",
+      "ybm_demographics.speak_polish",
+      "ybm_demographics.understand_polish",
+    ]);
+    const outside = [unitFor("understand_polish", { op: "selected", target: { item: languages }, code: POLISH })];
+    expect(computeVisibility(outside, store).visible).toEqual([true]);
+  });
+
+  it("counts an item placed twice as shown when either placement is", () => {
+    const store = new AnswerStore();
+    store.set(speaks, answered(2));
+    const twice: PresentableUnit[] = [
+      unitFor("speaks_other_language"),
+      unitFor("other_languages", { op: "selected", target: { item: speaks }, code: 1 }),
+      unitFor("other_languages"),
+    ];
+    expect(computeVisibility(twice, store).hidden.size).toBe(0);
+  });
+
+  it("works out visibility once per answer, not once per question asked of it", () => {
+    const store = new AnswerStore();
+    const many: PresentableUnit[] = Array.from({ length: 220 }, (_, i) =>
+      unitFor(`q${i}`, i === 0 ? undefined : { op: "answered", target: { item: ref("ybm_demographics", `q${i - 1}`) } }),
+    );
+    for (let i = 0; i < 220; i++) store.set(ref("ybm_demographics", `q${i}`), answered(1));
+    const w = new Walker(many, store, true);
+    let at: number | null = w.first();
+    let steps = 0;
+    while (at !== null) {
+      at = w.next(at);
+      steps += 1;
+    }
+    expect(steps).toBe(220);
+    expect(w.visibleAnswers()).toBe(w.visibleAnswers());
+    // Skipping the head of a 220-deep chain hides all of it.
+    store.set(ref("ybm_demographics", "q0"), { status: "skipped" });
+    expect(w.visibleUnits()).toEqual([0]);
   });
 });

@@ -83,6 +83,8 @@ export function ReviewScreen(props: ReviewScreenProps) {
   const { units, scales, store, allowBack, sectionTitles, sessionStart } = props;
   const walker = new Walker(units, store, allowBack, sessionStart);
   const visible = walker.visibleUnits();
+  // Pipes read the answers the visible survey holds, never a stale one.
+  const answers = walker.visibleAnswers();
 
   // Group in administered order, so the review reads like the session did.
   const groups: { key: string; title: string; rows: number[] }[] = [];
@@ -121,7 +123,7 @@ export function ReviewScreen(props: ReviewScreenProps) {
               const record = store.get({ instrument: unit.instrument, item: item.key, revision: item.revision });
               const scale = "scale" in item ? scales.get(item.scale) : undefined;
               const answer = record?.status === "answered" ? describeAnswer(record.value, scale) : null;
-              const stem = resolveText(item.stem.text, item.stem.pipes, store, sessionStart);
+              const stem = resolveText(item.stem.text, item.stem.pipes, answers, sessionStart);
               return (
                 <li key={`${unit.instrument}.${item.key}`}>
                   <button type="button" className="review-row" onClick={() => props.onEdit(index)}>
