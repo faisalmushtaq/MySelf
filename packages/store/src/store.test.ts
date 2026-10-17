@@ -18,7 +18,7 @@ import {
   monthNumber,
   nameKey,
 } from "./identity.js";
-import { ingest, resolveAlias, type DeviceEvent, type DeviceSession } from "./ingest.js";
+import { ingest, numberWaves, resolveAlias, type DeviceEvent, type DeviceSession } from "./ingest.js";
 import {
   exportableNarratives,
   summariseNarrative,
@@ -1172,4 +1172,217 @@ describe("the participant ID from name and date of birth (D-52)", () => {
     expect(rejected[0]!.reason).toContain("name or date of birth missing");
   });
 });
+
+describe("answers to questions the sitting ended up hiding", () => {
+  const load = (version: string): ReleaseManifest =>
+    releaseManifest.parse(
+      JSON.parse(readFileSync(fileURLToPath(new URL(`../../../releases/ybm_nd2026_standard_r${version}.manifest.json`, import.meta.url)), "utf8")),
+    );
+  const choice = (code: number) => ({ value: { kind: "choice", code } });
+  const rowsOf = (dataset: Dataset) => new Map(dataset.responses.map((r) => [`${r.instrument}.${r.item}`, r]));
+
+  it("files them as not presented, with no value, down every level of the branch", () => {
+    // A gamer names a game and says how long they play it, then goes back and
+    // says they do not game. r7.0.0: hours_week -> top_games -> game_time_1.
+    const s = session("s1", alice, {
+      extra: [
+        ev("response.recorded", "ybm_gaming.hours_week", choice(3)),
+        ev("response.recorded", "ybm_gaming.top_games", { value: { kind: "fields", values: { game_1: "Minecraft" } } }),
+        ev("response.recorded", "ybm_gaming.game_time_1", choice(2)),
+        ev("response.changed", "ybm_gaming.hours_week", choice(1)),
+      ],
+    });
+    const { dataset } = ingest([s], { manifest, study: "ybm" });
+    const rows = rowsOf(dataset);
+    expect(rows.get("ybm_gaming.hours_week")).toMatchObject({ status: "answered", value: 1 });
+    for (const key of ["ybm_gaming.top_games", "ybm_gaming.game_time_1"]) {
+      expect(rows.get(key), key).toMatchObject({ status: "not_presented_branching", value: null, text: null, label: null });
+    }
+    // Counted as what they now are: one answer, not three.
+    expect(dataset.sessions[0]!.answeredCount).toBe(5); // four code parts + hours_week
+  });
+
+  it("keeps them while the branch is still open", () => {
+    const s = session("s1", alice, {
+      extra: [
+        ev("response.recorded", "ybm_gaming.hours_week", choice(3)),
+        ev("response.recorded", "ybm_gaming.top_games", { value: { kind: "fields", values: { game_1: "Minecraft" } } }),
+        ev("response.recorded", "ybm_gaming.game_time_1", choice(2)),
+      ],
+    });
+    const rows = rowsOf(ingest([s], { manifest, study: "ybm" }).dataset);
+    expect(rows.get("ybm_gaming.game_time_1")).toMatchObject({ status: "answered", value: 2 });
+  });
+
+  it("leaves them out of the score, judging age conditions on the day the sitting started", () => {
+    // A 15-year-old's SDQ answered, then the date of birth corrected to an
+    // adult's: the 11–17 form is no longer this sitting's form (D-51).
+    const release = load("8.0.0");
+    seq = 0;
+    const sdq = Array.from({ length: 25 }, (_, i) => ev("response.recorded", `sdq25_s.q${i + 1}`, choice(1)));
+    const sitting = (id: string, dobs: string[]): DeviceSession => ({
+      sessionId: id,
+      studyCode: "NDC0042",
+      releaseKey: release.release.key,
+      releaseHash: release.hash ?? "sha256:test",
+      startedAt: "2026-09-29T09:00:00.000Z",
+      complete: true,
+      events: [
+        ev("response.recorded", "ybm_identity.first_name", { value: { kind: "text", value: "Amara" } }),
+        ev("response.recorded", "ybm_identity.last_name", { value: { kind: "text", value: "Hussain" } }),
+        ev("response.recorded", "ybm_identity.dob", { value: { kind: "date", iso: dobs[0]! } }),
+        ...sdq,
+        ...dobs.slice(1).map((iso) => ev("response.changed", "ybm_identity.dob", { value: { kind: "date", iso } })),
+      ],
+    });
+    const of = (dataset: Dataset, output: string) =>
+      dataset.scores.find((r) => r.scoringKey === "score.sdq25_s" && r.output === output)!;
+
+    const young = ingest([sitting("y", ["2011-05-04"])], { manifest: release, study: "demo" }).dataset;
+    expect(of(young, "emotional").value).toBe(5);
+
+    // 18 on the day the sitting started: the change hides the whole 11–17 form.
+    const corrected = ingest([sitting("c", ["2011-05-04", "2008-09-29"])], { manifest: release, study: "demo" }).dataset;
+    const sdqRows = corrected.responses.filter((r) => r.instrument === "sdq25_s");
+    expect(sdqRows).toHaveLength(25);
+    expect(sdqRows.every((r) => r.status === "not_presented_branching" && r.value === null)).toBe(true);
+    expect(of(corrected, "emotional").value).toBeNull();
+    expect(of(corrected, "emotional").validCount).toBe(0);
+  });
+
+  it("scores a code the item's scale does not have as missing, and keeps the response as recorded (F5)", () => {
+    const sdq = [1, 2, 3, 4, 5].flatMap((n) => [
+      ev("response.recorded", `sdq25_s.q${[3, 8, 13, 16, 24][n - 1]}`, choice(n === 1 ? 7 : 1)),
+    ]);
+    const { dataset } = ingest([session("s1", alice, { extra: sdq })], { manifest, study: "ybm" });
+    const emotional = dataset.scores.find((r) => r.scoringKey === "score.sdq25_s" && r.output === "emotional")!;
+    expect(emotional.value).toBe(5); // 4 valid answers of 1, prorated — never 1+1+1+1+7
+    expect(emotional.validCount).toBe(4);
+    expect(emotional.warnings.some((w) => w.includes("'q3'"))).toBe(true);
+    expect(dataset.responses.find((r) => r.instrument === "sdq25_s" && r.item === "q3")).toMatchObject({ status: "answered", value: 7 });
+  });
+});
+
+describe("linking across releases", () => {
+  const load = (version: string): ReleaseManifest =>
+    releaseManifest.parse(
+      JSON.parse(readFileSync(fileURLToPath(new URL(`../../../releases/ybm_nd2026_standard_r${version}.manifest.json`, import.meta.url)), "utf8")),
+    );
+  const newer = load("7.2.0");
+  const under = (release: ReleaseManifest, s: DeviceSession): DeviceSession => ({
+    ...s,
+    releaseKey: release.release.key,
+    releaseHash: release.hash ?? "sha256:newer",
+  });
+
+  it("numbers waves by when the sittings started, not by which release was read first (F3)", () => {
+    // Jan and Sep under the older release; March under the newer one, on an
+    // iPad that had picked it up early. Read a release at a time, as the
+    // researcher view and the export do.
+    const older = ingest(
+      [
+        session("jan", alice, { startedAt: "2026-01-10T09:00:00.000Z" }),
+        session("sep", alice, { startedAt: "2026-09-10T09:00:00.000Z" }),
+      ],
+      { manifest, study: "ybm" },
+    );
+    const both = ingest([under(newer, session("mar", alice, { startedAt: "2026-03-10T09:00:00.000Z" }))], {
+      manifest: newer,
+      study: "ybm",
+      existing: older.dataset,
+    });
+    const waves = Object.fromEntries(both.dataset.sessions.map((s) => [s.sessionId, s.wave]));
+    expect(waves).toEqual({ jan: 1, mar: 2, sep: 3 });
+    expect(both.dataset.participants[0]!.sessionCount).toBe(3);
+  });
+
+  it("reports twins who gave their names under different releases (F2)", () => {
+    const twin = (id: string, firstName: string, startedAt: string) =>
+      session(id, alice, {
+        startedAt,
+        extra: [ev("response.recorded", "ybm_identity.first_name", { value: { kind: "text", value: firstName } })],
+      });
+    const first = ingest([twin("t1", "Amara", "2026-03-01T09:00:00.000Z")], { manifest, study: "ybm" });
+    expect(first.collisions).toEqual([]);
+    const second = ingest([under(newer, twin("t2", "Zayn", "2026-03-01T10:00:00.000Z"))], {
+      manifest: newer,
+      study: "ybm",
+      existing: first.dataset,
+      nameSightings: first.nameSightings,
+    });
+    expect(second.collisions).toEqual([{ participantId: "JA101CD", names: ["amara", "zayn"], sessions: ["t1", "t2"] }]);
+    // The caller's sightings are not written to.
+    expect([...first.nameSightings.get("JA101CD")!.keys()]).toEqual(["amara"]);
+  });
+
+  it("links 20,000 small sittings in a few seconds (F11)", () => {
+    // Small sittings — the secret code and one answer — from 5,000 people,
+    // four each. Linking used to count each person's earlier rows per sitting.
+    const letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    const sittings: DeviceSession[] = [];
+    for (let p = 0; p < 5000; p++) {
+      const parts = {
+        initials: letters[p % 26]! + letters[Math.floor(p / 26) % 26]!,
+        digit: String(Math.floor(p / 676) % 10),
+        month: 1,
+        postcode: "CD",
+      };
+      for (let w = 0; w < 4; w++) {
+        sittings.push(
+          session(`p${p}w${w}`, parts, {
+            startedAt: `202${6 + w}-0${1 + (p % 9)}-01T09:00:00.000Z`,
+            extra: [ev("response.recorded", "ybm_smartphone.own", { value: { kind: "choice", code: 1 } })],
+          }),
+        );
+      }
+    }
+    const t0 = performance.now();
+    const { dataset } = ingest(sittings, { manifest, study: "ybm" });
+    const ms = performance.now() - t0;
+    expect(dataset.sessions).toHaveLength(20_000);
+    expect(dataset.participants).toHaveLength(5000);
+    expect(dataset.sessions.filter((s) => s.wave === 4)).toHaveLength(5000);
+    // About 2–3.5 s here, nearly all of it replaying, walking and scoring each
+    // sitting (the old per-sitting count added about 4 s on top). A loose
+    // bound for slow CI; the test below is the one that tells n log n from n².
+    expect(ms).toBeLessThan(8000);
+  }, 30_000);
+
+  it("numbers 200,000 sittings' waves with one sort", () => {
+    const rows = Array.from({ length: 200_000 }, (_, i) => ({
+      ...emptyRow,
+      sessionId: `s${i}`,
+      participantId: `P${i % 50_000}`,
+      // Each person's latest sitting arrives first.
+      startedAt: `20${29 - Math.floor(i / 50_000)}-01-01T09:00:00.000Z`,
+    }));
+    const t0 = performance.now();
+    const numbered = numberWaves(rows);
+    expect(performance.now() - t0).toBeLessThan(2000);
+    // Rows keep their order; only the wave changes.
+    expect(numbered.filter((s) => s.participantId === "P0").map((s) => [s.startedAt.slice(0, 4), s.wave])).toEqual([
+      ["2029", 4],
+      ["2028", 3],
+      ["2027", 2],
+      ["2026", 1],
+    ]);
+  });
+});
+
+const emptyRow = {
+  sessionId: "",
+  participantId: "",
+  study: "ybm",
+  wave: 0,
+  releaseKey: "k",
+  releaseHash: "h",
+  startedAt: "",
+  resumedCount: 0,
+  answeredCount: 0,
+  skippedCount: 0,
+  tooFastCount: 0,
+  revisitedCount: 0,
+  reviewEdits: 0,
+  complete: true,
+};
 

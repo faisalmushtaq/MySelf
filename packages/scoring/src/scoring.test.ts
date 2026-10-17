@@ -66,6 +66,22 @@ describe("SDQ scoring (canonical 0-2 codes)", () => {
     executeScoring(sdq, input);
     expect(input["q7"]).toBe(2); // reverse happened on a working copy only
   });
+
+  it("scores a code the scale does not have as missing, not as a number (dashboard F5)", () => {
+    const codes = Object.fromEntries(Array.from({ length: 25 }, (_, i) => [`q${i + 1}`, [0, 1, 2]]));
+    const input = sdqAll(1);
+    input["q3"] = 7; // emotional item; no SDQ option is 7
+    const { outputs, warnings, validCounts } = executeScoring(sdq, input, { codes });
+    expect(outputs["emotional"]).toBe(5); // prorated from the 4 real answers, not 1+1+1+1+7
+    expect(validCounts["emotional"]).toBe(4);
+    expect(warnings.some((w) => w.includes("'q3'"))).toBe(true);
+    expect(input["q3"]).toBe(7); // the response itself is untouched
+    // A reverse-scored item is checked before it is reversed: 7 is not "2 - 7".
+    const reversed = executeScoring(sdq, { ...sdqAll(1), q7: 7 }, { codes });
+    expect(reversed.validCounts["conduct"]).toBe(4);
+    // Without the scale's codes, the executor takes values as they come.
+    expect(executeScoring(sdq, input).outputs["emotional"]).toBe(11);
+  });
 });
 
 describe("EHI-SF laterality quotient", () => {
