@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { expect, test, type Page, type Route } from "@playwright/test";
+import { openStaffPanel } from "./support/staff.js";
 
 /**
  * A survey published after the app was built reaching an iPad (docs/16 §5.3).
@@ -424,7 +425,7 @@ test.describe("a survey published after this build", () => {
     await study.attach(page);
 
     await page.goto("./");
-    for (let i = 0; i < 5; i += 1) await buildLine(page).click();
+    await openStaffPanel(page);
     const note = page.locator(".handover .release-note");
     await expect(note).toContainText("was not used", { timeout: 15_000 });
     await expect(note).toContainText("changed after it was published");

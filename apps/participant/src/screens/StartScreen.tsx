@@ -28,6 +28,24 @@ export interface StartNotice {
   dismiss?: () => void;
 }
 
+/**
+ * What the empty code box says, whatever the release's `placeholder` is.
+ *
+ * Releases to r9 carry `NDC0042`, which is a perfectly valid code, and a code
+ * shown on every iPad is the first one anybody tries. So the box shows words,
+ * never a code, and an example in the release's format hint is swapped for
+ * `CODE_EXAMPLE`, whose letters no study issues. The releases themselves are
+ * frozen and hashed, so this is done here rather than in them.
+ */
+export const CODE_PLACEHOLDER = "Type your code here";
+export const CODE_EXAMPLE = "ABC1234";
+
+/** The release's hint with its own example code, if it quotes one, replaced by `CODE_EXAMPLE`. */
+export function codeHint(rule: NonNullable<ReleaseManifest["composition"]["participantCode"]>): string {
+  const example = rule.placeholder?.trim();
+  return example ? rule.hint.split(example).join(CODE_EXAMPLE) : rule.hint;
+}
+
 export interface StartScreenProps {
   notice?: StartNotice | null;
   /** `study/survey` when the iPad runs a survey other than this build's default, for the build line. */
@@ -110,7 +128,7 @@ export function StartScreen({
         <input
           className="text-input code"
           value={code}
-          placeholder={codeRule?.placeholder ?? "NDC0000"}
+          placeholder={CODE_PLACEHOLDER}
           autoCapitalize="characters"
           autoComplete="off"
           aria-invalid={codeError !== null}

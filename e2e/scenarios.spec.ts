@@ -2,6 +2,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { expect, test, type Page } from "@playwright/test";
 import { CANDIDATE, openOnCandidate } from "./support/candidate.js";
+import { openStaffPanel } from "./support/staff.js";
 
 /**
  * Whole sittings through the real app, down different paths, handed over and read
@@ -299,8 +300,7 @@ async function sit(page: Page, s: Scenario): Promise<Set<string>> {
 
 async function handOver(page: Page): Promise<unknown> {
   await page.locator("button.next.big").first().click();
-  const buildLine = page.locator("p.demo-note");
-  for (let i = 0; i < 5; i += 1) await buildLine.click();
+  await openStaffPanel(page);
   await page.locator('.handover input[type="password"]').fill(PASSPHRASE);
   const download = page.waitForEvent("download");
   await page.locator("button", { hasText: "Export completed sessions" }).click();

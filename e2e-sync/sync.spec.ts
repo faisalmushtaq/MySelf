@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import type { ChunkDoc, SessionDoc } from "@myself/firebase";
 import type { StudyServer } from "../e2e/support/study-server.js";
+import { openStaffPanel } from "../e2e/support/staff.js";
 import { accepted, position } from "../e2e/support/walker.js";
 
 /**
@@ -329,8 +330,7 @@ test("a sitting survives the study being unreachable and lands when it returns",
 
   // The operator's Sync now, which is what a researcher reaches for.
   await page.locator("button.next.big").first().click();
-  const buildLine = page.locator("p.demo-note");
-  for (let i = 0; i < 5; i += 1) await buildLine.click();
+  await openStaffPanel(page);
   await page.locator("button", { hasText: /Sync completed sessions/ }).click();
 
   const [id] = await waitForSittings(1);

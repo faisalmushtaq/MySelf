@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { openStaffPanel, STAFF_PIN } from "./support/staff.js";
 import { accepted, advance, position } from "./support/walker.js";
 
 /**
@@ -220,6 +221,32 @@ async function walkToEnd(page: Page, limit = 400): Promise<number> {
   throw new Error(`did not reach the end of the sitting within ${limit} screens`);
 }
 
+/** The date `answerCurrentScreen` gives for a date of birth. */
+const DOB = "2012-05-14";
+
+/** Walk until the date-of-birth screen has been answered and left. */
+async function walkPastDateOfBirth(page: Page, limit = 30): Promise<void> {
+  const onDob = async () => (await page.locator('.survey-body input[type="date"]:visible').count()) > 0;
+  let seen = false;
+  for (let screens = 0; screens < limit; screens += 1) {
+    // `step` counts the date being read back ("that makes you 14") as moving
+    // on, so the screen is only left once the date input itself has gone.
+    seen ||= await onDob();
+    await step(page);
+    if (seen && !(await onDob())) return;
+  }
+  throw new Error(`did not get past the date of birth within ${limit} screens`);
+}
+
+/** The check a code that matches an unfinished sitting meets: its date of birth. */
+async function carryOnWith(page: Page, dob: string): Promise<void> {
+  const check = page.locator(".screen.dob-check");
+  await expect(check).toContainText("To carry on, enter your date of birth");
+  await check.locator('input[type="date"]').fill(dob);
+  await check.getByRole("button", { name: "Carry on" }).click();
+  await expect(check).toHaveCount(0);
+}
+
 test.describe("a sitting on a device with no study configured", () => {
   test("starts, records answers, and says everything is saved locally", async ({ page }) => {
     await startSitting(page);
@@ -237,16 +264,22 @@ test.describe("a sitting on a device with no study configured", () => {
     // the sitting starts again from question one.
     await startSitting(page);
 
-    for (let i = 0; i < 6; i += 1) await step(page);
+    // Past the date of birth, so carrying on needs it (lib/dob.ts).
+    await walkPastDateOfBirth(page);
+    const where = await position(page);
     const before = await countStoredEvents(page);
     expect(before).toBeGreaterThan(0);
 
     await page.reload();
     await page.locator("input.code").fill(CODE);
     await page.locator("button.next.big").click();
+    await carryOnWith(page, DOB);
 
-    // Resumed, not restarted: the event log still holds everything from before.
+    // Resumed, not restarted: the same screen, one sitting, and the log still
+    // holds everything from before.
     await expect(page.locator(".survey, .screen.checkin")).toBeVisible();
+    expect(await position(page)).toBe(where);
+    expect(await countRows(page, "sessions")).toBe(1);
     const after = await countStoredEvents(page);
     expect(after).toBeGreaterThanOrEqual(before);
   });
@@ -285,9 +318,7 @@ test.describe("a sitting on a device with no study configured", () => {
 
     // The handover panel sits behind five taps on the build line, so a
     // participant cannot wander into it.
-    const buildLine = page.locator("p.demo-note");
-    for (let i = 0; i < 5; i += 1) await buildLine.click();
-    await expect(page.locator(".handover")).toBeVisible();
+    await openStaffPanel(page);
 
     const exportButton = page.locator("button", { hasText: "Export completed sessions" });
     // Nothing can be written before a passphrase is given: the plaintext file
@@ -358,8 +389,7 @@ test.describe("a sitting on a device with no study configured", () => {
     // plainly that everything stays on the device rather than implying an upload
     // that cannot happen.
     await page.goto("./");
-    const buildLine = page.locator("p.demo-note");
-    for (let i = 0; i < 5; i += 1) await buildLine.click();
+    await openStaffPanel(page);
 
     const handover = page.locator(".handover");
     await expect(handover).toBeVisible();
@@ -404,7 +434,7 @@ test.describe("a sitting on a device with no study configured", () => {
 
     // And the handover panel carries the same warning for the researcher deciding
     // whether this device can be put away.
-    for (let i = 0; i < 5; i += 1) await page.locator("p.demo-note").click();
+    await openStaffPanel(page);
     await expect(page.locator(".handover")).toContainText("deleted after 7 days");
   });
 
@@ -467,6 +497,255 @@ test.describe("a sitting on a device with no study configured", () => {
     await expect(page.getByRole("button", { name: /hand back to the researcher/i })).toBeVisible();
   });
 });
+
+/**
+ * A shared iPad: one child must not be able to see another's answers by typing
+ * their code, by picking up an iPad somebody walked away from, or by finding
+ * the staff panel.
+ */
+test.describe("a shared iPad", () => {
+  test("shows no real-looking code on the start screen", async ({ page }) => {
+    await page.goto("./");
+    const input = page.locator("input.code");
+    await expect(input).toHaveAttribute("placeholder", "Type your code here");
+    // The format hint's example is not one the study could have issued.
+    await input.fill("NDC12");
+    await page.locator("button.next.big").click();
+    await expect(page.locator(".code-field .error")).toContainText("ABC1234");
+    await expect(page.locator(".code-field .error")).not.toContainText("NDC0042");
+  });
+
+  test("carries a sitting on only with the date of birth it holds", async ({ page }) => {
+    await startSitting(page);
+    await walkPastDateOfBirth(page);
+    const where = await position(page);
+
+    // Another child, the same code: asked for the date of birth, shown nothing.
+    await page.reload();
+    await page.locator("input.code").fill(CODE);
+    await page.locator("button.next.big").click();
+    const check = page.locator(".screen.dob-check");
+    await expect(check).toContainText("To carry on, enter your date of birth");
+    await expect(page.locator(".survey")).toHaveCount(0);
+
+    // "That's not me" goes back to the start with nothing carried on.
+    await check.getByRole("button", { name: "That's not me" }).click();
+    await expect(page.locator("h1.brand")).toBeVisible();
+    await expect(page.locator("input.code")).toHaveValue("");
+
+    // The right date carries on, where it stopped, and Back reaches the answers given.
+    await page.locator("input.code").fill(CODE);
+    await page.locator("button.next.big").click();
+    await carryOnWith(page, DOB);
+    await expect(page.locator(".survey")).toBeVisible();
+    expect(await position(page)).toBe(where);
+    expect(await countRows(page, "sessions")).toBe(1);
+  });
+
+  test("refuses a wrong date of birth, and after three needs staff", async ({ page }) => {
+    await startSitting(page);
+    await walkPastDateOfBirth(page);
+
+    await page.reload();
+    const events = await countStoredEvents(page);
+    const check = page.locator(".screen.dob-check");
+    await page.locator("input.code").fill(CODE);
+    await page.locator("button.next.big").click();
+    for (const [wrong, left] of [["2011-01-01", 2], ["2012-05-15", 1]] as const) {
+      await check.locator('input[type="date"]').fill(wrong);
+      await check.getByRole("button", { name: "Carry on" }).click();
+      await expect(check.locator(".error")).toContainText(`That date doesn't match`);
+      await expect(check.locator(".error")).toContainText(`${left} ${left === 1 ? "try" : "tries"} left`);
+      await expect(page.locator(".survey")).toHaveCount(0);
+    }
+    await check.locator('input[type="date"]').fill("2010-02-02");
+    await check.getByRole("button", { name: "Carry on" }).click();
+    await expect(check).toContainText("can't be carried on with on this iPad");
+    await check.getByRole("button", { name: "OK" }).click();
+    // Nothing was added to the sitting by any of that.
+    expect(await countStoredEvents(page)).toBe(events);
+
+    // Locked on this iPad, even with the right date, and across a reload.
+    await page.reload();
+    await page.locator("input.code").fill(CODE);
+    await page.locator("button.next.big").click();
+    await expect(page.locator(".code-field .error")).toContainText("can't be carried on with on this iPad");
+    await expect(check).toHaveCount(0);
+
+    // Staff allow it again; then the right date carries on.
+    await openStaffPanel(page);
+    await page.getByRole("button", { name: `Allow ${CODE} to carry on` }).click();
+    await expect(page.locator(".handover")).toContainText(`${CODE} can carry on its unfinished sitting again`);
+    await page.locator("input.code").fill(CODE);
+    await page.locator("button.next.big").click();
+    // Starting closed the panel.
+    await expect(page.locator(".handover")).toHaveCount(0);
+    await carryOnWith(page, DOB);
+    await expect(page.locator(".survey")).toBeVisible();
+    expect(await countRows(page, "sessions")).toBe(1);
+  });
+
+  test("goes back to the start after ten idle minutes, keeping the sitting for its date of birth", async ({ page }) => {
+    await page.clock.install();
+    await startSitting(page);
+    await walkPastDateOfBirth(page);
+    const where = await position(page);
+
+    await page.clock.fastForward("09:30");
+    await expect(page.locator(".idle-notice")).toHaveCount(0);
+    await page.clock.fastForward("00:31");
+    const notice = page.locator(".idle-notice");
+    await expect(notice).toContainText("Are you still there?");
+    await expect(notice).toContainText(/back to the start in \d+ seconds/);
+
+    // "I'm still here" puts it away, and the quiet period starts again.
+    await notice.getByRole("button", { name: "I'm still here" }).click();
+    await expect(notice).toHaveCount(0);
+    await expect(page.locator(".survey")).toBeVisible();
+
+    await page.clock.fastForward("10:00");
+    await expect(notice).toBeVisible();
+    await page.clock.fastForward("01:01");
+    await expect(page.locator(".screen.start")).toBeVisible();
+    await expect(page.locator(".survey")).toHaveCount(0);
+
+    // Recorded as suspended, and carried on only with the date of birth.
+    await page.locator("input.code").fill(CODE);
+    await page.locator("button.next.big").click();
+    await carryOnWith(page, DOB);
+    await expect(page.locator(".survey")).toBeVisible();
+    expect(await position(page)).toBe(where);
+  });
+
+  test("hands a finished sitting back after two idle minutes, and the review list goes with it", async ({ page }) => {
+    test.slow();
+    await page.clock.install();
+    await startSitting(page);
+    await walkToEnd(page);
+    await expect(page.locator(".screen.finish")).toBeVisible();
+
+    // The review list, left: a countdown in the last twenty seconds…
+    await page.getByRole("button", { name: /go back to my answers/i }).click();
+    await expect(page.locator(".screen.review")).toBeVisible();
+    await page.clock.fastForward("01:41");
+    const notice = page.locator(".idle-notice");
+    await expect(notice).toContainText("Still there?");
+    await expect(notice).toContainText(/close in \d+ seconds/);
+    // …then the start screen, with nothing of the sitting reachable.
+    await page.clock.fastForward("00:21");
+    await expect(page.locator(".screen.start")).toBeVisible();
+    await expect(page.locator(".screen.review, .screen.finish")).toHaveCount(0);
+
+    // Its code starts a new sitting: a finished one is never reopened.
+    await page.locator("input.code").fill(CODE);
+    await page.locator("button.next.big").click();
+    await expect(page.locator(".screen.dob-check")).toHaveCount(0);
+    await expect(page.locator(".survey")).toBeVisible();
+    await expect(page.locator(".screen.review")).toHaveCount(0);
+    expect(await countRows(page, "sessions")).toBe(2);
+  });
+
+  test("puts the staff panel behind a PIN set on first use, with a lockout", async ({ page }) => {
+    await page.clock.install();
+    await page.goto("./");
+    const buildLine = page.locator("p.demo-note");
+    const gate = page.locator("form.staff-pin");
+    const tap5 = async () => {
+      for (let i = 0; i < 5; i += 1) await buildLine.click();
+    };
+
+    // First use: choose a PIN. Nothing of the panel, the export least of all, is there yet.
+    await tap5();
+    await expect(gate).toContainText("Set a staff PIN for this iPad");
+    await expect(page.locator(".handover")).toHaveCount(0);
+    await expect(page.getByRole("button", { name: /export/i })).toHaveCount(0);
+    const [first, second] = [gate.locator('input[type="password"]').nth(0), gate.locator('input[type="password"]').nth(1)];
+    await first.fill("2468");
+    await second.fill("2469");
+    await gate.getByRole("button", { name: "Set PIN and open" }).click();
+    await expect(gate).toContainText("not the same");
+    await first.fill(STAFF_PIN);
+    await second.fill(STAFF_PIN);
+    await gate.getByRole("button", { name: "Set PIN and open" }).click();
+    await expect(page.locator(".handover")).toBeVisible();
+
+    // Never stored as itself.
+    expect(JSON.stringify(await guardRows(page))).not.toContain(STAFF_PIN);
+
+    // Closed, and opened again: now it asks for the PIN, also after a reload.
+    await tap5();
+    await expect(page.locator(".handover")).toHaveCount(0);
+    await page.reload();
+    await tap5();
+    await expect(gate).toContainText("Staff PIN");
+    await expect(gate.locator('input[type="password"]')).toHaveCount(1);
+
+    // Five wrong tries lock it for five minutes; the right PIN is refused meanwhile.
+    const pin = gate.locator('input[type="password"]');
+    for (let left = 4; left >= 1; left -= 1) {
+      await pin.fill("1111");
+      await gate.getByRole("button", { name: "Open" }).click();
+      await expect(gate).toContainText(`${left} ${left === 1 ? "try" : "tries"} left`);
+    }
+    await pin.fill("1111");
+    await gate.getByRole("button", { name: "Open" }).click();
+    await expect(gate).toContainText("Too many wrong PINs");
+    await pin.fill(STAFF_PIN);
+    await gate.getByRole("button", { name: "Open" }).click();
+    await expect(gate).toContainText("Too many wrong PINs");
+    await expect(page.locator(".handover")).toHaveCount(0);
+
+    // Five minutes on. The gate, left that long, has closed itself (lib/idle.ts).
+    await page.clock.fastForward("05:01");
+    await expect(gate).toHaveCount(0);
+    await tap5();
+    await pin.fill(STAFF_PIN);
+    await gate.getByRole("button", { name: "Open" }).click();
+    await expect(page.locator(".handover")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Export completed sessions" })).toBeVisible();
+
+    // Left open and untouched, it locks itself again.
+    await page.clock.fastForward("02:01");
+    await expect(page.locator(".handover")).toHaveCount(0);
+  });
+});
+
+/** The shared-iPad guards as stored: the PIN record and any code's wrong-date count. */
+async function guardRows(page: Page): Promise<unknown[]> {
+  return page.evaluate(
+    () =>
+      new Promise<unknown[]>((resolve, reject) => {
+        const open = indexedDB.open("myself");
+        open.onerror = () => reject(new Error("could not open the device database"));
+        open.onsuccess = () => {
+          const database = open.result;
+          if (!database.objectStoreNames.contains("guards")) return resolve([]);
+          const all = database.transaction("guards", "readonly").objectStore("guards").getAll();
+          all.onsuccess = () => resolve(all.result as unknown[]);
+          all.onerror = () => reject(new Error("could not read guards"));
+        };
+      }),
+  );
+}
+
+/** How many rows a table of the device database holds. */
+async function countRows(page: Page, table: string): Promise<number> {
+  return page.evaluate(
+    (name) =>
+      new Promise<number>((resolve, reject) => {
+        const open = indexedDB.open("myself");
+        open.onerror = () => reject(new Error("could not open the device database"));
+        open.onsuccess = () => {
+          const database = open.result;
+          if (!database.objectStoreNames.contains(name)) return resolve(0);
+          const count = database.transaction(name, "readonly").objectStore(name).count();
+          count.onsuccess = () => resolve(count.result);
+          count.onerror = () => reject(new Error(`could not count ${name}`));
+        };
+      }),
+    table,
+  );
+}
 
 /**
  * How many events this device has actually written.

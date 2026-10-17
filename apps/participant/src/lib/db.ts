@@ -8,6 +8,8 @@ import {
   type AccessibilityPreferences,
 } from "./accessibility.js";
 import { ulid } from "./ulid.js";
+import type { PinRecord } from "./pin.js";
+import type { DobGuard } from "./dob.js";
 import type { DeviceEventUpload, SittingUploadItem } from "@myself/store";
 
 /**
@@ -166,6 +168,15 @@ export interface SelectionRow {
   lastLink: string | null;
 }
 
+/**
+ * The shared-iPad guards (lib/pin.ts, lib/dob.ts): the staff PIN, kept only as
+ * a salted hash, and the wrong-date-of-birth count for each code that has had
+ * one. Kept here rather than in the browser's other storage so they last
+ * exactly as long as the sittings they protect, and go with them when the
+ * site's data is cleared — which is how a forgotten PIN is reset (docs/15).
+ */
+export type GuardRow = ({ id: "staff-pin" } & PinRecord) | ({ id: `resume:${string}`; participantCode: string } & DobGuard);
+
 /** How the handover panel names this device. */
 export interface Enrolment {
   deviceId: string;
@@ -214,6 +225,7 @@ class MySelfDb extends Dexie {
   releases!: EntityTable<CachedReleaseRow, "hash">;
   /** Release state rows and the selection row: both keyed by `id`, no index added (see version 5). */
   release_state!: EntityTable<ReleaseStateRow | SelectionRow, "id">;
+  guards!: EntityTable<GuardRow, "id">;
 
   constructor() {
     super("myself");
@@ -297,6 +309,24 @@ class MySelfDb extends Dexie {
       accessibility: "id, updatedAt",
       releases: "hash, cachedAt",
       release_state: "id",
+    });
+    /**
+     * Version 6: the staff PIN and the resume guards. ONLY ADDS A TABLE, for
+     * the reason version 4 spells out; every existing table is restated
+     * unchanged, and an empty `guards` means no PIN set yet and no code locked.
+     */
+    this.version(6).stores({
+      sessions: "sessionId, participantCode, state, updatedAt",
+      events: "eventId, sessionId, [sessionId+seq]",
+      device: "id",
+      install: "id",
+      sync_state: "sessionId, nextAttemptAt, syncedAt, quarantinedAt",
+      receipts: "sessionId, verifiedAt",
+      checkpoints: "sessionId, at",
+      accessibility: "id, updatedAt",
+      releases: "hash, cachedAt",
+      release_state: "id",
+      guards: "id",
     });
   }
 }
@@ -827,6 +857,40 @@ export async function pruneCachedReleases(keep: readonly string[]): Promise<stri
     if (drop.length > 0) await db.releases.bulkDelete(drop);
     return drop;
   });
+}
+
+export async function getStaffPin(): Promise<PinRecord | undefined> {
+  const row = await db.guards.get("staff-pin");
+  if (!row || row.id !== "staff-pin") return undefined;
+  const { id: _id, ...record } = row;
+  return record;
+}
+
+export async function saveStaffPin(record: PinRecord): Promise<void> {
+  await db.guards.put({ id: "staff-pin", ...record });
+}
+
+const resumeGuardId = (participantCode: string) => `resume:${participantCode}` as const;
+
+export async function getResumeGuard(participantCode: string): Promise<DobGuard | null> {
+  const row = await db.guards.get(resumeGuardId(participantCode));
+  if (!row || row.id === "staff-pin") return null;
+  return { failures: row.failures, lockedAt: row.lockedAt };
+}
+
+/** Keep a code's wrong-date count, or forget it (null) after a right date or staff allowing it again. */
+export async function saveResumeGuard(participantCode: string, guard: DobGuard | null): Promise<void> {
+  if (guard === null) await db.guards.delete(resumeGuardId(participantCode));
+  else {
+    const row: GuardRow = { id: resumeGuardId(participantCode), participantCode, ...guard };
+    await db.guards.put(row);
+  }
+}
+
+/** Codes that can no longer be resumed on this iPad, for the handover panel. */
+export async function lockedResumeCodes(): Promise<string[]> {
+  const rows = await db.guards.toArray();
+  return rows.flatMap((row) => (row.id !== "staff-pin" && row.lockedAt ? [row.participantCode] : [])).sort();
 }
 
 async function requiredSession(sessionId: string): Promise<SessionRow> {
