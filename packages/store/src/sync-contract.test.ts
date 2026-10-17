@@ -77,6 +77,11 @@ describe("what a device sends", () => {
       {},
       { sittings: "one" },
       { sittings: [{ ...request.sittings[0]!, sessionId: "" }] },
+      // A path, not an id: it would address another sitting's documents.
+      { sittings: [{ ...request.sittings[0]!, sessionId: "ses_victim/chunks/0006" }] },
+      { sittings: [{ ...request.sittings[0]!, sessionId: ".." }] },
+      { sittings: [{ ...request.sittings[0]!, sessionId: "ses 1" }] },
+      { sittings: [{ ...request.sittings[0]!, sessionId: "s".repeat(121) }] },
       { sittings: [{ ...request.sittings[0]!, complete: "yes" }] },
       { sittings: [{ ...request.sittings[0]!, events: [{ ...event(0), seq: -1 }] }] },
       { sittings: [{ ...request.sittings[0]!, events: [{ ...event(0), tWall: "" }] }] },

@@ -177,6 +177,8 @@ describe("who may file a survey sitting", () => {
   it("makes an importing researcher say which iPad it came off", () => {
     expect(deviceIdFor(researcher, "dev_ipad_7")).toBe("dev_ipad_7");
     expect(() => deviceIdFor(researcher, undefined)).toThrow(RelayError);
+    // It names a quarantine document, so it can't be a path either.
+    expect(() => deviceIdFor(researcher, "dev/../../x")).toThrow(RelayError);
   });
 });
 
@@ -230,6 +232,17 @@ describe("what an upload may contain", () => {
 
   it("refuses an empty upload rather than storing nothing quietly", () => {
     expect(sittingUpload.safeParse({ sittings: [] }).success).toBe(false);
+  });
+
+  it("refuses a session id that is not one path segment, before anything is written", async () => {
+    // Posted for real: the id became a path and overwrote another sitting's chunk.
+    for (const id of ["ses_victim/chunks/0006", "..", ".", "ses 1", "ses_1\n", "a".repeat(121)]) {
+      expect(sittingUpload.safeParse({ sittings: [session([event(0)], id)] }).success, id).toBe(false);
+      const { db, docs } = fakeDb();
+      await expect(storeSitting(db, "ybm", session([event(0)], id), "dev_ipad_1")).rejects.toMatchObject({ status: 400 });
+      expect(docs.size).toBe(0);
+    }
+    expect(sittingUpload.safeParse({ sittings: [session([event(0)], "ses_01JABCDEFGHJKMNPQRSTVWXYZ")] }).success).toBe(true);
   });
 });
 

@@ -452,6 +452,26 @@ describe("whose conversation it is", () => {
     await expect(storeNarrative(fake.db, "ybm", ipad, run)).rejects.toMatchObject({ status: 409 });
     expect(fake.docs.has("studies/ybm/narratives/ses_01J")).toBe(false);
   });
+
+  // The session id is a path segment: `ses_victim/chunks/0006` would address another sitting.
+  const unsafe = ["ses_victim/chunks/0006", "..", ".", "ses 1", "ses_é", "", "a".repeat(121), "ses_1/../ses_2"];
+
+  it("takes only a session id that is one path segment, at the door and in the store", async () => {
+    const { narrativeSave } = await import("./narratives.js");
+    const { transcribeRequest } = await import("./transcribe.js");
+    const clip = { audio: "A".repeat(64), mimeType: "audio/mp4", protocolKey: "np.phone_wellbeing", sessionId: "ses_01J" };
+    expect(narrativeSave.safeParse(run).success).toBe(true);
+    expect(transcribeRequest.safeParse(clip).success).toBe(true);
+    for (const sessionId of ["lab_lx3k9a", "ses_01JABCDEFGHJKMNPQRSTVWXYZ", "a-b_C9", "a".repeat(120)]) {
+      expect(narrativeSave.safeParse({ ...run, sessionId }).success, sessionId).toBe(true);
+    }
+    for (const sessionId of unsafe) {
+      expect(narrativeSave.safeParse({ ...run, sessionId }).success, sessionId).toBe(false);
+      expect(transcribeRequest.safeParse({ ...clip, sessionId }).success, sessionId).toBe(false);
+      await expect(storeNarrative(fake.db, "ybm", ipad, { ...run, sessionId })).rejects.toMatchObject({ status: 400 });
+    }
+    expect([...fake.docs.keys()].filter((k) => k.includes("narratives"))).toEqual([]);
+  });
 });
 
 describe("an iPad in more than one study (D-56)", () => {

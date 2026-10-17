@@ -22,6 +22,29 @@ import { z } from "zod";
  * not must still be able to hand it over.
  */
 
+/**
+ * What a session id may be: letters, digits, `_` and `-`, at most 120 of them.
+ *
+ * WHY THIS IS STRICT WHEN PAYLOADS ARE NOT. The id the device chose is used as a
+ * Firestore document id and a Storage path segment (`studies/{study}/sessions/{id}`,
+ * its chunks, its narrative, its voice notes), so a `/` in it is not an odd value but
+ * a different path: `ses_victim/chunks/0006` addresses another sitting's chunk, and was
+ * used to overwrite one. `.` and `..` are refused for the same reason. Every id a
+ * device or the MyStory lab makes (`ses_<ULID>`, `lab_<base36>`) fits, so nothing
+ * honest is turned away.
+ */
+export const SESSION_ID_PATTERN = /^[A-Za-z0-9_-]{1,120}$/;
+
+/** Whether a value is a session id that is safe to use as a path segment. */
+export function isSessionId(value: unknown): value is string {
+  return typeof value === "string" && SESSION_ID_PATTERN.test(value);
+}
+
+/** A session id, as every endpoint that takes one accepts it. */
+export const sessionIdField = z
+  .string()
+  .regex(SESSION_ID_PATTERN, "a session id is 1 to 120 letters, digits, underscores or hyphens");
+
 /** One event, exactly as the device wrote it. */
 export const deviceEventUpload = z.object({
   seq: z.number().int().min(0),
@@ -40,7 +63,7 @@ export const deviceEventUpload = z.object({
  * a fortnight, which the chunk spill exists to store rather than refuse.
  */
 export const sittingUploadItem = z.object({
-  sessionId: z.string().min(1).max(120),
+  sessionId: sessionIdField,
   studyCode: z.string().min(1).max(120),
   releaseKey: z.string().min(1).max(120),
   releaseHash: z.string().min(1).max(200),

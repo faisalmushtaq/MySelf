@@ -6,6 +6,7 @@ import { defineSecret } from "firebase-functions/params";
 import { onRequest } from "firebase-functions/v2/https";
 import { z } from "zod";
 import { paths } from "@myself/firebase";
+import { sessionIdField } from "@myself/store";
 import { research } from "./apps.js";
 import { sessionClaimRefusal } from "./narratives.js";
 import { RelayError, deviceLimitError, isParticipantDevice, type Caller } from "./relay-policy.js";
@@ -77,11 +78,12 @@ const LANGUAGE = "en";
 const MAX_BYTES = 4_000_000;
 
 /** What the page sends: one clip, what container it is in, and whose run. */
-const request = z.object({
+export const transcribeRequest = z.object({
   audio: z.string().min(32).max(Math.ceil(MAX_BYTES * 1.4)),
   mimeType: z.string().min(4).max(80),
   protocolKey: z.string().min(1).max(120),
-  sessionId: z.string().min(1).max(120),
+  /** The recording's Storage path is under it, so only a safe segment (`SESSION_ID_PATTERN`). */
+  sessionId: sessionIdField,
   seconds: z.number().min(0).max(600).optional(),
   /** The sitting's study (D-56); absent means the default. */
   study: z.string().min(1).max(64).optional(),
@@ -245,7 +247,7 @@ export const transcribe = onRequest(
       // A closed study's iPads spend nothing (D-56), as for the relay.
       if (isParticipantDevice(caller) && registered.status === "closed") throw deviceLimitError("off");
 
-      const parsed = request.safeParse(req.body);
+      const parsed = transcribeRequest.safeParse(req.body);
       if (!parsed.success) {
         /**
          * WHICH field, in the log — and only the field.

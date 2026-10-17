@@ -9,7 +9,7 @@ import {
   type SessionDoc,
   type SittingConflict,
 } from "@myself/firebase";
-import { sittingUpload, type DeviceSession, type SittingOutcome } from "@myself/store";
+import { isSessionId, sittingUpload, type DeviceSession, type SittingOutcome } from "@myself/store";
 import { research } from "./apps.js";
 import { RelayError, type Caller } from "./relay-policy.js";
 import { authenticate, cors } from "./relay.js";
@@ -149,6 +149,9 @@ export function deviceIdFor(caller: Caller, claimed: string | undefined): string
       "say which device these sittings came off. An import from a file has to record the iPad that collected it.",
     );
   }
+  // It names a quarantine document, so it is held to the session id's rule
+  // (every installation id, `ipad_<ULID>` or a Firebase uid, fits it).
+  if (!isSessionId(claimed)) throw new RelayError(400, "unknown", "that device id is not one this study can store");
   return claimed;
 }
 
@@ -182,6 +185,9 @@ export async function storeSitting(
   now = new Date(),
   provenance: SessionDoc["provenance"] = "imported",
 ): Promise<SittingOutcome> {
+  // The id is a path segment; the contract checks it, and this holds for any
+  // other caller (a `/` in it would address another sitting's documents).
+  if (!isSessionId(session.sessionId)) throw new RelayError(400, "unknown", "that sitting's id is not one this study can store");
   const { doc, chunks } = splitSession(session, deviceId, study, now, provenance);
 
   const parentRef = db.doc(paths.session(study, session.sessionId));
