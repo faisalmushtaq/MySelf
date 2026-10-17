@@ -76,6 +76,50 @@ async function readBack(sessionId: string): Promise<DeviceSession> {
 
 const many = (n: number, chars = 20) => Array.from({ length: n }, (_, i) => event(i, chars));
 
+/** A payload whose leaf sits `levels` maps below `payload`. */
+const nested = (levels: number): Record<string, unknown> => {
+  let value: unknown = "leaf";
+  for (let i = 0; i < levels; i++) value = { n: value };
+  return value as Record<string, unknown>;
+};
+const withPayload = (payload: Record<string, unknown>): DeviceEvent => ({ ...event(0), payload });
+
+describe("a sitting the database can never hold", () => {
+  // events.0.payload is three segments, so 18 levels under it is the deepest
+  // the Admin SDK writes (21 segments) and 19 is one too many.
+  const cases: [string, DeviceEvent][] = [
+    ["nested too deep", withPayload(nested(19))],
+    ["a list in a list", withPayload({ value: [[1, 2], [3]] })],
+    ["an empty field name", withPayload({ "": 1 })],
+    ["a reserved field name", withPayload({ __name__: 1 })],
+    ["an answer over the size limit", withPayload({ text: "x".repeat(1_100_000) })],
+    ["a lone surrogate", withPayload({ text: "broken \uD83D here" })],
+  ];
+
+  it.each(cases)("refuses %s as invalid and not worth retrying, writing nothing — and the database agrees", async (_name, bad) => {
+    const one = sitting([bad]);
+    const error = await storeSitting(db, STUDY, one, "dev_ipad_1").then(
+      () => null,
+      (e: unknown) => e as { status?: number; retryable?: boolean; message?: string },
+    );
+    expect(error).toMatchObject({ status: 422, retryable: false });
+    expect(error?.message).toMatch(/can never be stored/);
+    expect((await db.doc(paths.session(STUDY, one.sessionId)).get()).exists).toBe(false);
+    // The classification is only honest if a direct write of the same event
+    // fails too: otherwise it would be refusing something that could be stored.
+    // (Some the SDK refuses synchronously, the rest the database refuses.)
+    await expect((async () => db.doc(`studies/${STUDY}/sessions/probe`).set({ events: [bad] }))()).rejects.toThrow();
+  });
+
+  it("still stores what is only just inside each limit", async () => {
+    const edge = sitting([
+      withPayload({ deep: nested(17), list: [{ inner: [1, 2] }], text: "fine 😀", big: "x".repeat(900_000) }),
+    ]);
+    await expect(storeSitting(db, STUDY, edge, "dev_ipad_1")).resolves.toMatchObject({ stored: true, events: 1 });
+    expect((await readBack(edge.sessionId)).events[0]!.payload).toEqual(edge.events[0]!.payload);
+  });
+});
+
 describe("storing a sitting in a real database", () => {
   it("round trips every event, in order, with its payload intact", async () => {
     const outcome = await storeSitting(db, STUDY, sitting(many(120)), "ipad_a", new Date(), "device");

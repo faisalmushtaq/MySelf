@@ -139,6 +139,17 @@ export const sittingOutcome = z.object({
   chunks: z.number().int().min(0),
   quarantined: z.boolean(),
   reason: z.string().optional(),
+  /**
+   * Whether posting this sitting again could ever store it, when it was not stored.
+   *
+   * `false` means never: the sitting is permanently invalid as it stands (nested too
+   * deep, a list directly inside a list, an empty or reserved `__name__` field, an
+   * answer over the size limit, text that is not valid Unicode), `reason` says which,
+   * and a device should stop retrying it and show that reason to whoever can act on
+   * it — while still keeping the sitting. `true` or absent means a passing failure
+   * worth retrying. Optional, so a server that does not send it reads as before.
+   */
+  retryable: z.boolean().optional(),
 });
 
 export const sittingsResponse = z.object({
