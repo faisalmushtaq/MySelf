@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { splitSession, type SessionDoc } from "@myself/firebase";
 import type { DeviceEvent, DeviceSession } from "@myself/store";
-import { assemblePull } from "./lib/study.js";
+import { assemblePull, canPullSittings } from "./lib/study.js";
 
 /**
  * Getting the study back out.
@@ -137,5 +137,14 @@ describe("assembling a pull", () => {
       const found = pull.sessions.find((s) => s.sessionId === `ses_${i}`)!;
       expect(found.events).toHaveLength(10 + i);
     }
+  });
+});
+
+describe("who may pull", () => {
+  it("is an owner only, as the rules decide; anyone else is told why rather than refused", () => {
+    // Raw sittings hold names, dates of birth and addresses (firestore.rules `readsRawSittings`).
+    expect(canPullSittings({ email: "o@example.org", role: "owner" })).toBe(true);
+    for (const role of ["researcher", "analyst", null]) expect(canPullSittings({ email: "r@example.org", role })).toBe(false);
+    expect(canPullSittings(null)).toBe(false);
   });
 });

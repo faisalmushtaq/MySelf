@@ -68,6 +68,16 @@ service cloud.firestore {
       return role() == 'owner';
     }
 
+    // Who may read a raw sitting and what hangs off it: its chunks, a copy in
+    // quarantine, the narrative run and its transcripts. Those hold what the
+    // iPad collected before ingest separated it — names, dates of birth, home
+    // addresses, a young person's own words — so they are the owner's alone.
+    // A researcher or analyst works from the dataset, which ingest builds
+    // without them (the identifiers go to the separate identity store).
+    function readsRawSittings() {
+      return isPerson() && isOwner();
+    }
+
     // The device's own study, so one site's iPad cannot post into another's.
     function deviceStudy() {
       return request.auth.token.get('study', '');
@@ -184,8 +194,8 @@ service cloud.firestore {
 
       // ── Sittings ────────────────────────────────────────────────────────
       match /sessions/{sessionId} {
-        // People read; devices never do.
-        allow read: if isPerson();
+        // The owner reads; nobody else, and devices never (see readsRawSittings).
+        allow read: if readsRawSittings();
 
         // A device may create a sitting that does not exist yet, in its own
         // study, stamped with its own id. Create-only is what makes a retried
@@ -218,7 +228,7 @@ service cloud.firestore {
         allow delete: if false;
 
         match /chunks/{chunk} {
-          allow read: if isPerson();
+          allow read: if readsRawSittings();
           allow create: if isDevice() && study == deviceStudy();
           allow update, delete: if false;
         }
@@ -226,9 +236,10 @@ service cloud.firestore {
 
       // ── Quarantine ──────────────────────────────────────────────────────
       // A device whose write was refused files the copy it was holding here,
-      // so both versions survive and a human can compare them.
+      // so both versions survive and a human can compare them. A whole copy of
+      // a sitting, so read as a sitting is.
       match /quarantine/{entry} {
-        allow read: if isPerson();
+        allow read: if readsRawSittings();
         allow create: if isDevice() && study == deviceStudy();
         allow update: if canWrite();
         allow delete: if false;
@@ -260,11 +271,14 @@ service cloud.firestore {
       }
 
       // ── Audit ───────────────────────────────────────────────────────────
-      // Append-only for anyone who can write, readable only by an owner. Not
-      // editable by anybody, including the person who wrote the entry.
+      // Written only by the functions, through the admin SDK, in the same
+      // request as the action each row records; readable only by an owner.
+      // No browser appends here: it used to be any signed-in account, which
+      // let any Google account forge rows in any study's log, and nothing in a
+      // browser writes one. Not editable by anybody, including the writer.
       match /audit/{entry} {
         allow read: if isOwner();
-        allow create: if signedIn();
+        allow create: if false;
         allow update, delete: if false;
       }
 
@@ -277,12 +291,14 @@ service cloud.firestore {
        * could not write here under any rule, and a device that could write
        * directly could also overwrite somebody else's run.
        *
-       * Reading is for people, not devices: an iPad that has finished a
+       * Reading is for the owner alone: what a young person said, and the
+       * transcripts of what they recorded, can name them and the people
+       * around them (see readsRawSittings). An iPad that has finished a
        * sitting has no business reading back what any child has said,
        * including the one in front of it.
        */
       match /narratives/{sessionId} {
-        allow read: if isPerson();
+        allow read: if readsRawSittings();
         allow write: if false;
       }
 
@@ -384,8 +400,7 @@ service cloud.firestore {
       // survey it runs and the one hash that pointer names; nobody needs to
       // enumerate what else exists, so a stranger cannot. The project's people
       // may list a study's pointers (D-56): that is how the dashboard finds
-      // the surveys with a live version in each study, and they already read
-      // every sitting filed under them. Written only by the publish, rollback
+      // the surveys with a live version in each study. Written only by the publish, rollback
       // and import functions, in the transaction that audits them.
       match /published/{surveyId} {
         allow get: if true;
@@ -420,8 +435,8 @@ service cloud.firestore {
         allow write: if false;
       }
 
-      // The Studio's audit trail, separate from `audit` above because that one
-      // any signed-in account may append to (docs/16 R9). Every row here is
+      // The Studio's audit trail, separate from `audit` above (docs/16 R9),
+      // which any signed-in account could once append to. Every row here is
       // written by a function in the same transaction as the action it
       // records, and never changed or removed afterwards, by anyone.
       match /studioAudit/{entry} {
