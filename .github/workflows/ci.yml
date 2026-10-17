@@ -1,16 +1,25 @@
 name: CI
 
-# Actions minutes are limited. CI runs once per change that matters — on a
-# pull request, and on main after a merge — never on every push to a working
-# branch as well (that ran the whole suite twice for each push to a PR). A
-# newer push cancels the run it supersedes. Run it by hand from the Actions tab
-# (workflow_dispatch) when a branch needs it without a PR. A change only to
-# the deploy workflows is skipped too: nothing here runs them.
+# Actions minutes are limited, and a full run bills about 64 of them across six
+# jobs (37 of those in e2e), so the suite is spent where it earns its keep:
+#
+#   pull request  every job, but e2e drives WebKit only (the engine an iPad
+#                 runs, which is where this app's hard cases live). Draft pull
+#                 requests run nothing until they are marked ready for review.
+#   main          the merge repeats only `test` and `e2e` (both engines).
+#                 rules, integration, sync and studio already passed on the
+#                 pull request and are not run again for the same code.
+#   by hand       workflow_dispatch from the Actions tab runs every job with
+#                 both engines, for a branch that needs it without a PR.
+#
+# A newer push cancels the run it supersedes. A change only to docs or to the
+# deploy workflows is skipped: nothing here runs them.
 on:
   push:
     branches: [main]
     paths-ignore: ["docs/**", "**/*.md", ".github/workflows/firebase.yml", ".github/workflows/pages.yml", ".github/workflows/preview.yml"]
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
     paths-ignore: ["docs/**", "**/*.md", ".github/workflows/firebase.yml", ".github/workflows/pages.yml", ".github/workflows/preview.yml"]
   workflow_dispatch:
 
@@ -20,6 +29,7 @@ concurrency:
 
 jobs:
   test:
+    if: github.event.pull_request.draft != true
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -41,9 +51,10 @@ jobs:
   # whole questionnaire in a real browser and hands it over as a file.
   #
   # WEBKIT IS THE ONE THAT MATTERS — an iPad runs it, and this app's hard cases
-  # are Safari's storage and service-worker behaviour. Chromium runs too because
-  # it is what a developer has to hand.
+  # are Safari's storage and service-worker behaviour. A pull request runs only
+  # WebKit, which halves the job; main and a manual run add Chromium too.
   e2e:
+    if: github.event.pull_request.draft != true
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -61,8 +72,8 @@ jobs:
       # and a WebKit job that never reaches WebKit tells nobody anything. Every
       # other job here already does it; this one was written without it.
       - run: pnpm -r build
-      - run: pnpm exec playwright install --with-deps chromium webkit
-      - run: pnpm test:e2e
+      - run: pnpm exec playwright install --with-deps ${{ github.event_name == 'pull_request' && 'webkit' || 'chromium webkit' }}
+      - run: pnpm test:e2e ${{ github.event_name == 'pull_request' && '--project=webkit' || '' }}
       # The trace is the only way to see what a failed walk actually did, and a
       # run that fails without one costs a second run to find out.
       - uses: actions/upload-artifact@v4
@@ -79,6 +90,7 @@ jobs:
   # platform makes is that two iPads handed over at the same instant cannot
   # overwrite each other. Only a database can prove that.
   integration:
+    if: github.event_name != 'push' && github.event.pull_request.draft != true
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -102,6 +114,7 @@ jobs:
   # collects and resumes — and this is the one that puts a real request on a socket in
   # front of the real handler and then reads the sitting back out of the database.
   sync:
+    if: github.event_name != 'push' && github.event.pull_request.draft != true
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -134,6 +147,7 @@ jobs:
   # Firestore and Functions all run as emulators, so nothing between the
   # browser and the database is mocked.
   studio:
+    if: github.event_name != 'push' && github.event.pull_request.draft != true
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -163,6 +177,7 @@ jobs:
   # change is an untested security change. This runs them against the real
   # Firestore emulator, from both sides of every rule.
   rules:
+    if: github.event_name != 'push' && github.event.pull_request.draft != true
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
