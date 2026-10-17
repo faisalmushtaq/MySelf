@@ -26,8 +26,8 @@ concurrency:
 
 jobs:
   seed:
-    runs-on: ubuntu-latest
-    if: github.repository == 'faisalmushtaq/MySelf'
+    runs-on: ubuntu-24.04
+    if: github.repository == 'faisalmushtaq/MySelf' && github.ref == 'refs/heads/main'
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4

@@ -66,8 +66,8 @@ const type = (text: string): Act => async (page) => {
 };
 
 const common = (s: { first: string; last: string; dob: string }): [RegExp, Act][] => [
-  [/^First Name$/, type(s.first)],
-  [/^Last Name$/, type(s.last)],
+  [/^What.s your first name\?$/, type(s.first)],
+  [/^What.s your last name/, type(s.last)],
   [/date of birth/, async (page) => page.locator('.survey-body input[type="date"]').fill(s.dob)],
 ];
 

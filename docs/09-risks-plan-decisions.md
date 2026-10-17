@@ -477,3 +477,44 @@ Survey-side change: the Studio's rules and the library's licence record only.
 Nothing participants see changes until the team edits and publishes. The
 repository candidate (`releases/candidates/…r9.0.0`) is re-cut with D-61 for
 the MacArthur licence.
+
+### Pre-launch content fixes (2026-10-17, D-62)
+
+**Asked.** "Do a fully rigorous test of the whole system … we are almost ready
+for prime time." A content review of every screen of the live 12.0.0 found
+statements that were untrue or contradicted each other, and missing support
+signposting. The team chose the withdrawal window (48 hours, matching the date
+shown) and the time to state ("about 20 minutes"; the review's own estimate for
+a typical path is 30–40 minutes, which the team may want to check against a
+timed sitting).
+
+**Changed (repository candidate, for the next published version):**
+- Intro: names, date of birth and address are no longer said to be seen "only
+  by the research team"; the intro says they go to Connected Yorkshire to link
+  with health and education records. The time is "about 20 minutes" and
+  "finish quickly" is gone. The privacy panel says the same (who sees what,
+  the address, a 48-hour withdrawal).
+- Consent: the withdrawal statement says 48 hours, by the date shown (two
+  days, as the date already was), and names the team's email instead of an
+  unnamed "primary researcher". British spelling, a hyphen and full stops.
+- "Why your answers matter" no longer promises every answer can be left blank.
+- Mental-health medication can be declined ("Prefer not to say").
+- The finish screen signposts support: Childline, Shout, Samaritans, Papyrus,
+  NHS 111 and 999 (docs/04 P5, A-29).
+- RCADS: item 17 back to its canonical wording (revision 2); the instructions
+  no longer promise "completely confidential", say to tell the team if a
+  question upsets them, and read "happens".
+- Handedness: the score is fed back only when all four questions were
+  answered; the instructions fit the questions.
+- Wording: the name and gender questions are questions; the social media app
+  list and its definition no longer include WhatsApp; "screen time", "Strongly
+  agree", "Less than 5 minutes", "Once a week or less"; the gaming slider's
+  wording and end labels; "mental wellbeing" in both paired items.
+
+**Left for the team (judgement calls in the review):** the reading level of
+two consent statements; ages in scope (the date-of-birth check accepts 4–100;
+SDQ 11–17 starts at 11, RCADS and the school ladder are shown to adults);
+youthinmind's permission for the SDQ 18+ item 22 adaptation; hair type with no
+"none of these"; screen-attitude items only for social media users; "school
+day" for those not in school; and the length (BIS/BAS subset and doomscrolling
+items have no documented source).

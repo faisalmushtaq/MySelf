@@ -114,7 +114,9 @@ export const ybmComposition: AssessmentDraftInput = {
         },
       },
       body: {
-        text: "That's everything — thanks for taking part in the Yorkshire Brain Map study.",
+        // Signposting after the mental-health questions (docs/04 P5, A-29; QC 2026-10-17).
+        text:
+          "That's everything — thanks for taking part in the Yorkshire Brain Map study.\n\nIf any of the questions brought up difficult feelings, please talk to a member of the research team, a teacher, or someone you trust. You can also get free, confidential support at any time:\n• Childline (up to age 19): call 0800 1111 or visit childline.org.uk\n• Shout: text SHOUT to 85258\n• Samaritans: call 116 123\n• Papyrus HOPELINE247 (under 35): call 0800 068 4141\n• NHS 111: choose the mental health option\n\nIf you or someone else is in danger right now, call 999.",
       },
     },
   },

@@ -3,8 +3,13 @@ name: Deploy participant preview to GitHub Pages
 # ONE BRANCH, because this publishes to the URL an iPad in a school hall loads.
 # It used to deploy from a long-lived feature branch as well, so whichever
 # pushed last was what a device picked up, with nothing on screen to say which.
+# Only after CI has passed on main (or by hand): a commit that fails its tests
+# must never reach the iPads or the backend. CI skips docs-only changes, which
+# have nothing to deploy.
 on:
-  push:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
     branches: [main]
   workflow_dispatch:
 
@@ -19,9 +24,12 @@ concurrency:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    if: (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
       - uses: pnpm/action-setup@v4
         with:
           version: 10
@@ -86,7 +94,7 @@ jobs:
 
   deploy:
     needs: build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}

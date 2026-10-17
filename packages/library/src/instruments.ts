@@ -217,12 +217,18 @@ const ehiForm = (
       revision: 1,
       variable: "ehi_lq_feedback",
       required: "optional",
+      // Only when all four were answered: with one skipped there is no score,
+      // and "somewhere in the middle" would be false feedback (QC 2026-10-17).
+      displayIf: {
+        op: "all" as const,
+        args: ehiTasks.map(([key]) => ({ op: "answered" as const, target: { item: { instrument: "ehi_sf", item: key, revision: 1 } } })),
+      },
       // Report what the answers say about this person, and stop. An earlier
       // draft added "being in the middle is genuinely uncommon, not a mistake"
       // — which tells someone their result needs excusing, and is a judgement
       // nobody asked for (D-34).
       stem: {
-        text: "Your answers suggest you're {band}",
+        text: "Your answers suggest you're {band}.",
         pipes: {
           band: {
             kind: "score",
@@ -259,7 +265,7 @@ export const ehiSf: InstrumentInput = {
       undefined,
       "EHI-SF canonical (Veale 2014 anchors, confirmed by the researcher 2026-08-02)",
       "scale.ehi_sf_5pt",
-      "Please indicate your preferences in the use of hands in the following activities.",
+      "Next, four quick questions about which hand you use for everyday things.",
       true,
     ),
     ehiForm(
@@ -641,7 +647,7 @@ const rcadsStems: string[] = [
   "I suddenly start to tremble or shake when there is no reason for this.",
   "I cannot think clearly.",
   "I feel worthless.",
-  "I have to think special thoughts (like number or words) to stop bad things happening.",
+  "I have to think of special thoughts (like numbers or words) to stop bad things from happening.",
   "I think about death.",
   "I feel like I don’t want to move.",
   "I worry that I will suddenly get a scared feeling when there is nothing to be afraid of.",
@@ -667,13 +673,16 @@ export const rcads25: InstrumentInput = {
       language: "en-GB",
       label: "RCADS-25 (en-GB) — administered wording matches canonical; canonical 0-3 coding",
       instructions:
-        "The next questions are about your feelings and mental health. Some of these questions may be difficult to answer. Remember, all your answers are completely confidential and if you do not want to answer a question, you can skip it. Please select how often each of these things happen to you.",
+        "The next questions are about your feelings and mental health. Some of them may be difficult to answer. Your answers are private (your name is kept apart from them), and if you don't want to answer a question, you can skip it. If any of these questions upset you, let a member of the research team know. Please choose how often each of these things happens to you.",
       items: rcadsStems.map((text, i) => {
         const n = i + 1;
         const item = row(`q${n}`, `rcads25_q${n}`, `rcads_${n}`, text, "scale.rcads_4pt", {
           required: "soft",
           allowDecline: true, // D-05: honour the skip promise (A-44)
         });
+        // q17 restored to the canonical wording; it had lost "of", "from" and
+        // the plural of "numbers" (QC 2026-10-17).
+        if (n === 17) return { ...item, revision: 2 };
         if (n === 18) {
           return {
             ...item,

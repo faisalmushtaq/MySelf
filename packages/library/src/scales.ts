@@ -247,7 +247,7 @@ export const aiUseFrequency: ResponseScale = {
   direction: "ascending",
   options: [
     opt(1, "Never"),
-    opt(2, "Less than once a week"),
+    opt(2, "Once a week or less"),
     opt(3, "A few times a week"),
     opt(4, "Once a day"),
     opt(5, "Several times a day"),
@@ -510,7 +510,7 @@ export const agree5LostTrack: ResponseScale = {
   name: "5-point agreement, agree-first, with Don't know",
   direction: "descending",
   options: [
-    opt(1, "Strongly Agree", 1),
+    opt(1, "Strongly agree", 1),
     opt(2, "Agree", 4),
     opt(3, "Neither agree nor disagree", 5),
     opt(4, "Disagree", 6),
@@ -642,7 +642,7 @@ export const morningLatency5: ResponseScale = {
   name: "Time to first social-media check after waking",
   direction: "ascending",
   options: [
-    opt(1, "<5 minutes", 1),
+    opt(1, "Less than 5 minutes", 1),
     opt(2, "5 to 10 minutes", 4),
     opt(3, "11 to 30 minutes", 5),
     opt(4, "31 to 60 minutes", 6),

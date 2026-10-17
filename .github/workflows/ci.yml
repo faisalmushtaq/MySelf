@@ -20,7 +20,7 @@ concurrency:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -44,7 +44,7 @@ jobs:
   # are Safari's storage and service-worker behaviour. Chromium runs too because
   # it is what a developer has to hand.
   e2e:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -79,7 +79,7 @@ jobs:
   # platform makes is that two iPads handed over at the same instant cannot
   # overwrite each other. Only a database can prove that.
   integration:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -102,7 +102,7 @@ jobs:
   # collects and resumes — and this is the one that puts a real request on a socket in
   # front of the real handler and then reads the sitting back out of the database.
   sync:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -134,7 +134,7 @@ jobs:
   # Firestore and Functions all run as emulators, so nothing between the
   # browser and the database is mocked.
   studio:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -163,7 +163,7 @@ jobs:
   # change is an untested security change. This runs them against the real
   # Firestore emulator, from both sides of every rule.
   rules:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
