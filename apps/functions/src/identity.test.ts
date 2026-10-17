@@ -1,5 +1,48 @@
-import { describe, expect, it } from "vitest";
-import { registryFields, type SittingIdentity } from "./identity.js";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+const logged = vi.hoisted(() => ({ warn: [] as string[], error: [] as string[] }));
+vi.mock("firebase-functions/logger", () => ({
+  warn: (message: string) => logged.warn.push(message),
+  error: (message: string) => logged.error.push(message),
+  info: () => undefined,
+  debug: () => undefined,
+  log: () => undefined,
+  write: () => undefined,
+}));
+
+const { identityCaptureOff, registryFields, resetIdentityCaptureWarning } = await import("./identity.js");
+const { identity } = await import("./apps.js");
+type SittingIdentity = import("./identity.js").SittingIdentity;
+
+describe("a deployment with no identity project", () => {
+  const saved = process.env["IDENTITY_SERVICE_ACCOUNT"];
+  afterEach(() => {
+    if (saved === undefined) delete process.env["IDENTITY_SERVICE_ACCOUNT"];
+    else process.env["IDENTITY_SERVICE_ACCOUNT"] = saved;
+    resetIdentityCaptureWarning();
+    logged.warn.length = 0;
+    logged.error.length = 0;
+  });
+
+  it("stands capture down quietly: one warning per instance, not an error per sitting", () => {
+    delete process.env["IDENTITY_SERVICE_ACCOUNT"];
+    for (let i = 0; i < 50; i++) expect(identityCaptureOff()).toBe(true);
+    expect(logged.warn).toHaveLength(1);
+    expect(logged.warn[0]).toMatch(/identity capture is off.*IDENTITY_SERVICE_ACCOUNT is not set/);
+    expect(logged.error).toEqual([]);
+  });
+
+  it("captures as before once it is configured", () => {
+    process.env["IDENTITY_SERVICE_ACCOUNT"] = '{"project_id":"demo-identity"}';
+    expect(identityCaptureOff()).toBe(false);
+    expect(logged.warn).toEqual([]);
+  });
+
+  it("still fails loudly for anything that asked for a name, such as an owner's lookup", () => {
+    delete process.env["IDENTITY_SERVICE_ACCOUNT"];
+    expect(() => identity()).toThrow(/IDENTITY_SERVICE_ACCOUNT is not set/);
+  });
+});
 
 /**
  * What the registry keeps from each sitting (D-52).
