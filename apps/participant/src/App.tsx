@@ -648,6 +648,19 @@ export default function App({ initial, initialRuntime }: { initial: Startup; ini
     [runningSession?.sessionId ?? "", runtime],
   );
 
+  /**
+   * The sitting's answers as its visible questions hold them: what the review
+   * and finish screens pipe from, so an answer to a question a later change
+   * hid never turns up in a sentence.
+   */
+  const visibleAnswers = (session: SessionRow) =>
+    new Walker(
+      flattened.units,
+      storeRef.current,
+      manifest.composition.allowBackNavigation,
+      new Date(session.startedAt),
+    ).visibleAnswers();
+
   const tMono = () => Math.round(performance.now() - monoStart.current);
 
   const linkBlocks = link.kind === "checking" || link.kind === "waiting";
@@ -1297,8 +1310,8 @@ export default function App({ initial, initialRuntime }: { initial: Startup; ini
           allowBack={manifest.composition.allowBackNavigation}
           sectionTitles={flattened.sectionTitles}
           sessionStart={new Date(phase.session.startedAt)}
-          title={reviewScreen.title ? resolveText(reviewScreen.title.text, reviewScreen.title.pipes, storeRef.current, new Date(phase.session.startedAt)) : "Change an answer"}
-          body={resolveText(reviewScreen.body.text, reviewScreen.body.pipes, storeRef.current, new Date(phase.session.startedAt))}
+          title={reviewScreen.title ? resolveText(reviewScreen.title.text, reviewScreen.title.pipes, visibleAnswers(phase.session), new Date(phase.session.startedAt)) : "Change an answer"}
+          body={resolveText(reviewScreen.body.text, reviewScreen.body.pipes, visibleAnswers(phase.session), new Date(phase.session.startedAt))}
           onEdit={(index) => {
             void appendEvent(phase.session, "review.opened", unitKeyOf(index), { editing: true }, index, tMono());
             const key = unitKeyOf(index);
@@ -1330,12 +1343,12 @@ export default function App({ initial, initialRuntime }: { initial: Startup; ini
           // this is a release decision rather than something coded here.
           title={
             finishScreen?.title
-              ? resolveText(finishScreen.title.text, finishScreen.title.pipes, storeRef.current, new Date(phase.session.startedAt))
+              ? resolveText(finishScreen.title.text, finishScreen.title.pipes, visibleAnswers(phase.session), new Date(phase.session.startedAt))
               : "Thank you!"
           }
           body={
             finishScreen
-              ? resolveText(finishScreen.body.text, finishScreen.body.pipes, storeRef.current, new Date(phase.session.startedAt))
+              ? resolveText(finishScreen.body.text, finishScreen.body.pipes, visibleAnswers(phase.session), new Date(phase.session.startedAt))
               : "You've finished — thank you."
           }
           onReview={

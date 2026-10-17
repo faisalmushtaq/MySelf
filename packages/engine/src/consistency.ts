@@ -1,5 +1,5 @@
 import type { CrossCheck, ItemDefinition, OptionLimit, ResponseScale, ScaleOption } from "@myself/schema";
-import type { AnswerStore, AnswerValue } from "./answers.js";
+import type { AnswerLookup, AnswerValue } from "./answers.js";
 
 /**
  * Answers that depend on earlier answers.
@@ -45,7 +45,7 @@ export function checkConsistency(
   item: ItemDefinition,
   value: AnswerValue,
   scale: ResponseScale | undefined,
-  store: AnswerStore,
+  store: AnswerLookup,
 ): string | null {
   for (const check of item.crossChecks ?? []) {
     if (check.kind === "matches_month_of_date") {
@@ -74,7 +74,7 @@ function chosenValue(value: AnswerValue, scale: ResponseScale | undefined): numb
 export function visibleOptions(
   limit: OptionLimit | undefined,
   options: ScaleOption[],
-  store: AnswerStore,
+  store: AnswerLookup,
   now: Date,
 ): ScaleOption[] {
   if (!limit) return options;

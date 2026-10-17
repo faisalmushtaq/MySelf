@@ -1,3 +1,4 @@
+import { AnswerStore, computeVisibility, flattenManifest, type AnswerValue, type VisibilityUnit } from "@myself/engine";
 import type { ReleaseManifest, ResponseScale, ScoringDefinition } from "@myself/schema";
 import { executeScoring, scoringItemKeys } from "@myself/scoring";
 import type { Dataset, IdentityRow, ResponseRow, ScoreRow, SessionRow } from "./dataset.js";
@@ -69,7 +70,18 @@ export interface IngestOptions {
    * An assignment wins over an alias: it is the more specific statement.
    */
   assignments?: Record<string, string>;
+  /**
+   * First names already seen under each code, from an earlier pass — the
+   * previous release's `nameSightings`. A dataset is built one release at a
+   * time, and twins who gave their names under different releases share a
+   * code just as surely as twins who sat the same one; without this, each
+   * pass sees one name and the collision is never reported (dashboard F2).
+   */
+  nameSightings?: NameSightings;
 }
+
+/** Code -> normalised first name -> the sittings it was given in. */
+export type NameSightings = Map<string, Map<string, Set<string>>>;
 
 export interface IngestResult {
   dataset: Dataset;
@@ -96,6 +108,12 @@ export interface IngestResult {
     names: string[];
     sessions: string[];
   }[];
+  /**
+   * Every first name seen under each code, including those handed in through
+   * `options.nameSightings`, for the next pass to carry on from. `collisions`
+   * is computed over all of it, so the last pass's list is the whole list.
+   */
+  nameSightings: NameSightings;
   warnings: string[];
 }
 
@@ -148,7 +166,60 @@ function indexManifest(manifest: ReleaseManifest) {
   // A release is normally answered by one kind of respondent throughout. If it
   // mixes them, say so rather than picking one and being quietly wrong.
   const informant = informants.size === 1 ? [...informants][0]! : informants.size > 1 ? "mixed" : undefined;
-  return { items, scales, scoring, informant };
+  // The codes each scored item's scale offers, so a value outside them is
+  // scored as missing (dashboard F5). Only substantive options: "Prefer not to
+  // say" is a code of the scale, but it is not a quantity to add up.
+  const scoringCodes = new Map<string, Record<string, number[]>>();
+  for (const [key, def] of scoring) {
+    const codes: Record<string, number[]> = {};
+    for (const item of scoringItemKeys(def)) {
+      const scaleKey = items.get(`${def.instrument}.${item}`)?.scaleKey;
+      const scale = scaleKey ? scales.get(scaleKey) : undefined;
+      if (scale) codes[item] = scale.options.filter((o) => (o.kind ?? "substantive") === "substantive").map((o) => o.code);
+    }
+    scoringCodes.set(key, codes);
+  }
+  return { items, scales, scoring, scoringCodes, informant };
+}
+
+/**
+ * The units the device walked for this release, or the reason there are none.
+ *
+ * The same `flattenManifest` the participant app runs, so "would this have
+ * been shown" is decided here exactly as it was on the iPad. It throws only on
+ * a manifest the publish gate would have refused.
+ */
+function walkOf(manifest: ReleaseManifest): { units: VisibilityUnit[] } | { error: string } {
+  try {
+    return { units: flattenManifest(manifest).units };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : String(error) };
+  }
+}
+
+/**
+ * Items the sitting's final answers hide, by the walker's cascading rule.
+ *
+ * A participant can answer a question and then go back and change the answer
+ * that put it on their path: Yes to another language, Polish ticked, the
+ * Polish questions answered, then No. The log keeps every one of those
+ * answers, as it should — but the Polish ones are no longer answers to
+ * anything this participant was asked, and exporting them as real would put
+ * Polish ability on record for someone who says they speak only English.
+ *
+ * Judged on the answers as they stood when the sitting ended and on the day it
+ * started (age conditions, D-51), so a rebuild years later agrees.
+ */
+function hiddenAtEnd(units: readonly VisibilityUnit[], items: Map<string, ItemState>, startedAt: string): Set<string> {
+  const store = new AnswerStore();
+  for (const [key, st] of items) {
+    const [instrument = "", item = ""] = key.split(".");
+    const ref = { instrument, item, revision: 1 };
+    if (st.status === "answered") store.set(ref, { status: "answered", ...(st.value ? { value: st.value as AnswerValue } : {}) });
+    else if (st.status === "skipped" || st.status === "declined") store.set(ref, { status: st.status });
+  }
+  const started = new Date(startedAt);
+  return computeVisibility(units, store, Number.isNaN(started.getTime()) ? undefined : started).hidden;
 }
 
 /** Reduce one session's events to per-item state plus session-level counts. */
@@ -344,16 +415,28 @@ function present(value: unknown, scale: ResponseScale | undefined) {
 
 export function ingest(sessions: DeviceSession[], options: IngestOptions): IngestResult {
   const { manifest, study } = options;
-  const { items: itemIndex, scales, scoring, informant } = indexManifest(manifest);
+  const { items: itemIndex, scales, scoring, scoringCodes, informant } = indexManifest(manifest);
   const usesSecretCode = itemIndex.has("ybm_identity.ps_mother_initials");
   const rejected: IngestResult["rejected"] = [];
   const warnings: string[] = [];
+  const walk = walkOf(manifest);
+  if ("error" in walk) {
+    warnings.push(
+      `release ${manifest.release.version} could not be walked (${walk.error}) — display conditions were not re-applied, so answers to questions a sitting later hid are exported as given`,
+    );
+  }
 
   const existing = options.existing;
   const identityRows: IdentityRow[] = [];
   // First names seen under each code, and the sittings they came from. Two
-  // different names under one code is the twin signature.
-  const namesByParticipant = new Map<string, Map<string, Set<string>>>();
+  // different names under one code is the twin signature. Carried on from
+  // earlier passes, copied so the caller's map is never written to.
+  const namesByParticipant: NameSightings = new Map(
+    [...(options.nameSightings ?? [])].map(([code, names]) => [
+      code,
+      new Map([...names].map(([name, sittings]) => [name, new Set(sittings)])),
+    ]),
+  );
   const sessionRows: SessionRow[] = existing ? [...existing.sessions] : [];
   const responseRows: ResponseRow[] = existing ? [...existing.responses] : [];
   const scoreRows: ScoreRow[] = existing ? [...existing.scores] : [];
@@ -368,6 +451,16 @@ export function ingest(sessions: DeviceSession[], options: IngestOptions): Inges
     }
 
     const { items, reviewEdits, durationMs, foregroundMs, wallClockMs, resumedCount } = replay(session);
+    if ("units" in walk) {
+      // Not presented, by the sitting's own branching: no value, whatever was
+      // typed before the branch closed. The log still holds it.
+      for (const key of hiddenAtEnd(walk.units, items, session.startedAt)) {
+        const st = items.get(key);
+        if (!st) continue;
+        st.status = "not_presented_branching";
+        st.value = null;
+      }
+    }
     // A sitting that gave a secret code links on it, as it always has — decided
     // by the sitting as well as the release, so an older sitting read through a
     // newer release (an unknown hash falls back to the latest) keeps its code.
@@ -394,7 +487,6 @@ export function ingest(sessions: DeviceSession[], options: IngestOptions): Inges
       continue;
     }
 
-    const priorWaves = sessionRows.filter((s) => s.participantId === participantId).length;
     let answered = 0;
     let skipped = 0;
     let tooFast = 0;
@@ -489,7 +581,7 @@ export function ingest(sessions: DeviceSession[], options: IngestOptions): Inges
       sessionId: session.sessionId,
       participantId,
       study,
-      wave: priorWaves + 1,
+      wave: 0, // numbered once every sitting is in: `numberWaves`
       studyCode: session.studyCode,
       ...(site(session.studyCode) ? { site: site(session.studyCode)! } : {}),
       releaseKey: session.releaseKey,
@@ -510,15 +602,16 @@ export function ingest(sessions: DeviceSession[], options: IngestOptions): Inges
     });
     seenSessions.add(session.sessionId);
 
-    scoreRows.push(...scoreSession(session.sessionId, participantId, items, itemIndex, scoring));
+    scoreRows.push(...scoreSession(session.sessionId, participantId, items, scoring, scoringCodes));
   }
 
+  const numbered = numberWaves(sessionRows);
   return {
     dataset: {
       generatedAt: new Date().toISOString(),
-      releaseHashes: [...new Set(sessionRows.map((s) => s.releaseHash))].sort(),
-      participants: summariseParticipants(sessionRows),
-      sessions: sessionRows,
+      releaseHashes: [...new Set(numbered.map((s) => s.releaseHash))].sort(),
+      participants: summariseParticipants(numbered),
+      sessions: numbered,
       responses: responseRows,
       scores: scoreRows,
     },
@@ -531,8 +624,38 @@ export function ingest(sessions: DeviceSession[], options: IngestOptions): Inges
         names: [...names.keys()].sort(),
         sessions: [...new Set([...names.values()].flatMap((s) => [...s]))].sort(),
       })),
+    nameSightings: namesByParticipant,
     warnings,
   };
+}
+
+/**
+ * Number each participant's sittings 1, 2, 3… in the order they started.
+ *
+ * Over every row, earlier passes' included, once a pass is over. A dataset is
+ * built a release at a time, and a sitting under an older release can start
+ * after one under a newer release — an iPad that had not yet picked up the new
+ * questionnaire — so numbering rows as they arrived gave the later sitting the
+ * lower wave (dashboard F3). Same start, then by session id, so the numbers
+ * never depend on arrival order. One sort, where counting each person's
+ * earlier rows per sitting made linking quadratic (dashboard F11).
+ */
+export function numberWaves(rows: readonly SessionRow[]): SessionRow[] {
+  const order = rows.map((_, i) => i);
+  const cmp = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
+  order.sort((i, j) => {
+    const a = rows[i]!;
+    const b = rows[j]!;
+    return cmp(a.participantId, b.participantId) || cmp(a.startedAt, b.startedAt) || cmp(a.sessionId, b.sessionId);
+  });
+  const out = [...rows];
+  let wave = 0;
+  order.forEach((i, at) => {
+    const row = rows[i]!;
+    wave = at > 0 && rows[order[at - 1]!]!.participantId === row.participantId ? wave + 1 : 1;
+    if (row.wave !== wave) out[i] = { ...row, wave };
+  });
+  return out;
 }
 
 /** Run every scoring definition the release carries over one session. */
@@ -540,10 +663,9 @@ function scoreSession(
   sessionId: string,
   participantId: string,
   items: Map<string, ItemState>,
-  itemIndex: Map<string, { variable: string; scaleKey?: string }>,
   scoring: Map<string, ScoringDefinition>,
+  scoringCodes: Map<string, Record<string, number[]>>,
 ): ScoreRow[] {
-  void itemIndex;
   const rows: ScoreRow[] = [];
   for (const [key, def] of scoring) {
     // Only the definition's items: a blank handed in under a subscale's name
@@ -561,7 +683,10 @@ function scoreSession(
               : null
           : null;
     }
-    const result = executeScoring(def, values);
+    // Only answers: a question the sitting's branching hid is
+    // `not_presented_branching` by now, so it is missing here too.
+    const codes = scoringCodes.get(key);
+    const result = executeScoring(def, values, codes ? { codes } : {});
     for (const [output, value] of Object.entries(result.outputs)) {
       rows.push({
         sessionId,

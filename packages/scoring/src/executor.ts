@@ -20,11 +20,30 @@ export interface ScoringResult {
   warnings: string[];
 }
 
-export function executeScoring(def: ScoringDefinition, input: ItemValues): ScoringResult {
+export interface ScoringOptions {
+  /**
+   * Item key -> the codes its scale offers. A value that is not one of them is
+   * scored as missing, with a warning: an SDQ item recorded as 7 is not a
+   * very high 2, it is a value nobody could have chosen, and adding it in
+   * would put a number on a subscale that the instrument cannot produce. The
+   * stored response is untouched — only the score reads it as missing.
+   * Items not listed here are taken as they come.
+   */
+  codes?: Record<string, readonly number[]>;
+}
+
+export function executeScoring(def: ScoringDefinition, input: ItemValues, options: ScoringOptions = {}): ScoringResult {
   const working: ItemValues = { ...input };
   const outputs: Record<string, number | string | null> = {};
   const validCounts: Record<string, number> = {};
   const warnings: string[] = [];
+
+  for (const [item, codes] of Object.entries(options.codes ?? {})) {
+    const v = working[item];
+    if (v === null || v === undefined || codes.includes(v)) continue;
+    warnings.push(`value ${v} for '${item}' is not a code of its scale; scored as missing`);
+    working[item] = null;
+  }
 
   const read = (key: string): number | null => {
     if (key in working) return working[key] ?? null;
