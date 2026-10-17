@@ -33,6 +33,7 @@ import {
   type LockedDifference,
   type LockedOptions,
 } from "./locked.js";
+import { askedBeforeConsent } from "./editing.js";
 import { myStoryMisplaced, narrativePlacements, nextProtocolVersion, protocolClash, protocolProblems } from "./mystory.js";
 import { CONSENT_MODULES } from "./model.js";
 import { formOf, liveQuestions, placements, type LiveQuestion, type Placement } from "./walk.js";
@@ -1557,6 +1558,65 @@ function checkIdentity(m: Model, c: Collector): void {
   }
 }
 
+/**
+ * The introduction and consent (docs/16 R4).
+ *
+ * Since D-61 the consent module is the study team's to edit, so nothing about
+ * its wording is protected — but participants must still read it and agree
+ * before they are asked anything else, and a survey that asked for consent
+ * must keep asking for it. The editing operations keep the consent first
+ * (`keepConsentFirst`), but a draft can arrive in any state, so this is the
+ * check that holds at publish. It runs whatever the baseline: for a copy that
+ * has never been published, the baseline is its source's (`lockBaseline`,
+ * which keeps the consent). A survey that never had a consent (a new study's
+ * own, started blank) has nothing to keep: leaving it out is allowed, with a
+ * warning.
+ */
+function checkConsent(m: Model, c: Collector): void {
+  const had = (d: StudioDraft | undefined, key: string) =>
+    !!d && Object.values(d.instruments ?? {}).some((x) => (x as { instrument?: unknown } | null)?.instrument === key);
+  const why = "Participants must read the introduction and give their consent before anything else.";
+  let consent = false;
+  for (const key of CONSENT_MODULES) {
+    // Asked, not merely defined: a consent module no section places is never seen.
+    const questions = m.live.filter((q) => q.instrument === key);
+    if (questions.length === 0) {
+      if (had(m.ctx.baseline, key)) {
+        consent = true;
+        c.error("consent.removed", "The consent has been removed", at("survey"), `${why} Put the consent back before publishing.`);
+      }
+      continue;
+    }
+    consent = true;
+    const block = m.places.find((p) => p.instrument === key);
+    const where = block ? blockAt(block) : at("survey");
+    if (askedBeforeConsent(m.draft) === key) {
+      c.error(
+        "consent.not_first",
+        "Something is asked before the consent",
+        where,
+        `${why} Move the consent to the start of the survey, or move what comes before it to after it.`,
+      );
+    }
+    if (!questions.some((q) => (q.item as unknown as Loose)["responseType"] === "checkbox_set")) {
+      c.error(
+        "consent.agreement_missing",
+        "The consent no longer asks participants to agree",
+        where,
+        `${why} Its statements of agreement have been removed. Put them back before publishing.`,
+      );
+    }
+  }
+  if (!consent) {
+    c.warn(
+      "consent.none",
+      "This survey doesn't ask for consent",
+      at("survey"),
+      "Nothing records that participants agreed to take part. Unless consent is taken some other way, add the introduction and consent at the start of the survey.",
+    );
+  }
+}
+
 /** Where a locked or protected difference is, as precisely as the draft allows. */
 function differenceAt(m: Model, d: LockedDifference): IssueLocation {
   if (d.itemKey) {
@@ -1611,20 +1671,6 @@ function checkAgainstBaseline(m: Model, c: Collector): void {
   }
   for (const d of lockedDifferences(m.draft, baseline, lockedOptions)) c.error(`locked.${d.change}`, d.summary, differenceAt(m, d), d.detail);
   for (const d of protectedDifferences(m.draft, baseline)) c.error(`protected.${d.change}`, d.summary, differenceAt(m, d), d.detail);
-
-  // The consent wording is the study team's to change (D-61), but a survey
-  // that asked for consent can't be published without it.
-  const has = (d: StudioDraft, key: string) => Object.values(d.instruments ?? {}).some((x) => x.instrument === key);
-  for (const key of CONSENT_MODULES) {
-    if (has(baseline, key) && !has(m.draft, key)) {
-      c.error(
-        "consent.removed",
-        "The consent has been removed",
-        { kind: "survey" },
-        "Participants must read the introduction and give their consent before anything else. Put the consent back before publishing.",
-      );
-    }
-  }
 
   // Participant linkage: no unlock permits breaking it.
   const unlocked = isUnlocked(m.draft.unlocked, "ybm_identity");
@@ -1908,6 +1954,7 @@ export function validateDraft(draft: StudioDraft, ctx: ValidationContext = {}): 
     c.run("IDs and reporting labels", () => checkDuplicatesAndReservations(model, c));
     c.run("conditions", () => checkLogic(model, c));
     c.run("identifying questions", () => checkIdentity(model, c));
+    c.run("consent", () => checkConsent(model, c));
     c.run("published content", () => checkAgainstBaseline(model, c));
     c.run("finishing screen", () => checkCompletion(model, c));
     c.run("MyStory", () => checkMyStory(model, c));

@@ -152,16 +152,17 @@ describe("restoring a version into the draft", () => {
 });
 
 describe("the locks on a survey that has never been published", () => {
-  it("are checked against the release it was copied from — its licensed and protected instruments, and nothing else", () => {
+  it("are checked against the release it was copied from — its licensed and protected instruments and its consent, and nothing else", () => {
     const origin = draftOf("7.3.0");
     const base = lockBaseline(origin, origin);
     expect(base.composition.sections).toEqual([]);
     const instruments = Object.values(base.instruments).map((d) => d.instrument);
     expect(instruments).toContain("ybm_identity");
-    expect(instruments).not.toContain("ybm_intro_consent");
+    // Kept so that a copy can't drop the consent its source asked for.
+    expect(instruments).toContain("ybm_intro_consent");
     expect(instruments).not.toContain("ybm_about_you");
     for (const def of Object.values(base.instruments)) {
-      expect(def.licence.modifiable !== "yes" || def.instrument === "ybm_identity").toBe(true);
+      expect(def.licence.modifiable !== "yes" || def.instrument === "ybm_identity" || def.instrument === "ybm_intro_consent").toBe(true);
     }
     // Unchanged: nothing to report.
     expect(validateDraft(origin, { baseline: base }).filter((i) => i.severity === "error")).toEqual([]);
