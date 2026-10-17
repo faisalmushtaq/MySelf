@@ -5,7 +5,7 @@
     "version": "9.0.0",
     "assessment": "ybm_nd2026_standard",
     "study": "ybm",
-    "publishedAt": "2026-10-17T09:00:00.000Z",
+    "publishedAt": "2026-10-17T12:00:00.000Z",
     "publishedBy": "faisalmushtaq",
     "engineVersion": "0.3.0",
     "decisionRefs": [
@@ -13,7 +13,8 @@
       "D-58",
       "D-59",
       "D-61",
-      "D-62"
+      "D-62",
+      "D-63"
     ]
   },
   "composition": {
@@ -32,10 +33,10 @@
     "progressIndicator": "sections",
     "participantCode": {
       "pattern": "^[A-Za-z]{3}[0-9]{4}$",
-      "hint": "Three letters then four numbers, for example NDC0042",
+      "hint": "Three letters then four numbers, for example ABC1234",
       "label": "Your study code",
       "instructions": "The research team gave you a code for today — three letters followed by four numbers. Type it in to begin. If you haven't got one, or you're not sure, ask a member of the team before you carry on.",
-      "placeholder": "NDC0042",
+      "placeholder": "ABC1234",
       "variable": "val_id"
     },
     "effort": {
@@ -9074,5 +9075,5 @@
       "bytes": 589147
     }
   },
-  "hash": "sha256:f888fb2995201f2163d93bc9fac4c72b33162aae093274c58ee901ffd18964cd"
+  "hash": "sha256:37a3c0684e892dfd9047ac7e5ac6a8dadc8d40563b690519db083ea8dcc0606f"
 }

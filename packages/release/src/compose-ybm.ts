@@ -62,8 +62,8 @@ export const ybmComposition: AssessmentDraftInput = {
   participantCode: {
     label: "Your study code",
     pattern: "^[A-Za-z]{3}[0-9]{4}$",
-    hint: "Three letters then four numbers, for example NDC0042",
-    placeholder: "NDC0042",
+    hint: "Three letters then four numbers, for example ABC1234",
+    placeholder: "ABC1234",
     variable: "val_id",
     instructions:
       "The research team gave you a code for today — three letters followed by four numbers. Type it in to begin. If you haven't got one, or you're not sure, ask a member of the team before you carry on.",
