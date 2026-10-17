@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { doc, onSnapshot, runTransaction, serverTimestamp } from "firebase/firestore";
+import { doc, getDoc, onSnapshot, runTransaction, serverTimestamp } from "firebase/firestore";
 import { paths } from "@myself/firebase";
 import {
   DraftFormatError,
@@ -259,6 +259,22 @@ export function useDraftSession(surveyId: string): DraftSession {
           });
         }
       } catch (error) {
+        // Two editors saving the same revision at once: the rules refuse the
+        // slower write (its revision is no longer the next one), and that
+        // refusal arrives as permission-denied. It is a conflict, not lost
+        // access, so look before saying so (QC 2026-10-17).
+        if (codeOf(error)?.endsWith("permission-denied")) {
+          try {
+            const snap = await getDoc(ref);
+            const current = snap.exists() ? (snap.data() as DraftDoc) : null;
+            if (current && current.revision !== baseRevision && !landedAttempt(attemptsRef.current, current, uid)) {
+              dispatch({ type: "save_conflict", theirs: remoteOf(current), now: now() });
+              return;
+            }
+          } catch {
+            // Can't read it either: the access really has gone. Fall through.
+          }
+        }
         const c = classifySaveError(error);
         const failure: SaveFailure =
           c.kind === "offline"
