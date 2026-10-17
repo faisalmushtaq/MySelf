@@ -136,9 +136,45 @@ describe("people", () => {
     });
   });
 
-  it("read the study when they have any role", async () => {
+  it("only an owner reads a raw sitting, or anything hanging off it", async () => {
+    // Raw sittings carry names, dates of birth and home addresses, and the
+    // narratives a young person's own words: the owner's alone. A researcher
+    // or analyst works from the dataset ingest builds without them.
+    await env.withSecurityRulesDisabled(async (admin) => {
+      const db = admin.firestore();
+      await setDoc(doc(db, `${sessionPath("s1")}/chunks/0000`), { index: 0, events: [] });
+      await setDoc(doc(db, `studies/${STUDY}/quarantine/s1__dev_b`), { sessionId: "s1", payload: sessionDoc("dev_b", "s1") });
+      await setDoc(doc(db, `studies/${STUDY}/narratives/s1`), { sessionId: "s1", records: [{ text: "My name is…" }] });
+    });
+    const raw = [
+      sessionPath("s1"),
+      `${sessionPath("s1")}/chunks/0000`,
+      `studies/${STUDY}/quarantine/s1__dev_b`,
+      `studies/${STUDY}/narratives/s1`,
+    ];
+    const lists = [`studies/${STUDY}/sessions`, `${sessionPath("s1")}/chunks`, `studies/${STUDY}/quarantine`, `studies/${STUDY}/narratives`];
+    const owner = person("u_owner", "owner");
+    for (const path of raw) await assertSucceeds(getDoc(doc(owner, path)));
+    for (const path of lists) await assertSucceeds(getDocs(collection(owner, path)));
+    for (const role of ["researcher", "analyst"]) {
+      const db = person(`u_${role}`, role);
+      for (const path of raw) await assertFails(getDoc(doc(db, path)));
+      for (const path of lists) await assertFails(getDocs(collection(db, path)));
+    }
+    // An owner claim on a device token is still a device.
+    const ipad = env.authenticatedContext("dev_a", { device: true, study: STUDY, role: "owner" }).firestore();
+    for (const path of raw) await assertFails(getDoc(doc(ipad, path)));
+  });
+
+  it("other than raw sittings, a role still reads what it did", async () => {
+    await env.withSecurityRulesDisabled(async (admin) => {
+      await setDoc(doc(admin.firestore(), `studies/${STUDY}/corrections/c1`), { wrongCode: "A", rightCode: "B" });
+      await setDoc(doc(admin.firestore(), `studies/${STUDY}/assignments/s1`), { participantCode: "A-2" });
+    });
     for (const role of ["owner", "researcher", "analyst"]) {
-      await assertSucceeds(getDoc(doc(person(`u_${role}`, role), sessionPath("s1"))));
+      const db = person(`u_${role}`, role);
+      await assertSucceeds(getDoc(doc(db, `studies/${STUDY}/corrections/c1`)));
+      await assertSucceeds(getDoc(doc(db, `studies/${STUDY}/assignments/s1`)));
     }
   });
 
@@ -243,15 +279,25 @@ describe("devices and audit", () => {
     await assertFails(getDoc(doc(person("u_r", "researcher"), `studies/${STUDY}/devices/dev_a`)));
   });
 
-  it("audit entries are appended by anyone signed in and edited by no one", async () => {
+  it("audit entries are written only by the functions, and edited by no one", async () => {
     let id = "";
     await env.withSecurityRulesDisabled(async (admin) => {
       const ref = await addDoc(collection(admin.firestore(), `studies/${STUDY}/audit`), { action: "sync.batch" });
       id = ref.id;
     });
-    await assertSucceeds(
-      addDoc(collection(person("u_r", "researcher"), `studies/${STUDY}/audit`), { action: "export" }),
-    );
+    // Nobody appends from a browser: any signed-in Google account once could,
+    // in any study, and so could forge the log. An owner included.
+    const strangers = [
+      env.authenticatedContext("u_google", { email: "someone@gmail.com", email_verified: true }).firestore(),
+      person("u_new", ""),
+      device("dev_a"),
+    ];
+    for (const db of [...strangers, ...["owner", "researcher", "analyst"].map((r) => person(`u_${r}`, r))]) {
+      await assertFails(addDoc(collection(db, `studies/${STUDY}/audit`), { action: "device.revoked", actor: "u_owner" }));
+      await assertFails(setDoc(doc(db, `studies/other/audit/forged`), { action: "export" }));
+    }
+    await assertFails(addDoc(collection(env.unauthenticatedContext().firestore(), `studies/${STUDY}/audit`), { action: "x" }));
+    await assertSucceeds(getDoc(doc(person("u_o", "owner"), `studies/${STUDY}/audit/${id}`)));
     // Not even by the person who wrote it: an audit log somebody can tidy up
     // afterwards is not an audit log.
     await assertFails(updateDoc(doc(person("u_o", "owner"), `studies/${STUDY}/audit/${id}`), { action: "nothing" }));

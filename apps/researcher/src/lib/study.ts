@@ -22,11 +22,13 @@ import type { DeviceSession } from "@myself/store";
  * hand, the nightly BIDS export landed in a Storage bucket reachable only from a
  * console, and "the data is in the database" was true and useless.
  *
- * IT READS DIRECTLY, not through a function. `firestore.rules` already allows
- * `read: if isPerson()` on sittings and their chunks — a signed-in account
- * carrying an owner, researcher or analyst role an owner granted — so a function
- * in front of this would be a second copy of an access rule that already exists,
- * and the copy is how one of them ends up wrong.
+ * IT READS DIRECTLY, not through a function. `firestore.rules` allows an OWNER
+ * to read sittings and their chunks (`readsRawSittings`): a raw sitting holds
+ * names, dates of birth and addresses that ingest later separates out, so a
+ * researcher or analyst cannot read one, and this view says so rather than
+ * offering a pull that would be refused (`canPullSittings`). A function in front
+ * of this would be a second copy of an access rule that already exists, and the
+ * copy is how one of them ends up wrong.
  *
  * A POPUP IS FINE HERE. The participant app cannot use `signInWithPopup` because
  * it runs as a standalone iOS web app, which is why devices enrol with a custom
@@ -115,6 +117,19 @@ export function watchUser(listener: (user: StudyUser | null) => void): () => voi
 }
 
 /**
+ * Whether this account may pull raw sittings from the study: an owner only,
+ * as `firestore.rules` decides (`readsRawSittings`). Anyone else is told why,
+ * not shown a button the rules would refuse.
+ */
+export function canPullSittings(user: StudyUser | null): boolean {
+  return user?.role === "owner";
+}
+
+/** What the rules' refusal means, in words a researcher can act on. */
+export const OWNER_ONLY_SITTINGS =
+  "only an owner can read the sittings the iPads upload, because they hold participants' names, dates of birth and addresses. Ask an owner for a handover file or a copy of the export.";
+
+/**
  * A sitting as pulled, with the time the study last received it.
  *
  * `receivedAt` is the server's clock, written on every upload. It is what decides
@@ -148,7 +163,14 @@ export interface StudyPull {
  */
 export async function pullSittings(): Promise<StudyPull> {
   const { db } = firebase();
-  const snapshot = await getDocs(collection(db, paths.sessions(STUDY)));
+  let snapshot;
+  try {
+    snapshot = await getDocs(collection(db, paths.sessions(STUDY)));
+  } catch (error) {
+    // A role changed since the token was read, or a stale page: say what it means.
+    if ((error as { code?: unknown } | null)?.code === "permission-denied") throw new Error(OWNER_ONLY_SITTINGS);
+    throw error;
+  }
 
   return assemblePull(
     snapshot.docs.map((document) => document.data() as SessionDoc),

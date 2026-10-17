@@ -3,6 +3,7 @@ import * as logger from "firebase-functions/logger";
 import { onRequest } from "firebase-functions/v2/https";
 import { z } from "zod";
 import { paths } from "@myself/firebase";
+import { isSessionId, sessionIdField } from "@myself/store";
 import { research } from "./apps.js";
 import { RelayError, isParticipantDevice, type Caller } from "./relay-policy.js";
 import { authenticate, cors, refuse } from "./relay.js";
@@ -60,7 +61,8 @@ const record = z.object({
 });
 
 export const narrativeSave = z.object({
-  sessionId: z.string().min(1).max(120),
+  /** A path segment, so only the characters one may hold (`SESSION_ID_PATTERN`). */
+  sessionId: sessionIdField,
   protocolKey: z.string().min(1),
   protocolVersion: z.string().min(1),
   /** A finished run is 30-odd records; the cap is a guard, not a budget. */
@@ -168,6 +170,7 @@ export async function storeNarrative(
 ): Promise<void> {
   const refusal = narrativeRefusal(caller, run);
   if (refusal) throw new RelayError(400, "unknown", refusal);
+  if (!isSessionId(run.sessionId)) throw new RelayError(400, "unknown", "that conversation's session id is not one this study can store");
 
   const ref = db.doc(paths.narrative(study, run.sessionId));
   const sitting = db.doc(paths.session(study, run.sessionId));
