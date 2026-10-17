@@ -14,6 +14,8 @@ import {
   type BidsFile,
   type Dataset,
   type DeviceSession,
+  type IngestResult,
+  type NameSightings,
   type StoredNarrativeRun,
 } from "@myself/store";
 import { STUDY, research } from "./apps.js";
@@ -124,9 +126,10 @@ export async function buildStudyDataset(
     assignments[a.id] = (a.data() as { participantCode: string }).participantCode;
   }
 
-  // Grouped by the release each sitting was collected under, oldest first, so
-  // waves are numbered in the order they happened rather than the order the
-  // documents came back.
+  // Grouped by the release each sitting was collected under, oldest first.
+  // Waves are numbered by start time over every sitting read so far, whatever
+  // order the releases come in (ingest's `numberWaves`), and first names are
+  // carried between passes so twins split across releases are still caught.
   const groups = new Map<string, DeviceSession[]>();
   for (const s of sessions) {
     const list = groups.get(s.releaseHash);
@@ -135,6 +138,8 @@ export async function buildStudyDataset(
   }
 
   let dataset = emptyDataset();
+  let nameSightings: NameSightings = new Map();
+  let collisions: IngestResult["collisions"] = [];
   const unreadable: UnreadableSitting[] = [];
   const releases: ReleaseManifest[] = [];
   for (const [hash, group] of [...groups.entries()].sort((a, b) => {
@@ -164,14 +169,18 @@ export async function buildStudyDataset(
       existing: dataset,
       aliases,
       assignments,
+      nameSightings,
     });
     dataset = result.dataset;
-    for (const collision of result.collisions) {
-      // An export built over an unresolved twin collision describes two
-      // children as one. It still runs — withholding the export helps nobody —
-      // but it says so where somebody will see it.
-      logger.error("unresolved code collision in export", collision);
-    }
+    nameSightings = result.nameSightings;
+    // Over every name seen so far, so the last pass's list is the whole list.
+    collisions = result.collisions;
+  }
+  for (const collision of collisions) {
+    // An export built over an unresolved twin collision describes two
+    // children as one. It still runs — withholding the export helps nobody —
+    // but it says so where somebody will see it.
+    logger.error("unresolved code collision in export", collision);
   }
 
   if (quarantinedCount > 0) {

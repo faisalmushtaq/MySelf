@@ -4,7 +4,7 @@ import * as logger from "firebase-functions/logger";
 import { FieldValue, type Firestore } from "firebase-admin/firestore";
 import { joinSession, paths, type SessionDoc } from "@myself/firebase";
 import { ingest, parseHomeAddress, type HomeAddress } from "@myself/store";
-import { identity, research } from "./apps.js";
+import { identity, identityConfigured, research } from "./apps.js";
 import { resolveRelease } from "./releases.js";
 import { studyForCall } from "./studies.js";
 
@@ -135,6 +135,37 @@ export async function fileIdentity(db: Firestore, sessionId: string, sitting: Si
   });
 }
 
+let warnedUnconfigured = false;
+
+/**
+ * Whether capture should stand down because this deployment has no identity
+ * project configured, saying so once per instance rather than on every write.
+ *
+ * Without the secret every sitting write used to throw, logging an error per
+ * upload — hundreds a school day — and burying every alert that mattered. A
+ * deployment without an identity project is a configuration, not an incident:
+ * the sittings are stored as normal and still hold what was typed, so nothing
+ * is lost by not filing it yet. The owner lookups are different, and still
+ * fail loudly: somebody asked for a name and must be told it cannot be had.
+ *
+ * Exported, with a reset, for the tests.
+ */
+export function identityCaptureOff(): boolean {
+  if (identityConfigured()) return false;
+  if (!warnedUnconfigured) {
+    warnedUnconfigured = true;
+    logger.warn(
+      "identity capture is off on this deployment: IDENTITY_SERVICE_ACCOUNT is not set, so names, dates of birth and addresses from sittings are not being filed in the identity project. Sittings are stored as normal and keep them; set the secret to start filing.",
+    );
+  }
+  return true;
+}
+
+/** For the tests: forget that the warning has been given. */
+export function resetIdentityCaptureWarning(): void {
+  warnedUnconfigured = false;
+}
+
 /**
  * Derive and file the identity partition for a sitting that has just arrived.
  *
@@ -144,6 +175,8 @@ export async function fileIdentity(db: Firestore, sessionId: string, sitting: Si
 export const captureIdentity = onDocumentWritten("studies/{study}/sessions/{sessionId}", async (event) => {
   const after = event.data?.after?.data() as SessionDoc | undefined;
   if (!after) return;
+  // Checked first, so an unconfigured deployment reads nothing for nothing.
+  if (identityCaptureOff()) return;
 
   // Bundled or from the release store, by hash: a sitting collected under a
   // release published from the Studio is not in the bundle, and before the

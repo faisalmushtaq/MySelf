@@ -233,16 +233,19 @@ export function SurveyScreen(props: SurveyScreenProps) {
 
   const item = unit.item;
   const baseScale = "scale" in item ? scales.get(item.scale) : undefined;
+  // Earlier answers as the walk now stands: one to a question a later change
+  // hid is stale, and must not be piped, checked against or limit options.
+  const answers = walker.visibleAnswers();
   // Options this participant could not truthfully choose are not offered —
   // an age older than they are is not an answer we want to be able to record.
   const scale =
     baseScale && item.responseType === "single_choice" && item.limitOptions
-      ? { ...baseScale, options: visibleOptions(item.limitOptions, baseScale.options, store, new Date()) }
+      ? { ...baseScale, options: visibleOptions(item.limitOptions, baseScale.options, answers, new Date()) }
       : baseScale;
   const record = store.get({ instrument: unit.instrument, item: item.key, revision: item.revision });
   const answered = record?.status === "answered";
   const progress = walker.sectionProgress(index);
-  const stemText = resolveText(item.stem.text, item.stem.pipes, store, sessionStart);
+  const stemText = resolveText(item.stem.text, item.stem.pipes, answers, sessionStart);
 
   const resolvedItem: ItemDefinition =
     item.responseType === "checkbox_set"
@@ -250,7 +253,7 @@ export function SurveyScreen(props: SurveyScreenProps) {
           ...item,
           statements: item.statements.map((s) => ({
             ...s,
-            text: { ...s.text, text: resolveText(s.text.text, s.text.pipes, store, sessionStart) },
+            text: { ...s.text, text: resolveText(s.text.text, s.text.pipes, answers, sessionStart) },
           })),
         }
       : item;
@@ -280,7 +283,7 @@ export function SurveyScreen(props: SurveyScreenProps) {
     // the participant said, and the raw log is never edited. But the screen
     // says so and holds here, because right now they can tell us which of the
     // two is right; after the session, nobody can.
-    const conflict = checkConsistency(item, value, scale, store);
+    const conflict = checkConsistency(item, value, scale, walker.visibleAnswers());
     setInconsistency(conflict);
     props.onRecord(unit, value);
     if (conflict) {
@@ -400,7 +403,7 @@ export function SurveyScreen(props: SurveyScreenProps) {
             answer is given. */}
         {item.lede && (
           <p className={`lede${item.responseType === "info" ? " lede-body" : ""}`}>
-            {resolveText(item.lede.text, item.lede.pipes, store, sessionStart)}
+            {resolveText(item.lede.text, item.lede.pipes, answers, sessionStart)}
           </p>
         )}
         {/* Detail on request — data handling, mostly. Available from the screen
@@ -424,7 +427,7 @@ export function SurveyScreen(props: SurveyScreenProps) {
             </button>
             {moreOpen && (
               <div className="more-info-body">
-                {resolveText(item.moreInfo.body.text, item.moreInfo.body.pipes, store, sessionStart)}
+                {resolveText(item.moreInfo.body.text, item.moreInfo.body.pipes, answers, sessionStart)}
               </div>
             )}
           </div>

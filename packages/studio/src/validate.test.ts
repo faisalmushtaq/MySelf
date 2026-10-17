@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import type { Issue, IssueLocation, StudioDraft } from "./contract.js";
 import { emptyDraft, extractDraft, previewRelease } from "./draft.js";
 import { manifestIndex, publishedScaleCodes, reservedFrom } from "./history.js";
+import { lockBaseline } from "./locked.js";
 import { hasBlockingIssues, issuesFor, summariseIssues, validateDraft, type ValidationContext } from "./validate.js";
 
 // Test-only: drafts are edited here the way a researcher (or a bug) would, which
@@ -607,6 +608,66 @@ describe("licensed, protected and identifying content", () => {
       for (const [refKey, def] of Object.entries(d.instruments)) if (def.instrument === "ybm_intro_consent") delete d.instruments[refKey];
     });
     expectIssue(validateDraft(removed, { baseline: live }), "consent.removed", { kind: "survey" });
+  });
+});
+
+describe("the consent, whatever the draft started from", () => {
+  const withoutConsent = (d: StudioDraft) => {
+    for (const [refKey, def] of Object.entries(d.instruments)) if (def.instrument === "ybm_intro_consent") delete d.instruments[refKey];
+    d.composition.sections = d.composition.sections.filter((s) => s.key !== "welcome");
+  };
+  const consentCodes = (issues: Issue[]) => errors(issues).filter((i) => i.code.startsWith("consent."));
+
+  it("is checked in the live survey and found in order", () => {
+    expect(consentCodes(validateDraft(live))).toEqual([]);
+    expect(consentCodes(validateDraft(live, fullContext))).toEqual([]);
+    expect(validateDraft(live).filter((i) => i.code === "consent.none")).toEqual([]);
+  });
+
+  it("can't be moved after other questions, even with no baseline to compare with", () => {
+    const last = edit((d) => {
+      const welcome = d.composition.sections.shift()!;
+      d.composition.sections.push(welcome);
+    });
+    expectIssue(validateDraft(last), "consent.not_first", { kind: "block", sectionKey: "welcome" });
+    expectIssue(validateDraft(last, fullContext), "consent.not_first", { kind: "block", sectionKey: "welcome" });
+    // Another block put in front of it in its own section is the same thing.
+    const before = edit((d) => {
+      const identity = section(d, "about_you").components.shift();
+      section(d, "welcome").components.unshift(identity);
+    });
+    expectIssue(validateDraft(before), "consent.not_first", { kind: "block", sectionKey: "welcome" });
+  });
+
+  it("must still ask participants to agree", () => {
+    const noAgreement = edit((d) => {
+      const form = instrument(d, "ybm_intro_consent").forms[0];
+      form.items = (form.items as Loose[]).filter((i) => i.responseType !== "checkbox_set");
+    });
+    expectIssue(validateDraft(noAgreement), "consent.agreement_missing", { kind: "block", sectionKey: "welcome" });
+    expectIssue(validateDraft(noAgreement, fullContext), "consent.agreement_missing", { kind: "block", sectionKey: "welcome" });
+  });
+
+  it("is kept by the baseline of a copy that has never been published, so the copy can't drop it", () => {
+    const copy = edit(withoutConsent);
+    const base = lockBaseline(live, copy);
+    expect(Object.values(base.instruments).map((d) => d.instrument)).toContain("ybm_intro_consent");
+    expectIssue(validateDraft(copy, { baseline: base }), "consent.removed", { kind: "survey" });
+    // Unplaced is as good as removed: the participant never sees it.
+    const unplaced = edit((d) => (d.composition.sections = d.composition.sections.filter((s) => s.key !== "welcome")));
+    expectIssue(validateDraft(unplaced, { baseline: base }), "consent.removed", { kind: "survey" });
+    // An unchanged copy is fine.
+    expect(consentCodes(validateDraft(live, { baseline: lockBaseline(live, live) }))).toEqual([]);
+  });
+
+  it("is only warned about in a survey that never had one", () => {
+    const blank = emptyDraft({ surveyId: "s_new", study: "newstudy", title: "A new study" });
+    const issues = validateDraft(blank, { baseline: lockBaseline(null, blank) });
+    expect(consentCodes(issues)).toEqual([]);
+    expectIssue(issues, "consent.none", { kind: "survey" }, "warning");
+    const noConsent = edit(withoutConsent);
+    expectIssue(validateDraft(noConsent), "consent.none", { kind: "survey" }, "warning");
+    expect(consentCodes(validateDraft(noConsent))).toEqual([]);
   });
 
   it("changing the identity wording without unlocking it", () => {

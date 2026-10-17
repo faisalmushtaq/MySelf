@@ -62,8 +62,8 @@ export const ybmComposition: AssessmentDraftInput = {
   participantCode: {
     label: "Your study code",
     pattern: "^[A-Za-z]{3}[0-9]{4}$",
-    hint: "Three letters then four numbers, for example NDC0042",
-    placeholder: "NDC0042",
+    hint: "Three letters then four numbers, for example ABC1234",
+    placeholder: "ABC1234",
     variable: "val_id",
     instructions:
       "The research team gave you a code for today — three letters followed by four numbers. Type it in to begin. If you haven't got one, or you're not sure, ask a member of the team before you carry on.",
@@ -114,7 +114,9 @@ export const ybmComposition: AssessmentDraftInput = {
         },
       },
       body: {
-        text: "That's everything — thanks for taking part in the Yorkshire Brain Map study.",
+        // Signposting after the mental-health questions (docs/04 P5, A-29; QC 2026-10-17).
+        text:
+          "That's everything — thanks for taking part in the Yorkshire Brain Map study.\n\nIf any of the questions brought up difficult feelings, please talk to a member of the research team, a teacher, or someone you trust. You can also get free, confidential support at any time:\n• Childline (up to age 19): call 0800 1111 or visit childline.org.uk\n• Shout: text SHOUT to 85258\n• Samaritans: call 116 123\n• Papyrus HOPELINE247 (under 35): call 0800 068 4141\n• NHS 111: choose the mental health option\n\nIf you or someone else is in danger right now, call 999.",
       },
     },
   },

@@ -10,8 +10,13 @@ name: Deploy to Firebase
 # backend redeploy has a cold-start cost and a window where the relay is
 # replaced, and doing that because somebody edited a document is not free.
 
+# Only after CI has passed on main (or by hand): a commit that fails its tests
+# must never reach the iPads or the backend. CI skips docs-only changes, which
+# have nothing to deploy.
 on:
-  push:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
     branches: [main]
   workflow_dispatch:
     inputs:
@@ -30,13 +35,14 @@ concurrency:
 
 jobs:
   deploy:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # Without the key there is nothing to authenticate with, and a run that
     # fails for that reason on every push is noise nobody reads.
-    if: github.repository == 'faisalmushtaq/MySelf'
+    if: github.repository == 'faisalmushtaq/MySelf' && ((github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push'))
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
           fetch-depth: 2
 
       - uses: pnpm/action-setup@v4

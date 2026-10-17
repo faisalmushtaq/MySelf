@@ -36,6 +36,16 @@ let identityApp: App | null = null;
 
 export const research = (): Firestore => getFirestore();
 
+/**
+ * Whether this deployment has been given a way to reach the identity project.
+ *
+ * Says nothing about whether the credential works: a secret that is set but
+ * wrong still fails loudly in `identity()`, as it should.
+ */
+export function identityConfigured(): boolean {
+  return identityApp !== null || !!process.env["IDENTITY_SERVICE_ACCOUNT"];
+}
+
 export function identity(): Firestore {
   if (identityApp) return getFirestore(identityApp);
 

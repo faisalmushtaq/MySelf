@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { normalisePostcode, type StreetList, type StreetMatch } from "@myself/engine";
 import { postcodeList } from "../../lib/postcodes.js";
 import { streetList as loadStreets } from "../../lib/streets.js";
+import { truncateText } from "../../lib/text.js";
 import type { ControlProps } from "./shared.js";
 
 export function FormFieldsControl({ item, value, onAnswer, onValidity, onSubmit }: ControlProps) {
@@ -111,7 +112,7 @@ export function FormFieldsControl({ item, value, onAnswer, onValidity, onSubmit 
     // A numeric field never holds a letter: strip rather than accept-and-scold.
     const field = item.fields.find((f) => f.key === key);
     const cleaned = field?.kind === "numeric" ? raw.replace(/[^0-9]/g, "") : raw;
-    const v = field ? cleaned.slice(0, field.maxChars) : cleaned;
+    const v = field ? truncateText(cleaned, field.maxChars) : cleaned;
     let next = { ...values, [key]: v };
     // Changing the street, or giving a postcode after all, undoes a match.
     if (streets && (key === streets.field || (key === check?.field && v.trim()))) next = withoutMatch(next);

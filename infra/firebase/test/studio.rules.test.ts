@@ -574,7 +574,7 @@ describe("people not on the list", () => {
     );
   });
 
-  it("researchers and analysts, whose claims give them the sittings but not the Studio", async () => {
+  it("researchers and analysts, whose claims are not a place in the Studio", async () => {
     for (const role of ["researcher", "analyst"]) {
       await hasNoStudioAccess(`${role} claim`, caller(`u_${role}`, { role }));
       await hasNoStudioAccess(
@@ -1044,8 +1044,10 @@ describe("two study spaces", () => {
     await seedFuture();
     await refused("future admin: future's sitting", () => getDoc(doc(futureAdmin().db, F.session)));
     await refused("ybm admin: future's sitting", () => getDoc(doc(member("admin").db, F.session)));
-    // The project's people read sittings in every study, as they read ybm's.
-    await allowed("researcher: future's sitting", () => getDoc(doc(caller("u_r", { role: "researcher" }).db, F.session)));
+    // The project's owner reads raw sittings in every study, as in ybm's; a
+    // researcher claim does not (raw sittings are owner-only).
+    await allowed("owner: future's sitting", () => getDoc(doc(caller("u_o", { role: "owner" }).db, F.session)));
+    await refused("researcher: future's sitting", () => getDoc(doc(caller("u_r", { role: "researcher" }).db, F.session)));
   });
 
   it("let the project's people list each study's live surveys, and nobody else", async () => {

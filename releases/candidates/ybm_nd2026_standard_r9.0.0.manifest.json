@@ -5,14 +5,16 @@
     "version": "9.0.0",
     "assessment": "ybm_nd2026_standard",
     "study": "ybm",
-    "publishedAt": "2026-10-14T09:00:00.000Z",
+    "publishedAt": "2026-10-17T12:00:00.000Z",
     "publishedBy": "faisalmushtaq",
     "engineVersion": "0.3.0",
     "decisionRefs": [
       "D-53",
       "D-58",
       "D-59",
-      "D-61"
+      "D-61",
+      "D-62",
+      "D-63"
     ]
   },
   "composition": {
@@ -31,10 +33,10 @@
     "progressIndicator": "sections",
     "participantCode": {
       "pattern": "^[A-Za-z]{3}[0-9]{4}$",
-      "hint": "Three letters then four numbers, for example NDC0042",
+      "hint": "Three letters then four numbers, for example ABC1234",
       "label": "Your study code",
       "instructions": "The research team gave you a code for today — three letters followed by four numbers. Type it in to begin. If you haven't got one, or you're not sure, ask a member of the team before you carry on.",
-      "placeholder": "NDC0042",
+      "placeholder": "ABC1234",
       "variable": "val_id"
     },
     "effort": {
@@ -413,7 +415,7 @@
           }
         },
         "body": {
-          "text": "That's everything — thanks for taking part in the Yorkshire Brain Map study."
+          "text": "That's everything — thanks for taking part in the Yorkshire Brain Map study.\n\nIf any of the questions brought up difficult feelings, please talk to a member of the research team, a teacher, or someone you trust. You can also get free, confidential support at any time:\n• Childline (up to age 19): call 0800 1111 or visit childline.org.uk\n• Shout: text SHOUT to 85258\n• Samaritans: call 116 123\n• Papyrus HOPELINE247 (under 35): call 0800 068 4141\n• NHS 111: choose the mental health option\n\nIf you or someone else is in danger right now, call 999."
         }
       }
     }
@@ -446,12 +448,12 @@
                 "text": "Yorkshire Brain Map School Workshop"
               },
               "lede": {
-                "text": "Thank you for taking part in this workshop.\n\nIn this study, we'll use a special tool called electroencephalography (EEG) to collect information about your brain. We'll put sensors on your head, and they'll record your brain activity. You'll also help collect brain data from another person. This new way helps us gather brain data quickly with help from people who aren't experts. The EEG headset should not feel uncomfortable, so if it does at any point, just let a member of the research team know. EEG is safe, pain free, and non-invasive.\n\nIn addition to EEG, we'll also ask questions about your life and how you feel. We made a list of questions that ask about things like who you are, how you feel, and how happy you are. We care about keeping your answers private. We'll ask for your name, date of birth and home address so we can keep your answers together if you take part again, and find them if you ask us to remove them. These are kept apart from your answers, and only the research team can see them.\n\nJoining this study is your choice, and you can leave at any time with no problems. If you want to leave, please let a member of the research team or a teacher know.\n\nOur study has permission from the School of Psychology Ethics Committee (Ethics Reference: PSCETHS-1449, Date of Approval: 5/6/25).\n\nThe questions you're about to answer should take about 10 minutes to answer. Please finish the survey quickly and carefully so we can stay on schedule. Thank you for joining our study! If you have questions or worries, please feel free to ask."
+                "text": "Thank you for taking part in this workshop.\n\nIn this study, we'll use a special tool called electroencephalography (EEG) to collect information about your brain. We'll put sensors on your head, and they'll record your brain activity. You'll also help collect brain data from another person. This new way helps us gather brain data quickly with help from people who aren't experts. The EEG headset should not feel uncomfortable, so if it does at any point, just let a member of the research team know. EEG is safe, pain free, and non-invasive.\n\nIn addition to EEG, we'll also ask questions about your life and how you feel. We made a list of questions that ask about things like who you are, how you feel, and how happy you are. We care about keeping your answers private. We'll ask for your name, date of birth and home address. We use them to keep your answers together if you take part again, to find your answers if you ask us to remove them, and — through a secure service called Connected Yorkshire — to link your answers with your health and education records (we explain this on the consent screen). Your name, date of birth and address are kept apart from your answers. Only the research team and Connected Yorkshire ever see them; researchers looking at the data only ever see a code.\n\nJoining this study is your choice, and you can leave at any time with no problems. If you want to leave, please let a member of the research team or a teacher know.\n\nOur study has permission from the School of Psychology Ethics Committee (Ethics Reference: PSCETHS-1449, Date of Approval: 5/6/25).\n\nThe questions take most people about 20 minutes. There's no rush: careful answers matter more than fast ones. Thank you for joining our study! If you have questions or worries, please ask a member of the research team."
               },
               "moreInfo": {
                 "label": "How we look after your information",
                 "body": {
-                  "text": "WHAT WE COLLECT\nYour answers to these questions, the EEG recording from the session, and some details about how you used the app — such as how long you spent on each question. We also collect your name, date of birth and home address, so the research team can identify your session and keep your answers together if you take part again.\n\nWHERE IT IS KEPT\nEverything is saved on this iPad first, encrypted, so it works even with no internet. It is later transferred to secure University of Leeds storage. Your name, date of birth and address are stored apart from your answers, so they are not held together.\n\nWHO CAN SEE IT\nThe research team. When we publish or share the data, your name and address are never attached — only a study number and your answers.\n\nYOUR ADDRESS\nWe ask for the address you live at most of the time. With your name and date of birth, it helps us keep your answers together if you take part more than once. It is never published or shared.\n\nLINKING WITH OTHER RECORDS\nTaking part includes this. Connected Yorkshire uses your name, date of birth and address to join your answers to your health and education records, then takes them off and replaces them with a code before any researcher sees the data. You can ask us to stop at any time.\n\nCHANGING YOUR MIND\nYou can stop at any time, and you don't have to give a reason. If you want your answers taken out afterwards, contact the research team within 24 hours of finishing and tell them your name and date of birth.\n\nQUESTIONS\nEmail the research team at brainpop@leeds.ac.uk. Ethics reference PSCETHS-1449."
+                  "text": "WHAT WE COLLECT\nYour answers to these questions, the EEG recording from the session, and some details about how you used the app — such as how long you spent on each question. We also collect your name, date of birth and home address, so the research team can identify your session, keep your answers together if you take part again, and link your answers with your health and education records (see below).\n\nWHERE IT IS KEPT\nEverything is saved on this iPad first, encrypted, so it works even with no internet. It is later transferred to secure University of Leeds storage. Your name, date of birth and address are stored apart from your answers, so they are not held together.\n\nWHO CAN SEE IT\nThe research team. Connected Yorkshire receives your name, date of birth and address, securely, only to link your records. When we publish or share the data, your name and address are never attached — only a study number and your answers.\n\nYOUR ADDRESS\nWe ask for the address you live at most of the time. With your name and date of birth, it helps us keep your answers together if you take part more than once. It is never published. The only place it is sent is Connected Yorkshire, securely, to link your records.\n\nLINKING WITH OTHER RECORDS\nTaking part includes this. Connected Yorkshire uses your name, date of birth and address to join your answers to your health and education records, then takes them off and replaces them with a code before any researcher sees the data. You can ask us to stop at any time.\n\nCHANGING YOUR MIND\nYou can stop at any time, and you don't have to give a reason. If you want your answers taken out afterwards, email the research team within 48 hours of finishing (by the date shown on the consent screen) and tell them your name and date of birth.\n\nQUESTIONS\nEmail the research team at brainpop@leeds.ac.uk. Ethics reference PSCETHS-1449."
                 }
               },
               "required": "soft",
@@ -478,7 +480,7 @@
                 {
                   "key": "dissemination",
                   "text": {
-                    "text": "I understand that anonymized results from this study may be disseminated through conference presentations, publication in peer reviewed journals, compiled as part of a report, used in future projects, included on institutional websites, presented in electronic theses and may be made available on online data repositories."
+                    "text": "I understand that anonymised results from this study may be disseminated through conference presentations, publication in peer-reviewed journals, compiled as part of a report, used in future projects, included on institutional websites, presented in electronic theses and may be made available on online data repositories."
                   },
                   "required": true
                 },
@@ -492,7 +494,7 @@
                 {
                   "key": "withdrawal_window",
                   "text": {
-                    "text": "I understand that if I choose to withdraw my data by contacting the primary researcher within 24 hours of submission (up until {withdrawal_date}) that my responses will be removed from the dataset and not used for analysis",
+                    "text": "I understand that if I want my answers removed, I can email the research team (brainpop@leeds.ac.uk) within 48 hours of finishing (by {withdrawal_date}), and my answers will be taken out of the study and not used.",
                     "pipes": {
                       "withdrawal_date": {
                         "kind": "date_offset",
@@ -505,14 +507,14 @@
                 {
                   "key": "free_withdrawal",
                   "text": {
-                    "text": "I understand that I am free to withdraw at any time without giving any reason and without there being any negative consequences"
+                    "text": "I understand that I am free to withdraw at any time without giving any reason and without there being any negative consequences."
                   },
                   "required": true
                 },
                 {
                   "key": "information_read",
                   "text": {
-                    "text": "I have read and understood the information about the study shown at the start of this survey and have been offered the opportunity to ask the research team questions via email (brainpop@leeds.ac.uk)"
+                    "text": "I have read and understood the information about the study shown at the start of this survey and have been offered the opportunity to ask the research team questions via email (brainpop@leeds.ac.uk)."
                   },
                   "required": true
                 },
@@ -526,7 +528,7 @@
                 {
                   "key": "agree",
                   "text": {
-                    "text": "I agree to take part in this study"
+                    "text": "I agree to take part in this study."
                   },
                   "required": true
                 }
@@ -541,7 +543,7 @@
                 "text": "Why your answers matter"
               },
               "lede": {
-                "text": "There are no right or wrong answers here — only true ones.\n\nWhat you tell us goes into research on how sleep, screens and feelings fit together for people your age, and on what actually helps. That only works if the answers are really yours, including the ones that aren't flattering.\n\nA rushed or made-up answer doesn't just lose one number. It makes the whole picture slightly less true — for everyone the research is meant to help.\n\nSo take your time. And if you'd rather not answer something, leave it blank — that's always allowed."
+                "text": "There are no right or wrong answers here — only true ones.\n\nWhat you tell us goes into research on how sleep, screens and feelings fit together for people your age, and on what actually helps. That only works if the answers are really yours, including the ones that aren't flattering.\n\nA rushed or made-up answer doesn't just lose one number. It makes the whole picture slightly less true — for everyone the research is meant to help.\n\nSo take your time. A few questions near the start, like your name and date of birth, are needed to take part. After that, if you'd rather not answer something, you can leave it blank or choose \"Prefer not to say\"."
               },
               "required": "optional",
               "allowDecline": false,
@@ -597,7 +599,10 @@
               "variable": "first_name",
               "legacyVariable": "first_name",
               "stem": {
-                "text": "First Name"
+                "text": "What's your first name?"
+              },
+              "lede": {
+                "text": "Please use your full first name as it is on your school or doctor's records, not a nickname."
               },
               "required": "hard",
               "allowDecline": false,
@@ -613,7 +618,7 @@
               "variable": "last_name",
               "legacyVariable": "last_name",
               "stem": {
-                "text": "Last Name"
+                "text": "What's your last name (surname)?"
               },
               "required": "hard",
               "allowDecline": false,
@@ -1823,7 +1828,7 @@
               "variable": "gender",
               "legacyVariable": "Gender",
               "stem": {
-                "text": "Gender"
+                "text": "What is your gender?"
               },
               "required": "hard",
               "allowDecline": false,
@@ -1846,8 +1851,8 @@
               "lede": {
                 "text": "For example, antidepressants. We only use this to describe who took part — it never affects whether you can take part, and it is not shared with anyone else."
               },
-              "required": "hard",
-              "allowDecline": false,
+              "required": "soft",
+              "allowDecline": true,
               "identifying": false,
               "researcherNote": "Special-category health data (A-30). Mid-sentence 'It' fixed per D-07. Question and reassurance split into stem and lede (D-29).",
               "responseType": "single_choice",
@@ -1966,7 +1971,7 @@
           "readingLevel": "standard",
           "informant": "self",
           "label": "EHI-SF canonical (Veale 2014 anchors, confirmed by the researcher 2026-08-02)",
-          "instructions": "Please indicate your preferences in the use of hands in the following activities.",
+          "instructions": "Next, four quick questions about which hand you use for everyday things.",
           "items": [
             {
               "key": "writing",
@@ -2053,7 +2058,7 @@
               "revision": 1,
               "variable": "ehi_lq_feedback",
               "stem": {
-                "text": "Your answers suggest you're {band}",
+                "text": "Your answers suggest you're {band}.",
                 "pipes": {
                   "band": {
                     "kind": "score",
@@ -2078,6 +2083,51 @@
               "required": "optional",
               "allowDecline": false,
               "identifying": false,
+              "displayIf": {
+                "op": "all",
+                "args": [
+                  {
+                    "op": "answered",
+                    "target": {
+                      "item": {
+                        "instrument": "ehi_sf",
+                        "item": "writing",
+                        "revision": 1
+                      }
+                    }
+                  },
+                  {
+                    "op": "answered",
+                    "target": {
+                      "item": {
+                        "instrument": "ehi_sf",
+                        "item": "throwing",
+                        "revision": 1
+                      }
+                    }
+                  },
+                  {
+                    "op": "answered",
+                    "target": {
+                      "item": {
+                        "instrument": "ehi_sf",
+                        "item": "toothbrush",
+                        "revision": 1
+                      }
+                    }
+                  },
+                  {
+                    "op": "answered",
+                    "target": {
+                      "item": {
+                        "instrument": "ehi_sf",
+                        "item": "spoon",
+                        "revision": 1
+                      }
+                    }
+                  }
+                ]
+              },
               "researcherNote": "Participant-facing feedback on the EHI laterality quotient (D-33). Presentational only — computed from the answers just given, stored nowhere, and shown after all four items so it cannot influence any of them.",
               "responseType": "info"
             }
@@ -3636,7 +3686,7 @@
           "readingLevel": "standard",
           "informant": "self",
           "label": "RCADS-25 (en-GB) — administered wording matches canonical; canonical 0-3 coding",
-          "instructions": "The next questions are about your feelings and mental health. Some of these questions may be difficult to answer. Remember, all your answers are completely confidential and if you do not want to answer a question, you can skip it. Please select how often each of these things happen to you.",
+          "instructions": "The next questions are about your feelings and mental health. Some of them may be difficult to answer. Your answers are private (your name is kept apart from them), and if you don't want to answer a question, you can skip it. If any of these questions upset you, let a member of the research team know. Please choose how often each of these things happens to you.",
           "items": [
             {
               "key": "q1",
@@ -3928,11 +3978,11 @@
             },
             {
               "key": "q17",
-              "revision": 1,
+              "revision": 2,
               "variable": "rcads25_q17",
               "legacyVariable": "rcads_17",
               "stem": {
-                "text": "I have to think special thoughts (like number or words) to stop bad things happening."
+                "text": "I have to think of special thoughts (like numbers or words) to stop bad things from happening."
               },
               "required": "soft",
               "allowDecline": true,
@@ -4252,7 +4302,7 @@
                 "text": "Just to check — do you use any of these?"
               },
               "lede": {
-                "text": "TikTok · Instagram · Snapchat · YouTube · WhatsApp · Discord · Reddit · X (Twitter) · Twitch · BeReal · Facebook · Pinterest\n\nWatching or reading without posting still counts. Messaging apps you use to keep up with friends count too."
+                "text": "TikTok · Instagram · Snapchat · YouTube · Discord · Reddit · X (Twitter) · Twitch · BeReal · Facebook · Pinterest\n\nWatching or reading without posting still counts. Messaging apps you use to keep up with friends count too."
               },
               "required": "soft",
               "allowDecline": false,
@@ -4539,7 +4589,7 @@
               "variable": "sm_apps_owned",
               "legacyVariable": "DragDrop_SM",
               "stem": {
-                "text": "Which of these apps do you have on your phone?"
+                "text": "Which of these apps do you use?"
               },
               "required": "soft",
               "allowDecline": false,
@@ -5040,7 +5090,7 @@
               "variable": "sm_limit_features",
               "legacyVariable": "app_reduce",
               "stem": {
-                "text": "Do you use any features designed to reduce your social media use and/or screentime (e.g., screentime limits, break reminders, sleep hours reminders)?"
+                "text": "Do you use any features designed to cut down your social media use or screen time (for example, screen time limits, break reminders or bedtime reminders)?"
               },
               "required": "soft",
               "allowDecline": false,
@@ -5286,7 +5336,7 @@
               "variable": "sm_impact_negative",
               "legacyVariable": "Social media impact _5",
               "stem": {
-                "text": "The impacts of social media on my wellbeing are mostly negative"
+                "text": "The impacts of social media on my mental wellbeing are mostly negative"
               },
               "required": "soft",
               "allowDecline": false,
@@ -5783,7 +5833,7 @@
               "variable": "gaming_social_pct",
               "legacyVariable": "game_time_per_wk_pct_1",
               "stem": {
-                "text": "Roughly how much of the time you spend gaming per week is spent playing with others (e.g., multiplayer, online)? (in percentage)"
+                "text": "Roughly what percentage of your gaming time is spent playing with other people (for example, multiplayer or online)?"
               },
               "required": "soft",
               "allowDecline": false,
@@ -5803,8 +5853,8 @@
               "min": 0,
               "max": 100,
               "step": 1,
-              "minLabel": "No time",
-              "maxLabel": "All of it",
+              "minLabel": "None of it (0%)",
+              "maxLabel": "All of it (100%)",
               "showValue": true
             }
           ],
@@ -7557,7 +7607,7 @@
         },
         {
           "code": 2,
-          "label": "Less than once a week",
+          "label": "Once a week or less",
           "kind": "substantive",
           "textEntry": false
         },
@@ -8022,7 +8072,7 @@
       "options": [
         {
           "code": 1,
-          "label": "<5 minutes",
+          "label": "Less than 5 minutes",
           "legacyCode": 1,
           "kind": "substantive",
           "textEntry": false
@@ -8137,7 +8187,7 @@
       "options": [
         {
           "code": 1,
-          "label": "Strongly Agree",
+          "label": "Strongly agree",
           "legacyCode": 1,
           "kind": "substantive",
           "textEntry": false
@@ -9025,5 +9075,5 @@
       "bytes": 589147
     }
   },
-  "hash": "sha256:f1224e6e28a5393617d956cc049c4d043f4448511baf2c253074acbcdea02173"
+  "hash": "sha256:37a3c0684e892dfd9047ac7e5ac6a8dadc8d40563b690519db083ea8dcc0606f"
 }

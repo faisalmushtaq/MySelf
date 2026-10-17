@@ -9,7 +9,7 @@ import {
   type SessionDoc,
   type SittingConflict,
 } from "@myself/firebase";
-import { sittingUpload, type DeviceSession, type SittingOutcome } from "@myself/store";
+import { isSessionId, sittingUpload, type DeviceSession, type SittingOutcome } from "@myself/store";
 import { research } from "./apps.js";
 import { RelayError, type Caller } from "./relay-policy.js";
 import { authenticate, cors } from "./relay.js";
@@ -133,6 +133,81 @@ async function meterUploads(caller: Caller, study: string): Promise<void> {
 
 
 /**
+ * The deepest a value may sit in a document, counted as the Admin SDK counts it:
+ * path segments from the top-level field down, array indexes included (its
+ * serializer refuses a path of more than MAX_DEPTH + 1 = 21 segments).
+ */
+const MAX_PATH_SEGMENTS = 21;
+
+/**
+ * The largest document this will try to write, by the same JSON byte count
+ * `splitSession` packs to. Firestore's hard limit is 1 MiB (1,048,576 bytes)
+ * including the document's name; JSON overcounts against Firestore's own
+ * accounting, so a document under this fits. One event over it cannot be
+ * stored however it is split, because an event is never divided.
+ */
+const MAX_WRITABLE_BYTES = 1_040_000;
+
+const RESERVED_KEY = /^__.*__$/;
+const LONE_SURROGATE = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/;
+
+function utf8Bytes(value: unknown): number {
+  let bytes = 0;
+  for (const char of JSON.stringify(value)) {
+    const code = char.codePointAt(0)!;
+    bytes += code < 0x80 ? 1 : code < 0x800 ? 2 : code < 0x10000 ? 3 : 4;
+  }
+  return bytes;
+}
+
+/**
+ * Why Firestore could never store this value, or null when it can.
+ *
+ * Each of these fails the write every time, however often it is retried, so a
+ * sitting that has one is refused as permanently invalid instead of being
+ * reported as a passing failure the device should post again (stress finding
+ * 4). Checked before the transaction, so nothing is written for it.
+ */
+export function unstorableReason(value: unknown, path: string[] = [], inArray = false): string | null {
+  const at = path.length > 0 ? ` at ${path.join(".")}` : "";
+  if (path.length > MAX_PATH_SEGMENTS) return `it is nested more than ${MAX_PATH_SEGMENTS - 1} levels deep${at}`;
+  if (typeof value === "string") {
+    return LONE_SURROGATE.test(value) ? `it holds text that is not valid Unicode (a lone surrogate)${at}` : null;
+  }
+  if (Array.isArray(value)) {
+    if (inArray) return `it holds a list directly inside a list${at}, which the database cannot store`;
+    for (let i = 0; i < value.length; i++) {
+      const problem = unstorableReason(value[i], [...path, String(i)], true);
+      if (problem) return problem;
+    }
+    return null;
+  }
+  if (value !== null && typeof value === "object") {
+    for (const [key, inner] of Object.entries(value)) {
+      if (key === "") return `it has a field with an empty name${at}`;
+      if (RESERVED_KEY.test(key)) return `it has a field named "${key.slice(0, 40)}"${at}, and names like __this__ are reserved`;
+      if (LONE_SURROGATE.test(key)) return `it has a field name that is not valid Unicode (a lone surrogate)${at}`;
+      // A map inside a list is a new value, so lists may hold maps holding lists.
+      const problem = unstorableReason(inner, [...path, key], false);
+      if (problem) return problem;
+    }
+  }
+  return null;
+}
+
+/** Why this sitting's documents could never be written, or null when they can. */
+export function unstorableSitting(doc: SessionDoc, chunks: readonly ChunkDoc[]): string | null {
+  for (const [what, document] of [["sitting", doc] as const, ...chunks.map((c) => [`part ${c.index}`, c] as const)]) {
+    const shape = unstorableReason(document);
+    if (shape) return shape;
+    if (utf8Bytes(document) > MAX_WRITABLE_BYTES) {
+      return `one of its answers is too large to store (the ${what} it is in is over ${Math.floor(MAX_WRITABLE_BYTES / 1000)} kB)`;
+    }
+  }
+  return null;
+}
+
+/**
  * Who the sitting is recorded as coming from.
  *
  * A device is its own identity. A researcher importing a file has to say which
@@ -149,6 +224,9 @@ export function deviceIdFor(caller: Caller, claimed: string | undefined): string
       "say which device these sittings came off. An import from a file has to record the iPad that collected it.",
     );
   }
+  // It names a quarantine document, so it is held to the session id's rule
+  // (every installation id, `ipad_<ULID>` or a Firebase uid, fits it).
+  if (!isSessionId(claimed)) throw new RelayError(400, "unknown", "that device id is not one this study can store");
   return claimed;
 }
 
@@ -182,7 +260,14 @@ export async function storeSitting(
   now = new Date(),
   provenance: SessionDoc["provenance"] = "imported",
 ): Promise<SittingOutcome> {
+  // The id is a path segment; the contract checks it, and this holds for any
+  // other caller (a `/` in it would address another sitting's documents).
+  if (!isSessionId(session.sessionId)) throw new RelayError(400, "unknown", "that sitting's id is not one this study can store");
   const { doc, chunks } = splitSession(session, deviceId, study, now, provenance);
+  const unstorable = unstorableSitting(doc, chunks);
+  if (unstorable) {
+    throw new RelayError(422, "invalid", `this sitting can never be stored as it is: ${unstorable}. Posting it again will not help.`, false);
+  }
 
   const parentRef = db.doc(paths.session(study, session.sessionId));
 
@@ -439,6 +524,29 @@ export const saveSitting = onRequest(
             await storeSitting(db, study.study, one as DeviceSession, deviceId, now, caller.device ? "device" : "imported"),
           );
         } catch (error) {
+          /**
+           * Permanent or passing, said plainly.
+           *
+           * A sitting the database can never hold (too deep, a list in a list, a
+           * reserved or empty field name, an answer over the size limit, broken
+           * Unicode) used to be reported like a dropped connection, so the device
+           * posted it again for ever and nobody was told. It is refused as
+           * invalid, not retryable, with the reason, so the device can stop and
+           * show it. Anything else may well work next time.
+           */
+          if (error instanceof RelayError && (error.status === 400 || error.status === 422)) {
+            logger.warn("a sitting was refused as permanently invalid", { sessionId: one.sessionId, reason: error.message });
+            outcomes.push({
+              sessionId: one.sessionId,
+              stored: false,
+              events: one.events.length,
+              chunks: 0,
+              quarantined: false,
+              retryable: false,
+              reason: error.message,
+            });
+            continue;
+          }
           logger.error("a sitting could not be stored", { sessionId: one.sessionId, error: String(error) });
           outcomes.push({
             sessionId: one.sessionId,
@@ -446,6 +554,7 @@ export const saveSitting = onRequest(
             events: one.events.length,
             chunks: 0,
             quarantined: false,
+            retryable: true,
             reason: "could not be written — it is still on the device, and posting it again is safe",
           });
         }
@@ -504,6 +613,21 @@ export const saveSitting = onRequest(
         logger.error("saveSitting: could not write the audit row", error);
       }
 
+      /**
+       * When nothing in the request could ever be stored — the usual case, since a
+       * device posts one sitting at a time — the request itself is refused, 422 and
+       * not retryable, so a client that reads only the status still stops. A
+       * handover with some sittings stored is answered 200, sitting by sitting.
+       */
+      const refused = outcomes.filter((o) => o.retryable === false);
+      if (refused.length > 0 && refused.length === outcomes.length) {
+        res.status(422).json({
+          error: { kind: "invalid", message: refused.map((o) => `${o.sessionId}: ${o.reason}`).join("; "), retryable: false },
+          stored,
+          outcomes,
+        });
+        return;
+      }
       res.status(200).json({ stored, outcomes });
     } catch (error) {
       if (error instanceof RelayError) {

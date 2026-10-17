@@ -679,6 +679,47 @@ describe("a new survey", () => {
   });
 });
 
+// ── The consent ─────────────────────────────────────────────────────────────
+
+describe("the consent, at publish", () => {
+  const isConsent = (def: { instrument: string }) => def.instrument === "ybm_intro_consent";
+  const consentErrors = (error: HttpsError) =>
+    (error.details as { issues: { code: string; severity: string }[] }).issues.filter((i) => i.severity === "error" && i.code.startsWith("consent.")).map((i) => i.code);
+
+  it("can't be dropped from a copy of a survey that asked for it, though the copy has never been published", async () => {
+    await setUp();
+    await createSurvey(db, { study: STUDY, surveyId: "ybm_copy", title: "YBM copy", from: { surveyId: SURVEY, version: "8.0.0" }, actor: ADMIN });
+    const draft = (await currentDraft("ybm_copy")).draft;
+    for (const [refKey, def] of Object.entries(draft.instruments)) if (isConsent(def)) delete draft.instruments[refKey];
+    draft.composition.sections = draft.composition.sections.filter((s) => s.key !== "welcome");
+    const revision = await save(draft, EDITOR, "ybm_copy");
+    const error = await refusedCleanly(() =>
+      publish(db, { study: STUDY, surveyId: "ybm_copy", expectedRevision: revision, version: "1.0.0", releaseNote: "First.", actor: PUBLISHER }),
+    );
+    expect(error.code).toBe("failed-precondition");
+    expect(consentErrors(error)).toEqual(["consent.removed"]);
+  });
+
+  it("can't be moved after other questions", async () => {
+    await setUp();
+    const draft = (await currentDraft()).draft;
+    draft.composition.sections.push(draft.composition.sections.shift()!);
+    const revision = await save(draft);
+    const error = await refusedCleanly(() => publishAs(revision, "9.0.0", "Moves the consent."));
+    expect(consentErrors(error)).toEqual(["consent.not_first"]);
+  });
+
+  it("can't lose its statements of agreement while the module stays", async () => {
+    await setUp();
+    const draft = (await currentDraft()).draft;
+    const consent = Object.values(draft.instruments).find(isConsent)!;
+    consent.forms[0]!.items = consent.forms[0]!.items.filter((i) => i.responseType !== "checkbox_set");
+    const revision = await save(draft);
+    const error = await refusedCleanly(() => publishAs(revision, "9.0.0", "Drops the agreement."));
+    expect(consentErrors(error)).toEqual(["consent.agreement_missing"]);
+  });
+});
+
 // ── The list ────────────────────────────────────────────────────────────────
 
 describe("the Studio list", () => {

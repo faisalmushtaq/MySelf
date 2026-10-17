@@ -250,6 +250,27 @@ describe("when the study already holds a copy of this sitting", () => {
   });
 });
 
+describe("when the study says a sitting can never be stored as it is", () => {
+  it("sets it aside with the reason instead of retrying for ever", async () => {
+    const calls = noCalls();
+    const transport = vi.fn(async () => reply([{ stored: false, events: 0, retryable: false, reason: "text that is not valid Unicode" }], 422));
+
+    const report = await synchroniseCompletedSessions({ storage: fakeStore(calls), transport: transport as unknown as typeof fetch });
+
+    expect(report).toMatchObject({ synced: 0, failed: 0, quarantined: 1 });
+    expect(calls.quarantine).toEqual(["ses_01:the study can't store this sitting as it is: text that is not valid Unicode"]);
+    expect(calls.errors).toEqual([]);
+    expect(calls.receipts).toEqual([]);
+  });
+
+  it("still retries a passing failure", async () => {
+    const calls = noCalls();
+    const transport = vi.fn(async () => new Response("{}", { status: 503 }));
+    const report = await synchroniseCompletedSessions({ storage: fakeStore(calls), transport: transport as unknown as typeof fetch });
+    expect(report).toMatchObject({ failed: 1, quarantined: 0 });
+  });
+});
+
 describe("a sitting still being answered", () => {
   const { completedAt: _finished, ...unfinished } = session;
   const running: SyncSession = { ...unfinished, complete: false };

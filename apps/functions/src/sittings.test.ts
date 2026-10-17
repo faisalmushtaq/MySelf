@@ -8,6 +8,7 @@ import {
   deviceIdFor,
   sittingRefusal,
   storeSitting,
+  unstorableReason,
 } from "./sittings.js";
 // The upload shape is the shared wire contract, not this function's own idea of it.
 import { sittingUpload } from "@myself/store";
@@ -177,6 +178,8 @@ describe("who may file a survey sitting", () => {
   it("makes an importing researcher say which iPad it came off", () => {
     expect(deviceIdFor(researcher, "dev_ipad_7")).toBe("dev_ipad_7");
     expect(() => deviceIdFor(researcher, undefined)).toThrow(RelayError);
+    // It names a quarantine document, so it can't be a path either.
+    expect(() => deviceIdFor(researcher, "dev/../../x")).toThrow(RelayError);
   });
 });
 
@@ -230,6 +233,56 @@ describe("what an upload may contain", () => {
 
   it("refuses an empty upload rather than storing nothing quietly", () => {
     expect(sittingUpload.safeParse({ sittings: [] }).success).toBe(false);
+  });
+
+  it("refuses a session id that is not one path segment, before anything is written", async () => {
+    // Posted for real: the id became a path and overwrote another sitting's chunk.
+    for (const id of ["ses_victim/chunks/0006", "..", ".", "ses 1", "ses_1\n", "a".repeat(121)]) {
+      expect(sittingUpload.safeParse({ sittings: [session([event(0)], id)] }).success, id).toBe(false);
+      const { db, docs } = fakeDb();
+      await expect(storeSitting(db, "ybm", session([event(0)], id), "dev_ipad_1")).rejects.toMatchObject({ status: 400 });
+      expect(docs.size).toBe(0);
+    }
+    expect(sittingUpload.safeParse({ sittings: [session([event(0)], "ses_01JABCDEFGHJKMNPQRSTVWXYZ")] }).success).toBe(true);
+  });
+});
+
+describe("a sitting that can never be stored", () => {
+  const deep = (levels: number): Record<string, unknown> => {
+    let value: unknown = 1;
+    for (let i = 0; i < levels; i++) value = { n: value };
+    return value as Record<string, unknown>;
+  };
+  const withPayload = (payload: Record<string, unknown>) => session([{ ...event(0), payload } as ReturnType<typeof event>]);
+
+  it.each([
+    ["nested too deep", { a: deep(19) }, /nested more than 20 levels/],
+    ["a list in a list", { value: [[1]] }, /list directly inside a list/],
+    ["an empty field name", { "": 1 }, /empty name/],
+    ["a reserved field name", { __name__: 1 }, /__this__ are reserved/],
+    ["an answer over the size limit", { text: "x".repeat(1_100_000) }, /too large to store/],
+    ["a lone surrogate", { text: "a\uDC00b" }, /lone surrogate/],
+    ["a lone surrogate in a field name", { ["k\uD800"]: 1 }, /lone surrogate/],
+  ])("is refused for %s, as invalid and not retryable, before anything is written", async (_name, payload, reason) => {
+    const { db, docs } = fakeDb();
+    const error = await storeSitting(db, "ybm", withPayload(payload as Record<string, unknown>), "dev_ipad_1").catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(RelayError);
+    expect(error).toMatchObject({ status: 422, kind: "invalid", retryable: false });
+    expect((error as Error).message).toMatch(reason);
+    expect(docs.size).toBe(0);
+  });
+
+  it("is not confused with what is merely unusual", async () => {
+    for (const payload of [
+      { a: deep(17) },
+      { list: [{ inner: [1, 2] }, null, "x"] },
+      { emoji: "😀", "_one_": 1, "__half": 2 },
+      { text: "x".repeat(600_000) },
+    ]) {
+      expect(unstorableReason({ events: [{ payload }] }), JSON.stringify(payload).slice(0, 60)).toBeNull();
+      const { db } = fakeDb();
+      await expect(storeSitting(db, "ybm", withPayload(payload), "dev_ipad_1")).resolves.toMatchObject({ stored: true });
+    }
   });
 });
 

@@ -1,5 +1,5 @@
 import type { LogicExpr } from "@myself/schema";
-import type { AnswerStore, AnswerValue } from "./answers.js";
+import type { AnswerLookup, AnswerValue } from "./answers.js";
 
 /**
  * Total, side-effect-free evaluation of the logic AST against an AnswerStore.
@@ -17,7 +17,7 @@ type Target = {
   part?: number | string | undefined;
 };
 
-function targetValue(store: AnswerStore, target: Target): AnswerValue | undefined {
+function targetValue(store: AnswerLookup, target: Target): AnswerValue | undefined {
   const rec = store.get(target.item);
   if (!rec || rec.status !== "answered") return undefined;
   return rec.value;
@@ -62,7 +62,7 @@ export function ageOn(iso: string, asOf: Date): number | null {
   return age < 0 ? null : age;
 }
 
-export function evaluate(expr: LogicExpr, store: AnswerStore, asOf?: Date): boolean {
+export function evaluate(expr: LogicExpr, store: AnswerLookup, asOf?: Date): boolean {
   switch (expr.op) {
     case "all":
       return expr.args.every((a) => evaluate(a, store, asOf));

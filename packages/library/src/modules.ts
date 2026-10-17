@@ -60,13 +60,13 @@ const introText = `Thank you for taking part in this workshop.
 
 In this study, we'll use a special tool called electroencephalography (EEG) to collect information about your brain. We'll put sensors on your head, and they'll record your brain activity. You'll also help collect brain data from another person. This new way helps us gather brain data quickly with help from people who aren't experts. The EEG headset should not feel uncomfortable, so if it does at any point, just let a member of the research team know. EEG is safe, pain free, and non-invasive.
 
-In addition to EEG, we'll also ask questions about your life and how you feel. We made a list of questions that ask about things like who you are, how you feel, and how happy you are. We care about keeping your answers private. We'll ask for your name, date of birth and home address so we can keep your answers together if you take part again, and find them if you ask us to remove them. These are kept apart from your answers, and only the research team can see them.
+In addition to EEG, we'll also ask questions about your life and how you feel. We made a list of questions that ask about things like who you are, how you feel, and how happy you are. We care about keeping your answers private. We'll ask for your name, date of birth and home address. We use them to keep your answers together if you take part again, to find your answers if you ask us to remove them, and — through a secure service called Connected Yorkshire — to link your answers with your health and education records (we explain this on the consent screen). Your name, date of birth and address are kept apart from your answers. Only the research team and Connected Yorkshire ever see them; researchers looking at the data only ever see a code.
 
 Joining this study is your choice, and you can leave at any time with no problems. If you want to leave, please let a member of the research team or a teacher know.
 
 Our study has permission from the School of Psychology Ethics Committee (Ethics Reference: PSCETHS-1449, Date of Approval: 5/6/25).
 
-The questions you're about to answer should take about 10 minutes to answer. Please finish the survey quickly and carefully so we can stay on schedule. Thank you for joining our study! If you have questions or worries, please feel free to ask.`;
+The questions take most people about 20 minutes. There's no rush: careful answers matter more than fast ones. Thank you for joining our study! If you have questions or worries, please ask a member of the research team.`;
 
 /**
  * Data handling, in the participant's own terms, available from the first
@@ -75,22 +75,22 @@ The questions you're about to answer should take about 10 minutes to answer. Ple
  * permissions — every claim here is one the protocol already makes.
  */
 const privacyText = `WHAT WE COLLECT
-Your answers to these questions, the EEG recording from the session, and some details about how you used the app — such as how long you spent on each question. We also collect your name, date of birth and home address, so the research team can identify your session and keep your answers together if you take part again.
+Your answers to these questions, the EEG recording from the session, and some details about how you used the app — such as how long you spent on each question. We also collect your name, date of birth and home address, so the research team can identify your session, keep your answers together if you take part again, and link your answers with your health and education records (see below).
 
 WHERE IT IS KEPT
 Everything is saved on this iPad first, encrypted, so it works even with no internet. It is later transferred to secure University of Leeds storage. Your name, date of birth and address are stored apart from your answers, so they are not held together.
 
 WHO CAN SEE IT
-The research team. When we publish or share the data, your name and address are never attached — only a study number and your answers.
+The research team. Connected Yorkshire receives your name, date of birth and address, securely, only to link your records. When we publish or share the data, your name and address are never attached — only a study number and your answers.
 
 YOUR ADDRESS
-We ask for the address you live at most of the time. With your name and date of birth, it helps us keep your answers together if you take part more than once. It is never published or shared.
+We ask for the address you live at most of the time. With your name and date of birth, it helps us keep your answers together if you take part more than once. It is never published. The only place it is sent is Connected Yorkshire, securely, to link your records.
 
 LINKING WITH OTHER RECORDS
 Taking part includes this. Connected Yorkshire uses your name, date of birth and address to join your answers to your health and education records, then takes them off and replaces them with a code before any researcher sees the data. You can ask us to stop at any time.
 
 CHANGING YOUR MIND
-You can stop at any time, and you don't have to give a reason. If you want your answers taken out afterwards, contact the research team within 24 hours of finishing and tell them your name and date of birth.
+You can stop at any time, and you don't have to give a reason. If you want your answers taken out afterwards, email the research team within 48 hours of finishing (by the date shown on the consent screen) and tell them your name and date of birth.
 
 QUESTIONS
 Email the research team at brainpop@leeds.ac.uk. Ethics reference PSCETHS-1449.`;
@@ -152,7 +152,7 @@ export const ybmIntroConsent: ModuleInput = {
             {
               key: "dissemination",
               text: {
-                text: "I understand that anonymized results from this study may be disseminated through conference presentations, publication in peer reviewed journals, compiled as part of a report, used in future projects, included on institutional websites, presented in electronic theses and may be made available on online data repositories.",
+                text: "I understand that anonymised results from this study may be disseminated through conference presentations, publication in peer-reviewed journals, compiled as part of a report, used in future projects, included on institutional websites, presented in electronic theses and may be made available on online data repositories.",
               },
             },
             {
@@ -164,20 +164,20 @@ export const ybmIntroConsent: ModuleInput = {
             {
               key: "withdrawal_window",
               text: {
-                text: "I understand that if I choose to withdraw my data by contacting the primary researcher within 24 hours of submission (up until {withdrawal_date}) that my responses will be removed from the dataset and not used for analysis",
+                text: "I understand that if I want my answers removed, I can email the research team (brainpop@leeds.ac.uk) within 48 hours of finishing (by {withdrawal_date}), and my answers will be taken out of the study and not used.",
                 pipes: { withdrawal_date: { kind: "date_offset", offsetDays: 2 } },
               },
             },
             {
               key: "free_withdrawal",
               text: {
-                text: "I understand that I am free to withdraw at any time without giving any reason and without there being any negative consequences",
+                text: "I understand that I am free to withdraw at any time without giving any reason and without there being any negative consequences.",
               },
             },
             {
               key: "information_read",
               text: {
-                text: "I have read and understood the information about the study shown at the start of this survey and have been offered the opportunity to ask the research team questions via email (brainpop@leeds.ac.uk)",
+                text: "I have read and understood the information about the study shown at the start of this survey and have been offered the opportunity to ask the research team questions via email (brainpop@leeds.ac.uk).",
               },
             },
             // Linkage is a condition of taking part (D-58), so it is one of the
@@ -188,7 +188,7 @@ export const ybmIntroConsent: ModuleInput = {
                 text: "I understand and agree that my name, date of birth and address will be shared securely with Connected Yorkshire so that my answers can be linked with my health records (such as GP and hospital visits) and education records (such as attendance and exam results), and that researchers will only see the linked information with my name, date of birth and address removed.",
               },
             },
-            { key: "agree", text: { text: "I agree to take part in this study" } },
+            { key: "agree", text: { text: "I agree to take part in this study." } },
           ],
         },
         // Placed after consent and before the first question: the last thing
@@ -204,7 +204,7 @@ export const ybmIntroConsent: ModuleInput = {
           // Answered, in effect, by taking it in: the button says so (D-53).
           advanceLabel: "I understand",
           lede: {
-            text: "There are no right or wrong answers here — only true ones.\n\nWhat you tell us goes into research on how sleep, screens and feelings fit together for people your age, and on what actually helps. That only works if the answers are really yours, including the ones that aren't flattering.\n\nA rushed or made-up answer doesn't just lose one number. It makes the whole picture slightly less true — for everyone the research is meant to help.\n\nSo take your time. And if you'd rather not answer something, leave it blank — that's always allowed.",
+            text: "There are no right or wrong answers here — only true ones.\n\nWhat you tell us goes into research on how sleep, screens and feelings fit together for people your age, and on what actually helps. That only works if the answers are really yours, including the ones that aren't flattering.\n\nA rushed or made-up answer doesn't just lose one number. It makes the whole picture slightly less true — for everyone the research is meant to help.\n\nSo take your time. A few questions near the start, like your name and date of birth, are needed to take part. After that, if you'd rather not answer something, you can leave it blank or choose \"Prefer not to say\".",
           },
           researcherNote:
             "Brief statement of why accurate responding matters, shown once after consent (D-30). Not a consent statement and carries no agreement — informational only.",
@@ -242,7 +242,8 @@ export const ybmIdentity: ModuleInput = {
           variable: "first_name",
           legacyVariable: "first_name",
           required: "hard",
-          stem: { text: "First Name" },
+          stem: { text: "What's your first name?" },
+          lede: { text: "Please use your full first name as it is on your school or doctor's records, not a nickname." },
           maxChars: 100,
           researcherNote: "Direct identifier — identity-schema routed, excluded from default exports (D-09).",
         },
@@ -254,7 +255,7 @@ export const ybmIdentity: ModuleInput = {
           variable: "last_name",
           legacyVariable: "last_name",
           required: "hard",
-          stem: { text: "Last Name" },
+          stem: { text: "What's your last name (surname)?" },
           maxChars: 100,
           researcherNote: "Direct identifier — identity-schema routed (D-09).",
         },
@@ -472,7 +473,7 @@ export const ybmDemographics: ModuleInput = {
           },
         ),
         ...languageItems,
-        single("gender", "gender", "Gender", "Gender", "scale.gender_4", { required: "hard" }),
+        single("gender", "gender", "Gender", "What is your gender?", "scale.gender_4", { required: "hard" }),
         single(
           "medication",
           "mh_medication",
@@ -480,7 +481,10 @@ export const ybmDemographics: ModuleInput = {
           "Are you currently taking any prescribed medication for a mental health or psychiatric condition?",
           "scale.yes_no",
           {
-            required: "hard",
+            // Special-category health data: a participant may always decline
+            // ("Prefer not to say") rather than having to answer (QC 2026-10-17).
+            required: "soft",
+            allowDecline: true,
             lede: {
               text: "For example, antidepressants. We only use this to describe who took part — it never affects whether you can take part, and it is not shared with anyone else.",
             },
@@ -628,7 +632,7 @@ export const ybmSmartphone: ModuleInput = {
           "scale.yes_no",
           {
             lede: {
-              text: "TikTok · Instagram · Snapchat · YouTube · WhatsApp · Discord · Reddit · X (Twitter) · Twitch · BeReal · Facebook · Pinterest\n\nWatching or reading without posting still counts. Messaging apps you use to keep up with friends count too.",
+              text: "TikTok · Instagram · Snapchat · YouTube · Discord · Reddit · X (Twitter) · Twitch · BeReal · Facebook · Pinterest\n\nWatching or reading without posting still counts. Messaging apps you use to keep up with friends count too.",
             },
             displayIf: {
               op: "selected",
@@ -713,7 +717,7 @@ export const ybmSocialMedia: ModuleInput = {
             // Was "Drag and drop the apps into the box…", describing a
             // Qualtrics interaction that does not exist here: the control is
             // two tap steps, and it prints its own step labels (D-29).
-            text: "Which of these apps do you have on your phone?",
+            text: "Which of these apps do you use?",
           },
           scale: "scale.sm_platforms",
           scaleVersion: "1.0.0",
@@ -769,7 +773,7 @@ export const ybmSocialMedia: ModuleInput = {
           "limit_features",
           "sm_limit_features",
           "app_reduce",
-          "Do you use any features designed to reduce your social media use and/or screentime (e.g., screentime limits, break reminders, sleep hours reminders)?",
+          "Do you use any features designed to cut down your social media use or screen time (for example, screen time limits, break reminders or bedtime reminders)?",
           "scale.yes_no_sometimes",
         ),
         single(
@@ -935,7 +939,7 @@ export const ybmScreenAttitudes: ModuleInput = {
           "impact_negative",
           "sm_impact_negative",
           "Social media impact _5",
-          "The impacts of social media on my wellbeing are mostly negative",
+          "The impacts of social media on my mental wellbeing are mostly negative",
           "scale.agree_5pt_desc",
           { researcherNote: "D-07: administered stem read 'my wellbeing in mostly negative'. Legacy row code 5." },
         ),
@@ -1014,13 +1018,13 @@ export const ybmGaming: ModuleInput = {
           variable: "gaming_social_pct",
           legacyVariable: "game_time_per_wk_pct_1",
           stem: {
-            text: "Roughly how much of the time you spend gaming per week is spent playing with others (e.g., multiplayer, online)? (in percentage)",
+            text: "Roughly what percentage of your gaming time is spent playing with other people (for example, multiplayer or online)?",
           },
           min: 0,
           max: 100,
           // End labels added by the team in the Studio (9.0.0), kept here.
-          minLabel: "No time",
-          maxLabel: "All of it",
+          minLabel: "None of it (0%)",
+          maxLabel: "All of it (100%)",
           displayIf: { op: "not_selected", target: { item: gamingHoursRef }, code: 1 },
         },
       ],

@@ -26,6 +26,7 @@ import {
   type StoredSession,
 } from "./lib/db.js";
 import {
+  canPullSittings,
   pullSittings,
   revokeDevice,
   signIn,
@@ -414,7 +415,21 @@ function ResearcherView() {
                   An owner grants one before this will work.
                 </p>
               )}
-              {user?.role && (
+              {user?.role && !canPullSittings(user) && (
+                <>
+                  <p className="note warn">
+                    Signed in as {user.email} ({user.role}). The sittings the iPads upload hold participants&rsquo; names,
+                    dates of birth and addresses, so only an owner can pull them from the study. Ask an owner for a
+                    handover file or a copy of the export, and bring it in below.
+                  </p>
+                  <div className="handover-actions">
+                    <button type="button" className="secondary" onClick={() => void signOutOfStudy()}>
+                      Sign out
+                    </button>
+                  </div>
+                </>
+              )}
+              {user?.role && canPullSittings(user) && (
                 <>
                   <p className="note">
                     Signed in as {user.email} ({user.role}). Pulling is safe to repeat: a sitting already here is left

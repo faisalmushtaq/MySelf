@@ -1,7 +1,7 @@
 import { allInstruments } from "@myself/library";
 import { canonicalJson, instrumentVersion, moduleDefinition, responseScale, scoringDefinition } from "@myself/schema";
 import type { InstrumentOrModule, ScaleInput, ScoringInput, StudioDraft } from "./contract.js";
-import { editTier as tierOf } from "./model.js";
+import { CONSENT_MODULES, editTier as tierOf } from "./model.js";
 
 /**
  * What the Studio may not change (docs/16 §4.4).
@@ -693,6 +693,10 @@ export function protectedDifferences(draft: StudioDraft, baseline: StudioDraft):
  * labels, linkage items) have nothing to compare with, which is true: it has
  * none. A survey started blank gets the same shape with no instruments, so a
  * licensed instrument in it is reported as introduced without provenance.
+ *
+ * The consent module is kept too, though it is editable (D-61): a copy of a
+ * survey that asked for consent must keep asking for it (validate.ts
+ * `checkConsent`), and only its presence is compared, never its wording.
  */
 export function lockBaseline(origin: StudioDraft | null, draft: StudioDraft): StudioDraft {
   const base: StudioDraft = {
@@ -708,7 +712,9 @@ export function lockBaseline(origin: StudioDraft | null, draft: StudioDraft): St
   };
   if (!origin) return base;
   for (const [refKey, def] of Object.entries(origin.instruments)) {
-    if (tierOf(origin, def.instrument) === "editable") continue;
+    // The consent is editable (D-61) but kept all the same, so a copy of a
+    // survey that asked for consent can't drop it (validate.ts `checkConsent`).
+    if (tierOf(origin, def.instrument) === "editable" && !CONSENT_MODULES.includes(def.instrument)) continue;
     base.instruments[refKey] = def;
     for (const form of def.forms) {
       for (const item of form.items) {

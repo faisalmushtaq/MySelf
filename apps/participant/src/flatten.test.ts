@@ -531,4 +531,20 @@ describe("shorter consent, sleep quality and sanity checks (D-53, in the r9.0.0 
     store.set({ instrument: "ybm_social_media", item: "family_control_how", revision: 1 }, { status: "answered", value: { kind: "multi", codes: [1, 8] } });
     expect(shown()).toContain("family_control_other");
   });
+
+  it("stops asking about Polish once 'another language' goes back to No", () => {
+    // The live repro: Yes, tick Polish, answer the Polish questions, go back, No.
+    const at = (item: string) => ({ instrument: "ybm_demographics", item, revision: 1 });
+    const store = new AnswerStore();
+    store.set(at("speaks_other_language"), { status: "answered", value: { kind: "choice", code: 1 } });
+    store.set(at("other_languages"), { status: "answered", value: { kind: "multi", codes: [3] } });
+    store.set(at("understand_polish"), { status: "answered", value: { kind: "choice", code: 4 } });
+    const walker = new Walker(units, store, true);
+    const polish = () => walker.visibleUnits().map((i) => units[i]!.item.key).filter((k) => /polish|other_languages/.test(k));
+    expect(polish()).toEqual(["other_languages", "understand_polish", "speak_polish"]);
+    store.set(at("speaks_other_language"), { status: "answered", value: { kind: "choice", code: 2 } });
+    expect(polish()).toEqual([]);
+    const from = units.findIndex((u) => u.item.key === "speaks_other_language");
+    expect(units[walker.next(from)!]!.item.key).not.toMatch(/polish|language/);
+  });
 });

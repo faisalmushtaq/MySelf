@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { AnswerStore, Walker, type AnswerValue, type PresentableUnit } from "@myself/engine";
-import { choiceKey, readTypedChoice, sameChoice, type LinkReading, type SurveyChoice } from "@myself/schema";
+import { choiceKey, readTypedChoice, sameChoice, type ItemDefinition, type LinkReading, type SurveyChoice } from "@myself/schema";
 import { resolveText, useScoringDefinitions } from "./lib/pipes.js";
 import {
   accessibilityPreferences,
@@ -13,15 +13,21 @@ import {
   loadAnswers,
   saveAccessibilityPreferences,
   deviceSummary,
-  forgetConfirmedSessions,
   unfinishedElsewhere,
+  getResumeGuard,
+  getStaffPin,
+  lockedResumeCodes,
+  saveResumeGuard,
+  saveStaffPin,
   type Enrolment,
+  type RecordedAnswer,
   type SelectionRow,
   type SessionRow,
   type StoredSessionCounts,
 } from "./lib/db.js";
-import { buildSealedExport, downloadExport } from "./lib/export.js";
-import { passphraseComplaint } from "@myself/store";
+import { dobUnit, resumeRule, tryDob, unitKey } from "./lib/dob.js";
+import { HAND_BACK_IDLE, SURVEY_IDLE, useIdleTimer, type IdlePolicy } from "./lib/idle.js";
+import { newPinRecord, pinComplaint, PIN_LOCKOUT_MS, tryPin } from "./lib/pin.js";
 import {
   applyAccessibilityPreferences,
   DEFAULT_ACCESSIBILITY_PREFERENCES,
@@ -57,11 +63,14 @@ import {
 import { ReviewScreen } from "./components/ReviewScreen.js";
 import { SurveyScreen } from "./components/SurveyScreen.js";
 import { CheckInScreen } from "./screens/CheckInScreen.js";
+import { DobCheckScreen } from "./screens/DobCheckScreen.js";
+import { IdleNotice } from "./screens/IdleNotice.js";
+import { StaffPinGate } from "./screens/StaffPinGate.js";
 import { FinishScreen } from "./screens/FinishScreen.js";
 import { HandoverPanel } from "./screens/HandoverPanel.js";
 import { PaceScreen } from "./screens/PaceScreen.js";
 import { SaveFailedScreen } from "./screens/SaveFailedScreen.js";
-import { StartScreen, type StartNotice } from "./screens/StartScreen.js";
+import { codeHint, StartScreen, type StartNotice } from "./screens/StartScreen.js";
 import type { PanelCheck } from "./screens/SurveyChoiceSection.js";
 
 /**
@@ -92,7 +101,23 @@ type Phase =
   | { kind: "pace"; session: SessionRow; index: number }
   /** The answer list, reached from the finish screen on request (D-31). */
   | { kind: "review"; session: SessionRow }
-  | { kind: "finished"; session: SessionRow };
+  | { kind: "finished"; session: SessionRow }
+  /**
+   * A code matched an unfinished sitting that holds a date of birth: it is
+   * carried on only once the same date is entered again (lib/dob.ts). The
+   * decrypted answers wait here, unrendered, so they are not read twice.
+   */
+  | {
+      kind: "verify";
+      session: SessionRow;
+      runtime: Runtime;
+      answers: Map<string, RecordedAnswer>;
+      dob: string;
+      item: ItemDefinition;
+    };
+
+/** Said on the start screen to a code that has had three wrong dates of birth on this iPad. */
+const RESUME_LOCKED = "This code can't be carried on with on this iPad. Please ask a member of the research team.";
 
 /**
  * What main.tsx found before the first render (D-56): the survey this iPad is
@@ -259,6 +284,107 @@ export default function App({ initial, initialRuntime }: { initial: Startup; ini
   const syncBusyRef = useRef(false);
   const [handoverOpen, setHandoverOpen] = useState(false);
   const [handoverNote, setHandoverNote] = useState<string | null>(null);
+  /**
+   * The staff PIN in front of the panel (lib/pin.ts): `set` on a device that
+   * has none yet, `enter` after. Null while neither the gate nor the panel is up.
+   */
+  const [pinGate, setPinGate] = useState<"set" | "enter" | null>(null);
+  const [pinNote, setPinNote] = useState<string | null>(null);
+  const [pinBusy, setPinBusy] = useState(false);
+  /** Codes refused three wrong dates of birth here, for the panel. */
+  const [lockedCodes, setLockedCodes] = useState<string[]>([]);
+  /** The date-of-birth check's last verdict, while it is on screen. */
+  const [dobNote, setDobNote] = useState<{ text: string | null; locked: boolean }>({ text: null, locked: false });
+
+  /** Shut the panel and its PIN gate, and forget the passphrase typed into it. */
+  const closeStaffPanel = useCallback(() => {
+    handoverTaps.current = 0;
+    setHandoverOpen(false);
+    setPinGate(null);
+    setPinNote(null);
+    setPassphrase("");
+  }, []);
+
+  /** Five taps on the build line: the PIN gate (or, if the panel is up, close it). */
+  const toggleStaffPanel = useCallback(() => {
+    if (handoverOpen || pinGate) {
+      closeStaffPanel();
+      return;
+    }
+    void getStaffPin()
+      .then((record) => {
+        setPinNote(null);
+        setPinGate(record ? "enter" : "set");
+      })
+      .catch(() => setPinGate("set"));
+  }, [handoverOpen, pinGate, closeStaffPanel]);
+
+  const openStaffPanel = useCallback(() => {
+    setPinGate(null);
+    setPinNote(null);
+    setHandoverOpen(true);
+    void lockedResumeCodes()
+      .then(setLockedCodes)
+      .catch(() => setLockedCodes([]));
+  }, []);
+
+  /** The first time on this iPad: staff choose the PIN (lib/pin.ts). */
+  const setStaffPin = useCallback(
+    async (pin: string, again: string) => {
+      const problem = pinComplaint(pin) ?? (pin === again ? null : "The two PINs are not the same. Type it twice.");
+      if (problem) {
+        setPinNote(problem);
+        return;
+      }
+      setPinBusy(true);
+      try {
+        // Never over one already set: that would let anyone choose a new PIN.
+        if (await getStaffPin()) {
+          setPinGate("enter");
+          setPinNote("A PIN has already been set on this iPad. Enter it to open the panel.");
+          return;
+        }
+        await saveStaffPin(await newPinRecord(pin, new Date()));
+        openStaffPanel();
+      } catch (error) {
+        setPinNote(error instanceof Error ? error.message : "The PIN could not be saved.");
+      } finally {
+        setPinBusy(false);
+      }
+    },
+    [openStaffPanel],
+  );
+
+  const enterStaffPin = useCallback(
+    async (pin: string) => {
+      setPinBusy(true);
+      try {
+        const record = await getStaffPin();
+        if (!record) {
+          setPinGate("set");
+          return;
+        }
+        const attempt = await tryPin(record, pin, new Date());
+        await saveStaffPin(attempt.record);
+        if (attempt.kind === "accepted") {
+          openStaffPanel();
+        } else if (attempt.kind === "locked") {
+          setPinNote(
+            `Too many wrong PINs. The panel is locked until ${attempt.until.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} (${PIN_LOCKOUT_MS / 60_000} minutes).`,
+          );
+        } else {
+          setPinNote(
+            `That PIN isn't right. ${attempt.triesLeft} ${attempt.triesLeft === 1 ? "try" : "tries"} left before the panel locks for ${PIN_LOCKOUT_MS / 60_000} minutes.`,
+          );
+        }
+      } catch {
+        setPinNote("The PIN could not be checked. Try again.");
+      } finally {
+        setPinBusy(false);
+      }
+    },
+    [openStaffPanel],
+  );
   // Consecutive skips, and where the run began, so a check-in can offer to
   // take the participant back to the first one they left blank.
   const skipRun = useRef<{ count: number; firstIndex: number | null }>({ count: 0, firstIndex: null });
@@ -648,47 +774,35 @@ export default function App({ initial, initialRuntime }: { initial: Startup; ini
     [runningSession?.sessionId ?? "", runtime],
   );
 
+  /**
+   * The sitting's answers as its visible questions hold them: what the review
+   * and finish screens pipe from, so an answer to a question a later change
+   * hid never turns up in a sentence.
+   */
+  const visibleAnswers = (session: SessionRow) =>
+    new Walker(
+      flattened.units,
+      storeRef.current,
+      manifest.composition.allowBackNavigation,
+      new Date(session.startedAt),
+    ).visibleAnswers();
+
   const tMono = () => Math.round(performance.now() - monoStart.current);
 
   const linkBlocks = link.kind === "checking" || link.kind === "waiting";
   const studyClosed = releaseCheck?.outcome.kind === "study_closed";
 
-  const start = useCallback(async () => {
-    const trimmed = code.trim();
-    if (trimmed.length < 2 || busy) return;
-    // Nothing to run, or a link still to be followed: the start screen says
-    // why, and offers no Start. Checked here too, so Enter cannot get past it.
-    if (!loaded || linkBlocks) return;
-    /**
-     * The code's format is the ACTIVE release's rule — the one on the start
-     * screen, whose instructions and hint the participant is reading — as it
-     * always was. A sitting resumed under an older release is found only after
-     * this, so a code valid only under an older rule cannot resume; the rule is a
-     * study decision, and changing it is expected to be rare.
-     */
-    if (codeRule && !new RegExp(codeRule.pattern).test(trimmed)) {
-      setCodeError(codeRule.hint);
-      return;
-    }
-    setCodeError(null);
-    setBusy(true);
-    starting.current = true;
-    try {
-      // `rt` is the release this sitting is rendered and stamped under: the
-      // active one for a new sitting, the sitting's own for a resumed one. Read
-      // from here down instead of the names above, which are still the start
-      // screen's until the next render.
-      const { session: existing, runtime: rt } = await sittingToResume(trimmed, runtime, resumeLookup, choiceRef.current);
-      // A closed study finishes what it started and starts nothing new (D-56).
-      if (!existing && studyClosed) {
-        setCodeError(CLOSED_TO_NEW);
-        return;
-      }
+  /**
+   * Into the survey: a new sitting under `rt`, or `existing` carried on with
+   * its `answers`. Called from Start, and from the date-of-birth check once it
+   * has passed.
+   */
+  const begin = useCallback(
+    async (trimmed: string, existing: SessionRow | undefined, rt: Runtime, answers: Map<string, RecordedAnswer> | null) => {
       const store = new AnswerStore();
       let session: SessionRow;
       if (existing) {
-        const answers = await loadAnswers(existing.sessionId);
-        for (const [key, rec] of answers) {
+        for (const [key, rec] of answers ?? (await loadAnswers(existing.sessionId))) {
           const [instrument, item] = key.split(".") as [string, string];
           store.set({ instrument, item, revision: 1 }, rec);
         }
@@ -728,11 +842,111 @@ export default function App({ initial, initialRuntime }: { initial: Startup; ini
       const running: Phase = { kind: "running", session, index };
       phaseRef.current = running;
       setPhase(running);
+    },
+    [showRuntime],
+  );
+
+  /**
+   * The date-of-birth check's answer (lib/dob.ts). Right: the sitting carries
+   * on, and the code's wrong-date count is forgotten. Wrong: counted, on this
+   * iPad, and the third wrong one locks the code until staff allow it again.
+   */
+  const confirmDob = useCallback(
+    async (typed: string) => {
+      const verify = phaseRef.current;
+      if (verify.kind !== "verify" || busy) return;
+      setBusy(true);
+      starting.current = true;
+      try {
+        const code = verify.session.participantCode;
+        const attempt = tryDob(verify.dob, typed, await getResumeGuard(code), new Date());
+        await saveResumeGuard(code, attempt.guard);
+        if (attempt.kind === "accepted") {
+          setDobNote({ text: null, locked: false });
+          await begin(code, verify.session, verify.runtime, verify.answers);
+        } else if (attempt.kind === "locked") {
+          setDobNote({ text: null, locked: true });
+        } else {
+          setDobNote({
+            text: `That date doesn't match. Please check it and try again (${attempt.triesLeft} ${attempt.triesLeft === 1 ? "try" : "tries"} left).`,
+            locked: false,
+          });
+        }
+      } finally {
+        starting.current = false;
+        setBusy(false);
+      }
+    },
+    [busy, begin],
+  );
+
+  const start = useCallback(async () => {
+    const trimmed = code.trim();
+    if (trimmed.length < 2 || busy) return;
+    // Nothing to run, or a link still to be followed: the start screen says
+    // why, and offers no Start. Checked here too, so Enter cannot get past it.
+    if (!loaded || linkBlocks) return;
+    /**
+     * The code's format is the ACTIVE release's rule — the one on the start
+     * screen, whose instructions and hint the participant is reading — as it
+     * always was. A sitting resumed under an older release is found only after
+     * this, so a code valid only under an older rule cannot resume; the rule is a
+     * study decision, and changing it is expected to be rare.
+     */
+    if (codeRule && !new RegExp(codeRule.pattern).test(trimmed)) {
+      setCodeError(codeHint(codeRule));
+      return;
+    }
+    setCodeError(null);
+    setBusy(true);
+    starting.current = true;
+    // Whoever sits down next is not staff: the panel, and what was typed into it, go.
+    closeStaffPanel();
+    try {
+      // `rt` is the release this sitting is rendered and stamped under: the
+      // active one for a new sitting, the sitting's own for a resumed one.
+      const found = await sittingToResume(trimmed, runtime, resumeLookup, choiceRef.current);
+      let existing = found.session;
+      let rt = found.runtime;
+      let answers: Map<string, RecordedAnswer> | null = null;
+      if (existing) {
+        /**
+         * Who may carry this sitting on (lib/dob.ts). One holding a date of
+         * birth waits for it to be entered again; one holding answers but no
+         * date of birth is left as the partial sitting it is, and a new one
+         * starts; one holding nothing carries on as before.
+         */
+        answers = await loadAnswers(existing.sessionId);
+        const dob = dobUnit(rt.flattened.units);
+        const rule = resumeRule(answers, dob ? unitKey(dob) : undefined);
+        if (rule.kind === "verify" && dob) {
+          if ((await getResumeGuard(trimmed))?.lockedAt) {
+            setCodeError(RESUME_LOCKED);
+            return;
+          }
+          setDobNote({ text: null, locked: false });
+          const verify: Phase = { kind: "verify", session: existing, runtime: rt, answers, dob: rule.dob, item: dob.item };
+          phaseRef.current = verify;
+          setPhase(verify);
+          return;
+        }
+        if (rule.kind === "fresh") {
+          existing = undefined;
+          answers = null;
+          rt = runtime;
+        }
+      }
+      // A closed study finishes what it started and starts nothing new (D-56).
+      if (!existing && studyClosed) {
+        setCodeError(CLOSED_TO_NEW);
+        return;
+      }
+      await begin(trimmed, existing, rt, answers);
     } finally {
       starting.current = false;
       setBusy(false);
     }
-  }, [code, busy, runtime, codeRule, showRuntime, loaded, linkBlocks, studyClosed, resumeLookup]);
+  }, [code, busy, runtime, codeRule, loaded, linkBlocks, studyClosed, resumeLookup, begin, closeStaffPanel]);
 
   /**
    * Do a write, and stop the survey if it fails.
@@ -1067,8 +1281,84 @@ export default function App({ initial, initialRuntime }: { initial: Startup; ini
     // this device already holds — a resumed sitting may have been shown under an
     // older one. The start screen then asks the study whether anything is newer.
     if (activeRuntime.current && runtimeRef.current !== activeRuntime.current) showRuntime(activeRuntime.current);
-    setPhase({ kind: "start" });
+    setCodeError(null);
+    setDobNote({ text: null, locked: false });
+    const back: Phase = { kind: "start" };
+    phaseRef.current = back;
+    setPhase(back);
   }, [effort, showRuntime]);
+
+  /**
+   * Complete the sitting again after the review, so the completion event
+   * always follows the last edit in the log. Through `persist`, because this is
+   * the write that queues the sitting for upload. True once both landed.
+   */
+  const recomplete = useCallback(
+    async (session: SessionRow): Promise<boolean> => {
+      const wrote = await persist(() =>
+        appendEvent(session, "session.completed", undefined, timing.current.summary(), 0, tMono()),
+      );
+      if (!wrote) return false;
+      return persist(() => completeSession(session));
+    },
+    [persist],
+  );
+
+  /**
+   * An iPad left untouched goes back to the start screen (lib/idle.ts).
+   *
+   * A finished sitting — the thank-you, the review list, an answer being
+   * corrected from it — after two minutes, completed again first if it was
+   * being reviewed. A sitting in progress after ten minutes and the "Are you
+   * still there?" countdown, recorded as suspended and left resumable, which
+   * then needs the date of birth (lib/dob.ts). The date-of-birth check, and an
+   * open staff panel, after two minutes. Never while a write has failed: that
+   * screen is waiting for a person, and leaving it would abandon the answers
+   * it is holding.
+   *
+   * Going back is `handover`, which empties the answer store, so nothing of
+   * the sitting — above all the review list — can be shown after it.
+   */
+  const idlePolicy: IdlePolicy | null = saveError
+    ? null
+    : phase.kind === "finished" || phase.kind === "review" || phase.kind === "verify" || (phase.kind === "running" && phase.fromReview)
+      ? HAND_BACK_IDLE
+      : phase.kind === "running" || phase.kind === "checkin" || phase.kind === "pace"
+        ? SURVEY_IDLE
+        : handoverOpen || pinGate
+          ? HAND_BACK_IDLE
+          : null;
+
+  const onIdle = useCallback(() => {
+    const now = phaseRef.current;
+    switch (now.kind) {
+      case "start":
+        closeStaffPanel();
+        return;
+      case "verify":
+      case "finished":
+        handover();
+        return;
+      case "review":
+        void recomplete(now.session).then((done) => done && handover());
+        return;
+      case "running":
+        if (now.fromReview) {
+          void recomplete(now.session).then((done) => done && handover());
+          return;
+        }
+      // falls through: a question in the middle of a sitting
+      case "checkin":
+      case "pace": {
+        const away = timing.current.suspend();
+        void appendEvent(now.session, "session.suspended", undefined, { ...(away ?? {}), reason: "idle" }, now.index, tMono());
+        handover();
+        return;
+      }
+    }
+  }, [closeStaffPanel, handover, recomplete]);
+
+  const idle = useIdleTimer(idlePolicy, onIdle, phase.kind === "running" ? `running:${phase.index}` : phase.kind);
 
   /** The handover panel's "Check": what typed text names, and whether this iPad can run it (D-56). */
   const checkTypedSurvey = useCallback(async (text: string): Promise<PanelCheck> => {
@@ -1177,10 +1467,20 @@ export default function App({ initial, initialRuntime }: { initial: Startup; ini
             handoverTaps.current += 1;
             if (handoverTaps.current >= 5) {
               handoverTaps.current = 0;
-              setHandoverOpen((v) => !v);
+              toggleStaffPanel();
             }
           }}
         >
+          {/* The PIN first (lib/pin.ts): nothing of the panel, the export above all, is reachable without it. */}
+          {pinGate && !handoverOpen && (
+            <StaffPinGate
+              mode={pinGate}
+              note={pinNote}
+              busy={pinBusy}
+              onSet={(pin, again) => void setStaffPin(pin, again)}
+              onEnter={(pin) => void enterStaffPin(pin)}
+            />
+          )}
           {handoverOpen && (
             <HandoverPanel
               counts={counts}
@@ -1217,9 +1517,30 @@ export default function App({ initial, initialRuntime }: { initial: Startup; ini
               }
               syncNote={syncNote}
               handoverNote={handoverNote}
+              lockedCodes={lockedCodes}
+              onAllowResume={(allowed) => {
+                void (async () => {
+                  await saveResumeGuard(allowed, null);
+                  setLockedCodes(await lockedResumeCodes());
+                  setHandoverNote(`${allowed} can carry on its unfinished sitting again, with its date of birth.`);
+                })();
+              }}
             />
           )}
         </StartScreen>
+      )}
+
+      {phase.kind === "verify" && (
+        <DobCheckScreen
+          // A new control for every check, so nothing typed for one code is left for the next.
+          key={phase.session.sessionId}
+          item={phase.item}
+          note={dobNote.text}
+          locked={dobNote.locked}
+          busy={busy}
+          onCheck={(iso) => void confirmDob(iso)}
+          onCancel={handover}
+        />
       )}
 
       {/*
@@ -1297,8 +1618,8 @@ export default function App({ initial, initialRuntime }: { initial: Startup; ini
           allowBack={manifest.composition.allowBackNavigation}
           sectionTitles={flattened.sectionTitles}
           sessionStart={new Date(phase.session.startedAt)}
-          title={reviewScreen.title ? resolveText(reviewScreen.title.text, reviewScreen.title.pipes, storeRef.current, new Date(phase.session.startedAt)) : "Change an answer"}
-          body={resolveText(reviewScreen.body.text, reviewScreen.body.pipes, storeRef.current, new Date(phase.session.startedAt))}
+          title={reviewScreen.title ? resolveText(reviewScreen.title.text, reviewScreen.title.pipes, visibleAnswers(phase.session), new Date(phase.session.startedAt)) : "Change an answer"}
+          body={resolveText(reviewScreen.body.text, reviewScreen.body.pipes, visibleAnswers(phase.session), new Date(phase.session.startedAt))}
           onEdit={(index) => {
             void appendEvent(phase.session, "review.opened", unitKeyOf(index), { editing: true }, index, tMono());
             const key = unitKeyOf(index);
@@ -1308,14 +1629,8 @@ export default function App({ initial, initialRuntime }: { initial: Startup; ini
           onFinish={() => {
             void (async () => {
               // Coming back from a change re-completes the session, so the completion
-              // event always follows the last edit in the log. Through `persist` for the
-              // same reason as the other completion path: this is the write that queues
-              // the sitting for upload.
-              const wrote = await persist(() =>
-                appendEvent(phase.session, "session.completed", undefined, timing.current.summary(), 0, tMono()),
-              );
-              if (!wrote) return;
-              if (await persist(() => completeSession(phase.session))) {
+              // event always follows the last edit in the log (`recomplete`).
+              if (await recomplete(phase.session)) {
                 setPhase({ kind: "finished", session: phase.session });
               }
             })();
@@ -1330,12 +1645,12 @@ export default function App({ initial, initialRuntime }: { initial: Startup; ini
           // this is a release decision rather than something coded here.
           title={
             finishScreen?.title
-              ? resolveText(finishScreen.title.text, finishScreen.title.pipes, storeRef.current, new Date(phase.session.startedAt))
+              ? resolveText(finishScreen.title.text, finishScreen.title.pipes, visibleAnswers(phase.session), new Date(phase.session.startedAt))
               : "Thank you!"
           }
           body={
             finishScreen
-              ? resolveText(finishScreen.body.text, finishScreen.body.pipes, storeRef.current, new Date(phase.session.startedAt))
+              ? resolveText(finishScreen.body.text, finishScreen.body.pipes, visibleAnswers(phase.session), new Date(phase.session.startedAt))
               : "You've finished — thank you."
           }
           onReview={
@@ -1347,6 +1662,14 @@ export default function App({ initial, initialRuntime }: { initial: Startup; ini
               : undefined
           }
           onHandBack={handover}
+        />
+      )}
+
+      {idle.stage.kind === "warning" && (
+        <IdleNotice
+          kind={idlePolicy === SURVEY_IDLE ? "survey" : "hand-back"}
+          secondsLeft={idle.stage.secondsLeft}
+          onStillHere={idle.stillHere}
         />
       )}
     </div>

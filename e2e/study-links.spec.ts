@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { expect, test, type Page, type Route } from "@playwright/test";
+import { openStaffPanel } from "./support/staff.js";
 
 /**
  * Participant links and study spaces on the iPad (D-56, docs/16 §11.3).
@@ -161,9 +162,9 @@ async function start(page: Page, code: string): Promise<void> {
   await expect(page.locator(".survey")).toBeVisible();
 }
 
-/** The handover panel: five taps on the build line, as staff open it. */
+/** The handover panel: five taps on the build line and the staff PIN, as staff open it. */
 async function openPanel(page: Page): Promise<void> {
-  for (let i = 0; i < 5; i += 1) await buildLine(page).click();
+  await openStaffPanel(page);
   await expect(page.getByRole("heading", { name: "Survey on this iPad" })).toBeVisible();
 }
 

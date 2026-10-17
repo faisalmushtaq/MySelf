@@ -477,3 +477,99 @@ Survey-side change: the Studio's rules and the library's licence record only.
 Nothing participants see changes until the team edits and publishes. The
 repository candidate (`releases/candidates/…r9.0.0`) is re-cut with D-61 for
 the MacArthur licence.
+
+### Pre-launch content fixes (2026-10-17, D-62)
+
+**Asked.** "Do a fully rigorous test of the whole system … we are almost ready
+for prime time." A content review of every screen of the live 12.0.0 found
+statements that were untrue or contradicted each other, and missing support
+signposting. The team chose the withdrawal window (48 hours, matching the date
+shown) and the time to state ("about 20 minutes"; the review's own estimate for
+a typical path is 30–40 minutes, which the team may want to check against a
+timed sitting).
+
+**Changed (repository candidate, for the next published version):**
+- Intro: names, date of birth and address are no longer said to be seen "only
+  by the research team"; the intro says they go to Connected Yorkshire to link
+  with health and education records. The time is "about 20 minutes" and
+  "finish quickly" is gone. The privacy panel says the same (who sees what,
+  the address, a 48-hour withdrawal).
+- Consent: the withdrawal statement says 48 hours, by the date shown (two
+  days, as the date already was), and names the team's email instead of an
+  unnamed "primary researcher". British spelling, a hyphen and full stops.
+- "Why your answers matter" no longer promises every answer can be left blank.
+- Mental-health medication can be declined ("Prefer not to say").
+- The finish screen signposts support: Childline, Shout, Samaritans, Papyrus,
+  NHS 111 and 999 (docs/04 P5, A-29).
+- RCADS: item 17 back to its canonical wording (revision 2); the instructions
+  no longer promise "completely confidential", say to tell the team if a
+  question upsets them, and read "happens".
+- Handedness: the score is fed back only when all four questions were
+  answered; the instructions fit the questions.
+- Wording: the name and gender questions are questions; the social media app
+  list and its definition no longer include WhatsApp; "screen time", "Strongly
+  agree", "Less than 5 minutes", "Once a week or less"; the gaming slider's
+  wording and end labels; "mental wellbeing" in both paired items.
+
+**Left for the team (judgement calls in the review):** the reading level of
+two consent statements; ages in scope (the date-of-birth check accepts 4–100;
+SDQ 11–17 starts at 11, RCADS and the school ladder are shown to adults);
+youthinmind's permission for the SDQ 18+ item 22 adaptation; hair type with no
+"none of these"; screen-attitude items only for social media users; "school
+day" for those not in school; and the length (BIS/BAS subset and doomscrolling
+items have no documented source).
+
+### Pre-launch hardening: data integrity, privacy and the shared iPad (2026-10-17, D-63)
+
+From the same pre-launch review as D-62. The team chose raw sittings readable
+by owners only, and all three shared-iPad protections.
+
+**Data integrity.**
+- *Cascading branching.* A hidden question's stored answer no longer opens the
+  branch below it: changing "Do you speak another language?" to No used to
+  leave the languages list stored, and its follow-ups were still asked.
+  Visibility is now worked out in one pass in survey order with hidden answers
+  removed (`computeVisibility` in packages/engine/src/walker.ts), on the iPad,
+  in the Studio preview, in ingest and in completeness (`completeness@2`).
+  Ingest records an answer to a question hidden by the end of a sitting as
+  `not_presented_branching` with no value, and scoring treats it as missing.
+  Sittings collected before this change may hold answers to questions that
+  were really shown because of the bug; those now export as
+  `not_presented_branching`. The event log is never changed.
+- *Waves* are numbered by start time after every release is read, not release
+  by release; shared codes (twins) are found across releases; a code that is
+  not an option of the question's scale is scored as missing; linking is no
+  longer quadratic in the number of sittings.
+
+**Privacy and security.**
+- Raw sittings, their chunks, quarantine, narratives and the export files in
+  Storage are readable by owners only. Researchers and analysts work through
+  the dashboard, which de-identifies.
+- The consent is enforced when publishing, not only in the editor: something
+  asked before it (`consent.not_first`), the consent question removed while
+  the module stays (`consent.agreement_missing`), and a survey — including a
+  copy — that had a consent and dropped it (`consent.removed`) are refused. A
+  survey that never had a consent can be published with a warning.
+- A sitting id must be one path segment (`^[A-Za-z0-9_-]{1,120}$`).
+- The study audit log can't be written from a browser.
+- A sitting the database can never store is refused with 422 and
+  `retryable: false`; the iPad sets it aside with the reason (it then goes as
+  a handover file) instead of retrying for ever.
+- Identity capture does nothing, with one warning, while the identity project
+  is not set up, instead of logging an error for every upload.
+
+**The shared iPad.**
+- Resuming an unfinished sitting by its code asks for the child's date of
+  birth; three wrong dates lock that code on the iPad until staff allow it. A
+  sitting with answers but no date of birth yet is not reopened.
+- The finish and review screens go back to the start after 2 minutes;
+  mid-survey, "Are you still there?" after 10 minutes, then back to the start
+  with the sitting resumable.
+- The staff panel (and its export) needs a PIN set on each iPad on first use;
+  five wrong tries lock it for five minutes. Resetting it means clearing the
+  site's data, after syncing.
+- Long text is cut at whole characters, so an emoji can no longer be split.
+
+**Deploys.** The Firebase and Pages deploys run only after CI has passed on
+main; runners are pinned to ubuntu-24.04; privileged workflows run from main
+only.

@@ -14,16 +14,23 @@ rules_version = '2';
  * Exports bucket.
  *
  * The nightly BIDS snapshot is written by a Cloud Function using the admin
- * SDK, which these rules do not apply to. No client writes, and only signed-in
- * people read — an export URL that works for anyone with the link would undo
- * every other control in the platform.
+ * SDK, which these rules do not apply to. No client writes, and only an owner
+ * reads — an export URL that works for anyone with the link would undo every
+ * other control in the platform.
+ *
+ * OWNER ONLY, like the raw sittings in Firestore. The export is pseudonymised
+ * (names, dates of birth and addresses go to the identity store, not the
+ * dataset), but it carries every narrative run's record log and every
+ * free-text answer, which can name a participant, and there is no separate,
+ * de-identified export an analyst could be given instead. Until there is, a
+ * researcher or analyst receives a copy from an owner.
  */
 service firebase.storage {
   match /b/{bucket}/o {
     match /exports/{allPaths=**} {
       allow read: if request.auth != null
         && request.auth.token.get('device', false) == false
-        && request.auth.token.get('role', '') in ['owner', 'researcher', 'analyst'];
+        && request.auth.token.get('role', '') == 'owner';
       allow write: if false;
     }
     /**
@@ -34,7 +41,7 @@ service firebase.storage {
      * through the admin SDK, which these rules do not apply to, and readable by
      * NOBODY through the client SDK — not even a signed-in owner.
      *
-     * Deliberately stricter than `exports`, which researchers can read. There
+     * Deliberately stricter than `exports`, which an owner can read. There
      * is no page that plays these back, so there is no rule that would let one:
      * listening happens through the console or a signed URL an owner mints
      * deliberately, which is a decision with a person attached to it rather

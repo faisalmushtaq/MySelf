@@ -8,6 +8,7 @@ import {
   type Dataset,
   type DeviceSession,
   type IdentityRow,
+  type NameSightings,
 } from "@myself/store";
 import { latestRelease, manifestsByHash, readStoredRelease, releasesByHash, type KnownRelease } from "./releases.js";
 import { fetchPublicRelease } from "./study.js";
@@ -16,9 +17,13 @@ import { fetchPublicRelease } from "./study.js";
  * Turning everything stored into one dataset.
  *
  * Sittings are grouped by the release they were collected under and ingested
- * oldest release first, each pass carrying the previous one forward, so wave
- * numbering follows the participant across releases rather than restarting
- * whenever the questionnaire changed.
+ * oldest release first, each pass carrying the previous one forward. Waves are
+ * numbered by each participant's sittings' start times over everything read so
+ * far (ingest's `numberWaves`), so a sitting under an older release that
+ * started after one under a newer release still gets the later wave — the
+ * order of the passes does not decide it (dashboard F3). First names are
+ * carried between passes too, so twins who sat under different releases are
+ * still reported (dashboard F2).
  */
 
 export interface BuildResult {
@@ -55,8 +60,9 @@ export function buildDataset(
     else groups.set(s.releaseHash, [s]);
   }
 
-  // Oldest sitting first, so a participant's waves are numbered in the order
-  // they actually happened rather than the order the files were imported.
+  // Oldest release first. Waves no longer depend on this order — every pass
+  // renumbers all sittings by start time — but it keeps warnings and identity
+  // rows in the order the releases were fielded.
   const ordered = [...groups.entries()].sort((a, b) => {
     const first = (rows: DeviceSession[]) => rows.reduce((m, r) => (r.startedAt < m ? r.startedAt : m), rows[0]!.startedAt);
     return first(a[1]).localeCompare(first(b[1]));
@@ -64,7 +70,10 @@ export function buildDataset(
 
   let dataset = emptyDataset();
   const identity: IdentityRow[] = [];
-  const collisions: BuildResult["collisions"] = [];
+  // Each pass reports collisions over every name seen so far, so the last
+  // pass's list is the whole list.
+  let collisions: BuildResult["collisions"] = [];
+  let nameSightings: NameSightings = new Map();
   const rejected: BuildResult["rejected"] = [];
   const warnings: string[] = [];
 
@@ -91,10 +100,12 @@ export function buildDataset(
       existing: dataset,
       aliases,
       assignments,
+      nameSightings,
     });
     dataset = result.dataset;
     identity.push(...result.identity);
-    collisions.push(...result.collisions);
+    collisions = result.collisions;
+    nameSightings = result.nameSightings;
     rejected.push(...result.rejected);
     warnings.push(...result.warnings);
   }

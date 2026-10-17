@@ -170,3 +170,33 @@ describe("counting a study", () => {
     expect(result.lifecycles.get("ses_stranger")).toBe(stranger.complete ? "complete" : "abandoned");
   });
 });
+
+describe("a hidden question's answer (completeness@2)", () => {
+  it("does not open the branch below it: changing 'other languages' to No hides the Polish follow-ups too", () => {
+    const at = (i: number) => new Date(Date.parse("2026-10-17T09:00:00.000Z") + i * 1000).toISOString();
+    const answer = (seq: number, itemKey: string, value: unknown) => ({ seq, type: "response.recorded", itemKey, payload: { value }, tWall: at(seq), tMono: seq * 1000 });
+    const sitting = {
+      sessionId: "ses_cascade",
+      studyCode: "ABC1234",
+      releaseKey: manifest.release.key,
+      releaseHash: manifest.hash!,
+      startedAt: at(0),
+      completedAt: at(9),
+      complete: true,
+      events: [
+        { seq: 0, type: "session.started", tWall: at(0), tMono: 0 },
+        answer(1, "ybm_demographics.speaks_other_language", { kind: "choice", code: 1 }),
+        answer(2, "ybm_demographics.other_languages", { kind: "multi", codes: [3] }),
+        answer(3, "ybm_demographics.understand_polish", { kind: "choice", code: 2 }),
+        // Back, and changed to No: the languages list is hidden, and so is everything it opened.
+        answer(4, "ybm_demographics.speaks_other_language", { kind: "choice", code: 2 }),
+        { seq: 9, type: "session.completed", payload: { totalMs: 9000 }, tWall: at(9), tMono: 9000 },
+      ],
+    } as unknown as DeviceSession;
+    const assessed = assessSitting(replaySitting(sitting), index, { requiredLevels: ["hard", "soft"], sittingStart: sitting.startedAt });
+    const outcome = (key: string) => assessed.outcomes.find((o) => o.key === key)?.outcome;
+    expect(outcome("ybm_demographics.other_languages")).toBe("answered_hidden");
+    expect(outcome("ybm_demographics.understand_polish")).toBe("answered_hidden");
+    expect(assessed.rulesVersion).toBe("completeness@2");
+  });
+});

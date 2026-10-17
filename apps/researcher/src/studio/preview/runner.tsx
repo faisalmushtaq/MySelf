@@ -309,7 +309,15 @@ export function PreviewRunner({ release, startAt, jump, accessibility, onAccessi
   }, [phase, answersVersion]);
 
   const piped = (text: { text: string; pipes?: Parameters<typeof resolveText>[1] } | undefined, fallback: string) =>
-    text ? resolveText(text.text, text.pipes, storeRef.current, sessionStart.current) : fallback;
+    text
+      ? resolveText(
+          text.text,
+          text.pipes,
+          // As on the device: never piped from an answer the walk now hides.
+          new Walker(units, storeRef.current, allowBack, sessionStart.current).visibleAnswers(),
+          sessionStart.current,
+        )
+      : fallback;
 
   return (
     <div className="app">

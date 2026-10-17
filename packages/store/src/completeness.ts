@@ -26,7 +26,7 @@ import type { DeviceEvent } from "./ingest.js";
  *      defines it;
  *   4. `assessSitting` — one outcome per question, and the counts.
  */
-export const RULES_VERSION = "completeness@1";
+export const RULES_VERSION = "completeness@2";
 
 export type RequiredLevel = "hard" | "soft" | "optional";
 
@@ -816,18 +816,21 @@ export function assessSitting(replay: ReplayResult, release: ReleaseQuestions | 
     };
   }
 
-  // The answer state the device's walker would see: answered items with their
-  // values, skips and declines as statuses.
+  // The answer state the device's walker would see, built up in survey order as
+  // each question is judged: answered items with their values, skips and
+  // declines as statuses — and nothing from a question that is hidden, so a
+  // hidden question's answer never opens a branch below it (completeness@2,
+  // the cascading rule the walker and ingest use).
   const started = options.sittingStart ? new Date(options.sittingStart) : undefined;
   const asOf = started && !Number.isNaN(started.getTime()) ? started : undefined;
   const store = new AnswerStore();
-  for (const f of replay.items.values()) {
-    if (!f.response) continue;
+  const record = (f: ItemFacts) => {
+    if (!f.response) return;
     const [instrument = "", item = ""] = f.key.split(".");
     const ref = { instrument, item, revision: 1 };
     if (f.response === "answered") store.set(ref, { status: "answered", value: f.value as AnswerValue });
     else store.set(ref, { status: f.response });
-  }
+  };
 
   // Questions whose final state is still open: the sitting has not finished and
   // they have no response. A condition reading one of these cannot be decided.
@@ -849,6 +852,7 @@ export function assessSitting(replay: ReplayResult, release: ReleaseQuestions | 
   for (const q of release.questions) {
     const f = replay.items.get(q.key);
     const eligibility: Eligibility = q.displayIf ? evaluate3(q.displayIf, store, unknownKeys, asOf) : "yes";
+    if (f && eligibility !== "no") record(f);
     const presentedCount = f?.presentedCount ?? 0;
     const shown = presentedCount > 0 || (!replay.hasPresentationEvents && (f?.response ?? null) !== null);
     let outcome: Outcome;

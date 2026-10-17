@@ -170,6 +170,18 @@ async function drain(storage: SyncPersistence, options: SyncOptions): Promise<Sy
     try {
       const outcome = await post(target, session, options);
 
+      // The study says posting this again can never store it (nested too deep,
+      // text that is not valid Unicode…). Retrying for ever would hide it, so
+      // it is set aside with the reason, kept on the iPad, and goes to the
+      // study as a handover file like a quarantined one (QC 2026-10-17).
+      if (!outcome.stored && outcome.retryable === false) {
+        const reason = `the study can't store this sitting as it is: ${outcome.reason ?? "no reason given"}`;
+        await storage.markQuarantined(session.sessionId, reason, at);
+        outcomes.push({ kind: "quarantined", sessionId: session.sessionId, reason });
+        quarantined += 1;
+        continue;
+      }
+
       if (outcome.quarantined) {
         const reason = outcome.reason ?? "the study already holds a copy of this sitting that this one contradicts";
         await storage.markQuarantined(session.sessionId, reason, at);
@@ -315,6 +327,12 @@ async function post(
       signal: controller.signal,
     });
     const body: unknown = await response.json().catch(() => null);
+    // 422: nothing in the request could ever be stored. Its outcomes say why.
+    if (response.status === 422) {
+      const refused = sittingsResponse.safeParse(body);
+      const own = refused.success ? refused.data.outcomes.find((entry) => entry.sessionId === session.sessionId) : undefined;
+      return own ?? { sessionId: session.sessionId, stored: false, events: 0, chunks: 0, quarantined: false, retryable: false, reason: detailOf(body).replace(/^: /, "") || "refused" };
+    }
     if (!response.ok) throw new Error(`sync server returned ${response.status}${detailOf(body)}`);
     const parsed = parseResponse(body);
     const outcome = parsed.outcomes.find((entry) => entry.sessionId === session.sessionId);
