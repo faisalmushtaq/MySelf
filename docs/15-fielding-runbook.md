@@ -111,6 +111,23 @@ money, so they have a daily limit per iPad and a ceiling across the whole study
 **Adding a device mid-study needs no action at all.** Open the URL on it — and add
 it to the Home Screen, for the reason above.
 
+**Set the staff PIN before the iPad goes near a participant.** The first time the
+handover panel is opened on an iPad (five taps on the build line), it asks you to
+choose a staff PIN of 4 to 8 digits, typed twice. From then on the panel — and with
+it the export, the survey switch and Clear — opens only with that PIN. Use the same
+PIN on every iPad of a study and keep it with the study passphrase, not on the
+device. Five wrong PINs lock the panel for five minutes. The PIN is kept only on
+that iPad, as a salted hash; nobody, including the study, can read it back.
+
+**A forgotten PIN can only be reset by clearing the site's data** (Settings →
+Apps → Safari → Advanced → Website Data → remove the MySelf site, or delete the
+Home Screen app). **That also deletes every sitting on the iPad that has not been
+uploaded, permanently** — the encryption key goes with it. So before resetting:
+get the iPad onto a working network and let it upload (the start screen's small
+print counts what is awaiting sync, no PIN needed) until it reads **0 sessions
+awaiting sync** and no participant is part-way through. Only then clear it, and set
+a new PIN on first opening.
+
 ## 3. On the day
 
 Hand the iPad over on the start screen. The participant types their code and
@@ -135,6 +152,39 @@ What is happening underneath:
 - With no network, all of it still works and the queue drains when a network
   returns. **Wifi coming back is acted on immediately** rather than waited out — the
   device drops whatever retry delay it had chosen and tries at once.
+
+### Sharing an iPad between participants
+
+The app assumes the next person to pick an iPad up may be another child, and
+behaves accordingly:
+
+- **Carrying on an unfinished sitting needs the date of birth.** A participant who
+  types the code of a sitting that stopped part-way is asked *"To carry on, enter
+  your date of birth"*, and is put back where they stopped only if it matches the
+  date given in that sitting. Three wrong dates and that code cannot be carried on
+  on this iPad: the child sees *"Please ask a member of the research team"*. Check
+  who they are, then in the handover panel tap **Allow** *(the code)* **to carry on**, which
+  gives three more tries. The sitting itself is never touched and still uploads.
+- **A sitting that stopped before the date of birth was given is not reopened.**
+  If it stopped on the welcome or consent screens with nothing answered, the code
+  carries on as before. If it holds answers but no date of birth (in YBM, stopped
+  between the name and the date of birth), the code starts a new sitting; the
+  unfinished one stays on the iPad and uploads as a partial sitting. Expect the
+  occasional extra partial sitting in the dataset for that reason.
+- **Screens go back to the start by themselves.** The finish screen and *Go back
+  to my answers* return to the start after two minutes untouched, with a
+  20-second countdown and an **I'm still here** button. A question in the middle of
+  a sitting asks *"Are you still there?"* after ten minutes untouched and returns to
+  the start 60 seconds later; the sitting is kept and can be carried on with the
+  code and date of birth. An open handover panel closes after two minutes
+  untouched, and always closes (forgetting the passphrase typed into it) when a
+  participant presses Start. None of this happens while the *Let's pause a moment*
+  save-failed screen is up: that waits for a person.
+- **MyStory conversations:** the module runs in its own frame, and typing there is
+  not seen by the app, so a long conversation can meet *"Are you still there?"*
+  after ten minutes; one tap carries on.
+- **The start screen never shows a real code**, so do not tell a participant
+  "it's like the example" — give them their own.
 
 **A new build never interrupts a sitting.** If one arrives mid-morning it waits for
 the start screen, between participants.
@@ -167,7 +217,8 @@ than the study saying it stored every event.
 
 ## 4. End of the day
 
-On each iPad, open the handover panel (five taps on the build line). It reads,
+On each iPad, open the handover panel (five taps on the build line, then the
+staff PIN — §2). It reads,
 in plain numbers, how many sittings are awaiting upload, confirmed by the study,
 needing review, and unfinished.
 

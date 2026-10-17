@@ -11,10 +11,12 @@ import { SurveyChoiceSection, type SurveyChoiceSectionProps } from "./SurveyChoi
  * three things to do about it — sync, export to an encrypted file, and clear
  * what the study has already confirmed.
  *
- * Opened by five taps on the build line (see `handoverTaps` in App), because the
- * device spends its day in participants' hands. Every value it shows and every
- * piece of state it changes belongs to App, so the panel stays open, and keeps
- * its passphrase, across the sittings in between.
+ * Opened by five taps on the build line (see `handoverTaps` in App) AND the
+ * staff PIN (lib/pin.ts, `StaffPinGate`), because the device spends its day in
+ * participants' hands and this panel can export every sitting on it. Every
+ * value it shows and every piece of state it changes belongs to App, which
+ * closes it — and forgets the passphrase — when a sitting starts, and when it
+ * has been left untouched for two minutes (lib/idle.ts).
  */
 export interface HandoverPanelProps {
   counts: StoredSessionCounts;
@@ -46,6 +48,9 @@ export interface HandoverPanelProps {
   onUseSurvey: SurveyChoiceSectionProps["onUse"];
   syncNote: string | null;
   handoverNote: string | null;
+  /** Codes refused three wrong dates of birth on this iPad (lib/dob.ts), and the way to allow one again. */
+  lockedCodes: string[];
+  onAllowResume: (code: string) => void;
 }
 
 export function HandoverPanel({
@@ -68,6 +73,8 @@ export function HandoverPanel({
   onUseSurvey,
   syncNote,
   handoverNote,
+  lockedCodes,
+  onAllowResume,
 }: HandoverPanelProps) {
   return (
     <div className="handover">
@@ -108,6 +115,27 @@ export function HandoverPanel({
       {/* An unfinished sitting keeps the version it started with, whatever this says. */}
       <p className="hint release-note">{releaseNote}</p>
       <SurveyChoiceSection survey={survey} online={online} onCheck={onCheckSurvey} onUse={onUseSurvey} />
+      {/*
+        A code whose unfinished sitting was refused three wrong dates of birth.
+        Allowing it again gives three more tries; check who is holding the iPad
+        first. The sitting itself is untouched either way and still uploads.
+      */}
+      {lockedCodes.length > 0 && (
+        <div className="resume-locks">
+          <h3>Codes that can&apos;t carry on here</h3>
+          <p className="hint">
+            Three wrong dates of birth were entered for these codes, so their unfinished sittings can&apos;t be carried
+            on until you allow it. Check the participant is who they say they are first.
+          </p>
+          <div className="handover-actions">
+            {lockedCodes.map((code) => (
+              <button key={code} type="button" className="secondary" onClick={() => onAllowResume(code)}>
+                Allow {code} to carry on
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
       <div className="handover-actions">
         <button
           type="button"

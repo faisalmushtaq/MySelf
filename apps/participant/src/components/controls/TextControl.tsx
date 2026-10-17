@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { truncateText } from "../../lib/text.js";
 import type { ControlProps } from "./shared.js";
 
 export function TextControl({ item, value, onAnswer, onValidity, onSubmit }: ControlProps) {
@@ -14,7 +15,8 @@ export function TextControl({ item, value, onAnswer, onValidity, onSubmit }: Con
   const patternHint = item.responseType === "text_short" ? item.patternHint : undefined;
 
   const commit = (input: string) => {
-    const raw = input.slice(0, item.maxChars); // autofill can exceed maxLength
+    // Autofill can exceed maxLength; cut whole characters, never half an emoji.
+    const raw = truncateText(input, item.maxChars);
     setText(raw);
     if (patternOf && raw.trim().length > 0 && !new RegExp(patternOf).test(raw.trim())) {
       setError(patternHint ?? "Please check the format");

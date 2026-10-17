@@ -1895,6 +1895,82 @@ input[type="range"] {
   cursor: not-allowed;
 }
 
+/* The staff PIN, where the panel would be until it is given (lib/pin.ts).
+   The panel's own box, so it reads as the same piece of equipment. */
+.staff-pin {
+  width: 100%;
+  max-width: 42rem;
+  margin-top: 1.5rem;
+  padding: 1rem 1.25rem 1.25rem;
+  border: 1px solid var(--hairline);
+  border-radius: 10px;
+  background: var(--off-white);
+}
+
+.staff-pin h2 {
+  font-family: var(--font-ui);
+  font-size: 1.05rem;
+  font-weight: 600;
+  margin: 0 0 0.5rem;
+}
+
+.staff-pin .text-input {
+  max-width: 12rem;
+}
+
+/* Codes that can no longer be resumed here, in the panel. */
+.resume-locks {
+  margin: 1rem 0;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--hairline);
+}
+
+.resume-locks h3 {
+  font-family: var(--font-ui);
+  font-size: 0.95rem;
+  font-weight: 600;
+  margin: 0 0 0.4rem;
+}
+
+/* "To carry on, enter your date of birth" (lib/dob.ts): a check-in screen
+   with the survey's own date control on it. */
+.screen.dob-check .date-wrap {
+  max-width: 22rem;
+}
+
+/* The countdown before an untouched iPad goes back to the start (lib/idle.ts).
+   Over everything, because whatever is under it is what it is protecting. */
+.idle-notice {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  background: rgba(0, 0, 0, 0.45);
+}
+
+.idle-notice-card {
+  max-width: 30rem;
+  padding: 1.75rem;
+  border-radius: 12px;
+  background: var(--paper);
+  color: var(--text);
+}
+
+.idle-notice-card h2 {
+  font-family: var(--font-ui);
+  font-size: 1.6rem;
+  margin: 0 0 0.75rem;
+}
+
+.idle-notice-card p {
+  font-size: 1.05rem;
+  line-height: 1.55;
+  margin: 0 0 1.25rem;
+}
+
 /* ------------------------------------------------ MyStory, inside the survey
 
    The module is a page of its own, embedded rather than reimplemented, so it
