@@ -204,7 +204,9 @@ export const ybmIntroConsent: ModuleInput = {
           // Answered, in effect, by taking it in: the button says so (D-53).
           advanceLabel: "I understand",
           lede: {
-            text: "There are no right or wrong answers here — only true ones.\n\nWhat you tell us goes into research on how sleep, screens and feelings fit together for people your age, and on what actually helps. That only works if the answers are really yours, including the ones that aren't flattering.\n\nA rushed or made-up answer doesn't just lose one number. It makes the whole picture slightly less true — for everyone the research is meant to help.\n\nSo take your time. A few questions near the start, like your name and date of birth, are needed to take part. After that, if you'd rather not answer something, you can leave it blank or choose \"Prefer not to say\".",
+            // Hannah's rewording (2026-10-18). Her last line said every question
+            // can be left blank; a few are required, so that line stays accurate.
+            text: "There are no right or wrong answers – we are interested in your personal experiences.\n\nWhat you tell us is used for research on how sleep, screens and feelings fit together for people your age, and what we can do to help. That only works if the answers are really yours, including ones which may be less flattering.\n\nA rushed or made-up answer causes the overall research picture to be slightly less true, affecting everyone the research is meant to help.\n\nSo take your time. A few questions near the start, like your name and date of birth, are needed to take part. After that, if you'd rather not answer something, you can leave it blank or choose \"Prefer not to say\".",
           },
           researcherNote:
             "Brief statement of why accurate responding matters, shown once after consent (D-30). Not a consent statement and carries no agreement — informational only.",

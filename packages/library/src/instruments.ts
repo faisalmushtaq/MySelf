@@ -295,10 +295,16 @@ export const ehiSf: InstrumentInput = {
 // ladder was preceded by two click-through pages, so the framing was gone by
 // the time the rungs appeared — and the wording said "the ladder below" when
 // there was no ladder on that screen at all.
-const societyLadderText =
+// The as-administered form keeps the wording it was administered with.
+const societyLadderTextV1 =
   "This ladder stands for where people sit in British society. At the top are the people who are best off — the most money, the most schooling, and the jobs that bring the most respect. At the bottom are the people who are worst off — the least money, little or no education, no job, or jobs nobody wants.";
-const schoolLadderText =
+const schoolLadderTextV1 =
   "This ladder stands for where people sit in your school. At the top are the people with the most respect, the highest grades and the highest standing. At the bottom are the people nobody respects, nobody wants to be around, and who have the worst grades.";
+// Hannah's rewording (2026-10-18), allowed by the open licence (D-61).
+const societyLadderText =
+  "The ladder stands for where people sit in British society.\n\nAt the top are the people who are most advantaged – the most money and resources, greatest access to education, and jobs which provide higher pay and status.\n\nAt the bottom are the people who are least advantaged – much less money and fewer resources, little access to education, and jobs which provide lower pay and status.";
+const schoolLadderText =
+  "This ladder stands for where people currently sit in your school.\n\nAt the top are the people looked up to by their peers – well-liked by many, doing well in school, or having lots of achievements.\n\nAt the bottom are people overlooked by their peers – feeling left out or finding schoolwork harder.";
 
 export const macarthurSsy: InstrumentInput = {
   instrument: "macarthur_ssy",
@@ -326,7 +332,7 @@ export const macarthurSsy: InstrumentInput = {
         {
           responseType: "ladder",
           key: "family",
-          revision: 1,
+          revision: 2,
           variable: "ses_family",
           legacyVariable: "SES_Family_4",
           stem: { text: "Where would your family be on this ladder?" },
@@ -339,15 +345,15 @@ export const macarthurSsy: InstrumentInput = {
         {
           responseType: "ladder",
           key: "self",
-          revision: 1,
+          revision: 2,
           variable: "ses_self",
           legacyVariable: "SES_Self_4",
           stem: { text: "Where would you be on this ladder?" },
           lede: { text: schoolLadderText },
           rungs: 10,
           lowestValue: 1,
-          topLabel: "The people with the most respect and highest standing",
-          bottomLabel: "The people with the least respect and lowest standing",
+          topLabel: "The people with the highest standing",
+          bottomLabel: "The people with the lowest standing",
         },
       ],
     },
@@ -363,7 +369,7 @@ export const macarthurSsy: InstrumentInput = {
           variable: "ses_family",
           legacyVariable: "SES_Family_4",
           stem: { text: "Where would your family be on this ladder?" },
-          lede: { text: societyLadderText },
+          lede: { text: societyLadderTextV1 },
           min: 0,
           max: 10,
         },
@@ -374,7 +380,7 @@ export const macarthurSsy: InstrumentInput = {
           variable: "ses_self",
           legacyVariable: "SES_Self_4",
           stem: { text: "Where would you be on this ladder?" },
-          lede: { text: schoolLadderText },
+          lede: { text: schoolLadderTextV1 },
           min: 0,
           max: 10,
         },
@@ -384,7 +390,8 @@ export const macarthurSsy: InstrumentInput = {
   timeEstimates: est([90, 70]),
   changelog:
     "1.0: encoded from QSF. Canonical form uses discrete 10-rung ladders per D-08; administered continuous 0-10 sliders (Qualtrics JS ladder background) preserved as ybm-asadmin. " +
-    "2.0 (D-23): the two click-through pages before each ladder are gone — the explanation now sits with the ladder on one screen as a lede, and 'imagine that the ladder below…' is rewritten for how it is actually presented. Response codes and anchors unchanged.",
+    "2.0 (D-23): the two click-through pages before each ladder are gone — the explanation now sits with the ladder on one screen as a lede, and 'imagine that the ladder below…' is rewritten for how it is actually presented. Response codes and anchors unchanged. " +
+    "Revision 2 of both ladders (2026-10-18): the research team's rewording of both explanations and the school ladder's rung labels; codes unchanged.",
   owner: "ybm",
 };
 
