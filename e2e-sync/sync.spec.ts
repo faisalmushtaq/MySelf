@@ -2,7 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 import type { ChunkDoc, SessionDoc } from "@myself/firebase";
 import type { StudyServer } from "../e2e/support/study-server.js";
 import { openStaffPanel } from "../e2e/support/staff.js";
-import { accepted, position } from "../e2e/support/walker.js";
+import { accepted, position, settle } from "../e2e/support/walker.js";
 
 /**
  * Loaded dynamically, because Playwright compiles these specs as CommonJS and every
@@ -108,15 +108,7 @@ async function walk(page: Page, screens = 400): Promise<void> {
     if (at === "finished") return;
     expect(at, "the survey stopped because the device could not save").not.toBe("save-failed");
     await answer(page);
-    let moved = false;
-    for (let waited = 0; waited < 600; waited += 100) {
-      if ((await position(page)) !== at) {
-        moved = true;
-        break;
-      }
-      await page.waitForTimeout(100);
-    }
-    if (moved) continue;
+    if (await settle(page, at)) continue;
     // Not the shared `advance`: this list is shorter, and a miss falls through to
     // the poll below instead of throwing. Left as it was when the walker was shared
     // (as is `answerSome`'s); bring them into line on purpose, not in passing.
@@ -252,15 +244,7 @@ async function answerSome(page: Page, count: number): Promise<void> {
     const at = await position(page);
     if (at === "finished") return;
     await answer(page);
-    let moved = false;
-    for (let waited = 0; waited < 600; waited += 100) {
-      if ((await position(page)) !== at) {
-        moved = true;
-        break;
-      }
-      await page.waitForTimeout(100);
-    }
-    if (moved) continue;
+    if (await settle(page, at)) continue;
     for (const selector of [".screen.checkin button.next.big", "button.next:not(.big)", "button.primary"]) {
       const button = page.locator(selector).first();
       if ((await button.count()) === 0) continue;

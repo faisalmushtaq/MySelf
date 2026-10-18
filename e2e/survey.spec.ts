@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { openStaffPanel, STAFF_PIN } from "./support/staff.js";
-import { accepted, advance, position } from "./support/walker.js";
+import { accepted, advance, position, settle } from "./support/walker.js";
 
 /**
  * A sitting, from the start screen to a file a researcher can read.
@@ -199,12 +199,9 @@ async function step(page: Page): Promise<void> {
   const before = await position(page);
   await answerCurrentScreen(page);
 
-  // A short grace period: an auto-advancing control needs a moment to re-render,
-  // and this must not be long enough to make a several-hundred-screen walk slow.
-  for (let waited = 0; waited < 600; waited += 100) {
-    if ((await position(page)) !== before) return;
-    await page.waitForTimeout(100);
-  }
+  // A short grace period for a control that advances itself, and none for a
+  // screen that cannot: see `settle`.
+  if (await settle(page, before)) return;
 
   await advance(page);
   await expect

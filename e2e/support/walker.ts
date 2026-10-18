@@ -110,3 +110,53 @@ export async function advance(page: Page): Promise<void> {
     `no way forward from this screen: nothing recognised to click. ${JSON.stringify(where)}`,
   );
 }
+
+/**
+ * Whether the screen holds a control that can move the survey on by itself.
+ *
+ * Three do, and only three: a single choice (all five presentations are a
+ * `radiogroup`) pauses 300ms and moves on, the social ladder does the same after
+ * a tap, and the consent set moves on 450ms after the tick that completes it.
+ * Everything else (text, dates, selects, sliders, a multi-select) waits for Next.
+ * If a new control learns to auto-advance, it belongs in this list.
+ */
+async function mayAdvanceItself(page: Page): Promise<boolean> {
+  return page.evaluate(() => document.querySelector('[role="radiogroup"], .ladder-svg, .consent-list') !== null);
+}
+
+/**
+ * After answering a screen: did the survey move on, and is it worth waiting to see?
+ *
+ * The walks used to give every screen 600 to 800ms to move on by itself, polling
+ * every 100ms, whether or not anything on it could. About one screen in four
+ * cannot, and each of those cost the whole wait: 30 of the 95 seconds in a single
+ * whole-sitting walk. A screen with an auto-advancing control is still given the
+ * same grace, polled faster so a move is seen as soon as it happens. Any other
+ * screen is given two frames for its own re-render (a follow-up step opening, a
+ * date read back) and then reported as not moved, so the caller clicks Next.
+ *
+ * Returns whether the position changed. `position` is a parameter for the one
+ * suite that reads it differently.
+ */
+export async function settle(
+  page: Page,
+  before: string,
+  options: { position?: (page: Page) => Promise<string>; graceMs?: number } = {},
+): Promise<boolean> {
+  const read = options.position ?? position;
+  const graceMs = options.graceMs ?? 600;
+
+  if (await mayAdvanceItself(page)) {
+    const deadline = Date.now() + graceMs;
+    for (;;) {
+      if ((await read(page)) !== before) return true;
+      if (Date.now() >= deadline) return false;
+      await page.waitForTimeout(25);
+    }
+  }
+
+  await page.evaluate(
+    () => new Promise<void>((done) => requestAnimationFrame(() => requestAnimationFrame(() => done()))),
+  );
+  return (await read(page)) !== before;
+}

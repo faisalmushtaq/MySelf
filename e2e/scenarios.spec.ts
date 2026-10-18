@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 import { expect, test, type Page } from "@playwright/test";
 import { CANDIDATE, openOnCandidate } from "./support/candidate.js";
 import { openStaffPanel } from "./support/staff.js";
+import { settle } from "./support/walker.js";
 
 /**
  * Whole sittings through the real app, down different paths, handed over and read
@@ -282,14 +283,7 @@ async function sit(page: Page, s: Scenario): Promise<Set<string>> {
     } else {
       await answerGenerally(page);
     }
-    let moved = false;
-    for (let waited = 0; waited < 800; waited += 100) {
-      if ((await position(page)) !== before) {
-        moved = true;
-        break;
-      }
-      await page.waitForTimeout(100);
-    }
+    const moved = await settle(page, before, { position, graceMs: 800 });
     if (!moved) {
       await advance(page);
       await expect.poll(() => position(page), { timeout: 10_000, message: `stuck on ${before}` }).not.toBe(before);
