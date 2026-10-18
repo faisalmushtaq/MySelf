@@ -74,7 +74,14 @@ const draft = parseDraft(draftSnap.get("content"));
 const revision = draftSnap.get("revision");
 
 // Somebody's unpublished edits are theirs to publish, not this command's.
-const pending = suggestBump(diffDrafts(live, draft));
+// List them, and who last saved, so the team can see whose work it is.
+const draftChanges = diffDrafts(live, draft);
+const pending = suggestBump(draftChanges);
+if (pending) {
+  const savedAt = draftSnap.get("updatedAt")?.toDate?.()?.toISOString() ?? "unknown time";
+  console.log(`Unpublished draft changes, last saved by ${draftSnap.get("updatedByEmail") ?? "unknown"} at ${savedAt}:`);
+  for (const e of draftChanges.entries) console.log(`  ${e.kind} ${e.itemKey ?? e.refKey ?? ""} ${e.message ?? ""}`.trimEnd());
+}
 if (pending) fail(`The draft of “${surveyId}” has unpublished changes (${pending}) since ${active.version}. Publish or discard them in the Studio first.`);
 
 const changes = diffDrafts(live, target);

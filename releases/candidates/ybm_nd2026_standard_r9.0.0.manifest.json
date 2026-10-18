@@ -543,7 +543,7 @@
                 "text": "Why your answers matter"
               },
               "lede": {
-                "text": "There are no right or wrong answers here — only true ones.\n\nWhat you tell us goes into research on how sleep, screens and feelings fit together for people your age, and on what actually helps. That only works if the answers are really yours, including the ones that aren't flattering.\n\nA rushed or made-up answer doesn't just lose one number. It makes the whole picture slightly less true — for everyone the research is meant to help.\n\nSo take your time. A few questions near the start, like your name and date of birth, are needed to take part. After that, if you'd rather not answer something, you can leave it blank or choose \"Prefer not to say\"."
+                "text": "There are no right or wrong answers – we are interested in your personal experiences.\n\nWhat you tell us is used for research on how sleep, screens and feelings fit together for people your age, and what we can do to help. That only works if the answers are really yours, including ones which may be less flattering.\n\nA rushed or made-up answer causes the overall research picture to be slightly less true, affecting everyone the research is meant to help.\n\nSo take your time. A few questions near the start, like your name and date of birth, are needed to take part. After that, if you'd rather not answer something, you can leave it blank or choose \"Prefer not to say\"."
               },
               "required": "optional",
               "allowDecline": false,
@@ -2193,14 +2193,14 @@
           "items": [
             {
               "key": "family",
-              "revision": 1,
+              "revision": 2,
               "variable": "ses_family",
               "legacyVariable": "SES_Family_4",
               "stem": {
                 "text": "Where would your family be on this ladder?"
               },
               "lede": {
-                "text": "This ladder stands for where people sit in British society. At the top are the people who are best off — the most money, the most schooling, and the jobs that bring the most respect. At the bottom are the people who are worst off — the least money, little or no education, no job, or jobs nobody wants."
+                "text": "The ladder stands for where people sit in British society.\n\nAt the top are the people who are most advantaged – the most money and resources, greatest access to education, and jobs which provide higher pay and status.\n\nAt the bottom are the people who are least advantaged – much less money and fewer resources, little access to education, and jobs which provide lower pay and status."
               },
               "required": "soft",
               "allowDecline": false,
@@ -2213,14 +2213,14 @@
             },
             {
               "key": "self",
-              "revision": 1,
+              "revision": 2,
               "variable": "ses_self",
               "legacyVariable": "SES_Self_4",
               "stem": {
                 "text": "Where would you be on this ladder?"
               },
               "lede": {
-                "text": "This ladder stands for where people sit in your school. At the top are the people with the most respect, the highest grades and the highest standing. At the bottom are the people nobody respects, nobody wants to be around, and who have the worst grades."
+                "text": "This ladder stands for where people currently sit in your school.\n\nAt the top are the people looked up to by their peers – well-liked by many, doing well in school, or having lots of achievements.\n\nAt the bottom are people overlooked by their peers – feeling left out or finding schoolwork harder."
               },
               "required": "soft",
               "allowDecline": false,
@@ -2228,8 +2228,8 @@
               "responseType": "ladder",
               "rungs": 10,
               "lowestValue": 1,
-              "topLabel": "The people with the most respect and highest standing",
-              "bottomLabel": "The people with the least respect and lowest standing"
+              "topLabel": "The people with the highest standing",
+              "bottomLabel": "The people with the lowest standing"
             }
           ],
           "presentationFidelity": "stepped_allowed"
@@ -2247,7 +2247,7 @@
           "provenance": "estimated-heuristic"
         }
       ],
-      "changelog": "1.0: encoded from QSF. Canonical form uses discrete 10-rung ladders per D-08; administered continuous 0-10 sliders (Qualtrics JS ladder background) preserved as ybm-asadmin. 2.0 (D-23): the two click-through pages before each ladder are gone — the explanation now sits with the ladder on one screen as a lede, and 'imagine that the ladder below…' is rewritten for how it is actually presented. Response codes and anchors unchanged.",
+      "changelog": "1.0: encoded from QSF. Canonical form uses discrete 10-rung ladders per D-08; administered continuous 0-10 sliders (Qualtrics JS ladder background) preserved as ybm-asadmin. 2.0 (D-23): the two click-through pages before each ladder are gone — the explanation now sits with the ladder on one screen as a lede, and 'imagine that the ladder below…' is rewritten for how it is actually presented. Response codes and anchors unchanged. Revision 2 of both ladders (2026-10-18): the research team's rewording of both explanations and the school ladder's rung labels; codes unchanged.",
       "approvalStatus": "draft",
       "owner": "ybm"
     },
@@ -9075,5 +9075,5 @@
       "bytes": 589147
     }
   },
-  "hash": "sha256:37a3c0684e892dfd9047ac7e5ac6a8dadc8d40563b690519db083ea8dcc0606f"
+  "hash": "sha256:89da35ca478793057e6d09b936bb69da3d106355a00a9f2dfee8427f5a20067d"
 }

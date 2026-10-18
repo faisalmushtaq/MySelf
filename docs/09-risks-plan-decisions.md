@@ -510,6 +510,14 @@ timed sitting).
   list and its definition no longer include WhatsApp; "screen time", "Strongly
   agree", "Less than 5 minutes", "Once a week or less"; the gaming slider's
   wording and end labels; "mental wellbeing" in both paired items.
+- Hannah's rewording (2026-10-18): "Why your answers matter" in her words,
+  keeping the accurate last line (a few questions near the start are needed;
+  after that, blank or "Prefer not to say"); both MacArthur ladder
+  explanations, and the school ladder's rung labels ("The people with the
+  highest/lowest standing"), as revision 2 of both ladders, codes unchanged
+  (permitted by the open licence, D-61). The as-administered slider form keeps
+  its original wording. The family ladder's labels stay "best off" / "worst
+  off".
 
 **Left for the team (judgement calls in the review):** the reading level of
 two consent statements; ages in scope (the date-of-birth check accepts 4–100;
