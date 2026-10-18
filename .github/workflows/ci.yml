@@ -1,14 +1,22 @@
 name: CI
 
 # Actions minutes are limited, and a full run bills about 64 of them across six
-# jobs (37 of those in e2e), so the suite is spent where it earns its keep:
+# jobs (37 of those in e2e). Two tiers keep iterating cheap and the merge safe:
 #
-#   pull request  every job, but e2e drives WebKit only (the engine an iPad
-#                 runs, which is where this app's hard cases live). Draft pull
-#                 requests run nothing until they are marked ready for review.
-#   main          the merge repeats only `test` and `e2e` (both engines).
-#                 rules, integration, sync and studio already passed on the
-#                 pull request and are not run again for the same code.
+#   FAST  test, rules, integration. About 12 minutes. Every pull request push.
+#   FULL  the fast tier plus e2e, sync and studio, the browser suites. About 64
+#         minutes. Always on main, which is what the Firebase and Pages deploys
+#         wait for, so nothing that fails a browser suite reaches the iPads.
+#
+#   pull request  the fast tier on every push. The browser suites run on a pull
+#                 request only when it carries the `full-ci` label, and then
+#                 e2e drives WebKit alone (the engine an iPad runs, where this
+#                 app's hard cases live); Chromium joins it on main. Put the
+#                 label on a pull request that touches the participant app, the
+#                 store, the service worker or storage code. It runs the browser
+#                 suites on every push while it stays, so add it when ready.
+#                 Draft pull requests run nothing until marked ready.
+#   main          every job, both engines.
 #   by hand       workflow_dispatch from the Actions tab runs every job with
 #                 both engines, for a branch that needs it without a PR.
 #
@@ -19,17 +27,20 @@ on:
     branches: [main]
     paths-ignore: ["docs/**", "**/*.md", ".github/workflows/firebase.yml", ".github/workflows/pages.yml", ".github/workflows/preview.yml"]
   pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
+    types: [opened, synchronize, reopened, ready_for_review, labeled]
     paths-ignore: ["docs/**", "**/*.md", ".github/workflows/firebase.yml", ".github/workflows/pages.yml", ".github/workflows/preview.yml"]
   workflow_dispatch:
 
+# Adding a label starts a run of its own, kept in a separate group so that
+# labelling a pull request neither cancels the run for its latest push nor is
+# cancelled by one.
 concurrency:
-  group: ci-${{ github.ref }}
+  group: ci-${{ github.ref }}-${{ github.event.action == 'labeled' && 'label' || 'code' }}
   cancel-in-progress: true
 
 jobs:
   test:
-    if: github.event.pull_request.draft != true
+    if: github.event.pull_request.draft != true && github.event.action != 'labeled'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -54,7 +65,10 @@ jobs:
   # are Safari's storage and service-worker behaviour. A pull request runs only
   # WebKit, which halves the job; main and a manual run add Chromium too.
   e2e:
-    if: github.event.pull_request.draft != true
+    if: >-
+      github.event.pull_request.draft != true
+      && (github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'full-ci'))
+      && (github.event.action != 'labeled' || github.event.label.name == 'full-ci')
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -90,7 +104,7 @@ jobs:
   # platform makes is that two iPads handed over at the same instant cannot
   # overwrite each other. Only a database can prove that.
   integration:
-    if: github.event_name != 'push' && github.event.pull_request.draft != true
+    if: github.event.pull_request.draft != true && github.event.action != 'labeled'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -114,7 +128,10 @@ jobs:
   # collects and resumes — and this is the one that puts a real request on a socket in
   # front of the real handler and then reads the sitting back out of the database.
   sync:
-    if: github.event_name != 'push' && github.event.pull_request.draft != true
+    if: >-
+      github.event.pull_request.draft != true
+      && (github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'full-ci'))
+      && (github.event.action != 'labeled' || github.event.label.name == 'full-ci')
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -147,7 +164,10 @@ jobs:
   # Firestore and Functions all run as emulators, so nothing between the
   # browser and the database is mocked.
   studio:
-    if: github.event_name != 'push' && github.event.pull_request.draft != true
+    if: >-
+      github.event.pull_request.draft != true
+      && (github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'full-ci'))
+      && (github.event.action != 'labeled' || github.event.label.name == 'full-ci')
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -177,7 +197,7 @@ jobs:
   # change is an untested security change. This runs them against the real
   # Firestore emulator, from both sides of every rule.
   rules:
-    if: github.event_name != 'push' && github.event.pull_request.draft != true
+    if: github.event.pull_request.draft != true && github.event.action != 'labeled'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4

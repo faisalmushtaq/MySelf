@@ -24,3 +24,4 @@ Implementation has since landed; for the code as it stands, start with the [main
 | [15-fielding-runbook.md](15-fielding-runbook.md) | Fielding a survey on several iPads: the morning, handover, getting the data out |
 | [16-researcher-studio.md](16-researcher-studio.md) | MySelf Studio: the researcher survey builder — design, publishing, roles, deploying it and rolling back |
 | [17-maintainers-guide.md](17-maintainers-guide.md) | For whoever maintains the code: what is where, how a question becomes data, changing questions, scales and the schema, cutting a release, tests, deploying |
+| [18-deploying-without-actions.md](18-deploying-without-actions.md) | Shipping a rules or function fix by hand when the GitHub Actions minutes are spent, and what has no manual route |

@@ -274,7 +274,8 @@ somebody has to notice.
 packages they bundle, the release manifests, or the rules. A backend redeploy
 has a cold start and a window where the relay is being replaced, and paying
 that because somebody edited a document is not free. `workflow_dispatch` with
-`functions: true` forces one.
+`functions: true` forces one. When Actions cannot run (the monthly minutes are
+spent), [docs/18](18-deploying-without-actions.md) is the same deploy by hand.
 
 The whole test suite runs first, the same one that guards the Pages deploy: a
 backend that fails its tests should not reach a study.
