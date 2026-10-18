@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { openStaffPanel, STAFF_PIN } from "./support/staff.js";
-import { accepted, advance, position, settle } from "./support/walker.js";
+import { accepted, advance, installClock, position, settle } from "./support/walker.js";
 
 /**
  * A sitting, from the start screen to a file a researcher can read.
@@ -466,6 +466,7 @@ test.describe("a sitting on a device with no study configured", () => {
    * end, ready to hand over.
    */
   test("editing an answer from the summary returns to the summary, not the middle of the survey", async ({ page }) => {
+    await installClock(page);
     await startSitting(page);
     await walkToEnd(page);
     await expect(page.locator(".screen.finish")).toBeVisible();
@@ -616,7 +617,7 @@ test.describe("a shared iPad", () => {
 
   test("hands a finished sitting back after two idle minutes, and the review list goes with it", async ({ page }) => {
     test.slow();
-    await page.clock.install();
+    await installClock(page);
     await startSitting(page);
     await walkToEnd(page);
     await expect(page.locator(".screen.finish")).toBeVisible();

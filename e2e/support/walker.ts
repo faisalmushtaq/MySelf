@@ -111,6 +111,33 @@ export async function advance(page: Page): Promise<void> {
   );
 }
 
+/** Pages whose clock the walk controls: see `installClock`. */
+const clocked = new WeakSet<Page>();
+
+/**
+ * Longer than the app's longest auto-advance pause (450ms, after the tick that
+ * completes the consent set), so one jump fires whichever is pending.
+ */
+const AUTO_ADVANCE_MS = 500;
+
+/**
+ * Put the page on a clock the walk can move, so a single-choice screen's 300ms
+ * pause (and the consent set's 450ms) does not have to be waited out in real time.
+ *
+ * It is the same time passing, only sooner: the page's clock jumps by the pause,
+ * so anything that reads elapsed time (the pace check that interrupts answers
+ * given faster than the question could be read, the paradata timings) sees what it
+ * would have seen. Time still flows in real time between jumps, so debounces and
+ * `expect` waits behave as they always did. Call it before the first `goto`, and
+ * instead of `page.clock.install()` in a test that also moves the clock itself.
+ * Safe to call twice.
+ */
+export async function installClock(page: Page): Promise<void> {
+  if (clocked.has(page)) return;
+  await page.clock.install();
+  clocked.add(page);
+}
+
 /**
  * Whether the screen holds a control that can move the survey on by itself.
  *
@@ -144,9 +171,16 @@ export async function settle(
   options: { position?: (page: Page) => Promise<string>; graceMs?: number } = {},
 ): Promise<boolean> {
   const read = options.position ?? position;
-  const graceMs = options.graceMs ?? 600;
+  let graceMs = options.graceMs ?? 600;
 
   if (await mayAdvanceItself(page)) {
+    if (clocked.has(page)) {
+      // The app's own pause is a timer, so let it run out on the page's clock rather
+      // than on ours. The pending move fires now; all that is left to wait for is
+      // the render, which is a few milliseconds, not the pause.
+      await page.clock.fastForward(AUTO_ADVANCE_MS);
+      graceMs = Math.min(graceMs, 250);
+    }
     const deadline = Date.now() + graceMs;
     for (;;) {
       if ((await read(page)) !== before) return true;

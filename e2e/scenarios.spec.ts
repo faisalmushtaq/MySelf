@@ -3,7 +3,7 @@ import { resolve } from "node:path";
 import { expect, test, type Page } from "@playwright/test";
 import { CANDIDATE, openOnCandidate } from "./support/candidate.js";
 import { openStaffPanel } from "./support/staff.js";
-import { settle } from "./support/walker.js";
+import { installClock, settle } from "./support/walker.js";
 
 /**
  * Whole sittings through the real app, down different paths, handed over and read
@@ -242,6 +242,7 @@ async function advance(page: Page): Promise<void> {
 async function sit(page: Page, s: Scenario): Promise<Set<string>> {
   const used = new Set<string>();
   const rules = [...common(s), ...s.rules];
+  await installClock(page);
   await openOnCandidate(page);
   await page.locator("input.code").fill(s.code);
   await page.locator("button.next.big").click();

@@ -3,7 +3,7 @@ import { resolve } from "node:path";
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { openOnCandidate } from "./support/candidate.js";
 import { openStaffPanel } from "./support/staff.js";
-import { accepted, advance, position, settle } from "./support/walker.js";
+import { accepted, advance, installClock, position, settle } from "./support/walker.js";
 
 /**
  * What the child tapped, against what the study stored.
@@ -247,6 +247,7 @@ async function walk(
   enough: () => boolean | Promise<boolean> = () => false,
   options: { candidate?: boolean } = {},
 ): Promise<void> {
+  await installClock(page);
   if (options.candidate) await openOnCandidate(page);
   else await page.goto("./");
   await page.locator("input.code").fill(CODE);
