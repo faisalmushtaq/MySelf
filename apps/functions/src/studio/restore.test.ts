@@ -13,8 +13,7 @@ import {
 } from "@myself/studio";
 import { bundledManifests } from "../releases.js";
 import { authorsOf, bumpTaken } from "./publish.js";
-import { openInLibrary } from "@myself/studio";
-import { assetEscapes, identityIssues, licenceEscapes, lockBaseline } from "./store.js";
+import { assetEscapes, identityIssues, lockBaseline } from "./store.js";
 import { mergeRestore } from "./versions.js";
 
 vi.mock("firebase-functions/logger", () => ({ error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn(), log: vi.fn(), write: vi.fn() }));
@@ -179,34 +178,14 @@ describe("the locks on a survey that has never been published", () => {
     expect(errors.some((i) => i.code.startsWith("locked."))).toBe(true);
   });
 
-  it("refuse a licensed instrument in a survey started blank, where nothing vouches for it", () => {
+  it("never refuse a licensed instrument in a survey started blank: a licence doesn't stop it being used", () => {
     const origin = draftOf("7.3.0");
     const errors = validateDraft(origin, { baseline: lockBaseline(null, origin) }).filter((i) => i.severity === "error");
-    expect(errors.some((i) => i.code === "locked.introduced")).toBe(true);
+    expect(errors.some((i) => i.code.startsWith("locked."))).toBe(false);
   });
 });
 
 describe("what the server refuses beyond Studio validation", () => {
-  it("a licensed instrument whose licence the draft now says may be modified", () => {
-    const live = draftOf("7.3.0");
-    const draft = structuredClone(live);
-    const [refKey, locked] = Object.entries(draft.instruments).find(([, d]) => d.licence.modifiable !== "yes" && !openInLibrary(d.instrument))!;
-    locked.licence = { ...locked.licence, modifiable: "yes" };
-    const issues = licenceEscapes(draft, [live]);
-    expect(issues).toHaveLength(1);
-    expect(issues[0]).toMatchObject({ severity: "error", code: "locked.licence_changed", location: { refKey } });
-    expect(licenceEscapes(live, [live])).toEqual([]);
-  });
-
-  it("but not a licence the instrument library now records as modifiable (D-61)", () => {
-    const live = draftOf("7.3.0");
-    const draft = structuredClone(live);
-    const ladder = Object.values(draft.instruments).find((d) => d.instrument === "macarthur_ssy")!;
-    expect(ladder.licence.modifiable).not.toBe("yes");
-    ladder.licence = { ...ladder.licence, modifiable: "yes" };
-    expect(licenceEscapes(draft, [live])).toEqual([]);
-  });
-
   it("a file pin no known release has, such as a different postcode list", () => {
     const live = draftOf("8.0.0");
     const published = [bundledManifests.find((b) => b.manifest.release.version === "8.0.0")!.raw as Record<string, unknown>];

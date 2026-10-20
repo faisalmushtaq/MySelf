@@ -172,11 +172,7 @@ if (dryRun) {
   // The publish's own checks, against the live version, so a dry run that
   // passes is not followed by a refused publish. (The publish still runs them
   // all, with every release the Studio knows, so this is a preview of them.)
-  const { licenceEscapes } = await import("./dist/studio/store.js");
-  const issues = [
-    ...licenceEscapes(next, [live, { instruments: lockVouchers({ releases: [], library: true }).reference }]),
-    ...validateDraft(next, { baseline: live, ...lockVouchers({ releases: [live], library: true, draft: next }) }),
-  ];
+  const issues = validateDraft(next, { baseline: live, ...lockVouchers({ releases: [live], library: true, draft: next }) });
   const errors = issues.filter((i) => i.severity === "error");
   for (const e of errors) console.log(`  would be refused: ${e.code} ${e.message}${e.location?.itemKey ? ` (${e.location.itemKey})` : e.location?.refKey ? ` (${e.location.refKey})` : ""}`);
   if (errors.length > 0) fail(`The publish would be refused: ${errors.length} problem${errors.length === 1 ? "" : "s"}, listed above.`);

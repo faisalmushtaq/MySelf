@@ -85,13 +85,13 @@ describe("the editor's vouchers", () => {
     validateDraft(d, { baseline: lockBaseline(null, d), ...(releases ? vouchersFor(releases, d) : {}) }).filter((i) => i.code.startsWith("locked."));
   const pilot = () => emptyDraft({ surveyId: "pilot_2027", study: "pilot", title: "Pilot" });
 
-  it("accept a validated questionnaire added from the library, unchanged", () => {
+  it("accept a validated questionnaire added from the library, with or without vouchers", () => {
     const d = insertFragment(pilot(), validatedFragment("kss@1.0/en-GB/self/standard"), { sectionKey: "welcome" }, opts).draft;
-    expect(lockErrors(d, null).length).toBeGreaterThan(0);
+    expect(lockErrors(d, null)).toEqual([]);
     expect(lockErrors(d, [])).toEqual([]);
   });
 
-  it("accept a questionnaire copied from a published version only when that verified version is given", () => {
+  it("accept a questionnaire copied from a published version: a licence never refuses it", () => {
     const source = extractDraft(r730);
     const piece = fragmentFromDraft(source, { kind: "block", sectionKey: "wellbeing", componentIndex: 1 }, {
       kind: "release",
@@ -102,7 +102,6 @@ describe("the editor's vouchers", () => {
     });
     const d = insertFragment(pilot(), piece, { sectionKey: "welcome" }, opts).draft;
     expect(lockErrors(d, [source])).toEqual([]);
-    // Naming the release is not enough: without it, the older SDQ is not the library's.
-    expect(lockErrors(d, []).length).toBeGreaterThan(0);
+    expect(lockErrors(d, [])).toEqual([]);
   });
 });

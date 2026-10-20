@@ -5,7 +5,6 @@ import { canonicalJson, hashHex, sha256, STUDY_ID_PATTERN, type ReleaseManifest 
 import {
   editTier,
   extractDraft,
-  openInLibrary,
   type DraftDoc,
   type Issue,
   type PublishedPointerDoc,
@@ -187,49 +186,6 @@ export function historyHashes(state: SurveyState): string[] {
  * does and a copied survey cannot look ready in the Studio and then be refused.
  */
 export { lockBaseline } from "@myself/studio";
-
-/**
- * Licensed instruments whose licence the draft now says may be modified.
- *
- * Studio validation decides whether an instrument is locked from the DRAFT's
- * own copy of its licence, so an editor who set `licence.modifiable` to "yes"
- * on the SDQ would find every lock check skipped. A licence is not the
- * editor's to change. Any instrument that a published or originating release
- * froze as locked must still be locked in the draft, whatever it now says
- * about itself; this is checked here, on the server, for every publish. The
- * one exception is a licence the instrument library itself now records as
- * modifiable (D-61, e.g. the MacArthur ladders): the library is code, reviewed
- * like any other, so taking up its licence is not the editor changing one.
- */
-export function licenceEscapes(draft: StudioDraft, published: Iterable<StudioDraft | Record<string, unknown>>): Issue[] {
-  const lockedKeys = new Set<string>();
-  for (const source of published) {
-    const instruments = (source as { instruments?: unknown }).instruments;
-    if (!instruments || typeof instruments !== "object") continue;
-    for (const def of Object.values(instruments as Record<string, unknown>)) {
-      const d = def as { instrument?: unknown; licence?: { modifiable?: unknown } } | null;
-      if (d && typeof d.instrument === "string" && d.licence?.modifiable !== "yes") lockedKeys.add(d.instrument);
-    }
-  }
-  const issues: Issue[] = [];
-  for (const [refKey, def] of Object.entries(draft.instruments ?? {})) {
-    const d = def as { instrument?: unknown; name?: unknown; licence?: { modifiable?: unknown } } | null;
-    if (!d || typeof d.instrument !== "string" || !lockedKeys.has(d.instrument)) continue;
-    if (d.licence?.modifiable !== "yes") continue;
-    // The instrument library (code, not the editor) records it as openly
-    // licensed and modifiable (D-61), as "Use the library's licence" applies.
-    if (openInLibrary(d.instrument)) continue;
-    const name = typeof d.name === "string" && d.name ? d.name : d.instrument;
-    issues.push(
-      problem(
-        "locked.licence_changed",
-        `${name} is a licensed, validated instrument, and its licence in this draft has been changed to say it may be modified. A licence isn't something the Studio can change. Restore the draft from a published version, or remove the instrument.`,
-        { kind: "block", refKey },
-      ),
-    );
-  }
-  return issues;
-}
 
 /**
  * A file a release is about to pin (D-52: the postcode list) that no known

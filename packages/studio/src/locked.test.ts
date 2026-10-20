@@ -142,13 +142,22 @@ describe("lockedDifferences", () => {
     expect(lockedDifferences(draft, baseline)).toMatchObject([{ change: "scoring", refKey: SDQ }]);
   });
 
-  it("refuses a locked instrument the published version did not have, unless it matches the library", () => {
+  it("never refuses a questionnaire the published version did not have: a licence doesn't stop it being used", () => {
     const withoutSdq = structuredClone(baseline);
     delete withoutSdq.instruments[SDQ];
-    expect(lockedDifferences(baseline, withoutSdq)).toMatchObject([{ change: "introduced", refKey: SDQ }]);
-    expect(lockedDifferences(baseline, withoutSdq, { reference: { [SDQ]: baseline.instruments[SDQ]! } })).toEqual([]);
+    expect(lockedDifferences(baseline, withoutSdq)).toEqual([]);
     const reworded = edit((d) => (sdqItems(d)[0]!.stem.text = "Changed"));
-    expect(lockedDifferences(reworded, withoutSdq, { reference: { [SDQ]: baseline.instruments[SDQ]! } })).toMatchObject([{ change: "introduced" }]);
+    expect(lockedDifferences(reworded, withoutSdq, { reference: { [SDQ]: baseline.instruments[SDQ]! } })).toEqual([]);
+  });
+
+  it("is not locked once unlocked with a reason, and is locked again once relocked", () => {
+    const reworded = edit((d) => (sdqItems(d)[2]!.stem.text = "I get headaches"));
+    expect(lockedDifferences(reworded, baseline).map((x) => x.change)).toEqual(["question"]);
+    const unlocked = structuredClone(reworded);
+    unlocked.unlocked = { sdq25_s: { instrument: "sdq25_s", by: "u", at: "2026-10-20T00:00:00Z", reason: "Rewording for this age group, agreed by the team." } };
+    expect(lockedDifferences(unlocked, baseline)).toEqual([]);
+    expect(editTier(unlocked.instruments[SDQ], unlocked.unlocked)).toBe("editable");
+    expect(editTier(reworded.instruments[SDQ], reworded.unlocked)).toBe("locked");
   });
 
   it("cannot be switched off by re-licensing the draft's copy", () => {
@@ -170,7 +179,8 @@ describe("lockedDifferences", () => {
       def.forms[0].items[2].stem.text = "I get headaches";
       d.instruments["sdq25_s@1.1/en-GB/self/standard"] = def as never;
     });
-    expect(lockedDifferences(copied, baseline)).toMatchObject([{ change: "introduced", refKey: "sdq25_s@1.1/en-GB/self/standard" }]);
+    // A new copy (a variant) is the study's own version: never refused for its licence.
+    expect(lockedDifferences(copied, baseline)).toEqual([]);
   });
 
   it("holds an instrument added from the library to the library's answer options and scoring too", () => {
@@ -187,15 +197,10 @@ describe("lockedDifferences", () => {
       d.scales["scale.sdq_3pt"]!.options[2]!.label = "Clearly True";
       (d.scoring["score.sdq25_s"] as Loose).steps = [];
     });
-    expect(lockedDifferences(tampered, without, library).map((x) => x.change)).toEqual(["scale", "scoring"]);
-    // With no library options to compare with, they can't be vouched for.
+    // Added afresh, its answer options and scoring are the study's to set: a licence doesn't refuse them.
+    expect(lockedDifferences(tampered, without, library)).toEqual([]);
     const unchecked = lockedDifferences(baseline, without, { reference: library.reference });
-    expect(unchecked.map((x) => x.change)).toEqual(["scale", "scoring"]);
-    // Each part reads as whole sentences: the hint behind the ⓘ is shown on its own.
-    for (const x of unchecked) {
-      expect(x.message).toMatch(/instrument library\. [A-Z]/);
-      expect(x.detail).toMatch(/^[A-Z]/);
-    }
+    expect(unchecked).toEqual([]);
   });
 });
 
@@ -208,7 +213,7 @@ describe("bringing a locked instrument up to the library's licensed version (D-6
     expect(lockedDifferences(corrected, baseline, library)).toEqual([]);
   });
 
-  it("still refuses any other change, even one that also differs from the library", () => {
+  it("asks for an unlock for any other change to a locked questionnaire", () => {
     const freehand = edit((d) => (sdqItems(d)[2]!.stem.text = "Something else entirely"));
     expect(lockedDifferences(freehand, baseline, library).map((x) => x.change)).toEqual(["question"]);
   });

@@ -394,24 +394,24 @@ describe("validated questionnaires", () => {
     expect(canonicalJson(f.blocks[0]!.definition)).toBe(canonicalJson(r800.instruments[SDQ2]));
   });
 
-  it("validates clean with the library's vouchers, and is reported without them", () => {
+  it("validates clean with or without the library's vouchers: a licence never refuses it", () => {
     const { draft, report } = insertFragment(blank(), validatedFragment(SDQ2), { sectionKey: "welcome" }, opts);
     expect(report.added).toHaveLength(25);
     expect(draft.scoring["score.sdq25_s"]).toBeDefined();
     publishable(draft);
     const baseline = lockBaseline(null, draft);
     expect(errors(draft, { baseline, ...lockVouchers({ releases: [], library: true }) })).toEqual([]);
-    expect(errors(draft, { baseline }).map((i) => i.code)).toEqual(["locked.introduced"]);
+    expect(errors(draft, { baseline })).toEqual([]); // a licence never refuses a questionnaire
   });
 
-  it("refuses a tampered copy even with every voucher", () => {
+  it("accepts an edited copy too: it is the study's own version", () => {
     const { draft } = insertFragment(blank(), validatedFragment(SDQ2), { sectionKey: "welcome" }, opts);
     const tampered = structuredClone(draft);
     const first = tampered.instruments[SDQ2]!.forms[0]!.items[0] as Loose;
     first.stem = { ...first.stem, text: first.stem.text.replace(/\bnice\b/, "kind") };
     expect(first.stem.text).not.toBe((draft.instruments[SDQ2]!.forms[0]!.items[0] as Loose).stem.text);
     const vouchers = lockVouchers({ releases: [extractDraft(r800)], library: true, draft: tampered });
-    expect(errors(tampered, { baseline: lockBaseline(null, tampered), ...vouchers }).map((i) => i.code)).toEqual(["locked.introduced"]);
+    expect(errors(tampered, { baseline: lockBaseline(null, tampered), ...vouchers })).toEqual([]); // a licence never refuses a questionnaire
   });
 
   it("is added whole, once: a second version is refused with the reason, the same one is already there", () => {
@@ -431,7 +431,7 @@ describe("validated questionnaires", () => {
     const { draft } = insertFragment(blank(), block(extractDraft(r730), "wellbeing", 1, FROM_R73), { sectionKey: "welcome" }, opts);
     const baseline = lockBaseline(null, draft);
     // SDQ 1.0 is not in today's library…
-    expect(errors(draft, { baseline, ...lockVouchers({ releases: [], library: true }) }).map((i) => i.code)).toEqual(["locked.introduced"]);
+    expect(errors(draft, { baseline, ...lockVouchers({ releases: [], library: true }) })).toEqual([]); // a licence never refuses a questionnaire
     // …but the release it came from froze it, exactly.
     expect(errors(draft, { baseline, ...lockVouchers({ releases: [extractDraft(r730)], library: true, draft }) })).toEqual([]);
   });
@@ -442,7 +442,7 @@ describe("validated questionnaires", () => {
     (older.instruments[SDQ2] as Loose).licence = { ...(older.instruments[SDQ2] as Loose).licence, evidence: "Register entry 12." };
     const { draft } = insertFragment(blank(), block(older, "wellbeing", 1), { sectionKey: "welcome" }, opts);
     const baseline = lockBaseline(null, draft);
-    expect(errors(draft, { baseline, ...lockVouchers({ releases: [older], library: true }) }).map((i) => i.code)).toEqual(["locked.introduced"]);
+    expect(errors(draft, { baseline, ...lockVouchers({ releases: [older], library: true }) })).toEqual([]); // a licence never refuses a questionnaire
     expect(errors(draft, { baseline, ...lockVouchers({ releases: [older], library: true, draft }) })).toEqual([]);
   });
 });
@@ -657,14 +657,14 @@ describe("saved modules", () => {
 
   it("can be made only of editable content that makes sense on its own", () => {
     expect(moduleProblems(block(source(), "gaming", 0))).toEqual([]);
-    expect(moduleProblems(block(source(), "wellbeing", 1)).map((i) => i.code)).toContain("piece.locked");
-    expect(moduleProblems(validatedFragment(SDQ2)).map((i) => i.code)).toEqual(["piece.locked"]);
+    // A licensed questionnaire may be saved as the library's own copy (a variant).
+    expect(moduleProblems(block(source(), "wellbeing", 1)).map((i) => i.code)).not.toContain("piece.locked");
+    expect(moduleProblems(validatedFragment(SDQ2))).toEqual([]);
     expect(moduleProblems(block(source(), "about_you", 0)).map((i) => i.code)).toContain("piece.protected");
     expect(moduleProblems(block(source(), "welcome", 0))).toEqual([]); // the consent is the study's own (D-61)
-    // A validated questionnaire relicensed in the piece is still one.
     const relicensed = validatedFragment(SDQ2);
     (relicensed.blocks[0]!.definition as Loose).licence = { status: "open", modifiable: "yes" };
-    expect(moduleProblems(relicensed).map((i) => i.code)).toEqual(["piece.locked"]);
+    expect(moduleProblems(relicensed)).toEqual([]);
 
     const outside = questions(source(), "gaming", 0, ["top_games"]);
     const problems = moduleProblems(outside);

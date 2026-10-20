@@ -513,9 +513,6 @@ function libraryScoring(): Map<string, ScoringInput> {
   return libraryScoringCache;
 }
 
-/** Licences the publish check refuses outright: never offered on the shelf. */
-const UNUSABLE_LICENCES = new Set(["permission_required", "blocked"]);
-
 function audienceOf(def: InstrumentVersion): string | null {
   const range = def.ageRange;
   if (!range) return null;
@@ -542,7 +539,6 @@ export function validatedCatalogue(language = "en-GB"): ValidatedEntry[] {
     // The canonical form for self-report at the standard reading level; the
     // "as administered" variants stay in the library for reading old data.
     if (form.language !== language || form.variant || form.informant !== "self" || form.readingLevel !== "standard") continue;
-    if (UNUSABLE_LICENCES.has(def.licence.status)) continue;
     out.push({
       instrument: def.instrument,
       version: def.version,
@@ -1416,17 +1412,8 @@ export function moduleProblems(fragment: StudioFragment): Issue[] {
     const instrument = def["instrument"];
     const name = nameOf(def, instrument);
     const at: IssueLocation = { kind: "block", refKey: block.refKey };
-    if (isLockedDef(def)) {
-      out.push(
-        pieceIssue(
-          "piece.locked",
-          "A validated questionnaire can't be saved as a module",
-          at,
-          `“${name}” is licensed and must be used exactly as published. It is already on the library's shelf of validated questionnaires, where every survey takes it from.`,
-        ),
-      );
-      continue;
-    }
+    // A licensed questionnaire, edited or not, may be saved as the library's
+    // own copy (a variant), to be used again in other surveys.
     if (protectedModule(instrument)) {
       out.push(
         pieceIssue(

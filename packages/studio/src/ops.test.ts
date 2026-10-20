@@ -258,6 +258,17 @@ describe("licensed questionnaires", () => {
     publishable(draft);
   });
 
+  it("can be unlocked with a reason, reworded, published, and locked again", () => {
+    expect(refusal(() => ops.unlockModule(live(), "sdq25_s", { ...actor, reason: "too short" })).message).toMatch(/why its wording needs to change/);
+    const unlocked = ops.unlockModule(live(), "sdq25_s", { ...actor, reason: "Rewording for this age group, agreed by the team." }).draft;
+    const { draft } = ops.updateQuestion(unlocked, "sdq25_s.q1", { stem: { text: "I try to be kind to other people." } });
+    expect(findQuestion(draft, "sdq25_s.q1")!.item.stem.text).toBe("I try to be kind to other people.");
+    publishable(draft);
+    const relocked = ops.relockModule(draft, "sdq25_s").draft;
+    expect(refusal(() => ops.updateQuestion(relocked, "sdq25_s.q1", { stem: { text: "Again" } })).code).toBe("locked");
+    expect(findQuestion(relocked, "sdq25_s.q1")!.item.stem.text).toBe("I try to be kind to other people.");
+  });
+
   it("refuses archiving one question; removing the block archives it whole, and a restore brings it back whole", () => {
     expect(refusal(() => ops.archiveQuestion(live(), "sdq25_s.q7", actor)).message).toMatch(/Remove the whole block instead/);
     const before = live();
@@ -775,7 +786,7 @@ describe("options belong to the right questions", () => {
 describe("small holes", () => {
   it("treats only the named modules as protected, never an inherited property", () => {
     expect(refusal(() => ops.unlockModule(live(), "constructor", { ...actor, reason: "a long enough reason to be accepted" })).message).toMatch(
-      /is not protected/,
+      /is not locked/,
     );
     expect(refusal(() => ops.updateQuestion(live(), "ybm_smartphone.age_smartphone", { scale: "constructor" })).code).toBe("not_found");
   });

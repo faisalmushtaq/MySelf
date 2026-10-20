@@ -351,11 +351,11 @@ describe("publish gate", () => {
     expect(() => buildRelease(bad, registries, meta)).toThrow(/unresolved instrument reference 'psqi@1.0'/);
   });
 
-  it("rejects a licence-blocked instrument", () => {
+  it("never refuses an instrument for its licence status (the team manages licences)", () => {
     const blockedRegistries = structuredClone(registries);
     const sdq = blockedRegistries.instruments.find((i) => i.instrument === "sdq25_s")!;
     sdq.licence.status = "permission_required";
-    expect(() => buildRelease(ybmComposition, blockedRegistries, meta)).toThrow(/licence gate: 'sdq25_s'/);
+    expect(() => buildRelease(ybmComposition, blockedRegistries, meta)).not.toThrow();
   });
 
   it("rejects a missing form variant", () => {

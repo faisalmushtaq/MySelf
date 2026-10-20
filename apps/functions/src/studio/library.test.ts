@@ -168,11 +168,12 @@ describe("saving a module", () => {
     expect(retired.details).toMatchObject({ issues: [{ code: "library.module_retired" }] });
   });
 
-  it("refuses licensed, protected or malformed content before reading anything", async () => {
-    const locked = await refusal(save({ fragment: validatedFragment("kss@1.0/en-GB/self/standard") }));
-    expect(locked.code).toBe("failed-precondition");
-    expect(locked.message).toMatch(/can't be saved to the library: a validated questionnaire/);
-    expect(locked.details).toMatchObject({ kind: "invalid", issues: [{ code: "piece.locked" }] });
+  it("saves a licensed questionnaire as the library's own copy (a variant)", async () => {
+    const saved = await save({ fragment: validatedFragment("kss@1.0/en-GB/self/standard") });
+    expect(saved.contentHash).toMatch(/^sha256:/);
+  });
+
+  it("refuses protected or malformed content before reading anything", async () => {
     const identity = fragmentFromDraft(extractDraft(R800.raw), { kind: "block", sectionKey: "about_you", componentIndex: 0 }, FROM);
     expect((await refusal(save({ fragment: identity }))).details).toMatchObject({ issues: expect.arrayContaining([expect.objectContaining({ code: "piece.protected" })]) });
     expect((await refusal(save({ fragment: { format: "nonsense" } }))).details).toMatchObject({ issues: [{ code: "piece.malformed" }] });

@@ -35,7 +35,6 @@ import {
   historyHashes,
   identityIssues,
   assetEscapes,
-  licenceEscapes,
   lockBaseline,
   readReleases,
   readReleasesAt,
@@ -236,8 +235,6 @@ export async function publish(db: Firestore, args: PublishArgs): Promise<Publish
     const copiedFrom = vouching.map((r) => r.raw);
     const issues: Issue[] = [
       ...identityIssues(draft, surveyId, study),
-      // A licence is the library's and the releases', never the draft's.
-      ...licenceEscapes(draft, [...published, ...(origin ? [origin.raw] : []), ...copiedFrom, { instruments: LIBRARY.reference }]),
       ...validateDraft(draft, {
         reserved: reservedFrom(versions),
         baseline: baseline ?? lockBaseline(origin ? draftOf(origin) : null, draft),
@@ -424,9 +421,6 @@ export async function publish(db: Firestore, args: PublishArgs): Promise<Publish
 // ---------------------------------------------------------------------------
 // Releases from other study spaces (D-57, docs/16 §12.4, §12.7)
 // ---------------------------------------------------------------------------
-
-/** The instrument library as `freezeRelease` freezes it: what a licence is checked against beside the releases. */
-const LIBRARY = lockVouchers({ releases: [], library: true });
 
 /**
  * The release a draft was copied from: in this study's store, or — for a copy
