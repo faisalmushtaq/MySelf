@@ -26,7 +26,7 @@ on:
         type: string
         default: ""
       section:
-        description: "Section key to insert into (insert)"
+        description: "Section key to insert into (insert; blank with replace)"
         type: string
         default: ""
       after:
@@ -35,6 +35,10 @@ on:
         default: ""
       pieces:
         description: "Comma-separated: questionnaire references (phq4@1.0/en-GB/self/standard) or module keys (insert)"
+        type: string
+        default: ""
+      replace:
+        description: "Questionnaire to replace, by key, e.g. macarthur_ssy (insert)"
         type: string
         default: ""
       min_age:
@@ -90,13 +94,14 @@ jobs:
           SECTION: ${{ inputs.section }}
           AFTER: ${{ inputs.after }}
           PIECES: ${{ inputs.pieces }}
+          REPLACE: ${{ inputs.replace }}
           MIN_AGE: ${{ inputs.min_age }}
           MAX_AGE: ${{ inputs.max_age }}
           APPLY: ${{ inputs.apply && '--apply' || '' }}
         run: |
           node studio-ops.mjs "$COMMAND" --project myself-research \
             ${STUDY:+--study "$STUDY"} ${SURVEY:+--survey "$SURVEY"} ${SECTION:+--section "$SECTION"} \
-            ${AFTER:+--after "$AFTER"} ${PIECES:+--pieces "$PIECES"} ${MIN_AGE:+--min-age "$MIN_AGE"} ${MAX_AGE:+--max-age "$MAX_AGE"} $APPLY
+            ${AFTER:+--after "$AFTER"} ${PIECES:+--pieces "$PIECES"} ${REPLACE:+--replace "$REPLACE"} ${MIN_AGE:+--min-age "$MIN_AGE"} ${MAX_AGE:+--max-age "$MAX_AGE"} $APPLY
 
       - name: Shred the credential
         if: always()
