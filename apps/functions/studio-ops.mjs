@@ -7,7 +7,9 @@ import {
   diffDrafts,
   extractDraft,
   insertFragment,
+  outline,
   parseDraft,
+  removeBlock,
   repositoryModuleFragment,
   serialiseDraft,
   suggestBump,
@@ -22,8 +24,9 @@ import {
  *   grant-owners --study S    everyone on S's Studio list: Studio admin there,
  *                             the project "owner" role (raw sittings, every
  *                             study) and the dashboard's access list
- *   insert --study S --survey V --pieces a,b --section K [--after ITEM]
- *                             library questionnaires or modules into V's draft
+ *   insert --study S --survey V --pieces a,b --section K [--after ITEM] [--replace INSTRUMENT]
+ *                             library questionnaires or modules into V's draft;
+ *                             with --replace, in place of that questionnaire
  *   dob-ages --study S --survey V --min-age A --max-age B
  *                             who may take part, by age: the survey's own
  *                             limits on its date of birth (no unlock needed)
@@ -161,7 +164,8 @@ if (command === "list") {
 } else if (command === "insert") {
   const study = studyArg();
   const surveyId = surveyArg();
-  const sectionKey = flag("section") ?? fail("Say which section with --section (list shows them).");
+  const replace = flag("replace") ?? null;
+  let sectionKey = flag("section") ?? (replace ? null : fail("Say which section with --section (list shows them)."));
   const after = flag("after") ?? null;
   const pieces = (flag("pieces") ?? "").split(",").map((p) => p.trim()).filter(Boolean);
   if (pieces.length === 0) fail("Say which pieces with --pieces.");
@@ -172,6 +176,17 @@ if (command === "list") {
     (draft) => {
       let d = draft;
       let anchor = after;
+      if (replace) {
+        // Where the questionnaire being replaced sits: its section, and the question before it.
+        const place = outline(d).sections.flatMap((s) => s.blocks.map((b) => ({ s, b }))).find(({ b }) => b.instrument === replace);
+        if (!place) fail(`“${replace}” is not in this survey's draft.`);
+        const inSection = place.s.blocks.flatMap((b) => (b.componentIndex < place.b.componentIndex ? b.questions.map((q) => q.itemKey) : []));
+        sectionKey = place.s.key;
+        anchor = inSection[inSection.length - 1] ?? null;
+        const removed = removeBlock(d, sectionKey, place.b.componentIndex, { by: ACTOR.uid, at });
+        d = removed.draft;
+        console.log(`  ${replace}: removed from “${sectionKey}” (${removed.archived.length} question(s) archived, restorable)`);
+      }
       for (const piece of pieces) {
         // A validated questionnaire by its reference ("phq4@1.0/en-GB/self/standard"), else a repository module by key.
         const fragment = piece.includes("@") ? validatedFragment(piece) : repositoryModuleFragment(piece, { title: piece });
