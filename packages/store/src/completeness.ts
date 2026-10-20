@@ -1,5 +1,5 @@
 import type { LogicExpr } from "@myself/schema";
-import { AnswerStore, evaluate, type AnswerValue } from "@myself/engine";
+import { AnswerStore, evaluate, timeGridCandidates, timeGridCondition, type AnswerValue } from "@myself/engine";
 import type { DeviceEvent } from "./ingest.js";
 
 /**
@@ -145,6 +145,8 @@ const CONSTRAINT_KEYS = [
   "streetCheck",
   "statements",
   "groups",
+  // A time grid's ceiling on one row, in minutes.
+  "maxMinutesPerRow",
 ] as const;
 
 const and = (a: LogicExpr | undefined, b: LogicExpr | undefined): LogicExpr | undefined => {
@@ -168,6 +170,30 @@ interface FrozenItem {
 interface FrozenInstrument {
   instrument: string;
   forms: { items: FrozenItem[]; instructions?: string }[];
+}
+
+/**
+ * A time grid's rows-exist condition and candidate rows, from its source among the
+ * questions already indexed. A source that is missing or after the grid is one the
+ * publish gate refuses; read tolerantly, the grid then has no extra condition.
+ */
+function gridOf(
+  definition: Record<string, unknown>,
+  earlier: readonly ReleaseQuestion[],
+  scales: Readonly<Record<string, unknown>>,
+): { condition: LogicExpr; options: OptionDef[] } | undefined {
+  const from = definition["rowsFrom"] as { instrument: string; item: string; revision: number; group?: string } | undefined;
+  if (!from) return undefined;
+  const source = earlier.find((q) => q.key === `${from.instrument}.${from.item}`);
+  const raw = source?.scaleKey ? (scales[source.scaleKey] as { options?: unknown } | undefined)?.options : undefined;
+  if (!source || !Array.isArray(raw)) return undefined;
+  const options = raw as { code: number; label: string; kind?: string; position?: number }[];
+  const groups = source.definition["groups"] as { key: string }[] | undefined;
+  const sourceItem = { responseType: source.responseType, groups };
+  return {
+    condition: timeGridCondition(from, sourceItem, options),
+    options: timeGridCandidates(options).map((o) => ({ code: o.code, label: o.label, kind: o.kind ?? "substantive" })),
+  };
 }
 
 /**
@@ -235,8 +261,11 @@ export function indexReleaseQuestions(manifest: ManifestForQuestions): ReleaseQu
         const key = `${ref.instrument}.${it.key}`;
         addUnit(key, sec.key);
         if (it.responseType === "info") continue;
-        const displayIf = and(componentCondition, it.displayIf);
         const definition = it as unknown as Record<string, unknown>;
+        // A time grid is asked only when its source gave it a row, exactly as
+        // the device's walk conjoins it; its options are the rows it could have.
+        const grid = it.responseType === "time_grid" ? gridOf(definition, questions, manifest.scales) : undefined;
+        const displayIf = and(and(componentCondition, it.displayIf), grid?.condition);
         const constraints: Record<string, unknown> = {};
         for (const c of CONSTRAINT_KEYS) if (definition[c] !== undefined) constraints[c] = definition[c];
         const q: ReleaseQuestion = {
@@ -257,6 +286,7 @@ export function indexReleaseQuestions(manifest: ManifestForQuestions): ReleaseQu
           ...(displayIf ? { displayIf } : {}),
           ...(it.scale ? { scaleKey: it.scale } : {}),
           ...(it.scale && scales.has(it.scale) ? { options: scales.get(it.scale)! } : {}),
+          ...(grid ? { options: grid.options } : {}),
           constraints,
           definition,
         };
@@ -598,6 +628,22 @@ export function validateAnswer(
         if (groups.size > 0 && !groups.has(String(a?.group))) return bad(`group ${String(a?.group)} does not exist`);
       }
       return ok(Object.keys(v["assignments"] as object).length === 0);
+    }
+    case "time_grid": {
+      // Judged against every row the grid could have: which of them this sitting
+      // was shown depends on another answer, and ingest files the rest as not presented.
+      if (v["kind"] !== "time_grid" || typeof v["minutes"] !== "object" || v["minutes"] === null) {
+        return bad("expected minutes for each row");
+      }
+      const max = num(c, "maxMinutesPerRow") ?? 24 * 60;
+      const entries = Object.entries(v["minutes"] as Record<string, unknown>);
+      for (const [code, n] of entries) {
+        if (codes.size > 0 && !codes.has(Number(code))) return bad(`row ${code} does not exist in this version`);
+        if (n === null) continue;
+        if (!isInt(n) || n < 0) return bad(`row ${code} is not a whole number of minutes`);
+        if (n > max) return bad(`row ${code} is more than ${max} minutes`);
+      }
+      return ok(entries.every(([, n]) => n === null));
     }
     case "checkbox_set": {
       if (v["kind"] !== "checkboxes" || !Array.isArray(v["checked"])) return bad("expected ticked statements");
