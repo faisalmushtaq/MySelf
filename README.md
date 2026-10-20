@@ -4,6 +4,7 @@ Every version published from MySelf Studio, archived automatically (D-60). Each 
 
 | Study | Survey | Version | Published | By | Note | Files |
 |---|---|---|---|---|---|---|
+| ybm | ybm_nd2026_standard | 13.0.0 | 2026-10-20 | repository | D-62/D-63: pre-launch content fixes and Hannah's rewording | [PDF](ybm/ybm_nd2026_standard/13.0.0/questionnaire.pdf) · [JSON](ybm/ybm_nd2026_standard/13.0.0/manifest.json) · [changes](ybm/ybm_nd2026_standard/13.0.0/CHANGES.md) |
 | ybm | ybm_nd2026_standard | 12.0.0 | 2026-10-10 | repository | D-59: three questions on AI chatbot use, at the end of Phones and social media. | [PDF](ybm/ybm_nd2026_standard/12.0.0/questionnaire.pdf) · [JSON](ybm/ybm_nd2026_standard/12.0.0/manifest.json) · [changes](ybm/ybm_nd2026_standard/12.0.0/CHANGES.md) |
 | ybm | ybm_nd2026_standard | 11.0.0 | 2026-10-09 | repository | D-53 and D-58: consent that includes record linkage and moves on by itself, brainpop@ contact, no 'Citizen Neuroscience' subtitle, Sleep Qua | [PDF](ybm/ybm_nd2026_standard/11.0.0/questionnaire.pdf) · [JSON](ybm/ybm_nd2026_standard/11.0.0/manifest.json) · [changes](ybm/ybm_nd2026_standard/11.0.0/CHANGES.md) |
 | ybm | ybm_nd2026_standard | 10.0.0 | 2026-10-09 | brainpopresearch@gmail.com | added language items after ethnicity | [PDF](ybm/ybm_nd2026_standard/10.0.0/questionnaire.pdf) · [JSON](ybm/ybm_nd2026_standard/10.0.0/manifest.json) · [changes](ybm/ybm_nd2026_standard/10.0.0/CHANGES.md) |
