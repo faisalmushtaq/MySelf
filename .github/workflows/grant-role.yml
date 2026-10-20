@@ -46,12 +46,20 @@ jobs:
           printf '%s' "$SERVICE_ACCOUNT" > "$RUNNER_TEMP/sa.json"
           echo "GOOGLE_APPLICATION_CREDENTIALS=$RUNNER_TEMP/sa.json" >> "$GITHUB_ENV"
 
+      # The repository is public, so its run logs are. The emails are read from
+      # the event file, never put in an env block or the script (both are
+      # printed), and masked before anything can print them.
       - name: Grant
         working-directory: apps/functions
         env:
-          EMAILS: ${{ inputs.emails }}
           ROLE: ${{ inputs.role }}
         run: |
+          EMAILS="$(jq -r '.inputs.emails' "$GITHUB_EVENT_PATH")"
+          IFS=, read -ra masklist <<< "$EMAILS"
+          for e in "${masklist[@]}"; do
+            e="$(echo "$e" | xargs)"
+            [ -n "$e" ] && echo "::add-mask::$e"
+          done
           status=0
           IFS=, read -ra list <<< "$EMAILS"
           for email in "${list[@]}"; do

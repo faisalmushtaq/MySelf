@@ -53,3 +53,17 @@ Monorepo layout: `packages/schema` (definition layer), `packages/engine` (pure s
 
 `apps/api` is a self-hosted Postgres alternative to `apps/functions`. Nothing
 deployed calls it — Firebase is the backend (docs/14 §8).
+## Public repository
+
+This repository is public. It holds the survey's code and wording, never
+participant data: answers live only in the Firebase project, behind its
+security rules, and tests use made-up people. Secrets live in GitHub Actions
+secrets, never in the code. Actions run logs are public too, so workflows mask
+any email address they are given.
+
+The standardised questionnaires in `packages/library` and `releases/` (for
+example the SDQ, RCADS, SWEMWBS, STAI, BIS/BAS, the Edinburgh Handedness
+Inventory and the MacArthur ladders) remain the property of their authors and
+licence holders. They are reproduced here as administered in this study; check
+each one's licence (recorded with it in `packages/library/src/instruments.ts`)
+before reusing it.

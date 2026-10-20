@@ -100,7 +100,10 @@ const draftChanges = diffDrafts(live, draft);
 const pending = suggestBump(draftChanges);
 if (pending) {
   const savedAt = draftSnap.get("updatedAt")?.toDate?.()?.toISOString() ?? "unknown time";
-  console.log(`Unpublished draft changes, last saved by ${draftSnap.get("updatedByEmail") ?? "unknown"} at ${savedAt}:`);
+  // The repository is public, so its run logs are: an email is shown masked.
+  const email = draftSnap.get("updatedByEmail");
+  const masked = typeof email === "string" && email.includes("@") ? `${email[0]}…@${email.split("@")[1]}` : "unknown";
+  console.log(`Unpublished draft changes, last saved by ${masked} at ${savedAt}:`);
   for (const e of draftChanges.entries) {
     console.log(`  ${e.kind} ${e.itemKey ?? e.refKey ?? ""} ${e.message ?? ""}`.trimEnd());
     const at = e.itemKey ? locate(draft, e.itemKey) : null;
