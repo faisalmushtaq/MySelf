@@ -73,16 +73,65 @@ const live = extractDraft(JSON.parse(releaseDoc.get("manifest")));
 const draft = parseDraft(draftSnap.get("content"));
 const revision = draftSnap.get("revision");
 
+// A question by its item key ("instrument.key"), wherever it sits in a draft.
+// Returns the array holding it and its index, or null unless exactly one.
+function locate(d, itemKey) {
+  const dot = itemKey.indexOf(".");
+  const inst = itemKey.slice(0, dot);
+  const key = itemKey.slice(dot + 1);
+  const found = [];
+  const walk = (arr) => {
+    if (!Array.isArray(arr)) return;
+    arr.forEach((it, i) => {
+      if (!it || typeof it !== "object") return;
+      if (it.key === key && it.responseType) found.push({ arr, i });
+      for (const v of Object.values(it)) if (Array.isArray(v)) walk(v);
+    });
+  };
+  for (const def of Object.values(d.instruments)) if (def.instrument === inst) for (const f of def.forms ?? []) walk(f.items);
+  return found.length === 1 ? found[0] : null;
+}
+const stable = (v) =>
+  Array.isArray(v) ? `[${v.map(stable).join(",")}]` : v && typeof v === "object" ? `{${Object.keys(v).sort().map((k) => `${JSON.stringify(k)}:${stable(v[k])}`).join(",")}}` : JSON.stringify(v);
+
 // Somebody's unpublished edits are theirs to publish, not this command's.
 // List them, and who last saved, so the team can see whose work it is.
 const draftChanges = diffDrafts(live, draft);
 const pending = suggestBump(draftChanges);
 if (pending) {
   const savedAt = draftSnap.get("updatedAt")?.toDate?.()?.toISOString() ?? "unknown time";
-  console.log(`Unpublished draft changes, last saved by ${draftSnap.get("updatedByEmail") ?? "unknown"} at ${savedAt}:`);
-  for (const e of draftChanges.entries) console.log(`  ${e.kind} ${e.itemKey ?? e.refKey ?? ""} ${e.message ?? ""}`.trimEnd());
+  // The repository is public, so its run logs are: an email is shown masked.
+  const email = draftSnap.get("updatedByEmail");
+  const masked = typeof email === "string" && email.includes("@") ? `${email[0]}…@${email.split("@")[1]}` : "unknown";
+  console.log(`Unpublished draft changes, last saved by ${masked} at ${savedAt}:`);
+  for (const e of draftChanges.entries) {
+    console.log(`  ${e.kind} ${e.itemKey ?? e.refKey ?? ""} ${e.message ?? ""}`.trimEnd());
+    const at = e.itemKey ? locate(draft, e.itemKey) : null;
+    if (at) console.log(`    the draft's question: ${JSON.stringify(at.arr[at.i])}`);
+  }
 }
-if (pending) fail(`The draft of “${surveyId}” has unpublished changes (${pending}) since ${active.version}. Publish or discard them in the Studio first.`);
+
+// --take-draft <itemKey>: publish that question exactly as the draft has it,
+// so the draft's edit goes out in this version instead of being discarded.
+for (const itemKey of flags("take-draft")) {
+  const from = locate(draft, itemKey);
+  const to = locate(target, itemKey);
+  if (!from || !to) fail(`Can't find “${itemKey}” once in both the draft and the repository's version.`);
+  to.arr[to.i] = structuredClone(from.arr[from.i]);
+  console.log(`Taking “${itemKey}” from the draft as it is.`);
+}
+
+// Go ahead only if every unpublished edit is in the version being published.
+const carried = (e) => {
+  if (e.kind !== "question.changed" || !e.itemKey) return false;
+  const a = locate(draft, e.itemKey);
+  const b = locate(target, e.itemKey);
+  return Boolean(a && b && stable(a.arr[a.i]) === stable(b.arr[b.i]));
+};
+if (pending && !draftChanges.entries.every(carried)) {
+  fail(`The draft of “${surveyId}” has unpublished changes (${pending}) since ${active.version}. Publish or discard them in the Studio first, or carry them with take_draft.`);
+}
+if (pending) console.log("Every unpublished draft change is in this version, so nothing in the draft is lost.");
 
 const changes = diffDrafts(live, target);
 console.log(`Live ${active.version} → ${version}: ${JSON.stringify(changes.counts)}`);

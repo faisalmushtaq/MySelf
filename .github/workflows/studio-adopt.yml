@@ -26,6 +26,10 @@ on:
         description: "Why the identity module may change, if it does (recorded with the version; leave blank if it does not)"
         type: string
         default: ""
+      take_draft:
+        description: "Questions to publish exactly as the Studio draft has them, by ID, comma-separated (e.g. ybm_intro_consent.why_it_matters)"
+        type: string
+        default: ""
       dry_run:
         description: "Only list the changes; publish nothing"
         type: boolean
@@ -70,8 +74,15 @@ jobs:
           CONSENT_REASON: ${{ inputs.consent_reason }}
           IDENTITY_REASON: ${{ inputs.identity_reason }}
           DRY_RUN: ${{ inputs.dry_run && '--dry-run' || '' }}
+          TAKE_DRAFT: ${{ inputs.take_draft }}
         run: |
-          node studio-adopt.mjs --project myself-research \
+          take=()
+          IFS=',' read -ra keys <<< "$TAKE_DRAFT"
+          for k in "${keys[@]}"; do
+            k="$(echo "$k" | xargs)"
+            [ -n "$k" ] && take+=(--take-draft "$k")
+          done
+          node studio-adopt.mjs "${take[@]}" --project myself-research \
             --release ../../releases/candidates/ybm_nd2026_standard_r9.0.0.manifest.json \
             --version "$VERSION" --note "$NOTE" \
             ${CONSENT_REASON:+--unlock "ybm_intro_consent=$CONSENT_REASON"} \
