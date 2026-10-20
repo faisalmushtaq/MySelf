@@ -5,7 +5,7 @@ name: "Studio: study space housekeeping"
 #   grant-owners  everyone on a study space's Studio list: Studio admin there,
 #                 the project owner role and the dashboard's access list
 #   insert        library questionnaires or modules into a survey's draft
-#   adult-dob     a survey's date of birth for adults
+#   dob-ages      the ages a survey's date of birth accepts
 # Without "apply" it is a dry run. Drafts are saved, never published. The
 # repository is public, so are these logs: emails are printed masked.
 
@@ -15,14 +15,14 @@ on:
       command:
         description: "What to do"
         type: choice
-        options: [list, grant-owners, insert, adult-dob]
+        options: [list, grant-owners, insert, dob-ages]
         default: list
       study:
         description: "Study space id (from list)"
         type: string
         default: ""
       survey:
-        description: "Survey id (insert, adult-dob)"
+        description: "Survey id (insert, dob-ages)"
         type: string
         default: ""
       section:
@@ -38,9 +38,13 @@ on:
         type: string
         default: ""
       min_age:
-        description: "Youngest age (adult-dob)"
+        description: "Youngest age (dob-ages)"
         type: string
-        default: "16"
+        default: ""
+      max_age:
+        description: "Oldest age (dob-ages)"
+        type: string
+        default: ""
       apply:
         description: "Make the change (otherwise a dry run)"
         type: boolean
@@ -87,11 +91,12 @@ jobs:
           AFTER: ${{ inputs.after }}
           PIECES: ${{ inputs.pieces }}
           MIN_AGE: ${{ inputs.min_age }}
+          MAX_AGE: ${{ inputs.max_age }}
           APPLY: ${{ inputs.apply && '--apply' || '' }}
         run: |
           node studio-ops.mjs "$COMMAND" --project myself-research \
             ${STUDY:+--study "$STUDY"} ${SURVEY:+--survey "$SURVEY"} ${SECTION:+--section "$SECTION"} \
-            ${AFTER:+--after "$AFTER"} ${PIECES:+--pieces "$PIECES"} ${MIN_AGE:+--min-age "$MIN_AGE"} $APPLY
+            ${AFTER:+--after "$AFTER"} ${PIECES:+--pieces "$PIECES"} ${MIN_AGE:+--min-age "$MIN_AGE"} ${MAX_AGE:+--max-age "$MAX_AGE"} $APPLY
 
       - name: Shred the credential
         if: always()

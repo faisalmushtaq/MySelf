@@ -623,7 +623,15 @@ library and into the break study's drafts; time on each app is one grid screen.
 - `studio-ops.yml` (main only, dry run unless applied): lists study spaces;
   makes everyone on a space's Studio list a Studio admin there, a project owner
   (raw sittings in every study, the YBM children's included, as chosen) and a
-  dashboard user; inserts library pieces into a draft; and sets a survey's date
-  of birth for adults (the copied schools settings allowed only 1990–2026 and a
-  youngest age of 4), unlocking the identity module with the reason recorded.
-  Drafts are saved, never published: the team publishes from the Studio.
+  dashboard user; inserts library pieces into a draft; and sets the ages a
+  survey's date of birth accepts. Drafts are saved, never published: the team
+  publishes from the Studio.
+- Date of birth: "limiters that can be specified in each implementation of
+  that item… for this study it's 18 to 24… online it could be from 12 to 100."
+  The youngest and oldest age are each survey's own setting (Studio: the date
+  question's "Youngest age" and "Oldest age"), changed without unlocking the
+  identity module; nothing else in it changes without an unlock. On the iPad a
+  date outside them is refused ("This survey is for people aged 18 to 24…"),
+  and the picker offers only dates in between, now including the whole of the
+  oldest year of age (it stopped a year early). The break study's copy had the
+  schools survey's 1990–2026 years and ages 4–100.

@@ -400,7 +400,7 @@ function Validation({ itemKey, item, issues, write, can, why }: SectionProps) {
       );
       break;
     case "date":
-      info = `For a date of birth: a date making the participant younger or older than this is questioned. Whatever is set here, no survey accepts an age over ${ABSOLUTE_MAX_AGE_YEARS}, so an impossible date of birth can't enter the data.`;
+      info = `For a date of birth: who may take part in this survey. A date making the participant younger than the youngest age, or older than the oldest, is refused, and the date picker offers only dates in between. Each survey sets its own, without unlocking. Whatever is set here, no survey accepts an age over ${ABSOLUTE_MAX_AGE_YEARS}.`;
       body = (
         <>
           <NumberField

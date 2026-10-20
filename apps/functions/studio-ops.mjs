@@ -11,7 +11,6 @@ import {
   repositoryModuleFragment,
   serialiseDraft,
   suggestBump,
-  unlockModule,
   validatedFragment,
 } from "@myself/studio";
 
@@ -25,10 +24,9 @@ import {
  *                             study) and the dashboard's access list
  *   insert --study S --survey V --pieces a,b --section K [--after ITEM]
  *                             library questionnaires or modules into V's draft
- *   adult-dob --study S --survey V [--min-age N]
- *                             the date of birth for adults: no 1990–2026 years,
- *                             youngest age N (unlocking the identity module,
- *                             with the reason recorded)
+ *   dob-ages --study S --survey V --min-age A --max-age B
+ *                             who may take part, by age: the survey's own
+ *                             limits on its date of birth (no unlock needed)
  *
  * Nothing is published: drafts are saved, and the team publishes from the
  * Studio. Every run is a dry run unless --apply is given. The repository is
@@ -186,32 +184,32 @@ if (command === "list") {
     },
     `Insert ${pieces.join(", ")}`,
   );
-} else if (command === "adult-dob") {
+} else if (command === "dob-ages") {
   const study = studyArg();
   const surveyId = surveyArg();
-  const minAge = Number(flag("min-age") ?? "16");
-  if (!Number.isInteger(minAge) || minAge < 0 || minAge > 100) fail("--min-age must be a whole number of years.");
-  const reason = `The ${study} study asks adults: their dates of birth go back before 1990, so the schools survey's 1990–2026 year range and its youngest age of 4 do not fit (requested by the study team, 2026-10-20).`;
+  const minAge = Number(flag("min-age"));
+  const maxAge = Number(flag("max-age"));
+  if (![minAge, maxAge].every((n) => Number.isInteger(n) && n >= 0 && n <= 100) || minAge > maxAge) {
+    fail("--min-age and --max-age must be whole numbers of years, 0 to 100, youngest first.");
+  }
   await editDraft(
     study,
     surveyId,
     (draft) => {
-      let d = unlockModule(draft, "ybm_identity", { by: ACTOR.uid, at: new Date().toISOString(), reason }).draft;
-      const found = Object.values(d.instruments).find((x) => x.instrument === "ybm_identity");
+      const found = Object.values(draft.instruments).find((x) => x.instrument === "ybm_identity");
       const dob = found?.forms[0]?.items.find((i) => i.key === "dob");
       if (!dob) fail(`“${surveyId}” has no date-of-birth question (ybm_identity.dob).`);
-      console.log(`  date of birth was: years ${dob.minYear ?? "any"}–${dob.maxYear ?? "any"}, ages ${dob.minAgeYears ?? 0}–${dob.maxAgeYears ?? "100"}`);
+      console.log(`  date of birth was: years ${dob.minYear ?? "any"}–${dob.maxYear ?? "any"}, ages ${dob.minAgeYears ?? 0}–${dob.maxAgeYears ?? 100}`);
+      // The ages say who may take part; a year range copied from another study would contradict them.
       delete dob.minYear;
       delete dob.maxYear;
       dob.minAgeYears = minAge;
-      dob.maxAgeYears = 100;
-      console.log(`  becomes: any year, ages ${minAge}–100`);
-      // Left unlocked, with the reason: a protected module's change is
-      // published only while it is unlocked. The team can lock it again after.
-      return d;
+      dob.maxAgeYears = maxAge;
+      console.log(`  becomes: ages ${minAge}–${maxAge}`);
+      return draft;
     },
-    `Date of birth for adults (youngest ${minAge})`,
+    `Date of birth: ages ${minAge} to ${maxAge}`,
   );
 } else {
-  fail("Commands: list, grant-owners, insert, adult-dob.");
+  fail("Commands: list, grant-owners, insert, dob-ages.");
 }

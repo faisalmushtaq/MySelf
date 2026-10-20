@@ -48,7 +48,7 @@ export const LOCKED_ALLOWED_FIELDS = [
 // participant-visible, so on ethics-approved or linkage text they need the
 // unlock too — and this, run on the server at publish, is the check that
 // holds even for a draft written without going through the operations.
-export const PROTECTED_ALLOWED_FIELDS = ["researcherNote", "reportingCategory"] as const;
+export const PROTECTED_ALLOWED_FIELDS = ["researcherNote", "reportingCategory", "minAgeYears", "maxAgeYears", "minYear", "maxYear"] as const;
 
 /** Study modules that need an unlock before their content changes. */
 export const PROTECTED_INSTRUMENTS: readonly string[] = ["ybm_identity"];

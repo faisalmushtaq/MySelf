@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { validateDraft } from "./validate.js";
 import { describe, expect, it } from "vitest";
 import { refKeyOf } from "@myself/release/gate";
 import type { ReleaseManifest } from "@myself/schema";
@@ -311,6 +312,11 @@ describe("protected modules", () => {
     expect(error.message).toMatch(/unlock it first/);
     // Notes for analysts change nothing a participant sees.
     publishable(ops.updateQuestion(live(), "ybm_identity.first_name", { researcherNote: "Checked." }).draft);
+    // Each survey's own age limits on the date of birth: no unlock (D-65).
+    const ages = ops.updateQuestion(live(), "ybm_identity.dob", { minAgeYears: 18, maxAgeYears: 24 }).draft;
+    expect(findQuestion(ages, "ybm_identity.dob")!.item).toMatchObject({ minAgeYears: 18, maxAgeYears: 24 });
+    expect(validateDraft(ages, { baseline: live() }).filter((i) => i.severity === "error")).toEqual([]);
+    publishable(ages);
     expect(refusal(() => ops.unlockModule(live(), "ybm_identity", { ...actor, reason: "because" })).message).toMatch(/at least 20/);
     expect(refusal(() => ops.unlockModule(live(), "ybm_smartphone", { ...actor, reason })).code).toBe("invalid");
     const unlocked = ops.unlockModule(live(), "ybm_identity", { ...actor, reason }).draft;

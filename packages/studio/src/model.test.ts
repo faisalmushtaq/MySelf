@@ -50,7 +50,10 @@ describe("editability tiers", () => {
     expect(fieldAllowed("protected", "reportingCategory")).toBe(true);
     expect(fieldAllowed("protected", "required")).toBe(false);
     expect(fieldAllowed("editable", "stem")).toBe(true);
-    expect(ALLOWED_FIELDS_BY_TIER.protected).toEqual(["researcherNote", "reportingCategory"]);
+    // Plus the date of birth's age limits, each survey's own (D-65).
+    expect(ALLOWED_FIELDS_BY_TIER.protected).toEqual(["researcherNote", "reportingCategory", "minAgeYears", "maxAgeYears", "minYear", "maxYear"]);
+    expect(fieldAllowed("protected", "minAgeYears")).toBe(true);
+    expect(fieldAllowed("protected", "stem")).toBe(false);
     expect(Object.keys(PROTECTED_MODULES)).toEqual(["ybm_identity"]);
   });
 });
