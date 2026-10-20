@@ -340,15 +340,20 @@ describe("publishing", () => {
     expect(details.issues.some((i) => i.severity === "error" && i.code.startsWith("locked."))).toBe(true);
   });
 
-  it("refuses a licensed instrument whose licence the draft has quietly changed", async () => {
+  it("asks for an unlock before a locked questionnaire is reworded, and publishes it once unlocked (D-64)", async () => {
     await setUp();
     const draft = (await currentDraft()).draft;
     const locked = Object.values(draft.instruments).find((d) => d.licence.modifiable !== "yes")!;
-    locked.licence = { ...locked.licence, modifiable: "yes" };
-    (locked.forms[0]!.items[0] as { stem?: { text: string } }).stem = { text: "Reworded behind a changed licence" };
+    (locked.forms[0]!.items[0] as { stem?: { text: string } }).stem = { text: "Reworded for this study" };
     const revision = await save(draft);
     const error = await refusedCleanly(() => publishAs(revision, "9.0.0"));
-    expect((error.details as { issues: { code: string }[] }).issues.map((i) => i.code)).toContain("locked.licence_changed");
+    expect((error.details as { issues: { code: string }[] }).issues.some((i) => i.code.startsWith("locked."))).toBe(true);
+
+    const unlocked = (await currentDraft()).draft;
+    const again = Object.values(unlocked.instruments).find((d) => d.instrument === locked.instrument)!;
+    (again.forms[0]!.items[0] as { stem?: { text: string } }).stem = { text: "Reworded for this study" };
+    unlocked.unlocked = { ...unlocked.unlocked, [locked.instrument]: { instrument: locked.instrument, by: "u_ed", at: new Date().toISOString(), reason: "Rewording agreed by the research team for this study." } };
+    await expect(publishAs(await save(unlocked), "9.0.0")).resolves.toBeDefined();
   });
 
   it("refuses a draft that claims to be another survey", async () => {
