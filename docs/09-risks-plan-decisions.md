@@ -508,7 +508,8 @@ timed sitting).
   answered; the instructions fit the questions.
 - Wording: the name and gender questions are questions; the social media app
   list and its definition no longer include WhatsApp; "screen time", "Strongly
-  agree", "Less than 5 minutes", "Once a week or less"; the gaming slider's
+  agree", "Less than 5 minutes" (the AI-use answer stays "Less than once a week":
+  a published code never changes meaning, so "once a week" would need a new code); the gaming slider's
   wording and end labels; "mental wellbeing" in both paired items.
 - Hannah's rewording (2026-10-18): "Why your answers matter" in her words,
   keeping the accurate last line (a few questions near the start are needed;

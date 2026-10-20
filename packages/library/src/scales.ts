@@ -247,7 +247,9 @@ export const aiUseFrequency: ResponseScale = {
   direction: "ascending",
   options: [
     opt(1, "Never"),
-    opt(2, "Once a week or less"),
+    // Published as "Less than once a week"; a code never changes meaning, so a
+    // label for exactly once a week would need a new code (D-62).
+    opt(2, "Less than once a week"),
     opt(3, "A few times a week"),
     opt(4, "Once a day"),
     opt(5, "Several times a day"),

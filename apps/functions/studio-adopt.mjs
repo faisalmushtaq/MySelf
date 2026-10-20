@@ -147,7 +147,11 @@ for (const [scaleKey, scale] of Object.entries(live.scales)) {
   if (!now) continue;
   for (const option of scale.options) {
     const kept = now.options.find((o) => o.code === option.code);
-    if (kept && kept.label !== option.label) fail(`${scaleKey} code ${option.code} would change from “${option.label}” to “${kept.label}”. A published code never changes meaning.`);
+    // Only case, spacing or a symbol written as words may differ ("<5 minutes"
+    // and "Less than 5 minutes" mean the same); anything else is a new meaning.
+    const same = (l) => l.toLowerCase().replace(/</g, "less than ").replace(/\s+/g, " ").trim();
+    if (kept && kept.label !== option.label && same(kept.label) === same(option.label)) console.log(`  relabels ${scaleKey} code ${option.code}: “${option.label}” → “${kept.label}” (same meaning)`);
+    if (kept && same(kept.label) !== same(option.label)) fail(`${scaleKey} code ${option.code} would change from “${option.label}” to “${kept.label}”. A published code never changes meaning.`);
     if (kept) continue;
     const list = (retiredCodes[scaleKey] ??= []);
     if (!list.some((r) => r.code === option.code)) list.push({ code: option.code, label: option.label, retiredAt: at });

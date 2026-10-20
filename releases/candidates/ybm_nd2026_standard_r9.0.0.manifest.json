@@ -7607,7 +7607,7 @@
         },
         {
           "code": 2,
-          "label": "Once a week or less",
+          "label": "Less than once a week",
           "kind": "substantive",
           "textEntry": false
         },
@@ -9075,5 +9075,5 @@
       "bytes": 589147
     }
   },
-  "hash": "sha256:89da35ca478793057e6d09b936bb69da3d106355a00a9f2dfee8427f5a20067d"
+  "hash": "sha256:75106a8f113db561aff6244a7ee33ccfd74895e2e5e2063bbd4de666915fde91"
 }
