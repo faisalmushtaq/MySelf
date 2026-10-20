@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { scoringDefinition } from "@myself/schema";
 import { executeScoring, type ItemValues } from "./executor.js";
-import { allScoring, scoreEhiSf, scoreSdq25S, scoreStai5, scoreSwemwbs } from "./definitions.js";
+import { allScoring, scoreEhiSf, scorePhq4, scoreSdq25S, scoreStai5, scoreSwemwbs } from "./definitions.js";
 import { scoringItemKeys, scoringReferenceProblems } from "./references.js";
 
 const sdq = scoringDefinition.parse(scoreSdq25S);
@@ -178,5 +178,24 @@ describe("the items a definition reads (S7)", () => {
     expect(out["total_difficulties"]).toBe((out["emotional"] as number) + (out["conduct"] as number) + (out["hyperactivity"] as number) + (out["peer"] as number));
     // Handing in a blank under a subscale's name is what hid it (the old reading).
     expect(executeScoring(sdq, { ...answers, emotional: null }).outputs["total_difficulties"]).toBeNull();
+  });
+});
+
+describe("PHQ-4 (Kroenke et al., 2009)", () => {
+  const phq4 = scoringDefinition.parse(scorePhq4);
+  const score = (nervous: number, worrying: number, interest: number, down: number) => executeScoring(phq4, { nervous, worrying, interest, down }).outputs;
+
+  it("totals 0–12 with GAD-2 from items 1–2 and PHQ-2 from items 3–4", () => {
+    expect(score(3, 2, 1, 0)).toMatchObject({ phq4_total: 6, gad2: 5, phq2: 1, phq4_band: "moderate" });
+    expect(score(0, 0, 0, 0)).toMatchObject({ phq4_total: 0, gad2: 0, phq2: 0, phq4_band: "normal" });
+    expect(score(3, 3, 3, 3)).toMatchObject({ phq4_total: 12, phq4_band: "severe" });
+    expect(score(1, 1, 1, 0)).toMatchObject({ phq4_total: 3, phq4_band: "mild" });
+  });
+
+  it("leaves the total blank when an item is missing, but still scores the complete subscale", () => {
+    const out = executeScoring(phq4, { nervous: 2, worrying: 2, interest: null, down: 1 }).outputs;
+    expect(out["phq4_total"]).toBeNull();
+    expect(out["gad2"]).toBe(4);
+    expect(out["phq2"]).toBeNull();
   });
 });

@@ -606,3 +606,24 @@ the library's wording).
   variant) and used in other surveys.
 - A locked questionnaire brought up to the library's version exactly is
   accepted without unlocking.
+
+### The social media break study: access, adult measures, date of birth (2026-10-20, D-65)
+
+**Asked.** Feedback from the break study's PhD student, with the team's choices:
+everyone added to the study space gets full rights, including the participant
+data ("Full owner, everything"); the date picker stays; the adult MacArthur
+ladders (society and community) in the supplied wording and the PHQ-4 go in the
+library and into the break study's drafts; time on each app is one grid screen.
+
+**Changed.**
+- Library: `macarthur_sss_adult` (society and community ladders, 1–10 from the
+  bottom, the study's wording, open licence) and `phq4` (Kroenke et al., 2009;
+  0–3; scored as a 0–12 total banded normal/mild/moderate/severe, with GAD-2
+  and PHQ-2). The youth MacArthur stays the schools survey's.
+- `studio-ops.yml` (main only, dry run unless applied): lists study spaces;
+  makes everyone on a space's Studio list a Studio admin there, a project owner
+  (raw sittings in every study, the YBM children's included, as chosen) and a
+  dashboard user; inserts library pieces into a draft; and sets a survey's date
+  of birth for adults (the copied schools settings allowed only 1990–2026 and a
+  youngest age of 4), unlocking the identity module with the reason recorded.
+  Drafts are saved, never published: the team publishes from the Studio.

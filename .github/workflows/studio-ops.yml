@@ -1,0 +1,98 @@
+name: "Studio: study space housekeeping"
+
+# Run by hand from main (apps/functions/studio-ops.mjs):
+#   list          every study space, its surveys, sections and (masked) members
+#   grant-owners  everyone on a study space's Studio list: Studio admin there,
+#                 the project owner role and the dashboard's access list
+#   insert        library questionnaires or modules into a survey's draft
+#   adult-dob     a survey's date of birth for adults
+# Without "apply" it is a dry run. Drafts are saved, never published. The
+# repository is public, so are these logs: emails are printed masked.
+
+on:
+  workflow_dispatch:
+    inputs:
+      command:
+        description: "What to do"
+        type: choice
+        options: [list, grant-owners, insert, adult-dob]
+        default: list
+      study:
+        description: "Study space id (from list)"
+        type: string
+        default: ""
+      survey:
+        description: "Survey id (insert, adult-dob)"
+        type: string
+        default: ""
+      section:
+        description: "Section key to insert into (insert)"
+        type: string
+        default: ""
+      after:
+        description: "Question ID to insert after (insert; blank = end of the section)"
+        type: string
+        default: ""
+      pieces:
+        description: "Comma-separated: questionnaire references (phq4@1.0/en-GB/self/standard) or module keys (insert)"
+        type: string
+        default: ""
+      min_age:
+        description: "Youngest age (adult-dob)"
+        type: string
+        default: "16"
+      apply:
+        description: "Make the change (otherwise a dry run)"
+        type: boolean
+        default: false
+
+concurrency:
+  group: studio-ops
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-24.04
+    if: github.repository == 'faisalmushtaq/MySelf' && github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm -r build
+
+      - name: Authenticate
+        env:
+          SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          if [ -z "$SERVICE_ACCOUNT" ]; then
+            echo "::error::No FIREBASE_SERVICE_ACCOUNT secret (docs/13-firebase.md section 5.2.1)."
+            exit 1
+          fi
+          printf '%s' "$SERVICE_ACCOUNT" > "$RUNNER_TEMP/sa.json"
+          echo "GOOGLE_APPLICATION_CREDENTIALS=$RUNNER_TEMP/sa.json" >> "$GITHUB_ENV"
+
+      - name: Run
+        working-directory: apps/functions
+        env:
+          COMMAND: ${{ inputs.command }}
+          STUDY: ${{ inputs.study }}
+          SURVEY: ${{ inputs.survey }}
+          SECTION: ${{ inputs.section }}
+          AFTER: ${{ inputs.after }}
+          PIECES: ${{ inputs.pieces }}
+          MIN_AGE: ${{ inputs.min_age }}
+          APPLY: ${{ inputs.apply && '--apply' || '' }}
+        run: |
+          node studio-ops.mjs "$COMMAND" --project myself-research \
+            ${STUDY:+--study "$STUDY"} ${SURVEY:+--survey "$SURVEY"} ${SECTION:+--section "$SECTION"} \
+            ${AFTER:+--after "$AFTER"} ${PIECES:+--pieces "$PIECES"} ${MIN_AGE:+--min-age "$MIN_AGE"} $APPLY
+
+      - name: Shred the credential
+        if: always()
+        run: rm -f "$RUNNER_TEMP/sa.json"

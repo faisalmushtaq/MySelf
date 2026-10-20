@@ -17,8 +17,8 @@ const everything = [...parsedInstruments, ...parsedModules];
 const scaleKeys = new Set(parsedScales.map((s) => s.key));
 
 describe("scales", () => {
-  it("all 43 scales parse", () => {
-    expect(parsedScales).toHaveLength(43);
+  it("all 44 scales parse", () => {
+    expect(parsedScales).toHaveLength(44);
   });
 
   it("scale keys are unique", () => {
@@ -203,9 +203,13 @@ describe("nothing describes an interaction or a layout that is not there", () =>
     for (const { inst, item } of canonicalItems) {
       if (item.responseType === "info") continue;
       const at = `${inst}/${item.key}`;
-      const prev = seen.get(item.stem.text);
+      // The explanation is part of what is asked: the MacArthur ladders share
+      // a stem and differ in what the ladder stands for.
+      const lede = (item as { lede?: { text?: string } }).lede?.text ?? "";
+      const asked = `${item.stem.text}\n${lede}`;
+      const prev = seen.get(asked);
       if (prev && !disjoint(prev.inst, inst)) dupes.push(`${at} duplicates ${prev.at}`);
-      else if (!prev) seen.set(item.stem.text, { inst, at });
+      else if (!prev) seen.set(asked, { inst, at });
     }
     expect(dupes).toEqual([]);
   });
@@ -259,8 +263,8 @@ describe("date of birth bounds", () => {
 });
 
 describe("instruments and modules", () => {
-  it("11 instruments and 11 modules parse", () => {
-    expect(parsedInstruments).toHaveLength(11);
+  it("13 instruments and 11 modules parse", () => {
+    expect(parsedInstruments).toHaveLength(13);
     expect(parsedModules).toHaveLength(11);
   });
 
