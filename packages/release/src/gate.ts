@@ -86,16 +86,29 @@ export class PublishGateError extends Error {
  * sends the module that exact protocol (docs/16 §10.1). A build before it would
  * open the module with only a protocol key, and the module would run its own
  * bundled copy of that protocol — or nothing, for one edited in the Studio.
+ * 0.5.0 adds the time grid: minutes for each option chosen at an earlier
+ * question, on one screen. A build before it has no control for the type and
+ * would show the question with nothing to answer it with.
  * The participant app refuses a release that needs more than it can render and
  * keeps running the one it has, so a feature can never reach a device that
  * would show it as a blank screen.
  */
-export const ENGINE_VERSIONS = ["0.1.0", "0.2.0", "0.3.0", "0.4.0"] as const;
+export const ENGINE_VERSIONS = ["0.1.0", "0.2.0", "0.3.0", "0.4.0", "0.5.0"] as const;
 
 export function requiredEngineVersion(
   composition: { sections: { components: { kind: string; items?: unknown }[] }[] },
   registries?: { instruments?: unknown; modules?: unknown; assets?: Record<string, unknown> },
 ): string {
+  // Only definitions the composition places: a library handed in whole holds
+  // grids that no release of this composition would ever show.
+  const placed = new Set(
+    composition.sections.flatMap((s) => s.components.map((c) => (c as { ref?: { instrument?: string } }).ref?.instrument)),
+  );
+  const usesTimeGrid = [...defsOf(registries?.instruments), ...defsOf(registries?.modules)]
+    .filter((def) => placed.has((def as { instrument?: string } | null)?.instrument))
+    .flatMap((def) => itemsOf([def]))
+    .some((item) => item["responseType"] === "time_grid");
+  if (usesTimeGrid) return "0.5.0";
   if (composition.sections.some((s) => s.components.some((c) => c.kind === "narrative"))) return "0.4.0";
   const usesSubsets = composition.sections.some((s) =>
     s.components.some((c) => (c.kind === "instrument" || c.kind === "module") && Array.isArray(c.items)),
@@ -107,9 +120,14 @@ export function requiredEngineVersion(
   return usesSubsets || usesAge || usesPostcodes ? "0.2.0" : "0.1.0";
 }
 
+/** The definitions in a registry, given as a list or keyed by reference. */
+function defsOf(defs: unknown): unknown[] {
+  return Array.isArray(defs) ? defs : defs && typeof defs === "object" ? Object.values(defs) : [];
+}
+
 /** Every question in a registry of definitions, given as a list or keyed by reference. */
 function itemsOf(defs: unknown): Record<string, unknown>[] {
-  const list = Array.isArray(defs) ? defs : defs && typeof defs === "object" ? Object.values(defs) : [];
+  const list = defsOf(defs);
   return list.flatMap((def) =>
     ((def as { forms?: { items?: unknown[] }[] } | null)?.forms ?? []).flatMap((form) =>
       (form.items ?? []).filter((item): item is Record<string, unknown> => !!item && typeof item === "object"),
@@ -271,6 +289,14 @@ function auditDependencies(
             why: `cross-check '${check.kind}'`,
           });
         }
+        if (item.responseType === "time_grid") {
+          deps.push({
+            at: n,
+            owner: key,
+            needs: `${item.rowsFrom.instrument}.${item.rowsFrom.item}`,
+            why: "time grid rows",
+          });
+        }
         if (item.responseType === "single_choice" && item.limitOptions) {
           deps.push({
             at: n,
@@ -292,6 +318,70 @@ function auditDependencies(
       failures.push(
         `${dep.owner}: ${dep.why} depends on '${dep.needs}', which is asked later (position ${target} vs ${dep.at})`,
       );
+    }
+  }
+  return failures;
+}
+
+/** Longest export variable name (Stata's limit), as `variableName` enforces. */
+const MAX_VARIABLE_LENGTH = 32;
+
+/**
+ * Time grids. Where the rows come from has to be a question that can give
+ * them — a sorting question and one of its groups, or a multiple choice — and
+ * every row's variable (`<variable>_<code>`) has to be a usable, unique name.
+ * Whether the source is asked before the grid is the dependency audit's.
+ */
+function auditTimeGrids(
+  draft: AssessmentDraft,
+  instruments: InstrumentVersion[],
+  modules: InstrumentVersion[],
+  scales: Map<string, { options: { code: number; kind: string }[] }>,
+): string[] {
+  const failures: string[] = [];
+  const placed = new Map<string, ItemDefinition>();
+  const variables = new Set<string>();
+  for (const section of draft.sections) {
+    for (const component of section.components) {
+      if (component.kind === "narrative" || component.kind === "screen") continue;
+      const defs = component.kind === "instrument" ? instruments : modules;
+      const def = defs.find((d) => d.instrument === component.ref.instrument && d.version === component.ref.version);
+      const form = def ? formFor(def, component.ref) : undefined;
+      for (const item of form?.items ?? []) {
+        placed.set(`${component.ref.instrument}.${item.key}`, item);
+        variables.add(item.variable);
+      }
+    }
+  }
+  for (const [key, item] of placed) {
+    if (item.responseType !== "time_grid") continue;
+    const from = item.rowsFrom;
+    const source = placed.get(`${from.instrument}.${from.item}`);
+    if (!source) continue; // reported by the dependency audit
+    if (source.revision !== from.revision) {
+      failures.push(`${key}: rows come from revision ${from.revision} of '${from.instrument}.${from.item}', but this release has revision ${source.revision}`);
+    }
+    if (source.responseType === "rank_group") {
+      if (!from.group) failures.push(`${key}: rows from a sorting question need the group whose options become rows`);
+      else if (!source.groups.some((g) => g.key === from.group)) {
+        failures.push(`${key}: rows come from group '${from.group}', which '${from.instrument}.${from.item}' does not have`);
+      }
+    } else if (source.responseType === "multi_choice") {
+      if (from.group) failures.push(`${key}: a multiple-choice question has no groups, so the rows cannot come from '${from.group}'`);
+    } else {
+      failures.push(`${key}: rows must come from a sorting or multiple-choice question; '${from.instrument}.${from.item}' is ${source.responseType}`);
+      continue;
+    }
+    const scale = scales.get(source.scale);
+    if (!scale) continue; // reported as an unresolved scale
+    const rows = scale.options.filter((o) => o.kind === "substantive" || o.kind === "other_specify");
+    if (rows.length === 0) failures.push(`${key}: '${from.instrument}.${from.item}' has no options that could be a row`);
+    for (const o of rows) {
+      const name = `${item.variable}_${o.code}`;
+      if (name.length > MAX_VARIABLE_LENGTH) {
+        failures.push(`${key}: row variable '${name}' is longer than ${MAX_VARIABLE_LENGTH} characters; shorten '${item.variable}'`);
+      }
+      if (variables.has(name)) failures.push(`${key}: row variable '${name}' is already another question's variable`);
     }
   }
   return failures;
@@ -623,6 +713,7 @@ export function freezeRelease(
   if (new Set(sectionKeys).size !== sectionKeys.length) failures.push("duplicate section keys");
 
   failures.push(...auditDependencies(draft, instruments, modules));
+  failures.push(...auditTimeGrids(draft, instruments, modules, scaleByKey));
 
   // A release must say what it needs to be rendered, and must not claim less:
   // a device that believed it could render a subset-using release would show

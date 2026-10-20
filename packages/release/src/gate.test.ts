@@ -226,3 +226,62 @@ describe("MyStory through the gate (docs/16 §10.1)", () => {
     ]);
   });
 });
+
+describe("time grids through the gate", () => {
+  const appTime = { instrument: "ybm_app_time", version: "1.0", language: "en-GB", informant: "self", readingLevel: "standard" } as const;
+  /** Just after the social-media battery, where the apps question is asked. */
+  const after =
+    ybmComposition.sections
+      .find((s) => s.key === "social_media")!
+      .components.findIndex((x) => x.kind === "module" && x.ref.instrument === "ybm_social_media") + 1;
+  /** The composition with the app-time grid placed in the social-media section at `at`. */
+  const withGrid = (at: number, regs: Registries = registries, engine?: string) =>
+    freeze(
+      (c) => {
+        section(c, "social_media").components.splice(at, 0, { kind: "module", ref: { ...appTime } });
+      },
+      regs,
+      engine,
+    );
+  const gridIn = (change: (item: Record<string, unknown>) => void): Registries => {
+    const copy = structuredClone(registries);
+    change(copy.modules.find((m) => m.instrument === "ybm_app_time")!.forms[0]!.items[0] as unknown as Record<string, unknown>);
+    return copy;
+  };
+
+  it("accepts the grid after the apps question, and says it needs engine 0.5.0", () => {
+    const { body, failures } = withGrid(after);
+    expect(failures).toEqual([]);
+    expect(body.release.engineVersion).toBe("0.5.0");
+    // The live composition does not place it, so it still needs only what it did.
+    expect(requiredEngineVersion(ybmComposition, registries)).toBe("0.3.0");
+  });
+
+  it("refuses an older engine, and a grid asked before its source", () => {
+    expect(withGrid(after, registries, "0.4.0").failures).toEqual([
+      "this composition needs engine 0.5.0, but the release declares engine 0.4.0",
+    ]);
+    expect(withGrid(after - 1).failures).toEqual([
+      expect.stringMatching(/^ybm_app_time\.minutes_per_app: time grid rows depends on 'ybm_social_media\.apps_owned', which is asked later/),
+    ]);
+  });
+
+  it("refuses rows from a group the question lacks, a missing group, or a question that cannot give rows", () => {
+    const wrongGroup = gridIn((i) => ((i["rowsFrom"] as { group: string }).group = "maybe"));
+    expect(withGrid(after, wrongGroup).failures).toEqual([
+      "ybm_app_time.minutes_per_app: rows come from group 'maybe', which 'ybm_social_media.apps_owned' does not have",
+    ]);
+    const noGroup = gridIn((i) => delete (i["rowsFrom"] as { group?: string }).group);
+    expect(withGrid(after, noGroup).failures).toEqual([
+      "ybm_app_time.minutes_per_app: rows from a sorting question need the group whose options become rows",
+    ]);
+    const single = gridIn((i) => (i["rowsFrom"] = { instrument: "ybm_social_media", item: "overuse", revision: 1 }));
+    expect(withGrid(after, single).failures).toEqual([
+      "ybm_app_time.minutes_per_app: rows must come from a sorting or multiple-choice question; 'ybm_social_media.overuse' is single_choice",
+    ]);
+    const long = gridIn((i) => (i["variable"] = "app_minutes_on_a_typical_day_x"));
+    expect(withGrid(after, long).failures).toContain(
+      "ybm_app_time.minutes_per_app: row variable 'app_minutes_on_a_typical_day_x_10' is longer than 32 characters; shorten 'app_minutes_on_a_typical_day_x'",
+    );
+  });
+});

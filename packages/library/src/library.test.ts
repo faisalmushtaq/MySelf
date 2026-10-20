@@ -259,9 +259,9 @@ describe("date of birth bounds", () => {
 });
 
 describe("instruments and modules", () => {
-  it("11 instruments and 11 modules parse", () => {
+  it("11 instruments and 12 modules parse", () => {
     expect(parsedInstruments).toHaveLength(11);
-    expect(parsedModules).toHaveLength(11);
+    expect(parsedModules).toHaveLength(12);
   });
 
   it("every scale reference resolves", () => {

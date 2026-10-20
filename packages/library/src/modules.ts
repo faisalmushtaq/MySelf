@@ -1069,6 +1069,42 @@ export const ybmFutureSelf: ModuleInput = {
   changelog: "1.0: encoded from QSF.",
 };
 
+// ---------------------------------------------------------------------------
+
+/**
+ * Minutes a day on each app the participant has, on one screen — for studies
+ * that need a number rather than a band (a social-media break, say). The rows
+ * are the apps put in "have" at `ybm_social_media.apps_owned`, so it must be
+ * placed after that question. Not part of the YBM composition.
+ */
+export const ybmAppTime: ModuleInput = {
+  ...moduleBase,
+  instrument: "ybm_app_time",
+  name: "Time on each app",
+  construct: "Self-reported daily time on each social-media app used",
+  forms: [
+    {
+      language: "en-GB",
+      label: "Time on each app (one grid of the apps the participant has)",
+      items: [
+        {
+          responseType: "time_grid",
+          key: "minutes_per_app",
+          revision: 1,
+          variable: "app_minutes",
+          stem: { text: "On a typical day, how much time do you usually spend on each of the following apps?" },
+          lede: { text: "You may refer to your phone's Screen Time or Digital Wellbeing summary." },
+          rowsFrom: { instrument: "ybm_social_media", item: "apps_owned", revision: 1, group: "have" },
+          researcherNote:
+            "Stored as app_minutes_<code>, total minutes per app (codes from scale.sm_platforms). Apps not in 'have' are not_presented_branching.",
+        },
+      ],
+    },
+  ],
+  timeEstimates: est(90, 75),
+  changelog: "1.0: new module; a time grid over the apps in ybm_social_media.apps_owned 'have'.",
+};
+
 export const allModules: ModuleInput[] = [
   ybmIntroConsent,
   ybmIdentity,
@@ -1081,4 +1117,5 @@ export const allModules: ModuleInput[] = [
   ybmScreenAttitudes,
   ybmGaming,
   ybmFutureSelf,
+  ybmAppTime,
 ];
