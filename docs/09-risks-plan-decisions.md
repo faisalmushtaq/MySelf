@@ -635,3 +635,19 @@ library and into the break study's drafts; time on each app is one grid screen.
   and the picker offers only dates in between, now including the whole of the
   oldest year of age (it stopped a year early). The break study's copy had the
   schools survey's 1990–2026 years and ages 4–100.
+
+### Time on each app: a grid question (2026-10-20, D-66)
+
+**Asked.** The break study wants, after "Which of these apps do you use?", the
+actual time on each app, read from the phone's Screen Time or Digital
+Wellbeing, on one screen; the team chose a grid.
+
+**Changed.** A new question type, `time_grid` ("Time for each chosen option"
+in the Studio): its rows are the options the participant put in a group of an
+earlier sorting question, or ticked in a multiple-choice one; each row has
+Hours and Minutes boxes and a live total. It is not asked when no row would be
+shown. Each row is recorded as whole minutes, `<variable>_<option code>`; an
+app the participant does not have is not presented, an empty row skipped. A
+release with a grid needs engine 0.5.0; the live YBM survey has none and still
+needs 0.3.0. The library's `ybm_app_time` module ("Time on each app",
+`app_minutes_<code>`) asks it of the apps in "I have these apps on my phone".

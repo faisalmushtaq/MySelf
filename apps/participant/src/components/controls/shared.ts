@@ -1,4 +1,4 @@
-import type { AnswerValue } from "@myself/engine";
+import type { AnswerValue, TimeGridRow } from "@myself/engine";
 import type { ItemDefinition, ResponseScale } from "@myself/schema";
 
 /**
@@ -12,6 +12,8 @@ export interface ControlProps {
   item: ItemDefinition;
   scale?: ResponseScale | undefined;
   value?: AnswerValue | undefined;
+  /** A time grid's rows: the options this participant chose at its source question. */
+  rows?: readonly TimeGridRow[] | undefined;
   /**
    * `autoAdvance` moves the screen on after a short pause; a number sets the
    * pause, for a control whose last input deserves to be seen landing first.

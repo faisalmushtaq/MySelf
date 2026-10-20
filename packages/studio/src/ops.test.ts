@@ -95,7 +95,8 @@ describe("adding questions", () => {
     const order = administered(manifest);
     expect(order.indexOf(itemKey)).toBe(order.indexOf("ybm_gaming.social_pct") + 1);
     expect(order[order.indexOf(itemKey) + 1]).toBe("stai5_s.upset");
-    expect(manifest.release.engineVersion).toBe("0.2.0");
+    // A time grid needs the engine that renders it (0.5.0).
+    expect(manifest.release.engineVersion).toBe(typeId === "time_grid" ? "0.5.0" : "0.2.0");
     expect(findQuestion(before, itemKey)).toBeNull();
   });
 

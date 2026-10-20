@@ -381,6 +381,21 @@ function Validation({ itemKey, item, issues, write, can, why }: SectionProps) {
         </>
       );
       break;
+    case "time_grid":
+      body = (
+        <NumberField
+          label="Most per row"
+          optional
+          inline
+          {...f("maxMinutesPerRow")}
+          value={item.maxMinutesPerRow}
+          parse={int(1, 24 * 60, true)}
+          suffix="minutes"
+          info="The longest total one row can have. With no limit it is a whole day (1440 minutes); hours are always 0 to 24 and minutes 0 to 59."
+          onCommit={(n) => write(label("limit per row"), () => ({ maxMinutesPerRow: n }))}
+        />
+      );
+      break;
     case "numeric":
       body = (
         <>

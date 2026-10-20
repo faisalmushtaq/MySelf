@@ -339,6 +339,7 @@ const FIELD_NAMES: Record<string, string> = {
   displayIf: "display condition",
   crossChecks: "consistency check",
   limitOptions: "option limit",
+  rowsFrom: "rows",
   identifying: "identifying setting",
   required: "required setting",
   allowDecline: "“Prefer not to say” setting",

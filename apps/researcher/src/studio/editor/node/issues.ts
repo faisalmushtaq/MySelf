@@ -130,6 +130,7 @@ const FIELDS_BY_TYPE: Record<string, readonly string[]> = {
   single_choice: ["required", "allowDecline", "options", "scale", "presentation", "autoAdvance", "spectrumReverse"],
   multi_choice: ["required", "allowDecline", "options", "scale", "maxSelections"],
   rank_group: ["required", "allowDecline", "options", "scale", "groups"],
+  time_grid: ["required", "allowDecline", "rowsFrom", "maxMinutesPerRow"],
   checkbox_set: ["required", "allowDecline", "statements"],
   form_fields: ["required", "allowDecline", "fields"],
   slider: ["required", "allowDecline", "min", "max", "step", "showValue", "minLabel", "maxLabel"],

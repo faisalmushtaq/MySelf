@@ -1,5 +1,16 @@
-import { AnswerStore, computeVisibility, flattenManifest, type AnswerValue, type VisibilityUnit } from "@myself/engine";
-import type { ReleaseManifest, ResponseScale, ScoringDefinition } from "@myself/schema";
+import {
+  AnswerStore,
+  computeVisibility,
+  flattenManifest,
+  timeGridCandidates,
+  timeGridRows,
+  timeGridVariable,
+  type AnswerValue,
+  type GridOption,
+  type GridSourceItem,
+  type VisibilityUnit,
+} from "@myself/engine";
+import type { ReleaseManifest, ResponseScale, ScoringDefinition, TimeGridSource } from "@myself/schema";
 import { executeScoring, scoringItemKeys } from "@myself/scoring";
 import type { Dataset, IdentityRow, ResponseRow, ScoreRow, SessionRow } from "./dataset.js";
 import { deriveParticipantCode, deriveParticipantId } from "./identity.js";
@@ -117,6 +128,48 @@ export interface IngestResult {
   warnings: string[];
 }
 
+/** What filing an item's answer needs from its definition. */
+interface ItemMeta {
+  variable: string;
+  scaleKey?: string;
+  identifying: boolean;
+  /** For a time grid: where its rows come from, and every option that could be one. */
+  grid?: { from: TimeGridSource; sourceKey: string; source: GridSourceItem; options: GridOption[] };
+}
+
+/**
+ * A time grid's response rows: one per option that could have been a row,
+ * as `<variable>_<code>` holding total minutes.
+ *
+ * Rows the participant was not asked about — an app they do not have — are
+ * `not_presented_branching`, like any question their answers routed them
+ * past, so "does not use it" is never confused with "used it for 0 minutes".
+ * A row shown and left empty is `skipped`. Which rows were shown is decided
+ * from the source question's final answer, by the same rule the device used.
+ */
+function gridRows(
+  grid: NonNullable<ItemMeta["grid"]>,
+  variable: string,
+  st: ItemState,
+  source: ItemState | undefined,
+): { variable: string; status: ResponseRow["status"]; value: number | null }[] {
+  const sourceAnswer = source?.status === "answered" ? ((source.value as AnswerValue | null) ?? undefined) : undefined;
+  const shown = new Set(timeGridRows(grid.from, grid.source, grid.options, sourceAnswer).map((r) => r.code));
+  const value = st.value as AnswerValue | null;
+  const minutes = st.status === "answered" && value?.kind === "time_grid" ? value.minutes : {};
+  return grid.options.map((o) => {
+    const v = timeGridVariable(variable, o.code);
+    if (st.status === "not_presented_branching" || !shown.has(o.code)) {
+      return { variable: v, status: "not_presented_branching" as const, value: null };
+    }
+    if (st.status !== "answered") return { variable: v, status: st.status, value: null };
+    const n = minutes[String(o.code)];
+    return typeof n === "number" && Number.isInteger(n) && n >= 0
+      ? { variable: v, status: "answered" as const, value: n }
+      : { variable: v, status: "skipped" as const, value: null };
+  });
+}
+
 /** Item-level facts assembled from the events of one session. */
 interface ItemState {
   instrument: string;
@@ -139,9 +192,10 @@ const site = (studyCode: string): string | undefined => {
 
 /** Flatten the manifest's frozen instruments into item and scale lookups. */
 function indexManifest(manifest: ReleaseManifest) {
-  const items = new Map<string, { variable: string; scaleKey?: string; identifying: boolean }>();
+  const items = new Map<string, ItemMeta>();
   const instrumentOf = new Map<string, string>();
   const informants = new Set<string>();
+  const definitions = new Map<string, Record<string, unknown>>();
   for (const def of Object.values(manifest.instruments)) {
     const inst = def as { instrument: string; forms: { informant?: string; items: Record<string, unknown>[] }[] };
     for (const form of inst.forms) {
@@ -154,12 +208,25 @@ function indexManifest(manifest: ReleaseManifest) {
           identifying: it.identifying === true,
         });
         instrumentOf.set(`${inst.instrument}.${it.key}`, inst.instrument);
+        definitions.set(`${inst.instrument}.${it.key}`, raw);
       }
     }
   }
   const scales = new Map<string, ResponseScale>(
     Object.entries(manifest.scales).map(([k, v]) => [k, v as ResponseScale]),
   );
+  // A time grid is filed as one variable per row it could have, so each row
+  // needs its source question and that question's options to hand.
+  for (const [key, raw] of definitions) {
+    if (raw["responseType"] !== "time_grid") continue;
+    const from = raw["rowsFrom"] as TimeGridSource;
+    const sourceKey = `${from.instrument}.${from.item}`;
+    const source = definitions.get(sourceKey) as (GridSourceItem & { scale?: string }) | undefined;
+    const scale = source?.scale ? scales.get(source.scale) : undefined;
+    const meta = items.get(key);
+    if (!meta || !source || !scale) continue;
+    meta.grid = { from, sourceKey, source, options: timeGridCandidates(scale.options) };
+  }
   const scoring = new Map<string, ScoringDefinition>(
     Object.entries(manifest.scoring).map(([k, v]) => [k, v as ScoringDefinition]),
   );
@@ -387,6 +454,7 @@ function present(value: unknown, scale: ResponseScale | undefined) {
     | { kind: "fields"; values: Record<string, string> }
     | { kind: "checkboxes"; checked: string[] }
     | { kind: "group_rank"; assignments: Record<number, { group: string; rank?: number }> }
+    | { kind: "time_grid"; minutes: Record<string, number | null> }
     | null;
   if (!v) return { value: null, text: null, label: null };
   switch (v.kind) {
@@ -410,6 +478,9 @@ function present(value: unknown, scale: ResponseScale | undefined) {
       return { value: v.checked.length, text: v.checked.join(","), label: null };
     case "group_rank":
       return { value: null, text: JSON.stringify(v.assignments), label: null };
+    case "time_grid":
+      // Filed row by row (`gridRows`); this is only the fallback rendering.
+      return { value: null, text: JSON.stringify(v.minutes), label: null };
   }
 }
 
@@ -560,6 +631,28 @@ export function ingest(sessions: DeviceSession[], options: IngestOptions): Inges
       if (st.status === "skipped" || st.status === "declined") skipped += 1;
       if (st.tooFast) tooFast += 1;
       if ((st.visits ?? 1) > 1) revisited += 1;
+      if (meta.grid) {
+        for (const row of gridRows(meta.grid, meta.variable, st, items.get(meta.grid.sourceKey))) {
+          responseRows.push({
+            sessionId: session.sessionId,
+            participantId,
+            instrument: st.instrument,
+            item: st.item,
+            variable: row.variable,
+            status: row.status,
+            value: row.value,
+            text: null,
+            // No label: the row's app is in the codebook, and a label here
+            // would stand in for the number in a readable export.
+            label: null,
+            dwellMs: st.dwellMs,
+            visits: st.visits,
+            tooFast: st.tooFast,
+            changed: st.changed,
+          });
+        }
+        continue;
+      }
       responseRows.push({
         sessionId: session.sessionId,
         participantId,

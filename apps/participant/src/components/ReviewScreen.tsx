@@ -1,6 +1,7 @@
-import { AnswerStore, Walker, type AnswerValue, type PresentableUnit } from "@myself/engine";
+import { AnswerStore, formatMinutes, Walker, type AnswerValue, type PresentableUnit } from "@myself/engine";
 import type { ResponseScale } from "@myself/schema";
 import { resolveText } from "../lib/pipes.js";
+import { gridRowsFor } from "../lib/timegrid.js";
 
 /**
  * The list of everything answered, reached from the finish screen.
@@ -76,6 +77,13 @@ export function describeAnswer(
         .sort((a, b) => (a.rank ?? 99) - (b.rank ?? 99));
       return named.map((n) => n.label).join(", ");
     }
+    case "time_grid": {
+      // The scale here is the source question's, which names the rows.
+      const parts = Object.entries(value.minutes)
+        .filter((e): e is [string, number] => typeof e[1] === "number")
+        .map(([code, n]) => `${scale?.options.find((o) => o.code === Number(code))?.label ?? code} ${formatMinutes(n)}`);
+      return parts.length ? parts.join(" · ") : null;
+    }
   }
 }
 
@@ -121,7 +129,12 @@ export function ReviewScreen(props: ReviewScreenProps) {
               const unit = units[index]!;
               const item = unit.item;
               const record = store.get({ instrument: unit.instrument, item: item.key, revision: item.revision });
-              const scale = "scale" in item ? scales.get(item.scale) : undefined;
+              const scale =
+                item.responseType === "time_grid"
+                  ? gridRowsFor(item, units, scales, answers).scale
+                  : "scale" in item
+                    ? scales.get(item.scale)
+                    : undefined;
               const answer = record?.status === "answered" ? describeAnswer(record.value, scale) : null;
               const stem = resolveText(item.stem.text, item.stem.pipes, answers, sessionStart);
               return (

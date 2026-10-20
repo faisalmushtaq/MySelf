@@ -228,6 +228,8 @@ export function studioTypeOf(item: ItemDefinition, scale?: ScaleInput | null): Q
       return "form_fields";
     case "rank_group":
       return "rank_group";
+    case "time_grid":
+      return "time_grid";
   }
 }
 

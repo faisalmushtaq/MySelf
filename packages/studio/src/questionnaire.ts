@@ -45,6 +45,7 @@ const TYPE_NAMES: Record<ItemDefinition["responseType"], string> = {
   text_long: "Long text",
   form_fields: "Form",
   rank_group: "Sort into groups",
+  time_grid: "Time for each chosen option",
   checkbox_set: "Statements to tick",
 };
 
@@ -85,6 +86,11 @@ function answerPart(item: ItemDefinition, draft: StudioDraft): string {
     }
     case "form_fields":
       return `<ul class="fields">${(it["fields"] as { label: string; required?: boolean }[]).map((f) => `<li>${esc(f.label)}${f.required ? " (required)" : ""}</li>`).join("")}</ul>`;
+    case "time_grid": {
+      const from = it["rowsFrom"] as { instrument: string; item: string; group?: string };
+      const max = typeof it["maxMinutesPerRow"] === "number" ? ` Each row at most ${String(it["maxMinutesPerRow"])} minutes.` : "";
+      return `<p class="detail">Hours and minutes for each option ${from.group ? `put in “${esc(from.group)}” at` : "chosen at"} <code>${esc(`${from.instrument}.${from.item}`)}</code>, stored per option as <code>${esc(item.variable)}_&lt;code&gt;</code> (total minutes).${esc(max)}</p>`;
+    }
     case "checkbox_set":
       return `<ol class="statements">${(it["statements"] as { text: { text: string } }[]).map((s) => `<li>${esc(s.text.text)}</li>`).join("")}</ol>` +
         (it["autoAdvance"] ? `<p class="detail">Moves on by itself once every statement is ticked.</p>` : "");

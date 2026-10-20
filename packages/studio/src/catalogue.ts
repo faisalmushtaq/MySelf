@@ -1,4 +1,4 @@
-import type { ItemDefinition } from "@myself/schema";
+import type { ItemDefinition, TimeGridSource } from "@myself/schema";
 import type { ScaleInput } from "./contract.js";
 import { generateScaleKey } from "./keys.js";
 import { StudioOpError } from "./model.js";
@@ -27,7 +27,8 @@ export type QuestionTypeId =
   | "consent"
   | "ladder"
   | "form_fields"
-  | "rank_group";
+  | "rank_group"
+  | "time_grid";
 
 export interface QuestionType {
   id: QuestionTypeId;
@@ -160,6 +161,15 @@ export const QUESTION_TYPES: readonly QuestionType[] = [
     canCreate: false,
     group: "choice",
   },
+  {
+    id: "time_grid",
+    label: "Time for each chosen option",
+    description:
+      "Hours and minutes for each option chosen at an earlier sorting or multiple-choice question, on one screen — time on each app someone said they use.",
+    responseType: "time_grid",
+    canCreate: true,
+    group: "number",
+  },
 ];
 
 /**
@@ -270,6 +280,11 @@ export interface TemplateOptions {
   instrument?: string;
   /** Key for a choice question's new option list. Defaults to `scale.<instrument>_<key>`. */
   scaleKey?: string;
+  /**
+   * Where a new time grid's rows come from. Without one it points at itself,
+   * which validation reports as "choose the question", until one is chosen.
+   */
+  rowsFrom?: TimeGridSource;
 }
 
 /**
@@ -346,6 +361,14 @@ export function templateFor(typeId: QuestionTypeId, opts: TemplateOptions): { it
           ...base,
           responseType: "checkbox_set",
           statements: [{ key: "agree", text: { text: "I agree to take part in this study." }, required: true }],
+        },
+      };
+    case "time_grid":
+      return {
+        item: {
+          ...base,
+          responseType: "time_grid",
+          rowsFrom: opts.rowsFrom ?? { instrument: opts.instrument ?? "studio", item: opts.key, revision: 1 },
         },
       };
     case "ladder":

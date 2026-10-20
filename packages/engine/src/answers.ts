@@ -17,7 +17,12 @@ export type AnswerValue =
       /** option code -> { group key, rank within group (1-based) if ranked } */
       assignments: Record<number, { group: string; rank?: number }>;
     }
-  | { kind: "checkboxes"; checked: string[] };
+  | { kind: "checkboxes"; checked: string[] }
+  | {
+      kind: "time_grid";
+      /** option code -> total minutes; null for a row shown but left empty */
+      minutes: Record<string, number | null>;
+    };
 
 export interface AnswerRecord {
   status: ResponseStatus;

@@ -20,6 +20,7 @@ describe("the question types offered", () => {
       "date",
       "info",
       "consent",
+      "time_grid",
     ]);
     expect(QUESTION_TYPES.filter((t) => !t.canCreate).map((t) => t.id)).toEqual(["ladder", "form_fields", "rank_group"]);
   });
