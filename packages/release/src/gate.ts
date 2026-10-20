@@ -358,9 +358,8 @@ function auditTimeGrids(
     const from = item.rowsFrom;
     const source = placed.get(`${from.instrument}.${from.item}`);
     if (!source) continue; // reported by the dependency audit
-    if (source.revision !== from.revision) {
-      failures.push(`${key}: rows come from revision ${from.revision} of '${from.instrument}.${from.item}', but this release has revision ${source.revision}`);
-    }
+    // The revision is not compared: answers are looked up by instrument and
+    // key, as for display conditions, so it records intent rather than binding.
     if (source.responseType === "rank_group") {
       if (!from.group) failures.push(`${key}: rows from a sorting question need the group whose options become rows`);
       else if (!source.groups.some((g) => g.key === from.group)) {
