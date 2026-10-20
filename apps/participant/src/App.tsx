@@ -281,6 +281,8 @@ export default function App({ initial, initialRuntime }: { initial: Startup; ini
   // participants' hands, so it sits behind a deliberate gesture on the build
   // line rather than a button anyone can find by wandering.
   const handoverTaps = useRef(0);
+  /** Bumped whenever the PIN gate closes, so a check still running then is ignored. */
+  const pinGateGeneration = useRef(0);
   const syncBusyRef = useRef(false);
   const [handoverOpen, setHandoverOpen] = useState(false);
   const [handoverNote, setHandoverNote] = useState<string | null>(null);
@@ -299,6 +301,8 @@ export default function App({ initial, initialRuntime }: { initial: Startup; ini
   /** Shut the panel and its PIN gate, and forget the passphrase typed into it. */
   const closeStaffPanel = useCallback(() => {
     handoverTaps.current = 0;
+    // A PIN still being checked belongs to the gate just closed: its result is dropped.
+    pinGateGeneration.current += 1;
     setHandoverOpen(false);
     setPinGate(null);
     setPinNote(null);
@@ -336,15 +340,18 @@ export default function App({ initial, initialRuntime }: { initial: Startup; ini
         setPinNote(problem);
         return;
       }
+      const generation = pinGateGeneration.current;
       setPinBusy(true);
       try {
         // Never over one already set: that would let anyone choose a new PIN.
         if (await getStaffPin()) {
+          if (pinGateGeneration.current !== generation) return;
           setPinGate("enter");
           setPinNote("A PIN has already been set on this iPad. Enter it to open the panel.");
           return;
         }
         await saveStaffPin(await newPinRecord(pin, new Date()));
+        if (pinGateGeneration.current !== generation) return;
         openStaffPanel();
       } catch (error) {
         setPinNote(error instanceof Error ? error.message : "The PIN could not be saved.");
@@ -357,15 +364,24 @@ export default function App({ initial, initialRuntime }: { initial: Startup; ini
 
   const enterStaffPin = useCallback(
     async (pin: string) => {
+      // Judged when it was typed: a PIN typed during the lockout stays refused
+      // even if the lockout ends while it is being checked.
+      const typedAt = new Date();
+      const generation = pinGateGeneration.current;
+      const stale = () => pinGateGeneration.current !== generation;
       setPinBusy(true);
       try {
         const record = await getStaffPin();
+        if (stale()) return;
         if (!record) {
           setPinGate("set");
           return;
         }
-        const attempt = await tryPin(record, pin, new Date());
+        const attempt = await tryPin(record, pin, typedAt);
         await saveStaffPin(attempt.record);
+        // The gate closed (left idle, or tapped shut) while this was checked:
+        // nothing opens behind it.
+        if (stale()) return;
         if (attempt.kind === "accepted") {
           openStaffPanel();
         } else if (attempt.kind === "locked") {
