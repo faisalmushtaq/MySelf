@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { logicExpr } from "./logic.js";
 import { instrumentVersion } from "./instrument.js";
+import { itemDefinition } from "./item.js";
 import { responseScale } from "./response-scale.js";
 import { kssInstrument, kssScaleAsAdministered, kssScaleCanonical } from "./fixtures/kss.js";
 
@@ -83,5 +84,28 @@ describe("logic AST", () => {
 
   it("rejects an unknown operator", () => {
     expect(() => logicExpr.parse({ op: "regex", target: { item: smOwn }, value: ".*" })).toThrow();
+  });
+});
+
+describe("time grid items", () => {
+  const grid = {
+    responseType: "time_grid",
+    key: "minutes_per_app",
+    revision: 1,
+    variable: "app_minutes",
+    stem: { text: "How long on each?" },
+    rowsFrom: { instrument: "apps", item: "owned", revision: 1, group: "have" },
+  };
+
+  it("accepts a grid that takes its rows from an earlier question", () => {
+    const parsed = itemDefinition.parse(grid);
+    expect(parsed.responseType).toBe("time_grid");
+    // Absent means a whole day; nothing is filled in, so the item hashes as written.
+    expect(parsed.responseType === "time_grid" && parsed.maxMinutesPerRow).toBeUndefined();
+  });
+
+  it("rejects a ceiling longer than a day, and a grid with no source", () => {
+    expect(() => itemDefinition.parse({ ...grid, maxMinutesPerRow: 1441 })).toThrow();
+    expect(() => itemDefinition.parse({ ...grid, rowsFrom: undefined })).toThrow();
   });
 });

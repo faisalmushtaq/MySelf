@@ -1,4 +1,5 @@
-import type { ReleaseManifest, ResponseScale } from "@myself/schema";
+import { timeGridCandidates, timeGridMax, timeGridVariable } from "@myself/engine";
+import type { ReleaseManifest, ResponseScale, TimeGridSource } from "@myself/schema";
 import type { Dataset } from "./dataset.js";
 import { exportableNarratives, summariseNarrative, type StoredNarrativeRun } from "./narratives.js";
 
@@ -230,6 +231,10 @@ function instrumentSidecar(
           scale?: string;
         };
         if (item.responseType === "info") continue;
+        if (item.responseType === "time_grid") {
+          Object.assign(out, gridSidecar(raw, manifest, scales));
+          continue;
+        }
         const scale = item.scale ? scales.get(item.scale) : undefined;
         const levels: Record<string, string> = {};
         for (const o of scale?.options ?? []) {
@@ -243,6 +248,37 @@ function instrumentSidecar(
         };
       }
     }
+  }
+  return out;
+}
+
+/**
+ * A time grid's dictionary entries: one per row it could have, named for the
+ * option it times. The grid's own variable is never a column.
+ */
+function gridSidecar(
+  raw: Record<string, unknown>,
+  manifest: ReleaseManifest,
+  scales: Map<string, ResponseScale>,
+): Record<string, unknown> {
+  const variable = raw["variable"] as string;
+  const stem = (raw["stem"] as { text: string }).text;
+  const from = raw["rowsFrom"] as TimeGridSource;
+  let sourceScale: string | undefined;
+  for (const def of Object.values(manifest.instruments)) {
+    const inst = def as { instrument: string; forms: { items: { key: string; scale?: string }[] }[] };
+    if (inst.instrument !== from.instrument) continue;
+    sourceScale ??= inst.forms.flatMap((f) => f.items).find((i) => i.key === from.item)?.scale;
+  }
+  const scale = sourceScale ? scales.get(sourceScale) : undefined;
+  const max = timeGridMax(raw as { maxMinutesPerRow?: number });
+  const out: Record<string, unknown> = {};
+  for (const o of timeGridCandidates(scale?.options ?? [])) {
+    out[timeGridVariable(variable, o.code)] = {
+      Description: `${stem} — ${o.label}`,
+      Units: "minutes",
+      Notes: `Total minutes (hours × 60 + minutes), 0 to ${max}. Asked only if ${from.instrument}.${from.item} put ${o.label} ${from.group ? `in '${from.group}'` : "among its choices"}; otherwise not_presented_branching.`,
+    };
   }
   return out;
 }

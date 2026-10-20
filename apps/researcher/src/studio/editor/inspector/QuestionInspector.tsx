@@ -381,6 +381,21 @@ function Validation({ itemKey, item, issues, write, can, why }: SectionProps) {
         </>
       );
       break;
+    case "time_grid":
+      body = (
+        <NumberField
+          label="Most per row"
+          optional
+          inline
+          {...f("maxMinutesPerRow")}
+          value={item.maxMinutesPerRow}
+          parse={int(1, 24 * 60, true)}
+          suffix="minutes"
+          info="The longest total one row can have. With no limit it is a whole day (1440 minutes); hours are always 0 to 24 and minutes 0 to 59."
+          onCommit={(n) => write(label("limit per row"), () => ({ maxMinutesPerRow: n }))}
+        />
+      );
+      break;
     case "numeric":
       body = (
         <>
@@ -400,7 +415,7 @@ function Validation({ itemKey, item, issues, write, can, why }: SectionProps) {
       );
       break;
     case "date":
-      info = `For a date of birth: a date making the participant younger or older than this is questioned. Whatever is set here, no survey accepts an age over ${ABSOLUTE_MAX_AGE_YEARS}, so an impossible date of birth can't enter the data.`;
+      info = `For a date of birth: who may take part in this survey. A date making the participant younger than the youngest age, or older than the oldest, is refused, and the date picker offers only dates in between. Each survey sets its own, without unlocking. Whatever is set here, no survey accepts an age over ${ABSOLUTE_MAX_AGE_YEARS}.`;
       body = (
         <>
           <NumberField

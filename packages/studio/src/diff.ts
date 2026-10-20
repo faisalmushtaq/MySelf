@@ -110,6 +110,9 @@ const FIELD_ASPECT: Record<string, string> = {
   displayIf: "logic",
   crossChecks: "logic",
   limitOptions: "logic",
+  // Which options become a time grid's rows: what is asked, like its options.
+  rowsFrom: "options",
+  maxMinutesPerRow: "validation",
   min: "validation",
   max: "validation",
   step: "validation",

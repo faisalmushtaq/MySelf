@@ -42,6 +42,7 @@ export const TYPE_ICONS: Record<QuestionTypeId, IconName> = {
   ladder: "type-ladder",
   form_fields: "type-fields",
   rank_group: "type-rank",
+  time_grid: "type-time",
 };
 
 const TYPE_LABELS = new Map(QUESTION_TYPES.map((t) => [t.id, t.label]));

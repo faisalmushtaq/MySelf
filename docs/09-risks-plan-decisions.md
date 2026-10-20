@@ -606,3 +606,48 @@ the library's wording).
   variant) and used in other surveys.
 - A locked questionnaire brought up to the library's version exactly is
   accepted without unlocking.
+
+### The social media break study: access, adult measures, date of birth (2026-10-20, D-65)
+
+**Asked.** Feedback from the break study's PhD student, with the team's choices:
+everyone added to the study space gets full rights, including the participant
+data ("Full owner, everything"); the date picker stays; the adult MacArthur
+ladders (society and community) in the supplied wording and the PHQ-4 go in the
+library and into the break study's drafts; time on each app is one grid screen.
+
+**Changed.**
+- Library: `macarthur_sss_adult` (society and community ladders, 1–10 from the
+  bottom, the study's wording, open licence) and `phq4` (Kroenke et al., 2009;
+  0–3; scored as a 0–12 total banded normal/mild/moderate/severe, with GAD-2
+  and PHQ-2). The youth MacArthur stays the schools survey's.
+- `studio-ops.yml` (main only, dry run unless applied): lists study spaces;
+  makes everyone on a space's Studio list a Studio admin there, a project owner
+  (raw sittings in every study, the YBM children's included, as chosen) and a
+  dashboard user; inserts library pieces into a draft; and sets the ages a
+  survey's date of birth accepts. Drafts are saved, never published: the team
+  publishes from the Studio.
+- Date of birth: "limiters that can be specified in each implementation of
+  that item… for this study it's 18 to 24… online it could be from 12 to 100."
+  The youngest and oldest age are each survey's own setting (Studio: the date
+  question's "Youngest age" and "Oldest age"), changed without unlocking the
+  identity module; nothing else in it changes without an unlock. On the iPad a
+  date outside them is refused ("This survey is for people aged 18 to 24…"),
+  and the picker offers only dates in between, now including the whole of the
+  oldest year of age (it stopped a year early). The break study's copy had the
+  schools survey's 1990–2026 years and ages 4–100.
+
+### Time on each app: a grid question (2026-10-20, D-66)
+
+**Asked.** The break study wants, after "Which of these apps do you use?", the
+actual time on each app, read from the phone's Screen Time or Digital
+Wellbeing, on one screen; the team chose a grid.
+
+**Changed.** A new question type, `time_grid` ("Time for each chosen option"
+in the Studio): its rows are the options the participant put in a group of an
+earlier sorting question, or ticked in a multiple-choice one; each row has
+Hours and Minutes boxes and a live total. It is not asked when no row would be
+shown. Each row is recorded as whole minutes, `<variable>_<option code>`; an
+app the participant does not have is not presented, an empty row skipped. A
+release with a grid needs engine 0.5.0; the live YBM survey has none and still
+needs 0.3.0. The library's `ybm_app_time` module ("Time on each app",
+`app_minutes_<code>`) asks it of the apps in "I have these apps on my phone".

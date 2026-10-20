@@ -100,6 +100,7 @@ const RESPONSE_TYPES = new Set([
   "text_long",
   "form_fields",
   "rank_group",
+  "time_grid",
   "checkbox_set",
 ]);
 
@@ -134,6 +135,7 @@ const OPS_BY_TYPE: Record<string, ReadonlySet<string>> = {
   text_short: new Set(["answered", "not_empty", "eq", "ne"]),
   text_long: new Set(["answered", "not_empty", "eq", "ne"]),
   form_fields: new Set(["answered", "not_empty"]),
+  time_grid: new Set(["answered"]),
   info: new Set(),
 };
 const NUMBER_VALUED = new Set(["single_choice", "slider", "numeric", "ladder"]);
@@ -167,6 +169,7 @@ const TYPE_NAMES: Record<string, string> = {
   text_short: "short-text",
   text_long: "long-text",
   form_fields: "form",
+  time_grid: "time grid",
   info: "information",
 };
 
@@ -530,6 +533,7 @@ function checkQuestion(m: Model, c: Collector, q: LiveQuestion): void {
   }
 
   checkLimits(c, q, item, type, optionCount);
+  if (type === "time_grid") checkTimeGrid(m, c, q, item);
 
   checkPipes(m, c, item["stem"], isInfo ? "the text" : "the question text", questionAt(q, "stem"), q.position);
   checkPipes(m, c, item["lede"], "the description", questionAt(q, "lede"), q.position);
@@ -594,6 +598,87 @@ function checkQuestion(m: Model, c: Collector, q: LiveQuestion): void {
       questionAt(q, "required"),
       "Participants who don't want to give it can't finish the survey. Check this matches your ethics approval and what participants are told.",
     );
+  }
+}
+
+/**
+ * Where a time grid's rows come from: a sorting or multiple-choice question
+ * asked before it, and for sorting, one of its groups. Each row is stored as
+ * `<label>_<code>`, so those names have to fit and be free.
+ */
+function checkTimeGrid(m: Model, c: Collector, q: LiveQuestion, item: Loose): void {
+  const from = isObject(item["rowsFrom"]) ? item["rowsFrom"] : null;
+  const sourceKey = from ? `${String(from["instrument"])}.${String(from["item"])}` : "";
+  const source = from && sourceKey !== q.itemKey ? m.first.get(sourceKey) : undefined;
+  const location = questionAt(q, "rowsFrom");
+  if (!source) {
+    c.error(
+      "grid.source_missing",
+      "Choose the question whose answers become the rows",
+      location,
+      "A time grid asks about each option a participant chose at an earlier sorting or multiple-choice question. Choose that question.",
+    );
+    return;
+  }
+  const label = questionLabel(source.itemKey, source.item);
+  if (source.position >= q.position) {
+    c.error(
+      "grid.source_later",
+      "The rows come from a question asked later",
+      location,
+      `${label} has to be answered before the grid can know which rows to show. Move it earlier, or choose another question.`,
+    );
+  }
+  const type = (source.item as { responseType?: unknown }).responseType;
+  if (type !== "rank_group" && type !== "multi_choice") {
+    c.error(
+      "grid.source_type",
+      `The rows can't come from a ${TYPE_NAMES[String(type)] ?? String(type)} question`,
+      location,
+      `${label} doesn't give a list of chosen options. Choose a sorting or multiple-choice question.`,
+    );
+    return;
+  }
+  const group = from?.["group"];
+  if (type === "rank_group") {
+    const groups = list((source.item as { groups?: unknown }).groups).filter(isObject).map((g) => g["key"]);
+    if (typeof group !== "string" || !groups.includes(group)) {
+      c.error(
+        "grid.group_missing",
+        typeof group === "string" ? `There is no group “${group}” to take rows from` : "Choose which group's options become the rows",
+        location,
+        `Choose one of the groups of ${label}: its options are the rows.`,
+      );
+    }
+  } else if (group !== undefined) {
+    c.error("grid.group_unused", "A multiple-choice question has no groups", location, "Every option ticked becomes a row. Remove the group.");
+  }
+  const variable = item["variable"];
+  const scaleKey = (source.item as { scale?: unknown }).scale;
+  const scale = typeof scaleKey === "string" ? m.draft.scales[scaleKey] : undefined;
+  if (!isVariable(variable) || !scale) return;
+  const taken = new Set(m.live.filter((x) => x.itemKey !== q.itemKey).map((x) => (x.item as { variable?: unknown }).variable));
+  for (const o of list(scale.options).filter(isObject)) {
+    const kind = o["kind"] ?? "substantive";
+    if (kind !== "substantive" && kind !== "other_specify") continue;
+    const name = `${variable}_${String(o["code"])}`;
+    if (name.length > 32) {
+      c.error(
+        "grid.variable_long",
+        `Row label “${name}” is longer than 32 characters`,
+        questionAt(q, "variable"),
+        "Each row is stored as the reporting label, an underscore and the option's code. Shorten the reporting label.",
+      );
+      return;
+    }
+    if (taken.has(name)) {
+      c.error(
+        "grid.variable_taken",
+        `Row label “${name}” is another question's reporting label`,
+        questionAt(q, "variable"),
+        "Each row is stored as the reporting label, an underscore and the option's code. Choose a reporting label that doesn't clash.",
+      );
+    }
   }
 }
 
@@ -756,6 +841,18 @@ function checkLimits(c: Collector, q: LiveQuestion, item: Loose, type: string, o
         if (!hasString(g["label"])) {
           c.error("question.group_label_missing", `Group “${String(key)}” has no label`, questionAt(q, "groups"), "Say what the group means.");
         }
+      }
+      break;
+    }
+    case "time_grid": {
+      const max = item["maxMinutesPerRow"];
+      if (max !== undefined && (!Number.isInteger(max) || (max as number) < 1 || (max as number) > 24 * 60)) {
+        c.error(
+          "limits.grid_max",
+          `A limit of ${String(max)} minutes a row isn't allowed`,
+          questionAt(q, "maxMinutesPerRow"),
+          "Use a whole number of minutes from 1 to 1440 (a whole day), or remove the limit.",
+        );
       }
       break;
     }
@@ -1754,6 +1851,7 @@ const GATE_RULES: { re: RegExp; code: string; plain: string }[] = [
   { re: /which is not in this release$/, code: "gate.dependency_missing", plain: "A condition or check refers to a question that is not in the survey" },
   { re: /which is asked later/, code: "gate.dependency_later", plain: "A condition or check depends on a question asked later" },
   { re: /^this composition needs engine /, code: "gate.engine_version", plain: "The survey uses features newer than its release declares" },
+  { re: /: (rows (come|from|must)|row variable |a multiple-choice question has no groups)/, code: "gate.time_grid", plain: "A time grid's rows can't be worked out" },
 ];
 
 const DOTTED_ITEM = /^[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*$/;

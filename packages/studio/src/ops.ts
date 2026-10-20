@@ -1,7 +1,7 @@
 import { narrativeProtocol, type NarrativeProtocol } from "@myself/narrative";
 import { refKeyOf } from "@myself/release/gate";
 import type { ReservedIds } from "./history.js";
-import { canonicalJson, type ItemDefinition, type LogicExpr } from "@myself/schema";
+import { canonicalJson, type ItemDefinition, type LogicExpr, type TimeGridSource } from "@myself/schema";
 import { CHOICE_TYPES, defaultTextFor, questionType, templateFor, type QuestionTypeId } from "./catalogue.js";
 import type { ArchivedPosition, ArchivedQuestion, CompositionInput, ScaleInput, StudioDraft } from "./contract.js";
 import { studioModule, studioModuleKey, studioModuleRef } from "./draft.js";
@@ -41,7 +41,7 @@ import {
   type FoundQuestion,
   type QuestionPlacementRef,
 } from "./model.js";
-import { definedQuestions, formOf, normaliseRef, placements, splitItemKey } from "./walk.js";
+import { definedQuestions, formOf, liveQuestions, normaliseRef, placements, splitItemKey } from "./walk.js";
 import {
   clone,
   componentAt,
@@ -497,6 +497,7 @@ export function addQuestion(draft: StudioDraft, req: AddQuestionRequest): { draf
   });
   if (scale) d.scales[scale.key] = scale;
   placeNewItem(d, target.refKey, item, target.component, target.where);
+  if (item.responseType === "time_grid") chooseGridSource(d, `${target.instrument}.${key}`);
   keepConsentFirst(draft, d, "add a question there");
   keepMyStoryLast(draft, d, "add a question there");
   return { draft: d, itemKey: `${target.instrument}.${key}` };
@@ -566,6 +567,7 @@ const TYPE_FIELDS: Record<ItemDefinition["responseType"], { required: string[]; 
   text_long: { required: ["minChars", "maxChars"], optional: [] },
   form_fields: { required: ["fields"], optional: [] },
   rank_group: { required: ["scale", "scaleVersion", "groups"], optional: [] },
+  time_grid: { required: ["rowsFrom"], optional: ["maxMinutesPerRow"] },
   checkbox_set: { required: ["statements"], optional: [] },
 };
 
@@ -582,6 +584,8 @@ const FIELD_ACTIONS: Record<string, string> = {
   identifying: "change whether its answer identifies someone",
   crossChecks: "change its answer checks",
   limitOptions: "change which options are offered",
+  rowsFrom: "change which options become its rows",
+  maxMinutesPerRow: "change its answer limits",
   statements: "change its statements",
   fields: "change its fields",
   groups: "change its groups",
@@ -762,6 +766,42 @@ function renameQuestion(d: StudioDraft, instrument: string, from: string, to: st
   }
 }
 
+/**
+ * The sorting or multiple-choice questions a time grid could take its rows
+ * from: those asked before it, nearest first. The editor offers these.
+ */
+export function gridSources(draft: StudioDraft, itemKey: string): { itemKey: string; item: ItemDefinition }[] {
+  const asked = liveQuestions(draft);
+  const at = asked.findIndex((q) => q.itemKey === itemKey);
+  if (at < 0) return [];
+  return asked
+    .slice(0, at)
+    .filter((q) => q.item.responseType === "rank_group" || q.item.responseType === "multi_choice")
+    .reverse()
+    .map((q) => ({ itemKey: q.itemKey, item: q.item }));
+}
+
+/** A grid's source, as rowsFrom: a sorting question's first group by default. */
+export function gridSourceRef(itemKey: string, item: ItemDefinition, group?: string): TimeGridSource {
+  const { instrument, key } = splitItemKey(itemKey);
+  const ref: TimeGridSource = { instrument, item: key, revision: item.revision };
+  if (item.responseType === "rank_group") ref.group = group ?? item.groups[0]?.key ?? "";
+  return ref;
+}
+
+/**
+ * Point a new time grid at the nearest sorting or multiple-choice question
+ * before it, so it starts out answerable; with none, it keeps pointing at
+ * itself and validation asks for one.
+ */
+function chooseGridSource(d: StudioDraft, itemKey: string): void {
+  const nearest = gridSources(d, itemKey)[0];
+  if (!nearest) return;
+  const q = live(d, itemKey);
+  if (q.item.responseType !== "time_grid") return;
+  q.item.rowsFrom = gridSourceRef(nearest.itemKey, nearest.item);
+}
+
 /** The fields a question keeps when its type changes: everything not about how it is answered. */
 const KEPT_ON_TYPE_CHANGE = [
   "revision",
@@ -841,6 +881,7 @@ export function changeQuestionType(
     d.scales[scale.key] = scale;
   }
   itemsOf(d.instruments[q.refKey])[q.formItemIndex] = item;
+  if (item.responseType === "time_grid") chooseGridSource(d, itemKey);
   // A published list stays in the draft: its key must not be reissued to different options.
   if (oldScale && !keepScale && !opts.published?.has(itemKey)) dropOrphanScale(d, oldScale);
   return { draft: d, itemKey };

@@ -23,7 +23,13 @@ export function DateControl({ item, value, onAnswer, onValidity, onSubmit }: Con
     item.minAgeYears !== undefined
       ? iso0(new Date(today.getFullYear() - item.minAgeYears, today.getMonth(), today.getDate()))
       : iso0(today); // never the future
-  const earliest = iso0(new Date(today.getFullYear() - maxAge, today.getMonth(), today.getDate()));
+  // Someone is still the oldest age until the day before their next birthday,
+  // so the earliest date is a day after (maxAge + 1) years ago.
+  const earliest = iso0(new Date(today.getFullYear() - maxAge - 1, today.getMonth(), today.getDate() + 1));
+  const range =
+    item.minAgeYears !== undefined && item.maxAgeYears !== undefined
+      ? `This survey is for people aged ${item.minAgeYears} to ${maxAge}`
+      : null;
 
   const check = (iso: string): string | null => {
     const d = new Date(`${iso}T00:00:00`);
@@ -35,12 +41,11 @@ export function DateControl({ item, value, onAnswer, onValidity, onSubmit }: Con
     if (before) age -= 1;
     if (d > now) return "That date is in the future — please check the year";
     if (item.minAgeYears !== undefined && age < item.minAgeYears) {
-      return `That would make you ${age} — please check the year you were born`;
+      return range ? `That would make you ${age}. ${range}: please check the year you were born.` : `That would make you ${age} — please check the year you were born`;
     }
     if (age > maxAge) {
-      return age > ABSOLUTE_MAX_AGE_YEARS
-        ? "Please check the year — that date is too long ago"
-        : "Please check the year you were born";
+      if (age > ABSOLUTE_MAX_AGE_YEARS) return "Please check the year — that date is too long ago";
+      return range ? `That would make you ${age}. ${range}: please check the year you were born.` : "Please check the year you were born";
     }
     return null;
   };

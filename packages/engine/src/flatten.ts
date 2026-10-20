@@ -1,4 +1,5 @@
 import type { InstrumentForm, ItemDefinition, LogicExpr, ReleaseManifest } from "@myself/schema";
+import { timeGridCondition, type GridOption } from "./timegrid.js";
 import type { PresentableUnit } from "./walker.js";
 
 /**
@@ -51,6 +52,24 @@ function pick(form: InstrumentForm, keys: string[], refKey: string): ItemDefinit
     if (!item) throw new Error(`manifest inconsistency: '${refKey}' has no question '${key}'`);
     return item;
   });
+}
+
+/**
+ * A time grid with no rows is not asked: the condition that it has one, read
+ * off the source question placed earlier in this walk. A grid whose source is
+ * not placed before it is a manifest inconsistency the publish gate refuses.
+ */
+function rowsCondition(item: ItemDefinition, earlier: readonly PresentableUnit[], manifest: ReleaseManifest): LogicExpr | undefined {
+  if (item.responseType !== "time_grid") return undefined;
+  const from = item.rowsFrom;
+  const source = earlier.find((u) => u.instrument === from.instrument && u.item.key === from.item && !u.narrative)?.item;
+  if (!source) {
+    throw new Error(`manifest inconsistency: '${item.key}' takes its rows from '${from.instrument}.${from.item}', which is not asked before it`);
+  }
+  const scaleKey = "scale" in source ? source.scale : undefined;
+  const scale = scaleKey ? (manifest.scales[scaleKey] as { options?: GridOption[] } | undefined) : undefined;
+  if (!scale?.options) throw new Error(`manifest inconsistency: '${item.key}' has no options to take rows from`);
+  return timeGridCondition(from, source, scale.options);
 }
 
 export interface FlattenedRelease {
@@ -156,7 +175,7 @@ export function flattenManifest(manifest: ReleaseManifest): FlattenedRelease {
           instrument: ref.instrument,
           sectionKey: section.key,
           item,
-          displayIf: and(componentCondition, item.displayIf),
+          displayIf: and(and(componentCondition, item.displayIf), rowsCondition(item, units, manifest)),
         });
       }
     }

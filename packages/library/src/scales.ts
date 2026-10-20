@@ -420,6 +420,15 @@ export const ehiSf5AsAdministered: ResponseScale = {
   ]),
 };
 
+/** PHQ-4 frequency anchors, coded 0–3 as published (Kroenke et al., 2009). */
+export const phq4pt: ResponseScale = {
+  key: "scale.phq_4pt",
+  version: "1.0.0",
+  name: "PHQ frequency scale (Not at all … Nearly every day, coded 0-3)",
+  direction: "ascending",
+  options: opts(["Not at all", "Several days", "More than half the days", "Nearly every day"], 0),
+};
+
 export const swemwbs5: ResponseScale = {
   key: "scale.swemwbs_5pt",
   version: "1.0.0",
@@ -855,6 +864,7 @@ export const allScales: ResponseScale[] = [
   ehiSf5Canonical,
   ehiSf5AsAdministered,
   swemwbs5,
+  phq4pt,
   sdq3Canonical,
   sdq3AsAdministered,
   rcads4,

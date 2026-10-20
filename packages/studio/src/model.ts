@@ -175,7 +175,9 @@ export const ALLOWED_FIELDS_BY_TIER: {
   readonly editable: "all";
 } = {
   locked: ["required", "allowDecline", "hint", "presentation", "a11yNote", "researcherNote", "reportingCategory"],
-  protected: ["researcherNote", "reportingCategory"],
+  // The age limits on the date of birth are each survey's own (who may take
+  // part), so they change without unlocking the identity module (D-65).
+  protected: ["researcherNote", "reportingCategory", "minAgeYears", "maxAgeYears", "minYear", "maxYear"],
   editable: "all",
 };
 
@@ -226,6 +228,8 @@ export function studioTypeOf(item: ItemDefinition, scale?: ScaleInput | null): Q
       return "form_fields";
     case "rank_group":
       return "rank_group";
+    case "time_grid":
+      return "time_grid";
   }
 }
 

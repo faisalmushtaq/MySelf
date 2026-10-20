@@ -396,6 +396,120 @@ export const macarthurSsy: InstrumentInput = {
 };
 
 // ---------------------------------------------------------------------------
+// MacArthur Scale of Subjective Social Status – adult
+// ---------------------------------------------------------------------------
+
+// The adult form, for the social media break study (not the schools survey):
+// a society ladder and a community ladder, in the wording the study supplied.
+const placeYourself = "Where would you place yourself on this ladder at this time in your life?";
+
+export const macarthurSssAdult: InstrumentInput = {
+  instrument: "macarthur_sss_adult",
+  version: "1.0",
+  name: "MacArthur Scale of Subjective Social Status – Adult Version",
+  abbreviation: "MacArthur SSS (adult)",
+  construct: "Subjective social status (in society; in one's community)",
+  citation:
+    "Adler, N. E., Epel, E. S., Castellazzo, G., & Ickovics, J. R. (2000). Relationship of subjective and objective social status with psychological and physiological functioning: preliminary data in healthy white women. Health Psychology, 19(6), 586–592.",
+  ageRange: { min: 18, max: 120 },
+  licence: {
+    status: "open",
+    holder: "SPARQ / MacArthur Network toolkit, with attribution",
+    modifiable: "yes",
+    evidence: "Openly available and free to use for non-commercial research and clinical purposes (SPARQ toolkit); confirmed by the research team 2026-10-14 (D-61).",
+    verified: true,
+  },
+  forms: [
+    {
+      language: "en-GB",
+      label: "Adult society and community ladders (10 rungs, 1 at the bottom)",
+      items: [
+        {
+          responseType: "ladder",
+          key: "society",
+          revision: 1,
+          variable: "sss_society",
+          stem: { text: "Where would you be on this ladder?" },
+          lede: {
+            text:
+              "Think of this ladder as representing where people stand in society in the UK.\n\n" +
+              "At the top are the people who are best off — those who have the most money, the most education, and the most respected jobs.\n\n" +
+              "At the bottom are the people who are worst off — those who have the least money, the least education, and the least respected jobs, or no job.\n\n" +
+              placeYourself,
+          },
+          rungs: 10,
+          lowestValue: 1,
+          topLabel: "The people who are best off",
+          bottomLabel: "The people who are worst off",
+        },
+        {
+          responseType: "ladder",
+          key: "community",
+          revision: 1,
+          variable: "sss_community",
+          stem: { text: "Where would you be on this ladder?" },
+          lede: {
+            text:
+              "Think of this ladder as representing where people stand in their communities.\n\n" +
+              "People define community in different ways. Please think about the community that is most meaningful to you.\n\n" +
+              "At the top of the ladder are the people who have the highest standing in their community. At the bottom are the people who have the lowest standing.\n\n" +
+              placeYourself,
+          },
+          rungs: 10,
+          lowestValue: 1,
+          topLabel: "The people with the highest standing",
+          bottomLabel: "The people with the lowest standing",
+        },
+      ],
+    },
+  ],
+  timeEstimates: est([60, 45]),
+  changelog: "1.0: the adult society and community ladders in the social media break study's wording; recorded 1–10, 1 at the bottom.",
+  owner: "ybm",
+};
+
+// ---------------------------------------------------------------------------
+// PHQ-4
+// ---------------------------------------------------------------------------
+
+const phq4Items: [string, string][] = [
+  ["nervous", "Feeling nervous, anxious or on edge"],
+  ["worrying", "Not being able to stop or control worrying"],
+  ["interest", "Little interest or pleasure in doing things"],
+  ["down", "Feeling down, depressed, or hopeless"],
+];
+
+export const phq4: InstrumentInput = {
+  instrument: "phq4",
+  version: "1.0",
+  name: "Patient Health Questionnaire-4",
+  abbreviation: "PHQ-4",
+  construct: "Anxiety and depression (last 2 weeks): GAD-2 and PHQ-2",
+  citation:
+    "Kroenke, K., Spitzer, R. L., Williams, J. B. W., & Löwe, B. (2009). An ultra-brief screening scale for anxiety and depression: the PHQ-4. Psychosomatics, 50(6), 613–621. https://doi.org/10.1176/appi.psy.2009.50.6.613",
+  ageRange: { min: 18, max: 120 },
+  licence: {
+    status: "open",
+    holder: "Pfizer (PHQ screeners): free to use, no permission required",
+    modifiable: "no",
+    evidence: "The PHQ screeners are free to reproduce and use; added at the social media break study's request (2026-10-20).",
+    verified: true,
+  },
+  forms: [
+    {
+      language: "en-GB",
+      label: "PHQ-4 (en-GB) — the published items and anchors, coded 0–3",
+      instructions: "Over the last two weeks, how often have you been bothered by the following problems?",
+      items: phq4Items.map(([key, text], i) => row(key, `phq4_q${i + 1}`, "", text, "scale.phq_4pt")),
+    },
+  ],
+  scoringKey: "score.phq4",
+  timeEstimates: est([45, 30]),
+  changelog: "1.0: Kroenke et al. (2009), items 1–2 anxiety (GAD-2), 3–4 depression (PHQ-2), each 0–3.",
+  owner: "ybm",
+};
+
+// ---------------------------------------------------------------------------
 // SWEMWBS
 // ---------------------------------------------------------------------------
 
@@ -850,6 +964,8 @@ export const allInstruments: InstrumentInput[] = [
   sqs,
   ehiSf,
   macarthurSsy,
+  macarthurSssAdult,
+  phq4,
   swemwbs,
   sdq25S,
   sdq25S18,

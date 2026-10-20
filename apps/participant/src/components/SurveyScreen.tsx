@@ -9,6 +9,7 @@ import {
 } from "@myself/engine";
 import type { ItemDefinition, ResponseScale } from "@myself/schema";
 import { resolveText } from "../lib/pipes.js";
+import { gridRowsFor } from "../lib/timegrid.js";
 import { dwellHintMs, wordCount, type DwellPolicy } from "../lib/timing.js";
 import { Illustration } from "./illustrations.js";
 import {
@@ -22,6 +23,7 @@ import {
   SingleChoice,
   SliderControl,
   TextControl,
+  TimeGridControl,
 } from "./controls/index.js";
 import { NarrativeStep } from "./NarrativeStep.js";
 
@@ -330,6 +332,8 @@ export function SurveyScreen(props: SurveyScreenProps) {
   const controlProps = {
     item: resolvedItem,
     scale,
+    // A time grid asks about what was chosen earlier, as the walk now stands.
+    rows: item.responseType === "time_grid" ? gridRowsFor(item, units, scales, answers).rows : undefined,
     value: record?.value,
     onAnswer: handleAnswer,
     onValidity: setDraft,
@@ -453,6 +457,7 @@ export function SurveyScreen(props: SurveyScreenProps) {
         <FormFieldsControl key={`ff-${unitKey}`} {...controlProps} />
         <RankGroupControl key={`rg-${unitKey}`} {...controlProps} />
         <CheckboxSetControl key={`cb-${unitKey}`} {...controlProps} />
+        <TimeGridControl key={`tg-${unitKey}`} {...controlProps} />
 
         {inconsistency && (
           <p className="error inconsistency" role="alert">

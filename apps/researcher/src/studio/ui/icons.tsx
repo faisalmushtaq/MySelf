@@ -64,6 +64,7 @@ export type IconName =
   | "type-ladder"
   | "type-fields"
   | "type-rank"
+  | "type-time"
   | "welcome"
   | "flag"
   | "story"
@@ -156,6 +157,7 @@ const paths: Record<IconName, JSX.Element> = {
   "type-ladder": <path d="M6 2v16M14 2v16M6 5h8M6 9h8M6 13h8" />,
   "type-fields": <path d="M3 4h14v4H3zM3 12h14v4H3z" />,
   "type-rank": <path d="M3 5h3M3 10h3M3 15h3M9 5h8M9 10h6M9 15h4" />,
+  "type-time": <path d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16zM10 5.5V10l3 2" />,
   welcome: <path d="M3 17V8l7-5 7 5v9h-5v-5H8v5z" />,
   flag: <path d="M5 18V3M5 4h10l-2 3.5L15 11H5" />,
   story: <path d="M3 4h14v9H9l-4 3.5V13H3zM6.5 7.5h7M6.5 10h4.5" />,
