@@ -18,6 +18,7 @@ export const TYPE_ICONS: Record<QuestionTypeId, IconName> = {
   ladder: "type-ladder",
   form_fields: "type-fields",
   rank_group: "type-rank",
+  time_grid: "type-time",
 };
 
 export function typeLabel(id: QuestionTypeId): string {

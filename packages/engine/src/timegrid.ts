@@ -25,7 +25,7 @@ export interface GridOption {
 /** The parts of the source question the rows depend on. */
 export interface GridSourceItem {
   responseType: string;
-  groups?: readonly { key: string }[] | undefined;
+  groups?: readonly { key: string; ranked?: boolean | undefined }[] | undefined;
 }
 
 export interface TimeGridRow {
@@ -56,8 +56,10 @@ export function timeGridCandidates(options: readonly GridOption[]): GridOption[]
 }
 
 /**
- * The rows for this answer to the source question, in the source's order.
- * Empty when the source was not answered, or nothing qualifying was chosen.
+ * The rows for this answer to the source question: in the order the
+ * participant ranked them when the group is ranked ("most used first"), else
+ * in the source's display order. Empty when the source was not answered, or
+ * nothing qualifying was chosen.
  */
 export function timeGridRows(
   from: TimeGridSource,
@@ -73,9 +75,14 @@ export function timeGridRows(
     if (source.responseType === "multi_choice" && answer.kind === "multi") return answer.codes.includes(code);
     return false;
   };
-  return timeGridCandidates(options)
-    .filter((o) => chosen(o.code))
-    .map((o) => ({ code: o.code, label: o.label }));
+  const rows = timeGridCandidates(options).filter((o) => chosen(o.code));
+  const ranked = source.groups?.find((g) => g.key === from.group)?.ranked === true;
+  if (ranked && answer.kind === "group_rank") {
+    const rank = (code: number) => answer.assignments[code]?.rank ?? Number.MAX_SAFE_INTEGER;
+    // A stable sort: unranked rows keep the source's order, after the ranked ones.
+    rows.sort((a, b) => rank(a.code) - rank(b.code));
+  }
+  return rows.map((o) => ({ code: o.code, label: o.label }));
 }
 
 /**
@@ -125,6 +132,8 @@ export interface TimeEntry {
   minutes: number | null;
   /** What is wrong with the entry, in words a participant can act on. */
   error?: string;
+  /** Which box is wrong; "both" when it is the total. */
+  field?: "hours" | "minutes" | "both";
 }
 
 const WHOLE = /^\d+$/;
@@ -137,15 +146,16 @@ export function readTimeEntry(hours: string, minutes: string, maxMinutes: number
   const h = hours.trim();
   const m = minutes.trim();
   if (h === "" && m === "") return { minutes: null };
-  if ((h !== "" && !WHOLE.test(h)) || (m !== "" && !WHOLE.test(m))) {
-    return { minutes: null, error: "Please use whole numbers" };
-  }
+  if (h !== "" && !WHOLE.test(h)) return { minutes: null, error: "Please use whole numbers", field: "hours" };
+  if (m !== "" && !WHOLE.test(m)) return { minutes: null, error: "Please use whole numbers", field: "minutes" };
   const hn = h === "" ? 0 : Number(h);
   const mn = m === "" ? 0 : Number(m);
-  if (hn > 24) return { minutes: null, error: "Hours must be between 0 and 24" };
-  if (mn > 59) return { minutes: null, error: "Minutes must be between 0 and 59" };
+  if (hn > 24) return { minutes: null, error: "Hours must be between 0 and 24", field: "hours" };
+  if (mn > 59) return { minutes: null, error: "Minutes must be between 0 and 59", field: "minutes" };
   const total = hn * 60 + mn;
-  if (total > maxMinutes) return { minutes: null, error: `Please enter no more than ${formatMinutes(maxMinutes)} in total` };
+  if (total > maxMinutes) {
+    return { minutes: null, error: `Please enter no more than ${formatMinutes(maxMinutes)} in total`, field: "both" };
+  }
   return { minutes: total };
 }
 

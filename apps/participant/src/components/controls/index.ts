@@ -21,3 +21,4 @@ export { TextControl } from "./TextControl.js";
 export { FormFieldsControl } from "./FormFieldsControl.js";
 export { RankGroupControl } from "./RankGroupControl.js";
 export { CheckboxSetControl } from "./CheckboxSetControl.js";
+export { TimeGridControl } from "./TimeGridControl.js";

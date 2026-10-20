@@ -26,7 +26,7 @@ const fromRank = { instrument: "apps", item: "owned", revision: 1, group: "have"
 const fromMulti = { instrument: "apps", item: "ticked", revision: 1 };
 
 describe("time grid rows", () => {
-  it("lists the options placed in the group, in the source's display order", () => {
+  it("lists the options placed in the group, in the source's display order when the group is not ranked", () => {
     const answer = {
       kind: "group_rank" as const,
       assignments: { 1: { group: "have", rank: 1 }, 2: { group: "dont_have" }, 3: { group: "have", rank: 2 } },
@@ -35,6 +35,15 @@ describe("time grid rows", () => {
       { code: 3, label: "Alpha" },
       { code: 1, label: "Bravo" },
     ]);
+  });
+
+  it("lists a ranked group's options in the participant's order", () => {
+    const ranked = { responseType: "rank_group", groups: [{ key: "have", ranked: true }, { key: "dont_have" }] };
+    const answer = {
+      kind: "group_rank" as const,
+      assignments: { 1: { group: "have", rank: 1 }, 2: { group: "have", rank: 3 }, 3: { group: "have", rank: 2 } },
+    };
+    expect(timeGridRows(fromRank, ranked, options, answer).map((r) => r.label)).toEqual(["Bravo", "Alpha", "Charlie"]);
   });
 
   it("lists ticked options for a multiple choice, never 'none of these'", () => {
@@ -59,7 +68,7 @@ describe("time grid entry", () => {
     expect(readTimeEntry("1.5", "", 1440).error).toMatch(/whole numbers/);
     expect(readTimeEntry("-1", "", 1440).error).toMatch(/whole numbers/);
     expect(readTimeEntry("25", "", 1440).error).toMatch(/0 and 24/);
-    expect(readTimeEntry("1", "60", 1440).error).toMatch(/0 and 59/);
+    expect(readTimeEntry("1", "60", 1440)).toMatchObject({ error: expect.stringMatching(/0 and 59/), field: "minutes" });
     expect(readTimeEntry("24", "1", 1440).error).toMatch(/no more than 24 h/);
     expect(readTimeEntry("3", "0", 120).error).toMatch(/no more than 2 h/);
   });

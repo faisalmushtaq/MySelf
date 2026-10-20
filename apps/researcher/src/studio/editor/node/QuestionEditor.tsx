@@ -27,6 +27,7 @@ import { FieldsEditor, GroupsEditor, StatementsEditor } from "./ListEditors.js";
 import { identityText, lockedBanner, protectedBanner, publishedPending, questionLock, tierAllows, typeLock, type QuestionLock } from "./locks.js";
 import { OptionsEditor } from "./OptionsEditor.js";
 import { pipeUses } from "./pipes.js";
+import { TimeGridEditor } from "./TimeGridEditor.js";
 import { TypePickerDialog } from "./TypePicker.js";
 import { TYPE_ICONS, typeLabel } from "./types.js";
 import { unlessUnchanged } from "./unchanged.js";
@@ -532,6 +533,8 @@ function AnswerEditor({
           <GroupsEditor itemKey={itemKey} groups={item.groups} editable={can("groups")} issues={issues.byField.get("groups")} />
         </>
       );
+    case "time_grid":
+      return <TimeGridEditor itemKey={itemKey} item={item} issues={issues} write={write} editable={can("rowsFrom")} />;
     case "checkbox_set":
       return (
         <>
