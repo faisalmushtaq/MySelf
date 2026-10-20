@@ -5,6 +5,7 @@ import { canonicalJson, hashHex, sha256, STUDY_ID_PATTERN, type ReleaseManifest 
 import {
   editTier,
   extractDraft,
+  openInLibrary,
   type DraftDoc,
   type Issue,
   type PublishedPointerDoc,
@@ -195,7 +196,10 @@ export { lockBaseline } from "@myself/studio";
  * on the SDQ would find every lock check skipped. A licence is not the
  * editor's to change. Any instrument that a published or originating release
  * froze as locked must still be locked in the draft, whatever it now says
- * about itself; this is checked here, on the server, for every publish.
+ * about itself; this is checked here, on the server, for every publish. The
+ * one exception is a licence the instrument library itself now records as
+ * modifiable (D-61, e.g. the MacArthur ladders): the library is code, reviewed
+ * like any other, so taking up its licence is not the editor changing one.
  */
 export function licenceEscapes(draft: StudioDraft, published: Iterable<StudioDraft | Record<string, unknown>>): Issue[] {
   const lockedKeys = new Set<string>();
@@ -212,6 +216,9 @@ export function licenceEscapes(draft: StudioDraft, published: Iterable<StudioDra
     const d = def as { instrument?: unknown; name?: unknown; licence?: { modifiable?: unknown } } | null;
     if (!d || typeof d.instrument !== "string" || !lockedKeys.has(d.instrument)) continue;
     if (d.licence?.modifiable !== "yes") continue;
+    // The instrument library (code, not the editor) records it as openly
+    // licensed and modifiable (D-61), as "Use the library's licence" applies.
+    if (openInLibrary(d.instrument)) continue;
     const name = typeof d.name === "string" && d.name ? d.name : d.instrument;
     issues.push(
       problem(

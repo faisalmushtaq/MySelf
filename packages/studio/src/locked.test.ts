@@ -199,6 +199,28 @@ describe("lockedDifferences", () => {
   });
 });
 
+describe("bringing a locked instrument up to the library's licensed version (D-62)", () => {
+  // The library's copy: the published one with item 3 corrected.
+  const corrected = edit((d) => (sdqItems(d)[2]!.stem.text = "I get a lot of headaches, stomach-aches or sickness (corrected)"));
+  const library = { reference: { [SDQ]: corrected.instruments[SDQ]! }, referenceScales: corrected.scales, referenceScoring: corrected.scoring };
+
+  it("accepts a draft that matches the library exactly", () => {
+    expect(lockedDifferences(corrected, baseline, library)).toEqual([]);
+  });
+
+  it("still refuses any other change, even one that also differs from the library", () => {
+    const freehand = edit((d) => (sdqItems(d)[2]!.stem.text = "Something else entirely"));
+    expect(lockedDifferences(freehand, baseline, library).map((x) => x.change)).toEqual(["question"]);
+  });
+
+  it("still checks the answer options against the library", () => {
+    const relabelled = structuredClone(corrected);
+    const scaleKey = Object.keys(relabelled.scales).find((k) => k.startsWith("scale.sdq"))!;
+    relabelled.scales[scaleKey]!.options[0]!.label = "Relabelled";
+    expect(lockedDifferences(relabelled, baseline, library).map((x) => x.change)).toContain("scale");
+  });
+});
+
 describe("protectedDifferences", () => {
   const identityItems = (d: StudioDraft) => (d.instruments[IDENTITY] as Loose).forms[0].items as Loose[];
   const consentItems = (d: StudioDraft) => (d.instruments[CONSENT] as Loose).forms[0].items as Loose[];

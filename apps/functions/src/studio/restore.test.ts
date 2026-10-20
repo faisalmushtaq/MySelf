@@ -13,6 +13,7 @@ import {
 } from "@myself/studio";
 import { bundledManifests } from "../releases.js";
 import { authorsOf, bumpTaken } from "./publish.js";
+import { openInLibrary } from "@myself/studio";
 import { assetEscapes, identityIssues, licenceEscapes, lockBaseline } from "./store.js";
 import { mergeRestore } from "./versions.js";
 
@@ -189,12 +190,21 @@ describe("what the server refuses beyond Studio validation", () => {
   it("a licensed instrument whose licence the draft now says may be modified", () => {
     const live = draftOf("7.3.0");
     const draft = structuredClone(live);
-    const [refKey, locked] = Object.entries(draft.instruments).find(([, d]) => d.licence.modifiable !== "yes")!;
+    const [refKey, locked] = Object.entries(draft.instruments).find(([, d]) => d.licence.modifiable !== "yes" && !openInLibrary(d.instrument))!;
     locked.licence = { ...locked.licence, modifiable: "yes" };
     const issues = licenceEscapes(draft, [live]);
     expect(issues).toHaveLength(1);
     expect(issues[0]).toMatchObject({ severity: "error", code: "locked.licence_changed", location: { refKey } });
     expect(licenceEscapes(live, [live])).toEqual([]);
+  });
+
+  it("but not a licence the instrument library now records as modifiable (D-61)", () => {
+    const live = draftOf("7.3.0");
+    const draft = structuredClone(live);
+    const ladder = Object.values(draft.instruments).find((d) => d.instrument === "macarthur_ssy")!;
+    expect(ladder.licence.modifiable).not.toBe("yes");
+    ladder.licence = { ...ladder.licence, modifiable: "yes" };
+    expect(licenceEscapes(draft, [live])).toEqual([]);
   });
 
   it("a file pin no known release has, such as a different postcode list", () => {

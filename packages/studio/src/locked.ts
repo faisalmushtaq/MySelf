@@ -601,11 +601,19 @@ export function lockedDifferences(draft: StudioDraft, baseline: StudioDraft, opt
   for (const [refKey, def] of Object.entries(draft.instruments ?? {})) {
     if (!isLocked(def, refKey, draft.unlocked)) continue;
     const base = baseline.instruments?.[refKey];
+    const known = options.reference?.[refKey];
     if (base) {
+      // Brought up to the instrument library's licensed version exactly (the
+      // library is reviewed code: D-62 put RCADS item 17 back to its published
+      // wording), as adding it afresh from the library would. Anything else
+      // that differs from the published version is an edit, and refused.
+      if (known && lockedFingerprint(def) === lockedFingerprint(known) && lockedFingerprint(def) !== lockedFingerprint(base)) {
+        out.push(...introducedRegistries(refKey, def, draft, baseline, options));
+        continue;
+      }
       out.push(...compareDefinitions(refKey, def, base, draft, baseline, { tier: "locked", allowed: LOCKED_ALLOWED_FIELDS }));
       continue;
     }
-    const known = options.reference?.[refKey];
     if (known && lockedFingerprint(def) === lockedFingerprint(known)) {
       out.push(...introducedRegistries(refKey, def, draft, baseline, options));
       continue;
