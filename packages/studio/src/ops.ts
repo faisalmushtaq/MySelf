@@ -1651,15 +1651,17 @@ export function setMyStory(draft: StudioDraft, protocol: NarrativeProtocol | nul
 export const MIN_UNLOCK_REASON = 20;
 
 /**
- * Open a protected module for editing, recording who, when and why. The reason
- * is kept verbatim and goes into the audit log with the draft.
+ * Open a protected module, or a licensed questionnaire, for editing, recording
+ * who, when and why. The reason is kept verbatim and goes into the audit log
+ * with the draft.
  */
 export function unlockModule(draft: StudioDraft, instrumentKey: string, req: OpActor & { reason: string }): { draft: StudioDraft } {
   const protection = protectedModule(instrumentKey);
-  if (!protection) throw new StudioOpError(`“${instrumentKey}” is not protected, so it does not need unlocking.`, "invalid");
+  const licensed = instrumentDef(draft, instrumentKey)?.def.licence.modifiable !== undefined && instrumentDef(draft, instrumentKey)?.def.licence.modifiable !== "yes";
+  if (!protection && !licensed) throw new StudioOpError(`“${instrumentKey}” is not locked, so it does not need unlocking.`, "invalid");
   if (req.reason.trim().length < MIN_UNLOCK_REASON) {
     throw new StudioOpError(
-      `Say in a sentence why this change is ${protection.reason === "ethics" ? "covered by the ethics approval" : "safe for participant linkage"} ` +
+      `Say in a sentence why ${!protection ? "its wording needs to change" : `this change is ${protection.reason === "ethics" ? "covered by the ethics approval" : "safe for participant linkage"}`} ` +
         `(at least ${MIN_UNLOCK_REASON} characters). It is kept with the survey's history.`,
       "invalid",
     );

@@ -587,16 +587,14 @@ describe("licensed, protected and identifying content", () => {
     expectIssue(validateDraft(relicensed, { baseline: live }), "locked.split", { kind: "block", field: "items" });
   });
 
-  it("a validated instrument in a survey never published is held to the library, when it is given", () => {
+  it("a questionnaire in a survey never published is never refused for its licence", () => {
     const locked = Object.fromEntries(Object.entries(live.instruments).filter(([, def]) => def.licence.modifiable !== "yes"));
     const library: ValidationContext = { reference: locked, referenceScales: live.scales, referenceScoring: live.scoring };
     expect(errors(validateDraft(live, library))).toEqual([]);
     const reworded = edit((d) => (item(d, "sdq25_s.q3").stem.text = "I get headaches"));
-    expectIssue(validateDraft(reworded, library), "locked.introduced", { kind: "block", refKey: "sdq25_s@1.0/en-GB/self/standard" });
+    expect(errors(validateDraft(reworded, library)).filter((i) => i.code.startsWith("locked."))).toEqual([]);
     const relabelled = edit((d) => (d.scales["scale.sdq_3pt"]!.options[2]!.label = "Clearly True"));
-    expectIssue(validateDraft(relabelled, library), "locked.scale", { itemKey: "sdq25_s.q1" });
-    // Without the library nothing can be said, as before.
-    expect(errors(validateDraft(reworded))).toEqual([]);
+    expect(errors(validateDraft(relabelled, library)).filter((i) => i.code.startsWith("locked."))).toEqual([]);
   });
 
   it("changing the consent wording needs no unlock (D-61), but taking the consent out can't be published", () => {

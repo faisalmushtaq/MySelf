@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { initializeApp, applicationDefault, cert } from "firebase-admin/app";
 import { FieldValue, getFirestore } from "firebase-admin/firestore";
-import { diffDrafts, extractDraft, parseDraft, serialiseDraft, suggestBump } from "@myself/studio";
+import { diffDrafts, extractDraft, lockVouchers, parseDraft, serialiseDraft, suggestBump, validateDraft } from "@myself/studio";
 
 /**
  * Publish the repository's version of a survey from MySelf Studio (D-58).
@@ -173,6 +173,13 @@ const next = {
 };
 
 if (dryRun) {
+  // The publish's own checks, against the live version, so a dry run that
+  // passes is not followed by a refused publish. (The publish still runs them
+  // all, with every release the Studio knows, so this is a preview of them.)
+  const issues = validateDraft(next, { baseline: live, ...lockVouchers({ releases: [live], library: true, draft: next }) });
+  const errors = issues.filter((i) => i.severity === "error");
+  for (const e of errors) console.log(`  would be refused: ${e.code} ${e.message}${e.location?.itemKey ? ` (${e.location.itemKey})` : e.location?.refKey ? ` (${e.location.refKey})` : ""}`);
+  if (errors.length > 0) fail(`The publish would be refused: ${errors.length} problem${errors.length === 1 ? "" : "s"}, listed above.`);
   console.log(`Dry run: would save draft revision ${revision + 1} and publish ${surveyId} ${version}.`);
   process.exit(0);
 }

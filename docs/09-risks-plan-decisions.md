@@ -582,3 +582,27 @@ by owners only, and all three shared-iPad protections.
 **Deploys.** The Firebase and Pages deploys run only after CI has passed on
 main; runners are pinned to ubuntu-24.04; privileged workflows run from main
 only.
+
+### Licences never block: lock, unlock, and library variants (2026-10-20, D-64)
+
+**Asked.** "Do not block anything about licenses because it's not true. You can
+lock and then unlock them if we need to edit. And they can have their own
+variants of versions. Eg I make some wording changes to SES should be saved as
+an updated copy in the library." The licence rules had refused the 13.0.0
+publish twice (the MacArthur licence, then RCADS and the EHI-SF brought up to
+the library's wording).
+
+**Changed.** Supersedes the licence parts of D-08, D-57 and D-61.
+- A licensed questionnaire starts locked, so its wording isn't changed by
+  accident. **Unlock…** asks why (kept with the survey's history, as for the
+  consent and identity modules); unlocked, its wording, options and order are
+  edited like any block; **Lock again** keeps the edits.
+- No licence check refuses anything: not the server's publish, not the
+  release gate (`permission_required` / `blocked`), not adding a questionnaire
+  to a survey (from the library, another survey or a saved copy). Every
+  licence is shown on the library shelf. The licence stays recorded with each
+  questionnaire, for the team to manage.
+- An edited questionnaire can be saved to the library as its own copy (a
+  variant) and used in other surveys.
+- A locked questionnaire brought up to the library's version exactly is
+  accepted without unlocking.

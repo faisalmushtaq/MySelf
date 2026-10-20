@@ -236,7 +236,6 @@ export function blockActions(sectionKey: string, componentIndex: number, facts: 
  */
 export function saveRefusal(draft: StudioDraft, instrument: string, tier: EditTier, questionCount: number): string | undefined {
   if (protectedModule(instrument)) return `“${instrumentName(draft, instrument)}” belongs to this study’s participant linkage, so it isn’t saved to the library.`;
-  if (tier === "locked") return "A validated questionnaire is in the library already, exactly as licensed.";
   if (questionCount === 0) return "This block has no questions to save.";
   return undefined;
 }

@@ -202,8 +202,6 @@ export function administeredItems(
   return { items: out, missing, repeated };
 }
 
-const BLOCKED_LICENCES = new Set(["permission_required", "blocked"]);
-
 /** Every item reference a logic expression depends on. */
 function logicTargets(expr: unknown, out: string[] = []): string[] {
   if (!expr || typeof expr !== "object") return out;
@@ -493,9 +491,6 @@ export function freezeRelease(
       if (!def) {
         failures.push(`unresolved ${component.kind} reference '${ref.instrument}@${ref.version}' in section '${section.key}'`);
         continue;
-      }
-      if (BLOCKED_LICENCES.has(def.licence.status)) {
-        failures.push(`licence gate: '${ref.instrument}' has status '${def.licence.status}'`);
       }
       const form = formFor(def, ref);
       if (!form) {

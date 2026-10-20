@@ -153,7 +153,9 @@ export function instrumentName(draft: StudioDraft, instrumentKey: string): strin
  */
 export function editTier(draft: StudioDraft, instrumentKey: string): EditTier {
   const found = instrumentDef(draft, instrumentKey);
-  if (found && found.def.licence.modifiable !== "yes") return "locked";
+  // Licensed questionnaires start locked, so nobody changes one by accident,
+  // and are unlocked with a recorded reason to edit them (as consent is).
+  if (found && found.def.licence.modifiable !== "yes") return isUnlocked(draft, instrumentKey) ? "editable" : "locked";
   if (protectedModule(instrumentKey) && !isUnlocked(draft, instrumentKey)) return "protected";
   return "editable";
 }

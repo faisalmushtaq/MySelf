@@ -117,8 +117,8 @@ export function isUnlocked(unlocked: StudioDraft["unlocked"] | undefined, instru
 export function editTier(def: unknown, unlocked: StudioDraft["unlocked"] | undefined): EditTier {
   if (!def || typeof def !== "object") return "editable";
   const d = def as { instrument?: unknown; licence?: { modifiable?: unknown } };
-  if (d.licence?.modifiable !== "yes") return "locked";
   const key = typeof d.instrument === "string" ? d.instrument : "";
+  if (d.licence?.modifiable !== "yes") return isUnlocked(unlocked, key) ? "editable" : "locked";
   if (PROTECTED_INSTRUMENTS.includes(key) && !isUnlocked(unlocked, key)) return "protected";
   return "editable";
 }
@@ -183,8 +183,9 @@ export function lockedTest(
     if (key && licenceLocked(def) && !openInLibrary(key)) instruments.add(key);
   }
   return (def, refKey, unlocked) => {
-    if (editTier(def, unlocked) === "locked" || refKeys.has(refKey)) return true;
     const key = instrumentKeyOf(def);
+    if (key !== null && isUnlocked(unlocked, key)) return false;
+    if (editTier(def, unlocked) === "locked" || refKeys.has(refKey)) return true;
     return key !== null && instruments.has(key);
   };
 }
@@ -376,13 +377,13 @@ function compareDefinitions(
   const name = instrumentLabel(now, instrument);
   const why =
     options.tier === "locked"
-      ? `${name} is a licensed, validated instrument, so it must be administered exactly as published`
+      ? `${name} is a published questionnaire, locked so its wording isn't changed by accident`
       : `${name} is protected (the details participant linkage relies on), so it can only change after it has been unlocked with a recorded reason`;
   // Short lines don't name the instrument: its block, or its question, is the heading they sit under.
   const kind = options.tier === "locked" ? "a licensed instrument" : "a protected module";
   const fix =
     options.tier === "locked"
-      ? "Undo the change. You can still move the block, show it conditionally, change whether answers are required, and edit help text and layout."
+      ? "Undo the change, or unlock the questionnaire and record why the change is needed."
       : "Undo the change, or unlock the module and record why the change is needed.";
 
   if (canonicalJson(stripped(now, options.allowed)) !== canonicalJson(stripped(then, options.allowed))) {
@@ -601,32 +602,21 @@ export function lockedDifferences(draft: StudioDraft, baseline: StudioDraft, opt
   for (const [refKey, def] of Object.entries(draft.instruments ?? {})) {
     if (!isLocked(def, refKey, draft.unlocked)) continue;
     const base = baseline.instruments?.[refKey];
+    const known = options.reference?.[refKey];
     if (base) {
+      // Brought up to the instrument library's licensed version exactly (the
+      // library is reviewed code: D-62 put RCADS item 17 back to its published
+      // wording), as adding it afresh from the library would. Anything else
+      // that differs from the published version is an edit, and refused.
+      if (known && lockedFingerprint(def) === lockedFingerprint(known) && lockedFingerprint(def) !== lockedFingerprint(base)) {
+        out.push(...introducedRegistries(refKey, def, draft, baseline, options));
+        continue;
+      }
       out.push(...compareDefinitions(refKey, def, base, draft, baseline, { tier: "locked", allowed: LOCKED_ALLOWED_FIELDS }));
       continue;
     }
-    const known = options.reference?.[refKey];
-    if (known && lockedFingerprint(def) === lockedFingerprint(known)) {
-      out.push(...introducedRegistries(refKey, def, draft, baseline, options));
-      continue;
-    }
-    const name = instrumentLabel(def, refKey);
-    const at = { instrument: String((def as { instrument?: unknown }).instrument ?? refKey), refKey, change: "introduced" as const };
-    out.push(
-      known
-        ? difference(
-            at,
-            `${name} differs from the licensed version in the instrument library.`,
-            "Differs from the licensed version in the library",
-            `Validated instruments such as ${name} must be used exactly as licensed; add it again from the library.`,
-          )
-        : difference(
-            at,
-            `${name} is a licensed, validated instrument that is not in the published version this draft started from, and nothing shows its content is the licensed one.`,
-            "A licensed instrument can't be added by editing",
-            `${name} isn't in the published version this draft started from, and nothing shows its content is the licensed one. Validated instruments can only be added unchanged from the instrument library.`,
-          ),
-    );
+    // Not in the published version (added from the library, a saved variant
+    // or another survey): a licence never stops a questionnaire being used.
   }
   return out;
 }

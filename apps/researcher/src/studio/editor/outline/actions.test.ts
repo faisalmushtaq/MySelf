@@ -241,10 +241,11 @@ describe("the library in the menus (D-57)", () => {
     for (const s of outline(d).sections) expect(find(sectionActions(s.key, facts(d)), "add-from-library").disabled).toBeUndefined();
   });
 
-  it("saves only editable blocks to the library, and says why not otherwise", () => {
+  it("saves blocks to the library, licensed questionnaires included, and says why not otherwise", () => {
     const d = live();
     expect(find(blockActions("gaming", 0, facts(d)), "save-to-library").disabled).toBeUndefined();
-    expect(find(blockActions("wellbeing", 1, facts(d)), "save-to-library").disabled).toMatch(/validated questionnaire is in the library already/);
+    // A licensed questionnaire is saved as the library's own copy (a variant).
+    expect(find(blockActions("wellbeing", 1, facts(d)), "save-to-library").disabled).toBeUndefined();
     // The consent is the study's own (D-61), so it can be saved like any module.
     expect(find(blockActions("welcome", 0, facts(d)), "save-to-library").disabled).toBeUndefined();
     // Unlocked or not, the identity module belongs to its study.

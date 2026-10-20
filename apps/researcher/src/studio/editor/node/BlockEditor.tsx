@@ -41,8 +41,8 @@ import { relock, UnlockDialog, unlockedText } from "./UnlockDialog.js";
 const LICENCE_STATUS: Record<string, string> = {
   open: "Open",
   permission_held: "Permission held",
-  permission_required: "Permission required — can't be published until it is held",
-  blocked: "Blocked — can't be published",
+  permission_required: "Permission to be confirmed with the licence holder",
+  blocked: "Marked as not for use — check with the licence holder",
 };
 
 const MODIFIABLE: Record<string, string> = {
@@ -130,15 +130,19 @@ export function BlockEditor({ sectionKey, componentIndex }: BlockRef) {
         info={
           licenceUpdate
             ? "The instrument library now lists this questionnaire as openly licensed, so its wording may be changed. Use the library's licence to edit it here; the change is kept with the survey's history."
-            : "Its wording, options, codes and question order are fixed by its licence and by the evidence it was validated on. You can move the whole block, show it only to some participants, remove it whole, and make each question required or not."
+            : "It is locked so its wording, options and question order aren't changed by accident. Unlock it, saying why, to edit it. You can always move the whole block, show it only to some participants, remove it whole, and make each question required or not."
         }
-        infoLabel="the licence"
+        infoLabel="the lock"
         actions={
           licenceUpdate ? (
             <Button size="sm" variant="secondary" icon="unlock" onClick={adoptLicence} disabled={!ctx.canEdit}>
               Use the library's licence
             </Button>
-          ) : undefined
+          ) : (
+            <Button size="sm" variant="secondary" icon="unlock" onClick={() => setUnlocking(true)} disabled={!ctx.canEdit}>
+              Unlock…
+            </Button>
+          )
         }
       />
     ) : tier === "protected" && protection ? (
@@ -152,7 +156,7 @@ export function BlockEditor({ sectionKey, componentIndex }: BlockRef) {
           </Button>
         }
       />
-    ) : protection && unlocked ? (
+    ) : (protection || def?.licence.modifiable !== "yes") && unlocked ? (
       <LockBanner
         tone="accent"
         icon="unlock"

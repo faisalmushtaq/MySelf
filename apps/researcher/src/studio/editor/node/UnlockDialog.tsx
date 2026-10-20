@@ -22,9 +22,11 @@ export function UnlockDialog({ instrument, onClose }: { instrument: string; onCl
   const reasonId = useId();
   const ackId = useId();
   const countId = useId();
-  if (!protection) return null;
   const name = instrumentName(ctx.draft, instrument);
-  const ethics = protection.reason === "ethics";
+  // A licensed questionnaire (no protection record) is locked only so it isn't
+  // changed by accident: unlocking it asks why, like a protected module.
+  const licensed = !protection;
+  const ethics = protection?.reason === "ethics";
   const remaining = MIN_UNLOCK_REASON - reason.trim().length;
   const ready = remaining <= 0 && acknowledged;
 
@@ -45,7 +47,13 @@ export function UnlockDialog({ instrument, onClose }: { instrument: string; onCl
       // landed on its Close button, so someone who opened this from the
       // keyboard and began typing their reason closed it with the first space.
       initialFocus={`#${CSS.escape(reasonId)}`}
-      description={<p className="stn-flush">{protection.explanation}</p>}
+      description={
+        <p className="stn-flush">
+          {licensed
+            ? "This is a published questionnaire. It is locked so its wording isn't changed by accident. Unlocked, its wording, answer options and order can be edited in this survey. To use the edited version in other surveys, save it to the library as its own copy."
+            : protection.explanation}
+        </p>
+      }
       footer={
         <>
           <Button variant="secondary" onClick={onClose}>
@@ -59,7 +67,7 @@ export function UnlockDialog({ instrument, onClose }: { instrument: string; onCl
     >
       <div className="stn-field">
         <label className="stn-label" htmlFor={reasonId}>
-          {ethics ? "Why is this change covered by the ethics approval?" : "Why is this change safe for participant linkage?"}
+          {licensed ? "Why does its wording need to change?" : ethics ? "Why is this change covered by the ethics approval?" : "Why is this change safe for participant linkage?"}
         </label>
         <textarea
           id={reasonId}
@@ -69,7 +77,9 @@ export function UnlockDialog({ instrument, onClose }: { instrument: string; onCl
           onChange={(e) => setReason(e.target.value)}
           aria-describedby={countId}
           placeholder={
-            ethics
+            licensed
+              ? "For example: Rewording the ladder explanations so they read better for this age group."
+              : ethics
               ? "For example: Correcting a typo in statement 2, approved as a minor amendment under PSCETHS-1449 on 12 Sep."
               : "For example: Rewording the hint only; the answers and their format stay exactly the same."
           }
@@ -83,7 +93,9 @@ export function UnlockDialog({ instrument, onClose }: { instrument: string; onCl
       <div className="stn-check">
         <input id={ackId} type="checkbox" checked={acknowledged} onChange={(e) => setAcknowledged(e.target.checked)} />
         <label htmlFor={ackId}>
-          {ethics
+          {licensed
+            ? "I understand that edited wording makes this the study's own version of the questionnaire, and that this is recorded with the survey."
+            : ethics
             ? "I confirm this change is covered by the study's ethics approval, and that participants will consent to the wording as changed."
             : "I confirm this change keeps participant linkage working: the same person will give the same answers, so their sittings still link together."}
         </label>
@@ -101,8 +113,8 @@ export function unlockedText(draft: StudioDraft, instrument: string): string | n
   return `Unlocked by ${unlock.by} on ${formatDateTime(Number.isNaN(when.getTime()) ? null : when)}: “${unlock.reason}”. Changes made while it is open stay when it is locked again.`;
 }
 
-/** Lock a protected module again. Changes made while it was open stay. */
+/** Lock a protected module or questionnaire again. Changes made while it was open stay. */
 export function relock(ctx: ReturnType<typeof useEditor>, instrument: string): void {
   const name = instrumentName(ctx.draft, instrument);
-  if (ctx.run(`Lock ${name} again`, (d) => relockModule(d, instrument).draft)) ctx.announce(`${name} is protected again.`);
+  if (ctx.run(`Lock ${name} again`, (d) => relockModule(d, instrument).draft)) ctx.announce(`${name} is locked again.`);
 }

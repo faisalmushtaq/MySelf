@@ -12,6 +12,7 @@ export {
   lockBaseline,
   lockedDifferences,
   lockedFingerprint,
+  openInLibrary,
   protectedDifferences,
   type LockedChange,
   type LockedDifference,

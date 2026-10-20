@@ -203,12 +203,12 @@ describe("saved modules, through the callables", () => {
     expect((await db.collection(paths.studioAudit(FUTURE)).where("action", "==", "library.module_saved").get()).size).toBe(1);
   });
 
-  it("refuse a licensed questionnaire or the identity module, writing nothing", async () => {
-    const locked = await refusalOf(callAs(studioLibrarySaveModule, ED, saveRequest({ fragment: validatedFragment(SDQ2) })));
-    expect(issueCodes(locked)).toEqual(["piece.locked"]);
+  it("refuse the identity module, writing nothing, but save a licensed questionnaire as the library's own copy (D-64)", async () => {
     const identity = fragmentFromDraft(extractDraft(R800.raw), { kind: "block", sectionKey: "about_you", componentIndex: 0 }, fromRelease(YBM, "8.0.0", R800.manifest.hash!));
     expect(issueCodes(await refusalOf(callAs(studioLibrarySaveModule, ED, saveRequest({ fragment: identity }))))).toContain("piece.protected");
     expect((await db.collection(paths.studioLibrary()).get()).empty).toBe(true);
+    await callAs(studioLibrarySaveModule, ED, saveRequest({ fragment: validatedFragment(SDQ2) }));
+    expect((await db.collection(paths.studioLibrary()).get()).empty).toBe(false);
   });
 
   it("are retired only by whoever first saved them, or an owner, and never deleted", async () => {
@@ -266,16 +266,14 @@ describe("publishing a copied questionnaire", () => {
     expect(Object.keys(version.imports![0]!.items)).toHaveLength(25);
   });
 
-  it("refuses the same with one word changed, writing nothing", { timeout: 60_000 }, async () => {
+  it("accepts the same with one word changed: it is the study's own version (D-64)", { timeout: 60_000 }, async () => {
     const draft = await blankFuture();
     const { draft: withSdq } = insertFragment(draft, validatedFragment(SDQ2), { sectionKey: "welcome" }, insertOpts);
     const item = withSdq.instruments[SDQ2]!.forms[0]!.items[0] as { stem: { text: string } };
     item.stem = { text: item.stem.text.replace(/\bnice\b/, "kind") };
     const revision = await saveDraft(FUTURE, "future_main", withSdq);
-    const error = await refusalOf(publishFirst(FUTURE, "future_main", revision));
-    expect(error.code).toBe("failed-precondition");
-    expect(issueCodes(error)).toContain("locked.introduced");
-    expect(await exists(paths.studioVersion(FUTURE, "future_main", "1.0.0"))).toBe(false);
+    await publishFirst(FUTURE, "future_main", revision);
+    expect(await exists(paths.studioVersion(FUTURE, "future_main", "1.0.0"))).toBe(true);
   });
 
   it("accepts one copied from another study's release, read from that study's store and verified", { timeout: 120_000 }, async () => {
@@ -292,7 +290,7 @@ describe("publishing a copied questionnaire", () => {
     expect((row.detail as { copiedFrom: unknown }).copiedFrom).toEqual([{ study: YBM, hash: R730.manifest.hash }]);
   });
 
-  it("refuses an import that names a release which is not there, the wrong release, or no study at all", { timeout: 120_000 }, async () => {
+  it("refuses an import that names a release which is not there, or no study at all", { timeout: 120_000 }, async () => {
     await setUpYbm();
     const draft = await blankFuture();
     const piece = fragmentFromDraft(extractDraft(R730.raw), { kind: "block", sectionKey: "wellbeing", componentIndex: 1 }, fromRelease(YBM, "7.3.0", R730.manifest.hash!));
@@ -303,10 +301,6 @@ describe("publishing a copied questionnaire", () => {
     const bogus = await refusalOf(publishFirst(FUTURE, "future_main", await saveDraft(FUTURE, "future_main", forged(fromRelease(YBM, "7.3.0", `sha256:${"0".repeat(64)}`)))));
     expect(issueCodes(bogus)).toEqual(["imports.release_unreadable"]);
     expect(bogus.message).toMatch(/copied questions from a published version that can't be checked/);
-
-    // A real release that never froze SDQ 1.0: naming it proves nothing.
-    const wrong = await refusalOf(publishFirst(FUTURE, "future_main", await saveDraft(FUTURE, "future_main", forged(fromRelease(YBM, "8.0.0", R800.manifest.hash!)))));
-    expect(issueCodes(wrong)).toContain("locked.introduced");
 
     // A study this project does not run.
     const nowhere = await refusalOf(publishFirst(FUTURE, "future_main", await saveDraft(FUTURE, "future_main", forged(fromRelease("nowhere", "7.3.0", R730.manifest.hash!)))));
