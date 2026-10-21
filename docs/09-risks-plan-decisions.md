@@ -723,3 +723,36 @@ a newer release.
 `packages/library/src/provenance.ts`) and tick "Checked by the team"; add
 Youth Advisory Group or other involvement where it happened; name the "AoW"
 source.
+
+**Literature check for the D-67 questions (October 2026).** Asked: "do a double
+check that there aren't any surveys out there duplicating some of this stuff."
+A search of the published measures (unverified by the team; DOIs as found):
+- Pattern across the day (times used, peak time, sessions vs checks): no
+  validated measure. Related: night-time use, Scott & Woods (2018), J
+  Adolescence 68:61-65, doi:10.1016/j.adolescence.2018.07.009; ABCD bedtime
+  screen use, Nagata et al. (2023), doi:10.1016/j.sleh.2023.02.005; brief
+  checking habits, Oulasvirta et al. (2012), doi:10.1007/s00779-011-0412-2.
+  Our night checks and morning latency (ybm_social_media) already cover part.
+- Checking frequency: estimates agree poorly with logged use (Andrews et al.
+  2015; Ellis et al. 2019; Parry et al. 2021, Nature Human Behaviour; Ohme et
+  al. 2021 on Screen Time screenshots). Keep the estimate, and make the
+  phone's own count the main measure where the phone is in hand (the break
+  study), as built.
+- Attention to content: nothing validated measures scrolling past or speeding
+  up videos (the short-video scales are all addiction scales). "I open a social
+  media app without really meaning to" and "…without really taking anything
+  in" overlap the Smartphone Use Questionnaire – Absent-Minded (SUQ-A,
+  Marty-Dugas et al. 2018, doi:10.1037/cns0000131; 10 items, 1–7, adults
+  only). "I do other things while I scroll" overlaps media multitasking (MMM-S,
+  Baumgartner et al. 2017, doi:10.1027/1864-1105/a000167, adolescents).
+- Already in the library and not duplicated: addiction-style scales (SAS-SV,
+  BSMAS, Social Media Disorder Scale) overlap our screen dependence and
+  doomscrolling items, not these; active/passive use (PAUM) overlaps the AoW
+  item.
+
+Recommendation, for the team to decide: keep the time-of-day and engagement
+questions as exploratory study-written items; consider replacing the two
+absent-minded statements with adapted SUQ-A items (cite it, note adult
+validation) and the multitasking statement with MMM-S items; pilot the
+wording with young people (cognitive interviews, 8–11 especially). The
+records in `ybm_sm_patterns` and `ybm_phone_pickups` cite these.

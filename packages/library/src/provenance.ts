@@ -178,15 +178,19 @@ export const LIBRARY_PROVENANCE: Record<string, ProvenanceInput> = {
     kind: "researcher_developed",
     developedBy: TEAM,
     involvement: [{ group: "YBM research team", role: "named the phenotype domains the questions should cover", when: "2026-10" }],
-    evidence: "None yet; study-written. A literature check for existing measures is recorded in docs/09 (D-68).",
-    decisions: ["D-67"],
+    evidence:
+      "None yet; study-written and exploratory. A literature check (October 2026, docs/09 D-68) found no validated measure of time-of-day pattern or of scrolling past or speeding up content.",
+    notes:
+      "Related published measures, from the literature check (not yet read by the team): night-time use, Scott & Woods (2018) J Adolescence 68:61-65; checking without a purpose, the Smartphone Use Questionnaire – Absent-Minded (SUQ-A), Marty-Dugas et al. (2018) doi:10.1037/cns0000131, adults only; media multitasking in adolescents, MMM-S, Baumgartner et al. (2017) doi:10.1027/1864-1105/a000167.",
+    decisions: ["D-67", "D-68"],
   },
   ybm_phone_pickups: {
     kind: "researcher_developed",
     developedBy: TEAM,
     involvement: [{ group: "YBM research team", role: "named the phenotype domains the questions should cover", when: "2026-10" }],
-    evidence: "None yet; study-written.",
-    decisions: ["D-67"],
+    evidence:
+      "Study-written. The phone's own count is asked because estimates of phone use agree poorly with logged use: Andrews et al. (2015) doi:10.1371/journal.pone.0139004; Ellis et al. (2019) doi:10.1016/j.ijhcs.2019.05.004; Parry et al. (2021) doi:10.1038/s41562-021-01117-5; Ohme et al. (2021) doi:10.1177/2050157920959106 (Screen Time screenshots).",
+    decisions: ["D-67", "D-68"],
   },
 };
 
@@ -206,6 +210,14 @@ export const QUESTION_PROVENANCE: Record<string, Record<string, ProvenanceInput>
   ybm_identity: { home_address: added(["D-52"]) },
   ybm_social_media: { family_control_how: added(["D-53"]), family_control_other: added(["D-53"]) },
   ybm_smartphone: { sm_use_confirm: added(["D-26"]) },
+  ybm_sm_patterns: {
+    unintended_open: added(
+      ["D-67", "D-68"],
+      "Close to the SUQ-A's 'check your phone without a purpose' and 'out of habit' (Marty-Dugas et al., 2018). Adapting the SUQ-A would give a published source; it was validated in adults only.",
+    ),
+    mindless: added(["D-67", "D-68"], "Overlaps the SUQ-A in part (Marty-Dugas et al., 2018)."),
+    multitask: added(["D-67", "D-68"], "Overlaps media multitasking; the MMM-S (Baumgartner et al., 2017) is validated in adolescents."),
+  },
 };
 
 /** The demographics questions the 2026 survey had; the rest are the languages questions (D-53, D-58). */
