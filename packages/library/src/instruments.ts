@@ -92,7 +92,7 @@ export const kss: InstrumentInput = {
     },
   ],
   timeEstimates: est([25, 20]),
-  changelog: "1.0: encoded from YBM NotreDame2026 QSF; canonical labels restored per D-08.",
+  changelog: "1.0: encoded from the Yorkshire Brain Map 2026 QSF; canonical labels restored per D-08.",
   owner: "ybm",
 };
 

@@ -274,7 +274,8 @@ function stripped(def: Loose, allowed: readonly string[]): Loose {
   for (const field of DEFINITION_RECORDS) delete rest[field];
   return {
     ...rest,
-    forms: formsOf(def).map((form) => ({ ...form, items: itemsOf(form).map((item) => withoutFields(item, allowed)) })),
+    // A form's label is a name for researchers, never shown to participants.
+    forms: formsOf(def).map(({ label: _label, ...form }) => ({ ...form, items: itemsOf(form).map((item) => withoutFields(item, allowed)) })),
   };
 }
 

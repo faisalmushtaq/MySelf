@@ -76,7 +76,7 @@ export const assessmentDraft = z.object({
   title: z.string().min(1),
   /**
    * Short label shown to participants on the opening screen — in practice the
-   * site and the year ("Notre Dame · 2026"). Set per fielding by the
+   * site and the year ("Leeds schools · 2026"). Set per fielding by the
    * researcher; the full title is not what a participant needs to read before
    * starting. Omit to show nothing.
    */

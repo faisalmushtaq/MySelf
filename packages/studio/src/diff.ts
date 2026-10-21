@@ -625,8 +625,13 @@ function diffBlocks(a: Side, b: Side, out: ChangeEntry[]): void {
     const now = normaliseDef(rawNow);
     const label = instrumentLabel(now, instrument);
     const form = (d: Loose) => (list(d["forms"])[0] ?? {}) as Loose;
-    if (!same(form(was)["instructions"], form(now)["instructions"]) || !same(form(was)["label"], form(now)["label"])) {
+    if (!same(form(was)["instructions"], form(now)["instructions"])) {
       out.push(entry("settings.changed", "major", `Changed the introduction shown before ${label}.`, { aspects: ["wording"] }));
+    }
+    // A form's label names it for researchers ("YBM introduction + consent");
+    // participants never see it, so renaming it is a note, not a wording change.
+    if (!same(form(was)["label"], form(now)["label"])) {
+      out.push(entry("settings.changed", "patch", `Renamed ${label}'s form label.`, { aspects: ["notes"] }));
     }
     const scoringFields = ["scoringKey", "subscales", "reverseScoredItems", "missingDataRule"];
     if (scoringFields.some((f) => !same(was[f], now[f]))) {

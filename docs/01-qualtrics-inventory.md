@@ -1,4 +1,4 @@
-# Yorkshire Brain Map — NotreDame2026: Structured Survey Inventory
+# Yorkshire Brain Map 2026: Structured Survey Inventory
 
 **Source artefact:** `Yorkshire_Brain_Map_-_NotreDame2026.docx` (Qualtrics Word export)
 **Analysed:** 2026-08-02

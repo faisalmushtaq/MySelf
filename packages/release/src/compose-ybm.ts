@@ -2,7 +2,7 @@ import type { z } from "zod";
 import type { assessmentDraft } from "@myself/schema";
 
 /**
- * The YBM NotreDame2026 standard assessment composition, mirroring the
+ * The Yorkshire Brain Map 2026 standard assessment composition, mirroring the
  * Qualtrics flow (docs/10 §1) with the decided structure:
  * both social-media sections sit behind the SM_Own = Yes condition; canonical
  * instrument forms are selected per D-08 (as-administered variants stay in
@@ -43,7 +43,7 @@ const usesSocialMedia = {
 export const ybmComposition: AssessmentDraftInput = {
   key: "ybm_nd2026_standard",
   study: "ybm",
-  title: "Yorkshire Brain Map — NotreDame 2026 standard questionnaire",
+  title: "Yorkshire Brain Map — standard questionnaire",
   // No participant-facing study label on the cover for this fielding: the field
   // is researcher-set per fielding (D-24), and leaving it unset removes the line
   // rather than printing an empty one (App renders it only when present).

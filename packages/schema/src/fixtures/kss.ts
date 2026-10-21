@@ -115,7 +115,7 @@ export const kssInstrument: z.input<typeof instrumentVersion> = {
     { ageBand: "11-13", medianSeconds: 25, provenance: "estimated-heuristic", note: "Single item, 9 labelled options" },
     { ageBand: "14-16", medianSeconds: 20, provenance: "estimated-heuristic" },
   ],
-  changelog: "1.0: initial encoding from YBM NotreDame2026 QSF; canonical labels restored per decision D-08.",
+  changelog: "1.0: initial encoding from the Yorkshire Brain Map 2026 QSF; canonical labels restored per decision D-08.",
   approvalStatus: "draft",
   owner: "ybm",
 };

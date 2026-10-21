@@ -45,6 +45,16 @@ const meta = {
   decisionRefs: ["D-53"],
 };
 
+/** The names r9.0.0 was frozen with, before "Notre Dame" was taken out of titles and labels (D-69). */
+function asNamedIn9(r: Registries): Registries {
+  const out = structuredClone(r);
+  const consent = out.modules.find((m) => m.instrument === "ybm_intro_consent")!;
+  consent.forms[0]!.label = "YBM NotreDame 2026 introduction + consent";
+  const kss = out.instruments.find((i) => i.instrument === "kss")!;
+  kss.changelog = "1.0: encoded from YBM NotreDame2026 QSF; canonical labels restored per D-08.";
+  return out;
+}
+
 /** The registries as they were before the library recorded provenance (D-68). */
 function withoutProvenance(r: Registries): Registries {
   const strip = <T>(defs: T[]): T[] =>
@@ -116,7 +126,9 @@ describe("YBM release r9.0.0", () => {
     // library's records of how each questionnaire was made (D-68) came after
     // r9.0.0 was frozen and are not part of what it administers, so they are
     // left out of the rebuild; anything else that differs still fails.
-    const rebuilt = buildRelease(ybmComposition, withoutProvenance(registries), {
+    // So, since D-69, are the old "NotreDame 2026" names it was frozen with:
+    // put back here, so that only a change to what it administers still fails.
+    const rebuilt = buildRelease({ ...ybmComposition, title: "Yorkshire Brain Map — NotreDame 2026 standard questionnaire" }, asNamedIn9(withoutProvenance(registries)), {
       version: committed.release.version,
       publishedAt: committed.release.publishedAt,
       publishedBy: committed.release.publishedBy,
