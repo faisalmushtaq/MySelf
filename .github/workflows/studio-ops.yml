@@ -1,6 +1,7 @@
 name: "Studio: study space housekeeping"
 
 # Run by hand from main (apps/functions/studio-ops.mjs):
+#   questions     a survey's questions (draft, live, archived), read-only
 #   list          every study space, its surveys, sections and (masked) members
 #   grant-owners  everyone on a study space's Studio list: Studio admin there,
 #                 the project owner role and the dashboard's access list
@@ -16,7 +17,7 @@ on:
       command:
         description: "What to do"
         type: choice
-        options: [list, grant-owners, insert, dob-ages, retitle, form-label]
+        options: [list, questions, grant-owners, insert, dob-ages, retitle, form-label]
         default: list
       study:
         description: "Study space id (from list)"
@@ -48,6 +49,10 @@ on:
         default: ""
       max_age:
         description: "Oldest age (dob-ages)"
+        type: string
+        default: ""
+      match:
+        description: "Only questions whose ID, variable or wording contains this (questions)"
         type: string
         default: ""
       title:
@@ -110,6 +115,7 @@ jobs:
           REPLACE: ${{ inputs.replace }}
           MIN_AGE: ${{ inputs.min_age }}
           MAX_AGE: ${{ inputs.max_age }}
+          MATCH: ${{ inputs.match }}
           TITLE: ${{ inputs.title }}
           INSTRUMENT: ${{ inputs.instrument }}
           LABEL: ${{ inputs.label }}
@@ -118,7 +124,7 @@ jobs:
           node studio-ops.mjs "$COMMAND" --project myself-research \
             ${STUDY:+--study "$STUDY"} ${SURVEY:+--survey "$SURVEY"} ${SECTION:+--section "$SECTION"} \
             ${AFTER:+--after "$AFTER"} ${PIECES:+--pieces "$PIECES"} ${REPLACE:+--replace "$REPLACE"} ${MIN_AGE:+--min-age "$MIN_AGE"} ${MAX_AGE:+--max-age "$MAX_AGE"} \
-            ${TITLE:+--title "$TITLE"} ${INSTRUMENT:+--instrument "$INSTRUMENT"} ${LABEL:+--label "$LABEL"} $APPLY
+            ${MATCH:+--match "$MATCH"} ${TITLE:+--title "$TITLE"} ${INSTRUMENT:+--instrument "$INSTRUMENT"} ${LABEL:+--label "$LABEL"} $APPLY
 
       - name: Shred the credential
         if: always()

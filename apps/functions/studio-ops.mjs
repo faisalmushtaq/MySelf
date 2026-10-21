@@ -229,6 +229,39 @@ if (command === "list") {
     },
     `Date of birth: ages ${minAge} to ${maxAge}`,
   );
+} else if (command === "questions") {
+  // Read-only: the draft's questions (and the archived ones, and the live
+  // version's), optionally only those whose ID, variable or wording matches --match.
+  const study = studyArg();
+  const surveyId = surveyArg();
+  const match = (flag("match") ?? "").toLowerCase();
+  const survey = await db.doc(paths.studioSurvey(study, surveyId)).get();
+  const snap = await db.doc(paths.studioDraft(study, surveyId)).get();
+  if (!survey.exists || !snap.exists) fail(`There is no survey “${surveyId}” in the study space “${study}”.`);
+  const draft = parseDraft(snap.get("content"));
+  const live = await liveDraft(study, surveyId, survey);
+  const itemOf = (d, itemKey) => {
+    const [instrument, key] = [itemKey.slice(0, itemKey.indexOf(".")), itemKey.slice(itemKey.indexOf(".") + 1)];
+    for (const def of Object.values(d.instruments)) if (def.instrument === instrument) for (const f of def.forms) for (const i of f.items) if (i.key === key) return i;
+    return null;
+  };
+  const shows = (itemKey, item, text) => !match || [itemKey, item?.variable ?? "", text ?? ""].some((x) => x.toLowerCase().includes(match));
+  const list = (label, d) => {
+    console.log(`\n${label}`);
+    for (const sec of outline(d).sections) {
+      for (const b of sec.blocks) {
+        for (const q of b.questions) {
+          const item = itemOf(d, q.itemKey);
+          if (shows(q.itemKey, item, q.text)) console.log(`  [${sec.key}] ${q.itemKey}  var=${item?.variable}  ${q.responseType}  “${q.text.slice(0, 70)}”`);
+        }
+      }
+    }
+  };
+  console.log(`Survey “${surveyId}”: live ${survey.get("active")?.version ?? "never published"}; draft revision ${snap.get("revision")}`);
+  if (live) list(`Live version (${survey.get("active")?.version}):`, live);
+  list("Draft:", draft);
+  console.log("\nArchived in the draft:");
+  for (const a of draft.archived) if (shows(a.itemKey, a.item, a.item?.stem?.text)) console.log(`  ${a.itemKey}  var=${a.item?.variable}  ${a.item?.responseType}  archived ${a.archivedAt}`);
 } else if (command === "retitle") {
   // The survey's title (participants see it), on its draft and its Studio listing.
   const study = studyArg();
@@ -271,5 +304,5 @@ if (command === "list") {
     `Form label of ${instrument}: ${label}`,
   );
 } else {
-  fail("Commands: list, grant-owners, insert, dob-ages, retitle, form-label.");
+  fail("Commands: list, questions, grant-owners, insert, dob-ages, retitle, form-label.");
 }
