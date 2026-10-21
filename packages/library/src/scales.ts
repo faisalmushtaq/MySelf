@@ -843,6 +843,75 @@ export const sleepKnow12: ResponseScale = {
   ],
 };
 
+// --- Social-media patterns and attention (D-67, study-written) ---------------
+
+/** Times of day; 1-6 in the order a day runs. */
+export const smTimesOfDay: ResponseScale = {
+  key: "scale.sm_times_of_day",
+  version: "1.0.0",
+  name: "Times of day social media is used",
+  direction: "unordered",
+  options: opts([
+    "Before school or work",
+    "During the school or work day",
+    "Straight after school or work",
+    "In the evening",
+    "Late at night, after 10pm",
+    "When I wake up in the night",
+  ]),
+};
+
+export const smSessionPattern: ResponseScale = {
+  key: "scale.sm_session_pattern",
+  version: "1.0.0",
+  name: "How social-media use is spread across a day",
+  direction: "unordered",
+  options: opts([
+    "A few longer sessions",
+    "Lots of short checks spread through the day",
+    "A mix of both",
+    "It changes a lot from day to day",
+  ]),
+};
+
+/** Estimated pickups a day; 6 = no idea (not ordinal). */
+export const phonePickupsEstimate: ResponseScale = {
+  key: "scale.phone_pickups_estimate",
+  version: "1.0.0",
+  name: "Estimated phone pickups or glances a day",
+  direction: "ascending",
+  options: [
+    opt(1, "Fewer than 10"),
+    opt(2, "10 to 30"),
+    opt(3, "31 to 60"),
+    opt(4, "61 to 100"),
+    opt(5, "More than 100"),
+    opt(6, "I have no idea", undefined, "dont_know"),
+  ],
+  scoringNote: "1-5 ascending bands; 6 = I have no idea (missing for analysis).",
+};
+
+export const phonePickupsAvailable: ResponseScale = {
+  key: "scale.phone_pickups_available",
+  version: "1.0.0",
+  name: "Whether the phone's own pickup count could be read",
+  direction: "unordered",
+  options: [
+    opt(1, "Yes, I can see it"),
+    opt(2, "I can't find it"),
+    opt(3, "My phone doesn't show this"),
+    opt(4, "I don't have my phone with me"),
+  ],
+};
+
+export const neverAlways4: ResponseScale = {
+  key: "scale.never_always_4pt",
+  version: "1.0.0",
+  name: "Never / Sometimes / Often / Always (coded 1-4)",
+  direction: "ascending",
+  options: opts(["Never", "Sometimes", "Often", "Always"]),
+};
+
 export const allScales: ResponseScale[] = [
   yesNo,
   yesNoUnsure,
@@ -888,4 +957,9 @@ export const allScales: ResponseScale[] = [
   ageAdoptionSocialMedia,
   sleepImportance11,
   sleepKnow12,
+  smTimesOfDay,
+  smSessionPattern,
+  phonePickupsEstimate,
+  phonePickupsAvailable,
+  neverAlways4,
 ];

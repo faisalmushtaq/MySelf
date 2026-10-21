@@ -1105,6 +1105,120 @@ export const ybmAppTime: ModuleInput = {
   changelog: "1.0: new module; a time grid over the apps in ybm_social_media.apps_owned 'have'.",
 };
 
+// ---------------------------------------------------------------------------
+
+/**
+ * Pattern of use across the day, how often the phone is checked (as the
+ * participant thinks), and how they engage with what they see (D-67). Asked
+ * to match the phenotype domains: timing and routine, checking frequency,
+ * content engagement and attention. Study-written, not a validated measure.
+ * Not part of the YBM composition.
+ */
+const engage = (key: string, variable: string, text: string): ItemInput =>
+  single(key, variable, "", text, "scale.never_always_4pt");
+
+export const ybmSmPatterns: ModuleInput = {
+  ...moduleBase,
+  instrument: "ybm_sm_patterns",
+  name: "Social media patterns and attention",
+  construct: "When in the day social media is used, perceived phone checking, and attention to content",
+  forms: [
+    {
+      language: "en-GB",
+      label: "Patterns and attention (study-written, D-67)",
+      items: [
+        {
+          responseType: "multi_choice",
+          key: "times_of_day",
+          revision: 1,
+          variable: "smp_times_of_day",
+          stem: { text: "At what times of day do you usually use social media?" },
+          lede: { text: "Choose all that apply." },
+          scale: "scale.sm_times_of_day",
+          scaleVersion: "1.0.0",
+          minSelections: 1,
+          researcherNote: "Study-written (D-67). One variable per time of day.",
+        },
+        single("peak_time", "smp_peak_time", "", "When do you use social media the most?", "scale.sm_times_of_day", {
+          researcherNote: "Study-written (D-67). Same codes as smp_times_of_day.",
+        }),
+        single("session_pattern", "smp_session_pattern", "", "Which best describes how you use social media during a day?", "scale.sm_session_pattern", {
+          researcherNote: "Study-written (D-67). Long sessions vs frequent short checks.",
+        }),
+        single(
+          "pickups_estimate",
+          "smp_pickups_estimate",
+          "",
+          "On a typical day, about how many times do you think you pick up or glance at your phone, even without unlocking it?",
+          "scale.phone_pickups_estimate",
+          {
+            researcherNote:
+              "Study-written (D-67). Perceived checking. Compare with phone_pickups (ybm_phone_pickups) where that module is asked.",
+          },
+        ),
+        engage("scroll_past", "smp_scroll_past", "I scroll past videos or posts without watching or reading them all the way through."),
+        engage("speed_up", "smp_speed_up", "I skip ahead or speed up videos instead of watching them normally."),
+        engage("attend", "smp_attend", "When I'm on social media, I'm really paying attention to what I'm watching or reading."),
+        engage("multitask", "smp_multitask", "I do other things while I scroll, like homework, TV or talking to people."),
+        engage("mindless", "smp_mindless", "I realise I've been scrolling without really taking anything in."),
+        engage("unintended_open", "smp_unintended_open", "I open a social media app without really meaning to."),
+      ],
+    },
+  ],
+  timeEstimates: est(150, 120),
+  changelog: "1.0 (D-67): ten study-written questions on daily pattern, perceived checking and attention to content.",
+};
+
+/**
+ * The phone's own count of pickups (iPhone Screen Time "Pickups"; Android
+ * Digital Wellbeing "Unlocks") for yesterday, to set against the estimate in
+ * ybm_sm_patterns (D-67). Only where participants have their phone with them
+ * and may look at it — not in school sessions. Not part of the YBM composition.
+ */
+export const ybmPhonePickups: ModuleInput = {
+  ...moduleBase,
+  instrument: "ybm_phone_pickups",
+  name: "Phone pickups from Screen Time",
+  construct: "Device-recorded phone pickups or unlocks yesterday",
+  forms: [
+    {
+      language: "en-GB",
+      label: "Pickups read from the phone (study-written, D-67)",
+      items: [
+        single(
+          "available",
+          "phone_pickups_available",
+          "",
+          "Please look at your phone's Screen Time or Digital Wellbeing. Can you see how many times you picked up or unlocked your phone yesterday?",
+          "scale.phone_pickups_available",
+          {
+            lede: {
+              text: "On an iPhone: Settings → Screen Time → See All App & Website Activity → Pickups. On Android: Settings → Digital Wellbeing → Unlocks.",
+            },
+            researcherNote: "Study-written (D-67). The number is asked only for 1 = Yes.",
+          },
+        ),
+        {
+          responseType: "numeric",
+          key: "count",
+          revision: 1,
+          variable: "phone_pickups",
+          stem: { text: "What number does it show for yesterday?" },
+          min: 0,
+          max: 2000,
+          integerOnly: true,
+          unitLabel: "pickups",
+          confirmAbove: 500,
+          displayIf: { op: "selected", target: { item: { instrument: "ybm_phone_pickups", item: "available", revision: 1 } }, code: 1 },
+          researcherNote: "Device-recorded pickups (iPhone) or unlocks (Android) yesterday, as read by the participant (D-67).",
+        },
+      ],
+    },
+  ],
+  timeEstimates: est(60, 60),
+  changelog: "1.0 (D-67): the phone's own pickup or unlock count for yesterday.",
+};
+
 export const allModules: ModuleInput[] = [
   ybmIntroConsent,
   ybmIdentity,
@@ -1118,4 +1232,6 @@ export const allModules: ModuleInput[] = [
   ybmGaming,
   ybmFutureSelf,
   ybmAppTime,
+  ybmSmPatterns,
+  ybmPhonePickups,
 ];
