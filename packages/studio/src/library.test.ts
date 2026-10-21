@@ -872,6 +872,22 @@ describe("a repository module as a library piece (D-58)", () => {
     publishable(draft);
   });
 
+  it("drops the social media patterns and the phone pickups modules into a survey, conditions intact (D-67)", () => {
+    let draft = extractDraft(r800);
+    for (const key of ["ybm_sm_patterns", "ybm_phone_pickups"]) {
+      const piece = repositoryModuleFragment(key, { title: key });
+      expect(moduleProblems(piece)).toEqual([]);
+      const { draft: next, report } = insertFragment(draft, piece, { sectionKey: "gaming", afterItemKey: null }, opts);
+      expect(report.conditionsRemoved).toEqual([]);
+      draft = next;
+    }
+    const order = asked(draft);
+    expect(order).toContain("ybm_sm_patterns.unintended_open");
+    expect(order.indexOf("ybm_phone_pickups.count")).toBe(order.indexOf("ybm_phone_pickups.available") + 1);
+    expect(errors(draft, { baseline: extractDraft(r800) })).toEqual([]);
+    publishable(draft);
+  });
+
   it("refuses a module or question that is not there", () => {
     expect(refusal(() => repositoryModuleFragment("ybm_nothing", { title: "x" })).code).toBe("not_found");
     expect(refusal(() => repositoryModuleFragment("ybm_demographics", { itemKeys: ["nope"], title: "x" })).code).toBe("not_found");
