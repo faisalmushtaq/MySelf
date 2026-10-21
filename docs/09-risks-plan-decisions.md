@@ -651,3 +651,30 @@ app the participant does not have is not presented, an empty row skipped. A
 release with a grid needs engine 0.5.0; the live YBM survey has none and still
 needs 0.3.0. The library's `ybm_app_time` module ("Time on each app",
 `app_minutes_<code>`) asks it of the apps in "I have these apps on my phone".
+
+### Social media patterns, checking and attention (2026-10-21, D-67)
+
+**Asked.** A team member, matching the survey to the phenotype domains: the
+pattern of use across a day, how often the phone is checked (even glanced at)
+and how often people think they do, and whether they notice how they engage
+with content (scrolling past videos without watching them, and so on). "It's
+not possible for the YBM (but is for the break study) to get them to glance
+at their phones. Never will we get that in a school environment."
+
+**Changed.** Two library modules, study-written (no validated short measure
+covers these), neither in the YBM composition:
+- `ybm_sm_patterns` "Social media patterns and attention": times of day used
+  (`smp_times_of_day`, tick all), the time used most (`smp_peak_time`),
+  long sessions or short checks (`smp_session_pattern`), estimated pickups or
+  glances a day (`smp_pickups_estimate`, bands, 6 = no idea), and six
+  Never–Always statements on attention to content (`smp_scroll_past`,
+  `smp_speed_up`, `smp_attend` (positively worded), `smp_multitask`,
+  `smp_mindless`, `smp_unintended_open`).
+- `ybm_phone_pickups` "Phone pickups from Screen Time": can they see
+  yesterday's Pickups (iPhone) or Unlocks (Android), then the number
+  (`phone_pickups`, 0–2000, read back above 500). Needs the phone in hand, so
+  for the break study only, never a school session.
+
+The break study's draft takes both after "Time on each app". For YBM the team
+chooses which of `ybm_sm_patterns` to take, in a later release; the screen
+check is not offered there.
