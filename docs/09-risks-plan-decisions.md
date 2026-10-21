@@ -721,8 +721,10 @@ a newer release.
 
 **For the team.** Check each record in the Studio (or in
 `packages/library/src/provenance.ts`) and tick "Checked by the team"; add
-Youth Advisory Group or other involvement where it happened; name the "AoW"
-source.
+Youth Advisory Group or other involvement where it happened. "AoW" is Age of
+Wonder, the Born in Bradford adolescent cohort (confirmed 2026-10-21; the
+`ybm_social_media` record names it); a citation for its questionnaire is still
+to be added.
 
 **Literature check for the D-67 questions (October 2026).** Asked: "do a double
 check that there aren't any surveys out there duplicating some of this stuff."
