@@ -102,7 +102,7 @@ export const LIBRARY_PROVENANCE: Record<string, ProvenanceInput> = {
     kind: "validated_adapted",
     basedOn: "BIS/BAS Scales (Carver & White, 1994).",
     adaptations:
-      "A 12-item subset (BIS 4, Reward Responsiveness 4, Drive 4; Fun Seeking left out), as in the 2026 Qualtrics survey (A-22). Who chose the subset, and whether it was used before (possibly in the 'AoW' study), is not recorded.",
+      "A 12-item subset (BIS 4, Reward Responsiveness 4, Drive 4; Fun Seeking left out), as in the 2026 Qualtrics survey (A-22). Who chose the subset, and whether it was used before (possibly in Born in Bradford's Age of Wonder study), is not recorded.",
     evidence: "The full scales are validated (Carver & White, 1994); this subset has not been, as far as the record shows.",
     decisions: ["D-07"],
   },
@@ -152,10 +152,10 @@ export const LIBRARY_PROVENANCE: Record<string, ProvenanceInput> = {
   ybm_social_media: {
     kind: "existing_items",
     basedOn:
-      "The 2026 Qualtrics survey's social media block, titled there 'adapted from AoW'. Which study 'AoW' is, and what exactly was adapted, is not recorded.",
+      "Age of Wonder (AoW), the Born in Bradford adolescent cohort study: the 2026 Qualtrics survey's social media block is titled 'adapted from AoW' (source confirmed by the principal investigator, 2026-10-21). What exactly the 2026 team adapted from the AoW questions is not recorded.",
     adaptations:
       "Per-platform time stepped into one question each, with the Twitch condition corrected (D-02); abstain-effect wording restored (D-01); family-control follow-ups written by the research team (D-53).",
-    notes: "To confirm: the AoW source, with a citation, and what the 2026 team changed from it.",
+    notes: "To add: a citation for the Age of Wonder questionnaire, and what the 2026 team changed from it. Using AoW's wording keeps these answers comparable with the Born in Bradford cohort.",
     decisions: ["D-01", "D-02", "D-53"],
   },
   ybm_ai_use: {
