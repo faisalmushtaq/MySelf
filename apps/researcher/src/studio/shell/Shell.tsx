@@ -13,6 +13,9 @@ import { StudySwitcher } from "./StudySwitcher.js";
  * The survey being built is the loudest thing on screen; this is not.
  */
 
+/** The research dashboard, where the data the Studio's surveys collect is read. */
+export const DASHBOARD_URL: string = import.meta.env.VITE_DASHBOARD_URL ?? "https://myself-research-dashboard.web.app";
+
 export interface ShellTab {
   label: string;
   to: Route;
@@ -96,6 +99,11 @@ export function Shell({
           ) : (
             <span className="stp-nav-spacer" />
           )}
+          {/* The other half of the work: the data the surveys collect. */}
+          <a className="stp-nav-link stp-nav-external" href={DASHBOARD_URL} target="_blank" rel="noopener noreferrer">
+            <span>Research dashboard</span>
+            <span aria-hidden="true"> ↗</span>
+          </a>
           <UserMenu extra={menuItems} />
         </div>
       </header>
