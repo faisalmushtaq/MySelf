@@ -11,6 +11,8 @@ import {
   type InstrumentForm,
   type InstrumentVersion,
   type ItemDefinition,
+  PROVENANCE_KIND_LABELS,
+  type ProvenanceInput,
 } from "@myself/schema";
 import {
   FRAGMENT_FORMAT,
@@ -465,6 +467,8 @@ export interface ValidatedEntry {
   audience: string | null;
   /** The licence in one line, for the shelf. */
   licence: string;
+  /** How it was made, in words ("Validated instrument, as published"), and whether the team has checked that (D-68). */
+  provenance: string | null;
 }
 
 interface LibraryForm {
@@ -532,6 +536,12 @@ function licenceLine(def: InstrumentVersion): string {
   return `${status}.${l.verified ? "" : " Permission still to be confirmed."} ${use}`;
 }
 
+function provenanceLine(def: InstrumentVersion): string | null {
+  const p = def.provenance;
+  if (!p) return null;
+  return `${PROVENANCE_KIND_LABELS[p.kind]}.${p.confirmed ? "" : " Not yet checked by the team."}`;
+}
+
 /** The validated questionnaires, as the shelf lists them, for one language (en-GB). */
 export function validatedCatalogue(language = "en-GB"): ValidatedEntry[] {
   const out: ValidatedEntry[] = [];
@@ -548,6 +558,7 @@ export function validatedCatalogue(language = "en-GB"): ValidatedEntry[] {
       questionCount: form.items.length,
       audience: audienceOf(def),
       licence: licenceLine(def),
+      provenance: provenanceLine(def),
     });
   }
   return out;
@@ -1941,3 +1952,29 @@ export function provenanceOf(draft: StudioDraft, itemKey: string): { record: Imp
   }
   return null;
 }
+
+/**
+ * The record a piece saved to the library starts with (D-68): its source's,
+ * except that a validated questionnaire which was unlocked and edited is no
+ * longer "as published" — it is an adaptation of it, and says what it came from.
+ */
+export function provenanceForSave(
+  prior: ProvenanceInput | null | undefined,
+  source: { name: string; citation?: string | undefined; edited: boolean },
+): ProvenanceInput {
+  if (!prior) return { kind: "researcher_developed", confirmed: false };
+  if (prior.kind === "validated" && source.edited) {
+    const { adaptations: _ignored, confirmed: _c, confirmedBy: _b, confirmedAt: _a, ...rest } = prior;
+    return { ...rest, kind: "validated_adapted", basedOn: prior.basedOn ?? (source.citation ? `${source.name}: ${source.citation}` : source.name), confirmed: false };
+  }
+  return structuredClone(prior);
+}
+
+/** The same record on every block of a piece, as saved. */
+export function withProvenance(fragment: StudioFragment, record: ProvenanceInput): StudioFragment {
+  return {
+    ...fragment,
+    blocks: fragment.blocks.map((b) => ({ ...b, definition: { ...b.definition, provenance: structuredClone(record) } as typeof b.definition })),
+  };
+}
+

@@ -262,6 +262,40 @@ describe("date of birth bounds", () => {
   });
 });
 
+describe("provenance (D-68)", () => {
+  it("every questionnaire and module says how it was made", () => {
+    for (const def of everything) {
+      expect(def.provenance, def.instrument).toBeDefined();
+      expect(def.provenance!.kind, def.instrument).not.toBe("unknown");
+    }
+  });
+
+  it("validated instruments carry a citation and name their source; adapted ones say what changed", () => {
+    for (const def of everything) {
+      const p = def.provenance!;
+      if (p.kind === "validated" || p.kind === "validated_adapted") {
+        expect(def.citation, def.instrument).toBeTruthy();
+        expect(p.basedOn, def.instrument).toBeTruthy();
+      }
+      if (p.kind === "validated_adapted" || p.kind === "existing_items") expect(p.adaptations, def.instrument).toBeTruthy();
+    }
+  });
+
+  it("no record is confirmed without saying who confirmed it and when", () => {
+    for (const def of everything) {
+      const records = [def.provenance!, ...def.forms.flatMap((f) => f.items.flatMap((i) => (i.provenance ? [i.provenance] : [])))];
+      for (const p of records) if (p.confirmed) expect(p.confirmedBy && p.confirmedAt, def.instrument).toBeTruthy();
+    }
+  });
+
+  it("questions the research team added to a borrowed module are marked as theirs", () => {
+    const demographics = parsedModules.find((m) => m.instrument === "ybm_demographics")!;
+    const byKey = new Map(demographics.forms[0]!.items.map((i) => [i.key, i]));
+    expect(byKey.get("ethnicity")!.provenance).toBeUndefined();
+    expect(byKey.get("understand_urdu")!.provenance?.kind).toBe("researcher_developed");
+  });
+});
+
 describe("instruments and modules", () => {
   it("13 instruments and 14 modules parse", () => {
     expect(parsedInstruments).toHaveLength(13);

@@ -1,4 +1,5 @@
 import type { z } from "zod";
+import { attachProvenance } from "./provenance.js";
 import type { itemDefinition, moduleDefinition } from "@myself/schema";
 import { ANOTHER_LANGUAGE_CODE, LANGUAGES } from "./scales.js";
 
@@ -1219,7 +1220,7 @@ export const ybmPhonePickups: ModuleInput = {
   changelog: "1.0 (D-67): the phone's own pickup or unlock count for yesterday.",
 };
 
-export const allModules: ModuleInput[] = [
+export const allModules: ModuleInput[] = attachProvenance([
   ybmIntroConsent,
   ybmIdentity,
   ybmDemographics,
@@ -1234,4 +1235,4 @@ export const allModules: ModuleInput[] = [
   ybmAppTime,
   ybmSmPatterns,
   ybmPhonePickups,
-];
+]);

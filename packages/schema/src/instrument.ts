@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { informant, languageTag, readingLevel, semver, shortVersion, slug } from "./identifiers.js";
 import { itemDefinition } from "./item.js";
+import { provenance } from "./provenance.js";
 
 /**
  * Instrument concept -> instrument version -> form (language / reading level /
@@ -56,6 +57,8 @@ export const instrumentVersion = z.object({
   construct: z.string().min(1),
   citation: z.string().optional(),
   citationVerified: z.boolean().default(false),
+  /** How it was made: validated, adapted, researcher-developed, co-produced… (D-68). */
+  provenance: provenance.optional(),
   ageRange: z.object({ min: z.number().int().min(3), max: z.number().int().max(120) }).optional(),
   licence,
   forms: z.array(instrumentForm).min(1),

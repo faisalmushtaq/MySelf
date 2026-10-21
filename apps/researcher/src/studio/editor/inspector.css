@@ -181,3 +181,21 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* "How it was made": who / what they did / when, on one line (D-68). */
+.stn-provenance-line {
+  display: grid;
+  grid-template-columns: 1fr 1.4fr 6.5rem auto;
+  gap: 0.5rem;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+@media (max-width: 560px) {
+  .stn-provenance-line {
+    grid-template-columns: 1fr auto;
+  }
+  .stn-provenance-line > :nth-child(2),
+  .stn-provenance-line > :nth-child(3) {
+    grid-column: 1;
+  }
+}

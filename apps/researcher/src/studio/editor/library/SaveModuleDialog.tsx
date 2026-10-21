@@ -1,7 +1,12 @@
 import { useId, useMemo, useState } from "react";
+import { PROVENANCE_KIND_LABELS, PROVENANCE_KINDS, type ProvenanceKind } from "@myself/schema";
 import {
   fragmentFromDraft,
+  instrumentDef,
+  isUnlocked,
   moduleProblems,
+  provenanceForSave,
+  withProvenance,
   outline,
   recordSavedModule,
   withoutOutsideConditions,
@@ -54,6 +59,15 @@ export function SaveModuleDialog({ block, onClose }: { block: BlockRef; onClose:
   const [tags, setTags] = useState("");
   const [note, setNote] = useState("");
   const [chosen, setChosen] = useState<Set<string>>(() => new Set(questions.map((q) => q.itemKey)));
+  // How the saved module was made (D-68): its source's record, or "adapted" for
+  // a validated questionnaire that was unlocked and edited here.
+  const startingRecord = useMemo(() => {
+    const found = info ? instrumentDef(draft, info.instrument) : null;
+    const prior = (found?.def as { provenance?: Parameters<typeof provenanceForSave>[0] } | undefined)?.provenance;
+    return provenanceForSave(prior, { name: info?.name ?? "", citation: found?.def.citation, edited: !!info && isUnlocked(draft, info.instrument) });
+  }, [draft, info]);
+  const [kind, setKind] = useState<ProvenanceKind>(startingRecord.kind);
+  const [adaptations, setAdaptations] = useState(startingRecord.adaptations ?? "");
   const [submitted, setSubmitted] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<ReturnType<typeof saveError> | null>(null);
@@ -66,6 +80,7 @@ export function SaveModuleDialog({ block, onClose }: { block: BlockRef; onClose:
   const titleError = mode === NEW && !title.trim() ? "Give the module a title." : null;
   const noteError = !note.trim() ? (mode === NEW ? "Say what this module is for, in a line." : "Say what changed in this version.") : null;
   const chosenKeys = questions.map((q) => q.itemKey).filter((k) => chosen.has(k));
+  const adaptationsError = kind === "validated_adapted" && !adaptations.trim() ? "Say what was changed from the published version." : null;
 
   // The piece, built as the server will check it, and what is wrong with it.
   type Built = { fragment: StudioFragment | null; problems: Issue[]; dropped: { itemKey: string | null; block: string | null; reason: string }[]; error: string | null };
@@ -82,15 +97,20 @@ export function SaveModuleDialog({ block, onClose }: { block: BlockRef; onClose:
       // A module has to make sense wherever it is added, so a condition about a
       // question outside it is left behind — and said, before it is saved.
       const { fragment, removed } = withoutOutsideConditions(taken);
-      const piece = { ...fragment, title: source ? (lib.modules.get(source.moduleId)?.title ?? fragment.title) : title.trim() || fragment.title };
+      const record = { ...startingRecord, kind, ...(adaptations.trim() ? { adaptations: adaptations.trim() } : {}) };
+      if (!adaptations.trim()) delete record.adaptations;
+      const piece = withProvenance(
+        { ...fragment, title: source ? (lib.modules.get(source.moduleId)?.title ?? fragment.title) : title.trim() || fragment.title },
+        record,
+      );
       return { fragment: piece, problems: moduleProblems(piece), dropped: removed, error: null };
     } catch (e) {
       return { fragment: null, problems: [], dropped: [], error: e instanceof Error ? e.message : String(e) };
     }
-  }, [info, draft, block.sectionKey, block.componentIndex, chosen, questions, source, effectiveId, title, lib.modules]);
+  }, [info, draft, block.sectionKey, block.componentIndex, chosen, questions, source, effectiveId, title, lib.modules, startingRecord, kind, adaptations]);
 
   const blocking = built.problems.filter((p) => p.severity === "error");
-  const valid = !idError && !titleError && !noteError && chosenKeys.length > 0 && !!built.fragment && blocking.length === 0;
+  const valid = !idError && !titleError && !noteError && !adaptationsError && chosenKeys.length > 0 && !!built.fragment && blocking.length === 0;
 
   const save = () => {
     setSubmitted(true);
@@ -242,6 +262,26 @@ export function SaveModuleDialog({ block, onClose }: { block: BlockRef; onClose:
           </ul>
           {submitted && chosenKeys.length === 0 ? <p className="st-field-msg st-field-msg-error">Choose at least one question.</p> : null}
         </fieldset>
+
+        <Field
+          label="How it was made"
+          hint="Kept with the module, so anyone using it can tell where it came from. More detail can be added on the block afterwards."
+        >
+          {(p) => (
+            <select {...p} className="st-select" value={kind} onChange={(e) => setKind(e.target.value as ProvenanceKind)}>
+              {PROVENANCE_KINDS.map((k) => (
+                <option key={k} value={k}>
+                  {PROVENANCE_KIND_LABELS[k]}
+                </option>
+              ))}
+            </select>
+          )}
+        </Field>
+        {kind === "validated_adapted" ? (
+          <Field label="What was changed from the published version, and why" error={submitted ? adaptationsError : null}>
+            {(p) => <textarea {...p} className="st-input" rows={2} value={adaptations} onChange={(e) => setAdaptations(e.target.value)} />}
+          </Field>
+        ) : null}
 
         <Field label={source ? "What changed in this version" : "Note"} error={submitted ? noteError : null}>
           {(p) => (

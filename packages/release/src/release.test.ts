@@ -45,6 +45,23 @@ const meta = {
   decisionRefs: ["D-53"],
 };
 
+/** The registries as they were before the library recorded provenance (D-68). */
+function withoutProvenance(r: Registries): Registries {
+  const strip = <T>(defs: T[]): T[] =>
+    defs.map((def) => {
+      const { provenance: _p, ...rest } = structuredClone(def) as T & { provenance?: unknown; forms: { items: { provenance?: unknown }[] }[] };
+      for (const form of rest.forms) for (const item of form.items) delete item.provenance;
+      return rest as T;
+    });
+  return { ...r, instruments: strip(r.instruments), modules: strip(r.modules) };
+}
+
+it("a release freezes how each questionnaire was made (D-68)", () => {
+  const manifest = buildRelease(ybmComposition, registries, meta);
+  const sdq = Object.entries(manifest.instruments).find(([k]) => k.startsWith("sdq25_s@"))![1] as { provenance?: { kind: string } };
+  expect(sdq.provenance?.kind).toBe("validated");
+});
+
 describe("canonical JSON", () => {
   it("is key-order independent", () => {
     expect(canonicalJson({ b: 1, a: [{ y: 2, x: 1 }] })).toBe(canonicalJson({ a: [{ x: 1, y: 2 }], b: 1 }));
@@ -95,8 +112,11 @@ describe("YBM release r9.0.0", () => {
     };
     expect(verifyManifestHash(committed as never)).toBe(true);
     // Rebuilt with the release's own publication metadata, so only a change to
-    // the instruments, scales, scoring or composition can move the hash.
-    const rebuilt = buildRelease(ybmComposition, registries, {
+    // the instruments, scales, scoring or composition can move the hash. The
+    // library's records of how each questionnaire was made (D-68) came after
+    // r9.0.0 was frozen and are not part of what it administers, so they are
+    // left out of the rebuild; anything else that differs still fails.
+    const rebuilt = buildRelease(ybmComposition, withoutProvenance(registries), {
       version: committed.release.version,
       publishedAt: committed.release.publishedAt,
       publishedBy: committed.release.publishedBy,

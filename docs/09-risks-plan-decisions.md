@@ -678,3 +678,48 @@ covers these), neither in the YBM composition:
 The break study's draft takes both after "Time on each app". For YBM the team
 chooses which of `ybm_sm_patterns` to take, in a later release; the screen
 check is not offered there.
+
+### How each questionnaire was made: provenance (2026-10-21, D-68)
+
+**Asked.** "Our survey library should have a provenance information somewhere
+so we can always refer back to how it was created, eg researcher developed,
+co-produced with Youth Advisory Group, validated instrument etc."
+
+**Changed.** Every questionnaire and module (and, where it differs, a single
+question) can carry a provenance record (`packages/schema/src/provenance.ts`):
+- its kind: validated instrument as published; validated instrument, adapted;
+  items from another study or source; researcher-developed; co-produced; or
+  not recorded yet;
+- what it was based on, what was changed and why, who developed it, who else
+  was involved (for example "Youth Advisory Group: co-wrote the questions,
+  2026-09"), the evidence of its validity, and the decisions behind it;
+- whether someone on the team has checked the record, who and when.
+
+All 27 library entries have one, written in one place
+(`packages/library/src/provenance.ts`) from the repository's own history.
+Nothing is guessed: where the 2026 Qualtrics survey does not say who wrote a
+question or where it came from (the "AoW" social media battery, the BIS/BAS
+subset, the doomscrolling items), the record says so, and every record is
+"not yet checked by the team" until someone confirms it. Questions the team
+added to modules from the 2026 survey (the languages questions, the home
+address, the family-control follow-ups) are marked as theirs.
+
+In the Studio, each block has a "How it was made" panel with an Edit dialog.
+Provenance is a record about the questions, not part of them: participants
+never see it, it changes nothing about how answers are stored or scored, it
+needs no unlock on a licensed questionnaire or a protected module, and a change
+to it is a patch. Questions written in the Studio start as researcher-developed.
+Saving to the library asks how the module was made; a validated questionnaire
+that was unlocked and edited is saved as "validated instrument, adapted", and
+the save asks what changed. The library shelf shows each questionnaire's kind.
+
+Releases from now on freeze the record with the questionnaire. Releases already
+published are unchanged (the 9.0.0 drift test rebuilds it without the
+records). Devices check a release's hash over the raw file before reading it
+and ignore fields they do not know, so an older copy of the app still accepts
+a newer release.
+
+**For the team.** Check each record in the Studio (or in
+`packages/library/src/provenance.ts`) and tick "Checked by the team"; add
+Youth Advisory Group or other involvement where it happened; name the "AoW"
+source.

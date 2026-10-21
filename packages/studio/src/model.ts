@@ -174,10 +174,10 @@ export const ALLOWED_FIELDS_BY_TIER: {
   readonly protected: readonly ItemField[];
   readonly editable: "all";
 } = {
-  locked: ["required", "allowDecline", "hint", "presentation", "a11yNote", "researcherNote", "reportingCategory"],
+  locked: ["required", "allowDecline", "hint", "presentation", "a11yNote", "researcherNote", "reportingCategory", "provenance"],
   // The age limits on the date of birth are each survey's own (who may take
   // part), so they change without unlocking the identity module (D-65).
-  protected: ["researcherNote", "reportingCategory", "minAgeYears", "maxAgeYears", "minYear", "maxYear"],
+  protected: ["researcherNote", "reportingCategory", "provenance", "minAgeYears", "maxAgeYears", "minYear", "maxYear"],
   editable: "all",
 };
 

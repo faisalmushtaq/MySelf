@@ -1,7 +1,7 @@
 import { narrativeProtocol, type NarrativeProtocol } from "@myself/narrative";
 import { refKeyOf } from "@myself/release/gate";
 import type { ReservedIds } from "./history.js";
-import { canonicalJson, type ItemDefinition, type LogicExpr, type TimeGridSource } from "@myself/schema";
+import { canonicalJson, provenance as provenanceSchema, type ItemDefinition, type LogicExpr, type ProvenanceInput, type TimeGridSource } from "@myself/schema";
 import { CHOICE_TYPES, defaultTextFor, questionType, templateFor, type QuestionTypeId } from "./catalogue.js";
 import type { ArchivedPosition, ArchivedQuestion, CompositionInput, ScaleInput, StudioDraft } from "./contract.js";
 import { studioModule, studioModuleKey, studioModuleRef } from "./draft.js";
@@ -552,6 +552,7 @@ const BASE_OPTIONAL = [
   "a11yNote",
   "researcherNote",
   "reportingCategory",
+  "provenance",
 ];
 
 /** The fields each type has beyond the shared ones: those it must have, and those it may. */
@@ -598,6 +599,7 @@ const FIELD_ACTIONS: Record<string, string> = {
   a11yNote: "change its accessibility note",
   researcherNote: "change its researcher note",
   reportingCategory: "change its reporting category",
+  provenance: "change the record of where it came from",
 };
 
 function typeLabel(d: StudioDraft, item: ItemDefinition): string {
@@ -819,6 +821,7 @@ const KEPT_ON_TYPE_CHANGE = [
   "a11yNote",
   "researcherNote",
   "reportingCategory",
+  "provenance",
 ] as const;
 
 /**
@@ -1716,6 +1719,34 @@ export function unlockModule(draft: StudioDraft, instrumentKey: string, req: OpA
 export function relockModule(draft: StudioDraft, instrumentKey: string): { draft: StudioDraft } {
   const d = clone(draft);
   delete d.unlocked[instrumentKey];
+  return { draft: d };
+}
+
+/**
+ * Record how a questionnaire or module was made (D-68): validated, adapted,
+ * researcher-developed, co-produced… A record about it, never part of it, so
+ * it needs no unlock, on a licensed questionnaire or a protected module alike,
+ * and changes nothing a participant sees. `null` clears it.
+ */
+export function setProvenance(draft: StudioDraft, instrumentKey: string, record: ProvenanceInput | null): { draft: StudioDraft } {
+  const d = clone(draft);
+  const refs = Object.entries(d.instruments).filter(([, def]) => def.instrument === instrumentKey);
+  if (refs.length === 0) throw new StudioOpError(`There is no questionnaire or module “${instrumentKey}” in this survey.`, "not_found");
+  let parsed: ReturnType<typeof provenanceSchema.parse> | null = null;
+  if (record) {
+    const result = provenanceSchema.safeParse(record);
+    if (!result.success) {
+      const first = result.error.issues[0];
+      throw new StudioOpError(`The provenance record isn't valid${first ? ` (${first.path.join(".") || "record"}: ${first.message})` : ""}.`, "invalid");
+    }
+    parsed = result.data;
+  }
+  for (const [refKey, def] of refs) {
+    const next = { ...def } as typeof def & { provenance?: unknown };
+    if (parsed) next.provenance = parsed;
+    else delete next.provenance;
+    d.instruments[refKey] = next;
+  }
   return { draft: d };
 }
 

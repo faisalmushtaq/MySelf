@@ -1,4 +1,5 @@
 import type { z } from "zod";
+import { attachProvenance } from "./provenance.js";
 import type { instrumentVersion, itemDefinition, licence, timeEstimate } from "@myself/schema";
 
 /**
@@ -959,7 +960,7 @@ export const doomscroll4: InstrumentInput = {
   owner: "ybm",
 };
 
-export const allInstruments: InstrumentInput[] = [
+export const allInstruments: InstrumentInput[] = attachProvenance([
   kss,
   sqs,
   ehiSf,
@@ -973,4 +974,4 @@ export const allInstruments: InstrumentInput[] = [
   stai5S,
   bisbas12Ybm,
   doomscroll4,
-];
+]);
