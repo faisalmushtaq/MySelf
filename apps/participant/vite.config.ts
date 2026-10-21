@@ -166,23 +166,13 @@ export default defineConfig({
       registerType: "prompt",
       injectRegister: false,
       includeAssets: ["apple-touch-icon.png", "icon-192.png", "icon-512.png"],
-      manifest: {
-        name: "MySelf",
-        short_name: "MySelf",
-        description: "MySelf research platform — participant application",
-        display: "standalone",
-        orientation: "portrait",
-        start_url: base,
-        scope: base,
-        background_color: "#faf6f0",
-        theme_color: "#faf6f0",
-        icons: [
-          { src: "icon-192.png", sizes: "192x192", type: "image/png" },
-          { src: "icon-512.png", sizes: "512x512", type: "image/png" },
-        ],
-      },
+      // The web app manifest is public/manifest.webmanifest, written by hand:
+      // the plugin always adds a start_url, and a fixed one makes every Home
+      // Screen icon open the app bare, dropping ?study=…&survey=… (D-56).
+      // Without one, an icon opens the address it was added from.
+      manifest: false,
       workbox: {
-        globPatterns: ["**/*.{js,css,html,svg,png,json,woff2}"],
+        globPatterns: ["**/*.{js,css,html,svg,png,json,woff2,webmanifest}"],
         // The bundled release manifest must be available offline.
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
         /**
