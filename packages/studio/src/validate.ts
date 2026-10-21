@@ -1806,7 +1806,7 @@ function checkAgainstBaseline(m: Model, c: Collector): void {
         `${why} Change it back.`,
       );
     } else if (unlocked) {
-      const notes = new Set(["researcherNote", "a11yNote", "reportingCategory"]);
+      const notes = new Set(["researcherNote", "a11yNote", "reportingCategory", "provenance"]);
       const strip = (x: Loose) => Object.fromEntries(Object.entries(x).filter(([k]) => !notes.has(k)));
       // The options count too: ingest builds the code from the birth month's
       // option *code*, so recoding its options changes every later code as

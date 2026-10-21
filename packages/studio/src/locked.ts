@@ -33,6 +33,8 @@ export const LOCKED_ALLOWED_FIELDS = [
   "a11yNote",
   "researcherNote",
   "reportingCategory",
+  // Where the question came from (D-68): a record about it, never part of it.
+  "provenance",
 ] as const;
 
 /**
@@ -48,7 +50,7 @@ export const LOCKED_ALLOWED_FIELDS = [
 // participant-visible, so on ethics-approved or linkage text they need the
 // unlock too — and this, run on the server at publish, is the check that
 // holds even for a draft written without going through the operations.
-export const PROTECTED_ALLOWED_FIELDS = ["researcherNote", "reportingCategory", "minAgeYears", "maxAgeYears", "minYear", "maxYear"] as const;
+export const PROTECTED_ALLOWED_FIELDS = ["researcherNote", "reportingCategory", "provenance", "minAgeYears", "maxAgeYears", "minYear", "maxYear"] as const;
 
 /** Study modules that need an unlock before their content changes. */
 export const PROTECTED_INSTRUMENTS: readonly string[] = ["ybm_identity"];
@@ -264,9 +266,14 @@ function itemsOf(form: Loose | undefined): Loose[] {
   return form && Array.isArray(form["items"]) ? (form["items"] as Loose[]) : [];
 }
 
+/** Records about an instrument rather than part of it: changing them changes nothing a participant sees (D-68). */
+const DEFINITION_RECORDS = ["provenance"] as const;
+
 function stripped(def: Loose, allowed: readonly string[]): Loose {
+  const rest: Loose = { ...def };
+  for (const field of DEFINITION_RECORDS) delete rest[field];
   return {
-    ...def,
+    ...rest,
     forms: formsOf(def).map((form) => ({ ...form, items: itemsOf(form).map((item) => withoutFields(item, allowed)) })),
   };
 }

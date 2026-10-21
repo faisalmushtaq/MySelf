@@ -25,6 +25,7 @@ import {
   pendingModuleUpdates,
   pickable,
   planModuleUpdate,
+  provenanceForSave,
   provenanceOf,
   questionCount,
   recordSavedModule,
@@ -33,6 +34,7 @@ import {
   validatedCatalogue,
   validatedFragment,
   withoutOutsideConditions,
+  withProvenance,
   type InsertOptions,
 } from "./library.js";
 import { lockBaseline } from "./locked.js";
@@ -390,8 +392,12 @@ describe("validated questionnaires", () => {
     expect(canonicalJson(f.scales)).toBe(canonicalJson(body.scales));
     expect(canonicalJson(f.scoring)).toBe(canonicalJson(body.scoring));
     expect(f.origin).toEqual({ kind: "validated", instrument: "sdq25_s", refKey: SDQ2 });
-    // …and it is what the live release froze, too.
-    expect(canonicalJson(f.blocks[0]!.definition)).toBe(canonicalJson(r800.instruments[SDQ2]));
+    // …and it is what the live release froze, too, but for the record of where
+    // it came from (D-68), which that release predates and which is never part
+    // of what is administered.
+    const { provenance, ...administered } = f.blocks[0]!.definition as typeof f.blocks[0]["definition"] & { provenance?: unknown };
+    expect(provenance).toMatchObject({ kind: "validated" });
+    expect(canonicalJson(administered)).toBe(canonicalJson(r800.instruments[SDQ2]));
   });
 
   it("validates clean with or without the library's vouchers: a licence never refuses it", () => {
@@ -833,6 +839,61 @@ describe("updating a module copy, three ways", () => {
     expect(refusal(() => planModuleUpdate(d, "imp_test", v2, v1)).code).toBe("invalid");
     expect(refusal(() => planModuleUpdate(d, "imp_test", { ...v1, origin: { ...v1Origin, moduleId: "other" } }, v2)).code).toBe("invalid");
     expect(refusal(() => planModuleUpdate(d, "imp_nope", v1, v2)).code).toBe("not_found");
+  });
+});
+
+describe("provenance records (D-68)", () => {
+  const record = {
+    kind: "validated" as const,
+    basedOn: "SDQ S11-17",
+    involvement: [{ group: "Youth Advisory Group", role: "reviewed how it reads on an iPad", when: "2026-11" }],
+    confirmed: true,
+    confirmedBy: "Principal investigator",
+    confirmedAt: "2026-11-01",
+  };
+
+  it("can be written on a published, locked questionnaire without unlocking it, as a patch", () => {
+    const live = extractDraft(r800);
+    const { draft } = ops.setProvenance(live, "sdq25_s", record);
+    expect((draft.instruments[SDQ2] as unknown as { provenance: unknown }).provenance).toMatchObject({ kind: "validated", confirmed: true });
+    expect(errors(draft, { baseline: live })).toEqual([]);
+    expect(diffDrafts(live, draft).bump).toBe("patch");
+    publishable(draft);
+  });
+
+  it("can be written on a protected module without unlocking it", () => {
+    const live = extractDraft(r800);
+    const { draft } = ops.setProvenance(live, "ybm_identity", { kind: "researcher_developed", developedBy: "YBM research team" });
+    expect(errors(draft, { baseline: live })).toEqual([]);
+  });
+
+  it("refuses a record that isn't one, and clears with null", () => {
+    const live = extractDraft(r800);
+    expect(() => ops.setProvenance(live, "sdq25_s", { kind: "made_up" } as never)).toThrow(StudioOpError);
+    expect(() => ops.setProvenance(live, "nothing_here", record)).toThrow(StudioOpError);
+    const { draft } = ops.setProvenance(ops.setProvenance(live, "sdq25_s", record).draft, "sdq25_s", null);
+    expect((draft.instruments[SDQ2] as unknown as { provenance?: unknown }).provenance).toBeUndefined();
+  });
+
+  it("a validated questionnaire edited and saved to the library becomes an adaptation of it", () => {
+    const prior = { kind: "validated" as const, basedOn: "SDQ S11-17", confirmed: true, confirmedBy: "PI", confirmedAt: "2026-11-01" };
+    expect(provenanceForSave(prior, { name: "SDQ", edited: false })).toEqual(prior);
+    const adapted = provenanceForSave(prior, { name: "SDQ", edited: true });
+    expect(adapted).toMatchObject({ kind: "validated_adapted", basedOn: "SDQ S11-17", confirmed: false });
+    expect(adapted.confirmedBy).toBeUndefined();
+    expect(provenanceForSave(null, { name: "x", edited: false }).kind).toBe("researcher_developed");
+    const piece = withProvenance(validatedFragment(SDQ2), adapted);
+    expect((piece.blocks[0]!.definition as unknown as { provenance: { kind: string } }).provenance.kind).toBe("validated_adapted");
+  });
+
+  it("the shelf says how each questionnaire was made", () => {
+    for (const entry of validatedCatalogue()) expect(entry.provenance, entry.instrument).toMatch(/^(Validated instrument|Items from|Researcher|Co-produced)/);
+  });
+
+  it("comes with a questionnaire added from the library", () => {
+    expect((validatedFragment(SDQ2).blocks[0]!.definition as unknown as { provenance: { kind: string } }).provenance.kind).toBe("validated");
+    const piece = repositoryModuleFragment("ybm_sm_patterns", { title: "x" });
+    expect((piece.blocks[0]!.definition as unknown as { provenance: { kind: string } }).provenance.kind).toBe("researcher_developed");
   });
 });
 

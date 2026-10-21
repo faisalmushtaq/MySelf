@@ -174,6 +174,7 @@ export function ValidatedPreview({
           {entry.audience ? ` · ${entry.audience}` : ""}
         </p>
         <p className="stl-detail-desc">{entry.licence}</p>
+        {entry.provenance ? <p className="stl-detail-desc">How it was made: {entry.provenance}</p> : null}
       </header>
       <p className="stl-whole">
         <Icon name="lock" size={14} /> Added whole and unchanged, exactly as licensed, with its answer options and scoring.

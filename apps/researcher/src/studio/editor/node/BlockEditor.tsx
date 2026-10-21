@@ -26,6 +26,7 @@ import { ConditionBuilder } from "./ConditionBuilder.js";
 import { Facts, IssueMessages, LockBanner, Panel } from "./controls.js";
 import { blockIssues } from "./issues.js";
 import { protectedBanner } from "./locks.js";
+import { HowMadePanel } from "./HowMade.js";
 import { NodeList } from "./NodeList.js";
 import { relock, UnlockDialog, unlockedText } from "./UnlockDialog.js";
 
@@ -248,6 +249,8 @@ export function BlockEditor({ sectionKey, componentIndex }: BlockRef) {
           </div>
         ) : null}
       </Panel>
+
+      <HowMadePanel instrument={p.instrument} def={def} />
 
       <Panel
         title="Library"

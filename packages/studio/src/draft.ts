@@ -280,6 +280,9 @@ export function studioModule(options: {
     ],
     timeEstimates: [{ ageBand: options.ageBand, medianSeconds: 10, provenance: "estimated-heuristic" }],
     changelog: "Written in MySelf Studio.",
+    // Questions written here are the team's own (D-68); a co-producing group
+    // or a source is added to the record in the Studio.
+    provenance: { kind: "researcher_developed", developedBy: "The study team, in MySelf Studio", confirmed: false },
     owner: "MySelf Studio",
   };
 }

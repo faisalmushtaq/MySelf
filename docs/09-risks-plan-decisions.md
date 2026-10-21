@@ -678,3 +678,81 @@ covers these), neither in the YBM composition:
 The break study's draft takes both after "Time on each app". For YBM the team
 chooses which of `ybm_sm_patterns` to take, in a later release; the screen
 check is not offered there.
+
+### How each questionnaire was made: provenance (2026-10-21, D-68)
+
+**Asked.** "Our survey library should have a provenance information somewhere
+so we can always refer back to how it was created, eg researcher developed,
+co-produced with Youth Advisory Group, validated instrument etc."
+
+**Changed.** Every questionnaire and module (and, where it differs, a single
+question) can carry a provenance record (`packages/schema/src/provenance.ts`):
+- its kind: validated instrument as published; validated instrument, adapted;
+  items from another study or source; researcher-developed; co-produced; or
+  not recorded yet;
+- what it was based on, what was changed and why, who developed it, who else
+  was involved (for example "Youth Advisory Group: co-wrote the questions,
+  2026-09"), the evidence of its validity, and the decisions behind it;
+- whether someone on the team has checked the record, who and when.
+
+All 27 library entries have one, written in one place
+(`packages/library/src/provenance.ts`) from the repository's own history.
+Nothing is guessed: where the 2026 Qualtrics survey does not say who wrote a
+question or where it came from (the "AoW" social media battery, the BIS/BAS
+subset, the doomscrolling items), the record says so, and every record is
+"not yet checked by the team" until someone confirms it. Questions the team
+added to modules from the 2026 survey (the languages questions, the home
+address, the family-control follow-ups) are marked as theirs.
+
+In the Studio, each block has a "How it was made" panel with an Edit dialog.
+Provenance is a record about the questions, not part of them: participants
+never see it, it changes nothing about how answers are stored or scored, it
+needs no unlock on a licensed questionnaire or a protected module, and a change
+to it is a patch. Questions written in the Studio start as researcher-developed.
+Saving to the library asks how the module was made; a validated questionnaire
+that was unlocked and edited is saved as "validated instrument, adapted", and
+the save asks what changed. The library shelf shows each questionnaire's kind.
+
+Releases from now on freeze the record with the questionnaire. Releases already
+published are unchanged (the 9.0.0 drift test rebuilds it without the
+records). Devices check a release's hash over the raw file before reading it
+and ignore fields they do not know, so an older copy of the app still accepts
+a newer release.
+
+**For the team.** Check each record in the Studio (or in
+`packages/library/src/provenance.ts`) and tick "Checked by the team"; add
+Youth Advisory Group or other involvement where it happened; name the "AoW"
+source.
+
+**Literature check for the D-67 questions (October 2026).** Asked: "do a double
+check that there aren't any surveys out there duplicating some of this stuff."
+A search of the published measures (unverified by the team; DOIs as found):
+- Pattern across the day (times used, peak time, sessions vs checks): no
+  validated measure. Related: night-time use, Scott & Woods (2018), J
+  Adolescence 68:61-65, doi:10.1016/j.adolescence.2018.07.009; ABCD bedtime
+  screen use, Nagata et al. (2023), doi:10.1016/j.sleh.2023.02.005; brief
+  checking habits, Oulasvirta et al. (2012), doi:10.1007/s00779-011-0412-2.
+  Our night checks and morning latency (ybm_social_media) already cover part.
+- Checking frequency: estimates agree poorly with logged use (Andrews et al.
+  2015; Ellis et al. 2019; Parry et al. 2021, Nature Human Behaviour; Ohme et
+  al. 2021 on Screen Time screenshots). Keep the estimate, and make the
+  phone's own count the main measure where the phone is in hand (the break
+  study), as built.
+- Attention to content: nothing validated measures scrolling past or speeding
+  up videos (the short-video scales are all addiction scales). "I open a social
+  media app without really meaning to" and "…without really taking anything
+  in" overlap the Smartphone Use Questionnaire – Absent-Minded (SUQ-A,
+  Marty-Dugas et al. 2018, doi:10.1037/cns0000131; 10 items, 1–7, adults
+  only). "I do other things while I scroll" overlaps media multitasking (MMM-S,
+  Baumgartner et al. 2017, doi:10.1027/1864-1105/a000167, adolescents).
+- Already in the library and not duplicated: addiction-style scales (SAS-SV,
+  BSMAS, Social Media Disorder Scale) overlap our screen dependence and
+  doomscrolling items, not these; active/passive use (PAUM) overlaps the AoW
+  item.
+
+Recommendation, for the team to decide: keep the time-of-day and engagement
+questions as exploratory study-written items; consider replacing the two
+absent-minded statements with adapted SUQ-A items (cite it, note adult
+validation) and the multitasking statement with MMM-S items; pilot the
+wording with young people (cognitive interviews, 8–11 especially). The
+records in `ybm_sm_patterns` and `ybm_phone_pickups` cite these.

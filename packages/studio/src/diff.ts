@@ -138,6 +138,7 @@ const FIELD_ASPECT: Record<string, string> = {
   image: "presentation",
   researcherNote: "notes",
   reportingCategory: "notes",
+  provenance: "notes",
   a11yNote: "notes",
   legacyVariable: "notes",
   revision: "notes",
