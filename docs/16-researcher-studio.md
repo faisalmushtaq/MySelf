@@ -88,12 +88,7 @@ already give every response a stable version, question ID and option value.
   - Hosting (MyStory lab only) on every push.
   - Rules when the rules files change.
   - Functions (`--force`) when function-related paths change.
-- **`ci.yml`** runs on pull requests and on `main` (not on every push to a working branch, to save Actions minutes):
-  - build, typecheck and unit tests;
-  - Playwright e2e against the participant app;
-  - the Functions integration suite on the Firestore emulator;
-  - the sync e2e on the emulator;
-  - the rules suite.
+- **`ci.yml`** runs in two tiers (never on every push to a working branch, to save Actions minutes). Pull requests run the fast tier (about 12 minutes): build, typecheck and unit tests, the Functions integration suite on the Firestore emulator, and the rules suite. `main` runs the full set, which adds the browser suites the deploys wait for: Playwright e2e against the participant app, the sync e2e and the Studio e2e on the emulators. A pull request gets the browser suites early by carrying the `full-ci` label.
 
 ---
 

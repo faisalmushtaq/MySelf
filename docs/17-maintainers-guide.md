@@ -364,10 +364,12 @@ Everything deploys from GitHub Actions (`.github/workflows/`):
 
 | Workflow | When | What |
 |---|---|---|
-| `ci.yml` | pull requests and pushes to `main`, skipping docs-only changes; or run by hand. Not every push to a working branch: Actions minutes are limited, and a newer push cancels the run it supersedes | build, typecheck and unit tests; browser tests on Chromium and WebKit; the functions integration, sync and rules suites |
+| `ci.yml` | pull requests and pushes to `main`, skipping docs-only changes; or run by hand. Not every push to a working branch: Actions minutes are limited, and a newer push cancels the run it supersedes. Draft pull requests run nothing | two tiers. The fast tier (about 12 minutes) runs on every pull request push: build, typecheck and unit tests, the functions integration suite and the rules suite. The full set (about 64 minutes) adds the browser suites, e2e on Chromium and WebKit, sync and studio, and runs on `main` and by hand. A pull request runs the browser suites (WebKit only) when it carries the `full-ci` label |
 | `pages.yml` | push to `main` | builds with the study's Firebase project baked in, runs the unit tests, and publishes the participant app to GitHub Pages at https://faisalmushtaq.github.io/MySelf/, with the researcher view at `/researcher/` and the MyStory lab at `/mystory/` |
 | `firebase.yml` | push to `main`, or run by hand | deploys Firebase Hosting (the MyStory lab) every time; the Firestore and Storage rules when their files changed; the functions when `apps/functions`, `releases/`, the Firebase configuration or one of the packages it lists (`llm`, `narrative`, `firebase`, `schema`, `store`) changed |
 | `preview.yml` | run by hand, on the branch to preview | publishes the survey to the Firebase Hosting preview channel `survey-preview` for 30 days, and prints its URL in the run summary |
+
+If Actions is unavailable because the monthly minutes are spent, [18-deploying-without-actions.md](18-deploying-without-actions.md) is how to ship a rules or function fix by hand.
 
 Two things to know about `firebase.yml`:
 

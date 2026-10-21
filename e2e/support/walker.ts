@@ -110,3 +110,87 @@ export async function advance(page: Page): Promise<void> {
     `no way forward from this screen: nothing recognised to click. ${JSON.stringify(where)}`,
   );
 }
+
+/** Pages whose clock the walk controls: see `installClock`. */
+const clocked = new WeakSet<Page>();
+
+/**
+ * Longer than the app's longest auto-advance pause (450ms, after the tick that
+ * completes the consent set), so one jump fires whichever is pending.
+ */
+const AUTO_ADVANCE_MS = 500;
+
+/**
+ * Put the page on a clock the walk can move, so a single-choice screen's 300ms
+ * pause (and the consent set's 450ms) does not have to be waited out in real time.
+ *
+ * It is the same time passing, only sooner: the page's clock jumps by the pause,
+ * so anything that reads elapsed time (the pace check that interrupts answers
+ * given faster than the question could be read, the paradata timings) sees what it
+ * would have seen. Time still flows in real time between jumps, so debounces and
+ * `expect` waits behave as they always did. Call it before the first `goto`, and
+ * instead of `page.clock.install()` in a test that also moves the clock itself.
+ * Safe to call twice.
+ */
+export async function installClock(page: Page): Promise<void> {
+  if (clocked.has(page)) return;
+  await page.clock.install();
+  clocked.add(page);
+}
+
+/**
+ * Whether the screen holds a control that can move the survey on by itself.
+ *
+ * Three do, and only three: a single choice (all five presentations are a
+ * `radiogroup`) pauses 300ms and moves on, the social ladder does the same after
+ * a tap, and the consent set moves on 450ms after the tick that completes it.
+ * Everything else (text, dates, selects, sliders, a multi-select) waits for Next.
+ * If a new control learns to auto-advance, it belongs in this list.
+ */
+async function mayAdvanceItself(page: Page): Promise<boolean> {
+  return page.evaluate(() => document.querySelector('[role="radiogroup"], .ladder-svg, .consent-list') !== null);
+}
+
+/**
+ * After answering a screen: did the survey move on, and is it worth waiting to see?
+ *
+ * The walks used to give every screen 600 to 800ms to move on by itself, polling
+ * every 100ms, whether or not anything on it could. About one screen in four
+ * cannot, and each of those cost the whole wait: 30 of the 95 seconds in a single
+ * whole-sitting walk. A screen with an auto-advancing control is still given the
+ * same grace, polled faster so a move is seen as soon as it happens. Any other
+ * screen is given two frames for its own re-render (a follow-up step opening, a
+ * date read back) and then reported as not moved, so the caller clicks Next.
+ *
+ * Returns whether the position changed. `position` is a parameter for the one
+ * suite that reads it differently.
+ */
+export async function settle(
+  page: Page,
+  before: string,
+  options: { position?: (page: Page) => Promise<string>; graceMs?: number } = {},
+): Promise<boolean> {
+  const read = options.position ?? position;
+  let graceMs = options.graceMs ?? 600;
+
+  if (await mayAdvanceItself(page)) {
+    if (clocked.has(page)) {
+      // The app's own pause is a timer, so let it run out on the page's clock rather
+      // than on ours. The pending move fires now; all that is left to wait for is
+      // the render, which is a few milliseconds, not the pause.
+      await page.clock.fastForward(AUTO_ADVANCE_MS);
+      graceMs = Math.min(graceMs, 250);
+    }
+    const deadline = Date.now() + graceMs;
+    for (;;) {
+      if ((await read(page)) !== before) return true;
+      if (Date.now() >= deadline) return false;
+      await page.waitForTimeout(25);
+    }
+  }
+
+  await page.evaluate(
+    () => new Promise<void>((done) => requestAnimationFrame(() => requestAnimationFrame(() => done()))),
+  );
+  return (await read(page)) !== before;
+}

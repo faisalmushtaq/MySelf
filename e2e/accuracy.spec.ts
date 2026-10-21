@@ -3,7 +3,7 @@ import { resolve } from "node:path";
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { openOnCandidate } from "./support/candidate.js";
 import { openStaffPanel } from "./support/staff.js";
-import { accepted, advance, position } from "./support/walker.js";
+import { accepted, advance, installClock, position, settle } from "./support/walker.js";
 
 /**
  * What the child tapped, against what the study stored.
@@ -247,6 +247,7 @@ async function walk(
   enough: () => boolean | Promise<boolean> = () => false,
   options: { candidate?: boolean } = {},
 ): Promise<void> {
+  await installClock(page);
   if (options.candidate) await openOnCandidate(page);
   else await page.goto("./");
   await page.locator("input.code").fill(CODE);
@@ -256,14 +257,7 @@ async function walk(
     if ((await position(page)) === "finished" || (await enough())) break;
     const before = await position(page);
     await answerAndRecord(page, ledger);
-    let moved = false;
-    for (let waited = 0; waited < 600; waited += 100) {
-      if ((await position(page)) !== before) {
-        moved = true;
-        break;
-      }
-      await page.waitForTimeout(100);
-    }
+    const moved = await settle(page, before);
     if (!moved) {
       await advance(page);
       await expect.poll(() => position(page), { timeout: 10_000 }).not.toBe(before);
@@ -453,14 +447,7 @@ async function walk_on(page: Page, enough: () => Promise<boolean>): Promise<void
     if (await enough()) return;
     const before = await position(page);
     await answerAndRecord(page, []);
-    let moved = false;
-    for (let waited = 0; waited < 600; waited += 100) {
-      if ((await position(page)) !== before) {
-        moved = true;
-        break;
-      }
-      await page.waitForTimeout(100);
-    }
+    const moved = await settle(page, before);
     if (!moved) {
       await advance(page);
       await expect.poll(() => position(page), { timeout: 10_000 }).not.toBe(before);
