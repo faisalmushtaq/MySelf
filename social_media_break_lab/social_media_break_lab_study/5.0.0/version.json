@@ -1,0 +1,912 @@
+{
+  "study": "social_media_break_lab",
+  "surveyId": "social_media_break_lab_study",
+  "version": "5.0.0",
+  "hash": "sha256:e835738a483366f61bbd113e07429116e78ac64b2dc121466a4e069bd0345f1b",
+  "publishedAt": "2026-10-21T08:41:55.465Z",
+  "publishedBy": "miftafai@gmail.com",
+  "releaseNote": "toggle required questions on",
+  "changeSummary": {
+    "bump": "major",
+    "entries": [
+      {
+        "kind": "question.changed",
+        "bump": "major",
+        "breaking": false,
+        "message": "Changed the required setting of “Which hand do you write with?” (ehi_sf.writing).",
+        "itemKey": "ehi_sf.writing",
+        "sectionKey": "hands_and_ladders",
+        "aspects": [
+          "required"
+        ]
+      },
+      {
+        "kind": "question.changed",
+        "bump": "major",
+        "breaking": false,
+        "message": "Changed the required setting of “Which hand do you throw a ball with?” (ehi_sf.throwing).",
+        "itemKey": "ehi_sf.throwing",
+        "sectionKey": "hands_and_ladders",
+        "aspects": [
+          "required"
+        ]
+      },
+      {
+        "kind": "question.changed",
+        "bump": "major",
+        "breaking": false,
+        "message": "Changed the required setting of “Which hand do you hold your toothbrush in?” (ehi_sf.toothbrush).",
+        "itemKey": "ehi_sf.toothbrush",
+        "sectionKey": "hands_and_ladders",
+        "aspects": [
+          "required"
+        ]
+      },
+      {
+        "kind": "question.changed",
+        "bump": "major",
+        "breaking": false,
+        "message": "Changed the required setting of “Which hand do you hold a spoon in?” (ehi_sf.spoon).",
+        "itemKey": "ehi_sf.spoon",
+        "sectionKey": "hands_and_ladders",
+        "aspects": [
+          "required"
+        ]
+      },
+      {
+        "kind": "question.changed",
+        "bump": "major",
+        "breaking": false,
+        "message": "Changed the required setting of “Where would you be on this ladder?” (macarthur_sss_adult.society).",
+        "itemKey": "macarthur_sss_adult.society",
+        "sectionKey": "hands_and_ladders",
+        "aspects": [
+          "required"
+        ]
+      },
+      {
+        "kind": "question.changed",
+        "bump": "major",
+        "breaking": false,
+        "message": "Changed the required setting of “Where would you be on this ladder?” (macarthur_sss_adult.community).",
+        "itemKey": "macarthur_sss_adult.community",
+        "sectionKey": "hands_and_ladders",
+        "aspects": [
+          "required"
+        ]
+      },
+      {
+        "kind": "question.changed",
+        "bump": "major",
+        "breaking": false,
+        "message": "Changed the required setting of “During the past 7 days, how would you rate your…” (sqs.q1).",
+        "itemKey": "sqs.q1",
+        "sectionKey": "sleep",
+        "aspects": [
+          "required"
+        ]
+      },
+      {
+        "kind": "question.changed",
+        "bump": "major",
+        "breaking": false,
+        "message": "Changed the required setting of “How sleepy are you feeling right now?” (kss.q1).",
+        "itemKey": "kss.q1",
+        "sectionKey": "sleep",
+        "aspects": [
+          "required"
+        ]
+      },
+      {
+        "kind": "question.changed",
+        "bump": "major",
+        "breaking": false,
+        "message": "Changed the required setting of “I’ve been feeling optimistic about the future” (swemwbs.optimistic).",
+        "itemKey": "swemwbs.optimistic",
+        "sectionKey": "wellbeing",
+        "aspects": [
+          "required"
+        ]
+      },
+      {
+        "kind": "question.changed",
+        "bump": "major",
+        "breaking": false,
+        "message": "Changed the required setting of “I’ve been feeling useful” (swemwbs.useful).",
+        "itemKey": "swemwbs.useful",
+        "sectionKey": "wellbeing",
+        "aspects": [
+          "required"
+        ]
+      },
+      {
+        "kind": "question.changed",
+        "bump": "major",
+        "breaking": false,
+        "message": "Changed the required setting of “I’ve been feeling relaxed” (swemwbs.relaxed).",
+        "itemKey": "swemwbs.relaxed",
+        "sectionKey": "wellbeing",
+        "aspects": [
+          "required"
+        ]
+      },
+      {
+        "kind": "question.changed",
+        "bump": "major",
+        "breaking": false,
+        "message": "Changed the required setting of “I’ve been dealing with problems well” (swemwbs.problems).",
+        "itemKey": "swemwbs.problems",
+        "sectionKey": "wellbeing",
+        "aspects": [
+          "required"
+        ]
+      },
+      {
+        "kind": "question.changed",
+        "bump": "major",
+        "breaking": false,
+        "message": "Changed the required setting of “I’ve been thinking clearly” (swemwbs.thinking).",
+        "itemKey": "swemwbs.thinking",
+        "sectionKey": "wellbeing",
+        "aspects": [
+          "required"
+        ]
+      },
+      {
+        "kind": "question.changed",
+        "bump": "major",
+        "breaking": false,
+        "message": "Changed the required setting of “I’ve been feeling close to other people” (swemwbs.close).",
+        "itemKey": "swemwbs.close",
+        "sectionKey": "wellbeing",
+        "aspects": [
+          "required"
+        ]
+      },
+      {
+        "kind": "question.changed",
+        "bump": "major",
+        "breaking": false,
+        "message": "Changed the required setting of “I’ve been able to make up my own mind about thi…” (swemwbs.mind).",
+        "itemKey": "swemwbs.mind",
+        "sectionKey": "wellbeing",
+        "aspects": [
+          "required"
+        ]
+      },
+      {
+        "kind": "question.changed",
+        "bump": "major",
+        "breaking": false,
+        "message": "Changed the required setting of “I feel upset.” (stai5_s.upset).",
+        "itemKey": "stai5_s.upset",
+        "sectionKey": "wellbeing",
+        "aspects": [
+          "required"
+        ]
+      },
+      {
+        "kind": "question.changed",
+        "bump": "major",
+        "breaking": false,
+        "message": "Changed the required setting of “I feel frightened.” (stai5_s.frightened).",
+        "itemKey": "stai5_s.frightened",
+        "sectionKey": "wellbeing",
+        "aspects": [
+          "required"
+        ]
+      },
+      {
+        "kind": "question.changed",
+        "bump": "major",
+        "breaking": false,
+        "message": "Changed the required setting of “I feel nervous.” (stai5_s.nervous).",
+        "itemKey": "stai5_s.nervous",
+        "sectionKey": "wellbeing",
+        "aspects": [
+          "required"
+        ]
+      },
+      {
+        "kind": "question.changed",
+        "bump": "major",
+        "breaking": false,
+        "message": "Changed the required setting of “I am jittery.” (stai5_s.jittery).",
+        "itemKey": "stai5_s.jittery",
+        "sectionKey": "wellbeing",
+        "aspects": [
+          "required"
+        ]
+      },
+      {
+        "kind": "question.changed",
+        "bump": "major",
+        "breaking": false,
+        "message": "Changed the required setting of “I feel confused.” (stai5_s.confused).",
+        "itemKey": "stai5_s.confused",
+        "sectionKey": "wellbeing",
+        "aspects": [
+          "required"
+        ]
+      },
+      {
+        "kind": "question.changed",
+        "bump": "major",
+        "breaking": false,
+        "message": "Changed the required setting of “Feeling nervous, anxious or on edge” (phq4.nervous).",
+        "itemKey": "phq4.nervous",
+        "sectionKey": "wellbeing",
+        "aspects": [
+          "required"
+        ]
+      },
+      {
+        "kind": "question.changed",
+        "bump": "major",
+        "breaking": false,
+        "message": "Changed the required setting of “Not being able to stop or control worrying” (phq4.worrying).",
+        "itemKey": "phq4.worrying",
+        "sectionKey": "wellbeing",
+        "aspects": [
+          "required"
+        ]
+      },
+      {
+        "kind": "question.changed",
+        "bump": "major",
+        "breaking": false,
+        "message": "Changed the required setting of “Little interest or pleasure in doing things” (phq4.interest).",
+        "itemKey": "phq4.interest",
+        "sectionKey": "wellbeing",
+        "aspects": [
+          "required"
+        ]
+      },
+      {
+        "kind": "question.changed",
+        "bump": "major",
+        "breaking": false,
+        "message": "Changed the required setting of “Feeling down, depressed, or hopeless” (phq4.down).",
+        "itemKey": "phq4.down",
+        "sectionKey": "wellbeing",
+        "aspects": [
+          "required"
+        ]
+      },
+      {
+        "kind": "question.changed",
+        "bump": "major",
+        "breaking": false,
+        "message": "Changed the required setting of “Do you have your own smartphone?” (ybm_smartphone.own).",
+        "itemKey": "ybm_smartphone.own",
+        "sectionKey": "phones",
+        "aspects": [
+          "required"
+        ]
+      },
+      {
+        "kind": "question.changed",
+        "bump": "major",
+        "breaking": false,
+        "message": "Changed the required setting of “At what age did you get your first smartphone?…” (ybm_smartphone.age_smartphone).",
+        "itemKey": "ybm_smartphone.age_smartphone",
+        "sectionKey": "phones",
+        "aspects": [
+          "required"
+        ]
+      },
+      {
+        "kind": "question.changed",
+        "bump": "major",
+        "breaking": false,
+        "message": "Changed the required setting of “Do you currently use social media?” (ybm_smartphone.sm_use).",
+        "itemKey": "ybm_smartphone.sm_use",
+        "sectionKey": "phones",
+        "aspects": [
+          "required"
+        ]
+      },
+      {
+        "kind": "question.changed",
+        "bump": "major",
+        "breaking": false,
+        "message": "Changed the required setting of “At what age did you start using social media? P…” (ybm_smartphone.age_sm).",
+        "itemKey": "ybm_smartphone.age_sm",
+        "sectionKey": "phones",
+        "aspects": [
+          "required"
+        ]
+      },
+      {
+        "kind": "question.changed",
+        "bump": "major",
+        "breaking": false,
+        "message": "Changed the required setting of “Do you think you spend too much time on social…” (ybm_social_media.overuse).",
+        "itemKey": "ybm_social_media.overuse",
+        "sectionKey": "social_media",
+        "aspects": [
+          "required"
+        ]
+      },
+      {
+        "kind": "question.changed",
+        "bump": "major",
+        "breaking": false,
+        "message": "Changed the required setting of “Which of these apps do you have on your phone?” (ybm_social_media.apps_owned).",
+        "itemKey": "ybm_social_media.apps_owned",
+        "sectionKey": "social_media",
+        "aspects": [
+          "required"
+        ]
+      },
+      {
+        "kind": "question.changed",
+        "bump": "major",
+        "breaking": false,
+        "message": "Changed the required setting of “On a typical day, how much time do you usually…” (ybm_social_media.minutes_per_app).",
+        "itemKey": "ybm_social_media.minutes_per_app",
+        "sectionKey": "social_media",
+        "aspects": [
+          "required"
+        ]
+      },
+      {
+        "kind": "question.changed",
+        "bump": "major",
+        "breaking": false,
+        "message": "Changed the required setting of “On a typical weekday (Monday–Friday), how much…” (ybm_social_media.time_school_day).",
+        "itemKey": "ybm_social_media.time_school_day",
+        "sectionKey": "social_media",
+        "aspects": [
+          "required"
+        ]
+      },
+      {
+        "kind": "question.changed",
+        "bump": "major",
+        "breaking": false,
+        "message": "Changed the required setting of “On a typical weekend day, holiday, or other day…” (ybm_social_media.time_nonschool_day).",
+        "itemKey": "ybm_social_media.time_nonschool_day",
+        "sectionKey": "social_media",
+        "aspects": [
+          "required"
+        ]
+      },
+      {
+        "kind": "question.changed",
+        "bump": "major",
+        "breaking": false,
+        "message": "Changed the required setting of “I lose track of how much time I spend on social…” (ybm_social_media.lose_track).",
+        "itemKey": "ybm_social_media.lose_track",
+        "sectionKey": "social_media",
+        "aspects": [
+          "required"
+        ]
+      },
+      {
+        "kind": "question.changed",
+        "bump": "major",
+        "breaking": false,
+        "message": "Changed the required setting of “Do you use any features designed to reduce your…” (ybm_social_media.limit_features).",
+        "itemKey": "ybm_social_media.limit_features",
+        "sectionKey": "social_media",
+        "aspects": [
+          "required"
+        ]
+      },
+      {
+        "kind": "question.changed",
+        "bump": "major",
+        "breaking": false,
+        "message": "Changed the required setting of “What effect do you think abstaining from social…” (ybm_social_media.abstain_effect).",
+        "itemKey": "ybm_social_media.abstain_effect",
+        "sectionKey": "social_media",
+        "aspects": [
+          "required"
+        ]
+      },
+      {
+        "kind": "question.changed",
+        "bump": "major",
+        "breaking": false,
+        "message": "Changed the required setting of “I can control my screen behaviours” (ybm_screen_attitudes.control).",
+        "itemKey": "ybm_screen_attitudes.control",
+        "sectionKey": "social_media",
+        "aspects": [
+          "required"
+        ]
+      },
+      {
+        "kind": "question.changed",
+        "bump": "major",
+        "breaking": false,
+        "message": "Changed the required setting of “I feel dependent on screens in order to functio…” (ybm_screen_attitudes.dependent).",
+        "itemKey": "ybm_screen_attitudes.dependent",
+        "sectionKey": "social_media",
+        "aspects": [
+          "required"
+        ]
+      },
+      {
+        "kind": "question.changed",
+        "bump": "major",
+        "breaking": false,
+        "message": "Changed the required setting of “I feel addicted to any screen based activities” (ybm_screen_attitudes.addicted).",
+        "itemKey": "ybm_screen_attitudes.addicted",
+        "sectionKey": "social_media",
+        "aspects": [
+          "required"
+        ]
+      },
+      {
+        "kind": "question.changed",
+        "bump": "major",
+        "breaking": false,
+        "message": "Changed the required setting of “The impacts of social media on my mental wellbe…” (ybm_screen_attitudes.impact_positive).",
+        "itemKey": "ybm_screen_attitudes.impact_positive",
+        "sectionKey": "social_media",
+        "aspects": [
+          "required"
+        ]
+      },
+      {
+        "kind": "question.changed",
+        "bump": "major",
+        "breaking": false,
+        "message": "Changed the required setting of “The impacts of social media on my wellbeing are…” (ybm_screen_attitudes.impact_negative).",
+        "itemKey": "ybm_screen_attitudes.impact_negative",
+        "sectionKey": "social_media",
+        "aspects": [
+          "required"
+        ]
+      },
+      {
+        "kind": "question.changed",
+        "bump": "major",
+        "breaking": false,
+        "message": "Changed the required setting of “Social media is essential for day-to-day life” (ybm_screen_attitudes.impact_essential).",
+        "itemKey": "ybm_screen_attitudes.impact_essential",
+        "sectionKey": "social_media",
+        "aspects": [
+          "required"
+        ]
+      },
+      {
+        "kind": "question.changed",
+        "bump": "major",
+        "breaking": false,
+        "message": "Changed the required setting of “I avoid some social media” (ybm_screen_attitudes.impact_avoid).",
+        "itemKey": "ybm_screen_attitudes.impact_avoid",
+        "sectionKey": "social_media",
+        "aspects": [
+          "required"
+        ]
+      }
+    ],
+    "counts": {
+      "added": 0,
+      "removed": 0,
+      "archived": 0,
+      "changed": 43,
+      "moved": 0
+    }
+  },
+  "basedOnVersion": "4.0.0",
+  "source": "studio",
+  "bump": "major",
+  "imports": [
+    {
+      "id": "imp_3krix1f7jmodcrm4",
+      "at": "2026-10-16T09:48:01.038Z",
+      "by": "bbMYvw5F6zg9KIPHJInh1o08C9u1",
+      "byEmail": "faisalmushtaq@gmail.com",
+      "origin": {
+        "kind": "release",
+        "study": "ybm",
+        "surveyId": "ybm_nd2026_standard",
+        "version": "12.0.0",
+        "hash": "sha256:92b28e0802629d1e342be502ce84278125e5989dfb1bed1523a44872e1de6ab9"
+      },
+      "items": {
+        "ybm_intro_consent.intro": "ybm_intro_consent.intro",
+        "ybm_intro_consent.consent": "ybm_intro_consent.consent",
+        "ybm_intro_consent.why_it_matters": "ybm_intro_consent.why_it_matters",
+        "ybm_identity.first_name": "ybm_identity.first_name",
+        "ybm_identity.last_name": "ybm_identity.last_name",
+        "ybm_identity.dob": "ybm_identity.dob",
+        "ybm_identity.home_address": "ybm_identity.home_address",
+        "ybm_demographics.ethnicity": "ybm_demographics.ethnicity",
+        "ybm_demographics.first_language_english": "ybm_demographics.first_language_english",
+        "ybm_demographics.speaks_other_language": "ybm_demographics.speaks_other_language",
+        "ybm_demographics.other_languages": "ybm_demographics.other_languages",
+        "ybm_demographics.other_language_named": "ybm_demographics.other_language_named",
+        "ybm_demographics.understand_urdu": "ybm_demographics.understand_urdu",
+        "ybm_demographics.speak_urdu": "ybm_demographics.speak_urdu",
+        "ybm_demographics.understand_punjabi": "ybm_demographics.understand_punjabi",
+        "ybm_demographics.speak_punjabi": "ybm_demographics.speak_punjabi",
+        "ybm_demographics.understand_polish": "ybm_demographics.understand_polish",
+        "ybm_demographics.speak_polish": "ybm_demographics.speak_polish",
+        "ybm_demographics.understand_arabic": "ybm_demographics.understand_arabic",
+        "ybm_demographics.speak_arabic": "ybm_demographics.speak_arabic",
+        "ybm_demographics.understand_mandarin": "ybm_demographics.understand_mandarin",
+        "ybm_demographics.speak_mandarin": "ybm_demographics.speak_mandarin",
+        "ybm_demographics.understand_cantonese": "ybm_demographics.understand_cantonese",
+        "ybm_demographics.speak_cantonese": "ybm_demographics.speak_cantonese",
+        "ybm_demographics.understand_gujarati": "ybm_demographics.understand_gujarati",
+        "ybm_demographics.speak_gujarati": "ybm_demographics.speak_gujarati",
+        "ybm_demographics.understand_bengali": "ybm_demographics.understand_bengali",
+        "ybm_demographics.speak_bengali": "ybm_demographics.speak_bengali",
+        "ybm_demographics.understand_portuguese": "ybm_demographics.understand_portuguese",
+        "ybm_demographics.speak_portuguese": "ybm_demographics.speak_portuguese",
+        "ybm_demographics.understand_spanish": "ybm_demographics.understand_spanish",
+        "ybm_demographics.speak_spanish": "ybm_demographics.speak_spanish",
+        "ybm_demographics.understand_russian": "ybm_demographics.understand_russian",
+        "ybm_demographics.speak_russian": "ybm_demographics.speak_russian",
+        "ybm_demographics.understand_french": "ybm_demographics.understand_french",
+        "ybm_demographics.speak_french": "ybm_demographics.speak_french",
+        "ybm_demographics.understand_tamil": "ybm_demographics.understand_tamil",
+        "ybm_demographics.speak_tamil": "ybm_demographics.speak_tamil",
+        "ybm_demographics.understand_bsl": "ybm_demographics.understand_bsl",
+        "ybm_demographics.speak_bsl": "ybm_demographics.speak_bsl",
+        "ybm_demographics.understand_turkish": "ybm_demographics.understand_turkish",
+        "ybm_demographics.speak_turkish": "ybm_demographics.speak_turkish",
+        "ybm_demographics.understand_other_language": "ybm_demographics.understand_other_language",
+        "ybm_demographics.speak_other_language": "ybm_demographics.speak_other_language",
+        "ybm_demographics.gender": "ybm_demographics.gender",
+        "ybm_demographics.medication": "ybm_demographics.medication",
+        "ybm_eeg_practical.hair_type": "ybm_eeg_practical.hair_type",
+        "ehi_sf.writing": "ehi_sf.writing",
+        "ehi_sf.throwing": "ehi_sf.throwing",
+        "ehi_sf.toothbrush": "ehi_sf.toothbrush",
+        "ehi_sf.spoon": "ehi_sf.spoon",
+        "ehi_sf.lq_feedback": "ehi_sf.lq_feedback",
+        "sqs.q1": "sqs.q1",
+        "kss.q1": "kss.q1",
+        "swemwbs.optimistic": "swemwbs.optimistic",
+        "swemwbs.useful": "swemwbs.useful",
+        "swemwbs.relaxed": "swemwbs.relaxed",
+        "swemwbs.problems": "swemwbs.problems",
+        "swemwbs.thinking": "swemwbs.thinking",
+        "swemwbs.close": "swemwbs.close",
+        "swemwbs.mind": "swemwbs.mind",
+        "ybm_smartphone.own": "ybm_smartphone.own",
+        "ybm_smartphone.age_smartphone": "ybm_smartphone.age_smartphone",
+        "ybm_smartphone.sm_use": "ybm_smartphone.sm_use",
+        "ybm_smartphone.sm_use_confirm": "ybm_smartphone.sm_use_confirm",
+        "ybm_smartphone.age_sm": "ybm_smartphone.age_sm",
+        "ybm_ai_use.frequency": "ybm_ai_use.frequency",
+        "ybm_ai_use.purpose": "ybm_ai_use.purpose",
+        "ybm_ai_use.purpose_other": "ybm_ai_use.purpose_other",
+        "ybm_ai_use.feeling": "ybm_ai_use.feeling",
+        "ybm_social_media.overuse": "ybm_social_media.overuse",
+        "ybm_social_media.apps_owned": "ybm_social_media.apps_owned",
+        "ybm_social_media.account_privacy": "ybm_social_media.account_privacy",
+        "ybm_social_media.active_passive": "ybm_social_media.active_passive",
+        "ybm_social_media.functions": "ybm_social_media.functions",
+        "ybm_social_media.night_checks": "ybm_social_media.night_checks",
+        "ybm_social_media.morning_latency": "ybm_social_media.morning_latency",
+        "ybm_social_media.time_school_day": "ybm_social_media.time_school_day",
+        "ybm_social_media.time_nonschool_day": "ybm_social_media.time_nonschool_day",
+        "ybm_social_media.lose_track": "ybm_social_media.lose_track",
+        "ybm_social_media.limit_features": "ybm_social_media.limit_features",
+        "ybm_social_media.abstain_effect": "ybm_social_media.abstain_effect",
+        "ybm_social_media.abstain_days": "ybm_social_media.abstain_days",
+        "ybm_social_media.family_control": "ybm_social_media.family_control",
+        "ybm_social_media.family_control_how": "ybm_social_media.family_control_how",
+        "ybm_social_media.family_control_other": "ybm_social_media.family_control_other",
+        "ybm_screen_attitudes.control": "ybm_screen_attitudes.control",
+        "ybm_screen_attitudes.dependent": "ybm_screen_attitudes.dependent",
+        "ybm_screen_attitudes.addicted": "ybm_screen_attitudes.addicted",
+        "ybm_screen_attitudes.impact_positive": "ybm_screen_attitudes.impact_positive",
+        "ybm_screen_attitudes.impact_negative": "ybm_screen_attitudes.impact_negative",
+        "ybm_screen_attitudes.impact_essential": "ybm_screen_attitudes.impact_essential",
+        "ybm_screen_attitudes.impact_avoid": "ybm_screen_attitudes.impact_avoid",
+        "doomscroll4.q1": "doomscroll4.q1",
+        "doomscroll4.q2": "doomscroll4.q2",
+        "doomscroll4.q3": "doomscroll4.q3",
+        "doomscroll4.q4": "doomscroll4.q4",
+        "stai5_s.upset": "stai5_s.upset",
+        "stai5_s.frightened": "stai5_s.frightened",
+        "stai5_s.nervous": "stai5_s.nervous",
+        "stai5_s.jittery": "stai5_s.jittery",
+        "stai5_s.confused": "stai5_s.confused",
+        "bisbas12_ybm.bis1": "bisbas12_ybm.bis1",
+        "bisbas12_ybm.bis2": "bisbas12_ybm.bis2",
+        "bisbas12_ybm.bis3": "bisbas12_ybm.bis3",
+        "bisbas12_ybm.bis4": "bisbas12_ybm.bis4",
+        "bisbas12_ybm.rr1": "bisbas12_ybm.rr1",
+        "bisbas12_ybm.rr2": "bisbas12_ybm.rr2",
+        "bisbas12_ybm.rr3": "bisbas12_ybm.rr3",
+        "bisbas12_ybm.rr4": "bisbas12_ybm.rr4",
+        "bisbas12_ybm.dr1": "bisbas12_ybm.dr1",
+        "bisbas12_ybm.dr2": "bisbas12_ybm.dr2",
+        "bisbas12_ybm.dr3": "bisbas12_ybm.dr3",
+        "bisbas12_ybm.dr4": "bisbas12_ybm.dr4"
+      }
+    },
+    {
+      "id": "imp_tz5bsxa3frg7386d",
+      "at": "2026-10-20T19:54:55.899Z",
+      "by": "repository",
+      "byEmail": "repository",
+      "origin": {
+        "kind": "validated",
+        "instrument": "phq4",
+        "refKey": "phq4@1.0/en-GB/self/standard"
+      },
+      "items": {
+        "phq4.nervous": "phq4.nervous",
+        "phq4.worrying": "phq4.worrying",
+        "phq4.interest": "phq4.interest",
+        "phq4.down": "phq4.down"
+      }
+    },
+    {
+      "id": "imp_vcw8hsgb98h9zdve",
+      "at": "2026-10-20T20:30:24.116Z",
+      "by": "repository",
+      "byEmail": "repository",
+      "origin": {
+        "kind": "validated",
+        "instrument": "macarthur_sss_adult",
+        "refKey": "macarthur_sss_adult@1.0/en-GB/self/standard"
+      },
+      "items": {
+        "macarthur_sss_adult.society": "macarthur_sss_adult.society",
+        "macarthur_sss_adult.community": "macarthur_sss_adult.community"
+      }
+    }
+  ],
+  "itemKeys": [
+    "ybm_intro_consent.intro",
+    "ybm_intro_consent.consent",
+    "ybm_intro_consent.why_it_matters",
+    "ybm_identity.first_name",
+    "ybm_identity.last_name",
+    "ybm_identity.dob",
+    "ybm_identity.home_address",
+    "ybm_demographics.ethnicity",
+    "ybm_demographics.first_language_english",
+    "ybm_demographics.speaks_other_language",
+    "ybm_demographics.other_languages",
+    "ybm_demographics.other_language_named",
+    "ybm_demographics.understand_urdu",
+    "ybm_demographics.speak_urdu",
+    "ybm_demographics.understand_punjabi",
+    "ybm_demographics.speak_punjabi",
+    "ybm_demographics.understand_polish",
+    "ybm_demographics.speak_polish",
+    "ybm_demographics.understand_arabic",
+    "ybm_demographics.speak_arabic",
+    "ybm_demographics.understand_mandarin",
+    "ybm_demographics.speak_mandarin",
+    "ybm_demographics.understand_cantonese",
+    "ybm_demographics.speak_cantonese",
+    "ybm_demographics.understand_gujarati",
+    "ybm_demographics.speak_gujarati",
+    "ybm_demographics.understand_bengali",
+    "ybm_demographics.speak_bengali",
+    "ybm_demographics.understand_portuguese",
+    "ybm_demographics.speak_portuguese",
+    "ybm_demographics.understand_spanish",
+    "ybm_demographics.speak_spanish",
+    "ybm_demographics.understand_russian",
+    "ybm_demographics.speak_russian",
+    "ybm_demographics.understand_french",
+    "ybm_demographics.speak_french",
+    "ybm_demographics.understand_tamil",
+    "ybm_demographics.speak_tamil",
+    "ybm_demographics.understand_bsl",
+    "ybm_demographics.speak_bsl",
+    "ybm_demographics.understand_turkish",
+    "ybm_demographics.speak_turkish",
+    "ybm_demographics.understand_other_language",
+    "ybm_demographics.speak_other_language",
+    "ybm_demographics.gender",
+    "ybm_demographics.medication",
+    "ybm_eeg_practical.hair_type",
+    "ehi_sf.writing",
+    "ehi_sf.throwing",
+    "ehi_sf.toothbrush",
+    "ehi_sf.spoon",
+    "ehi_sf.lq_feedback",
+    "macarthur_sss_adult.society",
+    "macarthur_sss_adult.community",
+    "sqs.q1",
+    "kss.q1",
+    "swemwbs.optimistic",
+    "swemwbs.useful",
+    "swemwbs.relaxed",
+    "swemwbs.problems",
+    "swemwbs.thinking",
+    "swemwbs.close",
+    "swemwbs.mind",
+    "stai5_s.upset",
+    "stai5_s.frightened",
+    "stai5_s.nervous",
+    "stai5_s.jittery",
+    "stai5_s.confused",
+    "phq4.nervous",
+    "phq4.worrying",
+    "phq4.interest",
+    "phq4.down",
+    "ybm_smartphone.own",
+    "ybm_smartphone.number_of_phone",
+    "ybm_smartphone.new_question",
+    "ybm_smartphone.new_question_other",
+    "ybm_smartphone.age_smartphone",
+    "ybm_smartphone.sm_use",
+    "ybm_smartphone.sm_use_confirm",
+    "ybm_smartphone.age_sm",
+    "ybm_ai_use.frequency",
+    "ybm_ai_use.purpose",
+    "ybm_ai_use.purpose_other",
+    "ybm_ai_use.feeling",
+    "ybm_social_media.overuse",
+    "ybm_social_media.apps_owned",
+    "ybm_social_media.minutes_per_app",
+    "ybm_social_media.account_privacy",
+    "ybm_social_media.active_passive",
+    "ybm_social_media.functions",
+    "ybm_social_media.night_checks",
+    "ybm_social_media.morning_latency",
+    "ybm_social_media.time_school_day",
+    "ybm_social_media.time_nonschool_day",
+    "ybm_social_media.lose_track",
+    "ybm_social_media.limit_features",
+    "ybm_social_media.abstain_effect",
+    "ybm_social_media.abstain_days",
+    "ybm_social_media.family_control",
+    "ybm_social_media.family_control_how",
+    "ybm_social_media.family_control_other",
+    "ybm_screen_attitudes.control",
+    "ybm_screen_attitudes.dependent",
+    "ybm_screen_attitudes.addicted",
+    "ybm_screen_attitudes.impact_positive",
+    "ybm_screen_attitudes.impact_negative",
+    "ybm_screen_attitudes.impact_essential",
+    "ybm_screen_attitudes.impact_avoid",
+    "doomscroll4.q1",
+    "doomscroll4.q2",
+    "doomscroll4.q3",
+    "doomscroll4.q4",
+    "bisbas12_ybm.bis1",
+    "bisbas12_ybm.bis2",
+    "bisbas12_ybm.bis3",
+    "bisbas12_ybm.bis4",
+    "bisbas12_ybm.rr1",
+    "bisbas12_ybm.rr2",
+    "bisbas12_ybm.rr3",
+    "bisbas12_ybm.rr4",
+    "bisbas12_ybm.dr1",
+    "bisbas12_ybm.dr2",
+    "bisbas12_ybm.dr3",
+    "bisbas12_ybm.dr4"
+  ],
+  "variables": [
+    "study_intro",
+    "consent",
+    "why_accurate",
+    "first_name",
+    "last_name",
+    "dob",
+    "home_address",
+    "ethnicity",
+    "first_language_english",
+    "speaks_other_language",
+    "other_languages",
+    "other_language_named",
+    "understand_urdu",
+    "speak_urdu",
+    "understand_punjabi",
+    "speak_punjabi",
+    "understand_polish",
+    "speak_polish",
+    "understand_arabic",
+    "speak_arabic",
+    "understand_mandarin",
+    "speak_mandarin",
+    "understand_cantonese",
+    "speak_cantonese",
+    "understand_gujarati",
+    "speak_gujarati",
+    "understand_bengali",
+    "speak_bengali",
+    "understand_portuguese",
+    "speak_portuguese",
+    "understand_spanish",
+    "speak_spanish",
+    "understand_russian",
+    "speak_russian",
+    "understand_french",
+    "speak_french",
+    "understand_tamil",
+    "speak_tamil",
+    "understand_bsl",
+    "speak_bsl",
+    "understand_turkish",
+    "speak_turkish",
+    "understand_other_language",
+    "speak_other_language",
+    "gender",
+    "mh_medication",
+    "hair_type",
+    "ehi_writing",
+    "ehi_throwing",
+    "ehi_toothbrush",
+    "ehi_spoon",
+    "ehi_lq_feedback",
+    "sss_society",
+    "sss_community",
+    "sqs_q1",
+    "kss_q1",
+    "swemwbs_q1",
+    "swemwbs_q2",
+    "swemwbs_q3",
+    "swemwbs_q4",
+    "swemwbs_q5",
+    "swemwbs_q6",
+    "swemwbs_q7",
+    "stai5_q1",
+    "stai5_q2",
+    "stai5_q3",
+    "stai5_q4",
+    "stai5_q5",
+    "phq4_q1",
+    "phq4_q2",
+    "phq4_q3",
+    "phq4_q4",
+    "smartphone_own",
+    "number_of_phone",
+    "new_question_2",
+    "new_question_2_other",
+    "smartphone_age",
+    "sm_use",
+    "sm_use_confirm",
+    "sm_age",
+    "ai_use_frequency",
+    "ai_use_purpose",
+    "ai_use_purpose_other",
+    "ai_use_feeling",
+    "sm_overuse",
+    "sm_apps_owned",
+    "app_minutes2",
+    "sm_account_privacy",
+    "sm_active_passive",
+    "sm_functions",
+    "sm_night_checks",
+    "sm_morning_latency",
+    "sm_time_school_day",
+    "sm_time_nonschool_day",
+    "sm_lose_track",
+    "sm_limit_features",
+    "sm_abstain_effect",
+    "sm_abstain_days",
+    "sm_family_control",
+    "sm_family_control_how",
+    "sm_family_control_other",
+    "screen_control",
+    "screen_dependent",
+    "screen_addicted",
+    "sm_impact_positive",
+    "sm_impact_negative",
+    "sm_impact_essential",
+    "sm_impact_avoid",
+    "doomscroll_q1",
+    "doomscroll_q2",
+    "doomscroll_q3",
+    "doomscroll_q4",
+    "bisbas12_bis1",
+    "bisbas12_bis2",
+    "bisbas12_bis3",
+    "bisbas12_bis4",
+    "bisbas12_rr1",
+    "bisbas12_rr2",
+    "bisbas12_rr3",
+    "bisbas12_rr4",
+    "bisbas12_dr1",
+    "bisbas12_dr2",
+    "bisbas12_dr3",
+    "bisbas12_dr4"
+  ]
+}

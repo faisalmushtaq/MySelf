@@ -1,0 +1,1497 @@
+{
+  "study": "social_media_break_lab",
+  "surveyId": "social_media_break_lab_study",
+  "version": "1.0.0",
+  "hash": "sha256:e8c705d377d34e4a1b7d3162586a8f83678ea4164bd6688a225e6da3abd40df8",
+  "publishedAt": "2026-10-21T07:16:50.090Z",
+  "publishedBy": "miftafai@gmail.com",
+  "releaseNote": "Published by Miftah",
+  "changeSummary": {
+    "bump": "major",
+    "entries": [
+      {
+        "kind": "section.added",
+        "bump": "major",
+        "breaking": false,
+        "message": "Added the section “Welcome”.",
+        "sectionKey": "welcome"
+      },
+      {
+        "kind": "section.added",
+        "bump": "major",
+        "breaking": false,
+        "message": "Added the section “About you”.",
+        "sectionKey": "about_you"
+      },
+      {
+        "kind": "section.added",
+        "bump": "major",
+        "breaking": false,
+        "message": "Added the section “Hands and standing”.",
+        "sectionKey": "hands_and_ladders"
+      },
+      {
+        "kind": "section.added",
+        "bump": "major",
+        "breaking": false,
+        "message": "Added the section “Sleep”.",
+        "sectionKey": "sleep"
+      },
+      {
+        "kind": "section.added",
+        "bump": "major",
+        "breaking": false,
+        "message": "Added the section “How you've been feeling”.",
+        "sectionKey": "wellbeing"
+      },
+      {
+        "kind": "section.added",
+        "bump": "major",
+        "breaking": false,
+        "message": "Added the section “Phones and social media”.",
+        "sectionKey": "phones"
+      },
+      {
+        "kind": "section.added",
+        "bump": "major",
+        "breaking": false,
+        "message": "Added the section “Your social media”.",
+        "sectionKey": "social_media"
+      },
+      {
+        "kind": "section.added",
+        "bump": "major",
+        "breaking": false,
+        "message": "Added the section “Right now”.",
+        "sectionKey": "right_now"
+      },
+      {
+        "kind": "question.added",
+        "bump": "major",
+        "breaking": false,
+        "message": "Added “MyPhone/MyBrain Intervention Study” (ybm_intro_consent.intro) in the section “Welcome”.",
+        "itemKey": "ybm_intro_consent.intro",
+        "sectionKey": "welcome"
+      },
+      {
+        "kind": "question.added",
+        "bump": "major",
+        "breaking": false,
+        "message": "Added “Please tap each statement to show you understan…” (ybm_intro_consent.consent) in the section “Welcome”.",
+        "itemKey": "ybm_intro_consent.consent",
+        "sectionKey": "welcome"
+      },
+      {
+        "kind": "question.added",
+        "bump": "major",
+        "breaking": false,
+        "message": "Added “Why your answers matter” (ybm_intro_consent.why_it_matters) in the section “Welcome”.",
+        "itemKey": "ybm_intro_consent.why_it_matters",
+        "sectionKey": "welcome"
+      },
+      {
+        "kind": "question.added",
+        "bump": "major",
+        "breaking": false,
+        "message": "Added “Participant ID” (social_media_break_lab_studio.new_question) in the section “Welcome”.",
+        "itemKey": "social_media_break_lab_studio.new_question",
+        "sectionKey": "welcome"
+      },
+      {
+        "kind": "question.added",
+        "bump": "major",
+        "breaking": false,
+        "message": "Added “First Name” (ybm_identity.first_name) in the section “About you”.",
+        "itemKey": "ybm_identity.first_name",
+        "sectionKey": "about_you"
+      },
+      {
+        "kind": "question.added",
+        "bump": "major",
+        "breaking": false,
+        "message": "Added “Last Name” (ybm_identity.last_name) in the section “About you”.",
+        "itemKey": "ybm_identity.last_name",
+        "sectionKey": "about_you"
+      },
+      {
+        "kind": "question.added",
+        "bump": "major",
+        "breaking": false,
+        "message": "Added “What's your date of birth?” (ybm_identity.dob) in the section “About you”.",
+        "itemKey": "ybm_identity.dob",
+        "sectionKey": "about_you"
+      },
+      {
+        "kind": "question.added",
+        "bump": "major",
+        "breaking": false,
+        "message": "Added “What's your home address?” (ybm_identity.home_address) in the section “About you”.",
+        "itemKey": "ybm_identity.home_address",
+        "sectionKey": "about_you"
+      },
+      {
+        "kind": "question.added",
+        "bump": "major",
+        "breaking": false,
+        "message": "Added “What best describes your ethnic origin?” (ybm_demographics.ethnicity) in the section “About you”.",
+        "itemKey": "ybm_demographics.ethnicity",
+        "sectionKey": "about_you"
+      },
+      {
+        "kind": "question.added",
+        "bump": "major",
+        "breaking": false,
+        "message": "Added “Was English the first language you learned to s…” (ybm_demographics.first_language_english) in the section “About you”.",
+        "itemKey": "ybm_demographics.first_language_english",
+        "sectionKey": "about_you"
+      },
+      {
+        "kind": "question.added",
+        "bump": "major",
+        "breaking": false,
+        "message": "Added “Do you speak or understand any language other t…” (ybm_demographics.speaks_other_language) in the section “About you”.",
+        "itemKey": "ybm_demographics.speaks_other_language",
+        "sectionKey": "about_you"
+      },
+      {
+        "kind": "question.added",
+        "bump": "major",
+        "breaking": false,
+        "message": "Added “Which other languages do you speak or understan…” (ybm_demographics.other_languages) in the section “About you”.",
+        "itemKey": "ybm_demographics.other_languages",
+        "sectionKey": "about_you"
+      },
+      {
+        "kind": "question.added",
+        "bump": "major",
+        "breaking": false,
+        "message": "Added “Which other language?” (ybm_demographics.other_language_named) in the section “About you”.",
+        "itemKey": "ybm_demographics.other_language_named",
+        "sectionKey": "about_you"
+      },
+      {
+        "kind": "question.added",
+        "bump": "major",
+        "breaking": false,
+        "message": "Added “How well do you understand Urdu when someone sp…” (ybm_demographics.understand_urdu) in the section “About you”.",
+        "itemKey": "ybm_demographics.understand_urdu",
+        "sectionKey": "about_you"
+      },
+      {
+        "kind": "question.added",
+        "bump": "major",
+        "breaking": false,
+        "message": "Added “How well can you speak Urdu?” (ybm_demographics.speak_urdu) in the section “About you”.",
+        "itemKey": "ybm_demographics.speak_urdu",
+        "sectionKey": "about_you"
+      },
+      {
+        "kind": "question.added",
+        "bump": "major",
+        "breaking": false,
+        "message": "Added “How well do you understand Punjabi when someone…” (ybm_demographics.understand_punjabi) in the section “About you”.",
+        "itemKey": "ybm_demographics.understand_punjabi",
+        "sectionKey": "about_you"
+      },
+      {
+        "kind": "question.added",
+        "bump": "major",
+        "breaking": false,
+        "message": "Added “How well can you speak Punjabi?” (ybm_demographics.speak_punjabi) in the section “About you”.",
+        "itemKey": "ybm_demographics.speak_punjabi",
+        "sectionKey": "about_you"
+      },
+      {
+        "kind": "question.added",
+        "bump": "major",
+        "breaking": false,
+        "message": "Added “How well do you understand Polish when someone…” (ybm_demographics.understand_polish) in the section “About you”.",
+        "itemKey": "ybm_demographics.understand_polish",
+        "sectionKey": "about_you"
+      },
+      {
+        "kind": "question.added",
+        "bump": "major",
+        "breaking": false,
+        "message": "Added “How well can you speak Polish?” (ybm_demographics.speak_polish) in the section “About you”.",
+        "itemKey": "ybm_demographics.speak_polish",
+        "sectionKey": "about_you"
+      },
+      {
+        "kind": "question.added",
+        "bump": "major",
+        "breaking": false,
+        "message": "Added “How well do you understand Arabic when someone…” (ybm_demographics.understand_arabic) in the section “About you”.",
+        "itemKey": "ybm_demographics.understand_arabic",
+        "sectionKey": "about_you"
+      },
+      {
+        "kind": "question.added",
+        "bump": "major",
+        "breaking": false,
+        "message": "Added “How well can you speak Arabic?” (ybm_demographics.speak_arabic) in the section “About you”.",
+        "itemKey": "ybm_demographics.speak_arabic",
+        "sectionKey": "about_you"
+      },
+      {
+        "kind": "question.added",
+        "bump": "major",
+        "breaking": false,
+        "message": "Added “How well do you understand Mandarin Chinese whe…” (ybm_demographics.understand_mandarin) in the section “About you”.",
+        "itemKey": "ybm_demographics.understand_mandarin",
+        "sectionKey": "about_you"
+      },
+      {
+        "kind": "question.added",
+        "bump": "major",
+        "breaking": false,
+        "message": "Added “How well can you speak Mandarin Chinese?” (ybm_demographics.speak_mandarin) in the section “About you”.",
+        "itemKey": "ybm_demographics.speak_mandarin",
+        "sectionKey": "about_you"
+      },
+      {
+        "kind": "question.added",
+        "bump": "major",
+        "breaking": false,
+        "message": "Added “How well do you understand Cantonese Chinese wh…” (ybm_demographics.understand_cantonese) in the section “About you”.",
+        "itemKey": "ybm_demographics.understand_cantonese",
+        "sectionKey": "about_you"
+      },
+      {
+        "kind": "question.added",
+        "bump": "major",
+        "breaking": false,
+        "message": "Added “How well can you speak Cantonese Chinese?” (ybm_demographics.speak_cantonese) in the section “About you”.",
+        "itemKey": "ybm_demographics.speak_cantonese",
+        "sectionKey": "about_you"
+      },
+      {
+        "kind": "question.added",
+        "bump": "major",
+        "breaking": false,
+        "message": "Added “How well do you understand Gujarati when someon…” (ybm_demographics.understand_gujarati) in the section “About you”.",
+        "itemKey": "ybm_demographics.understand_gujarati",
+        "sectionKey": "about_you"
+      },
+      {
+        "kind": "question.added",
+        "bump": "major",
+        "breaking": false,
+        "message": "Added “How well can you speak Gujarati?” (ybm_demographics.speak_gujarati) in the section “About you”.",
+        "itemKey": "ybm_demographics.speak_gujarati",
+        "sectionKey": "about_you"
+      },
+      {
+        "kind": "question.added",
+        "bump": "major",
+        "breaking": false,
+        "message": "Added “How well do you understand Bengali (including S…” (ybm_demographics.understand_bengali) in the section “About you”.",
+        "itemKey": "ybm_demographics.understand_bengali",
+        "sectionKey": "about_you"
+      },
+      {
+        "kind": "question.added",
+        "bump": "major",
+        "breaking": false,
+        "message": "Added “How well can you speak Bengali (including Sylhe…” (ybm_demographics.speak_bengali) in the section “About you”.",
+        "itemKey": "ybm_demographics.speak_bengali",
+        "sectionKey": "about_you"
+      },
+      {
+        "kind": "question.added",
+        "bump": "major",
+        "breaking": false,
+        "message": "Added “How well do you understand Portuguese when some…” (ybm_demographics.understand_portuguese) in the section “About you”.",
+        "itemKey": "ybm_demographics.understand_portuguese",
+        "sectionKey": "about_you"
+      },
+      {
+        "kind": "question.added",
+        "bump": "major",
+        "breaking": false,
+        "message": "Added “How well can you speak Portuguese?” (ybm_demographics.speak_portuguese) in the section “About you”.",
+        "itemKey": "ybm_demographics.speak_portuguese",
+        "sectionKey": "about_you"
+      },
+      {
+        "kind": "question.added",
+        "bump": "major",
+        "breaking": false,
+        "message": "Added “How well do you understand Spanish when someone…” (ybm_demographics.understand_spanish) in the section “About you”.",
+        "itemKey": "ybm_demographics.understand_spanish",
+        "sectionKey": "about_you"
+      },
+      {
+        "kind": "question.added",
+        "bump": "major",
+        "breaking": false,
+        "message": "Added “How well can you speak Spanish?” (ybm_demographics.speak_spanish) in the section “About you”.",
+        "itemKey": "ybm_demographics.speak_spanish",
+        "sectionKey": "about_you"
+      },
+      {
+        "kind": "question.added",
+        "bump": "major",
+        "breaking": false,
+        "message": "Added “How well do you understand Russian when someone…” (ybm_demographics.understand_russian) in the section “About you”.",
+        "itemKey": "ybm_demographics.understand_russian",
+        "sectionKey": "about_you"
+      },
+      {
+        "kind": "question.added",
+        "bump": "major",
+        "breaking": false,
+        "message": "Added “How well can you speak Russian?” (ybm_demographics.speak_russian) in the section “About you”.",
+        "itemKey": "ybm_demographics.speak_russian",
+        "sectionKey": "about_you"
+      },
+      {
+        "kind": "question.added",
+        "bump": "major",
+        "breaking": false,
+        "message": "Added “How well do you understand French when someone…” (ybm_demographics.understand_french) in the section “About you”.",
+        "itemKey": "ybm_demographics.understand_french",
+        "sectionKey": "about_you"
+      },
+      {
+        "kind": "question.added",
+        "bump": "major",
+        "breaking": false,
+        "message": "Added “How well can you speak French?” (ybm_demographics.speak_french) in the section “About you”.",
+        "itemKey": "ybm_demographics.speak_french",
+        "sectionKey": "about_you"
+      },
+      {
+        "kind": "question.added",
+        "bump": "major",
+        "breaking": false,
+        "message": "Added “How well do you understand Tamil when someone s…” (ybm_demographics.understand_tamil) in the section “About you”.",
+        "itemKey": "ybm_demographics.understand_tamil",
+        "sectionKey": "about_you"
+      },
+      {
+        "kind": "question.added",
+        "bump": "major",
+        "breaking": false,
+        "message": "Added “How well can you speak Tamil?” (ybm_demographics.speak_tamil) in the section “About you”.",
+        "itemKey": "ybm_demographics.speak_tamil",
+        "sectionKey": "about_you"
+      },
+      {
+        "kind": "question.added",
+        "bump": "major",
+        "breaking": false,
+        "message": "Added “How well do you understand British Sign Languag…” (ybm_demographics.understand_bsl) in the section “About you”.",
+        "itemKey": "ybm_demographics.understand_bsl",
+        "sectionKey": "about_you"
+      },
+      {
+        "kind": "question.added",
+        "bump": "major",
+        "breaking": false,
+        "message": "Added “How well can you sign in British Sign Language?” (ybm_demographics.speak_bsl) in the section “About you”.",
+        "itemKey": "ybm_demographics.speak_bsl",
+        "sectionKey": "about_you"
+      },
+      {
+        "kind": "question.added",
+        "bump": "major",
+        "breaking": false,
+        "message": "Added “How well do you understand Turkish when someone…” (ybm_demographics.understand_turkish) in the section “About you”.",
+        "itemKey": "ybm_demographics.understand_turkish",
+        "sectionKey": "about_you"
+      },
+      {
+        "kind": "question.added",
+        "bump": "major",
+        "breaking": false,
+        "message": "Added “How well can you speak Turkish?” (ybm_demographics.speak_turkish) in the section “About you”.",
+        "itemKey": "ybm_demographics.speak_turkish",
+        "sectionKey": "about_you"
+      },
+      {
+        "kind": "question.added",
+        "bump": "major",
+        "breaking": false,
+        "message": "Added “How well do you understand {language} when some…” (ybm_demographics.understand_other_language) in the section “About you”.",
+        "itemKey": "ybm_demographics.understand_other_language",
+        "sectionKey": "about_you"
+      },
+      {
+        "kind": "question.added",
+        "bump": "major",
+        "breaking": false,
+        "message": "Added “How well can you speak {language}?” (ybm_demographics.speak_other_language) in the section “About you”.",
+        "itemKey": "ybm_demographics.speak_other_language",
+        "sectionKey": "about_you"
+      },
+      {
+        "kind": "question.added",
+        "bump": "major",
+        "breaking": false,
+        "message": "Added “Gender” (ybm_demographics.gender) in the section “About you”.",
+        "itemKey": "ybm_demographics.gender",
+        "sectionKey": "about_you"
+      },
+      {
+        "kind": "question.added",
+        "bump": "major",
+        "breaking": false,
+        "message": "Added “Are you currently taking any prescribed medicat…” (ybm_demographics.medication) in the section “About you”.",
+        "itemKey": "ybm_demographics.medication",
+        "sectionKey": "about_you"
+      },
+      {
+        "kind": "question.added",
+        "bump": "major",
+        "breaking": false,
+        "message": "Added “Which of these is most like your own hair?” (ybm_eeg_practical.hair_type) in the section “About you”.",
+        "itemKey": "ybm_eeg_practical.hair_type",
+        "sectionKey": "about_you"
+      },
+      {
+        "kind": "question.added",
+        "bump": "major",
+        "breaking": false,
+        "message": "Added “Which hand do you write with?” (ehi_sf.writing) in the section “Hands and standing”.",
+        "itemKey": "ehi_sf.writing",
+        "sectionKey": "hands_and_ladders"
+      },
+      {
+        "kind": "question.added",
+        "bump": "major",
+        "breaking": false,
+        "message": "Added “Which hand do you throw a ball with?” (ehi_sf.throwing) in the section “Hands and standing”.",
+        "itemKey": "ehi_sf.throwing",
+        "sectionKey": "hands_and_ladders"
+      },
+      {
+        "kind": "question.added",
+        "bump": "major",
+        "breaking": false,
+        "message": "Added “Which hand do you hold your toothbrush in?” (ehi_sf.toothbrush) in the section “Hands and standing”.",
+        "itemKey": "ehi_sf.toothbrush",
+        "sectionKey": "hands_and_ladders"
+      },
+      {
+        "kind": "question.added",
+        "bump": "major",
+        "breaking": false,
+        "message": "Added “Which hand do you hold a spoon in?” (ehi_sf.spoon) in the section “Hands and standing”.",
+        "itemKey": "ehi_sf.spoon",
+        "sectionKey": "hands_and_ladders"
+      },
+      {
+        "kind": "question.added",
+        "bump": "major",
+        "breaking": false,
+        "message": "Added “Your answers suggest you're {band}” (ehi_sf.lq_feedback) in the section “Hands and standing”.",
+        "itemKey": "ehi_sf.lq_feedback",
+        "sectionKey": "hands_and_ladders"
+      },
+      {
+        "kind": "question.added",
+        "bump": "major",
+        "breaking": false,
+        "message": "Added “Where would you be on this ladder?” (macarthur_sss_adult.society) in the section “Hands and standing”.",
+        "itemKey": "macarthur_sss_adult.society",
+        "sectionKey": "hands_and_ladders"
+      },
+      {
+        "kind": "question.added",
+        "bump": "major",
+        "breaking": false,
+        "message": "Added “Where would you be on this ladder?” (macarthur_sss_adult.community) in the section “Hands and standing”.",
+        "itemKey": "macarthur_sss_adult.community",
+        "sectionKey": "hands_and_ladders"
+      },
+      {
+        "kind": "question.added",
+        "bump": "major",
+        "breaking": false,
+        "message": "Added “During the past 7 days, how would you rate your…” (sqs.q1) in the section “Sleep”.",
+        "itemKey": "sqs.q1",
+        "sectionKey": "sleep"
+      },
+      {
+        "kind": "question.added",
+        "bump": "major",
+        "breaking": false,
+        "message": "Added “How sleepy are you feeling right now?” (kss.q1) in the section “Sleep”.",
+        "itemKey": "kss.q1",
+        "sectionKey": "sleep"
+      },
+      {
+        "kind": "question.added",
+        "bump": "major",
+        "breaking": false,
+        "message": "Added “I’ve been feeling optimistic about the future” (swemwbs.optimistic) in the section “How you've been feeling”.",
+        "itemKey": "swemwbs.optimistic",
+        "sectionKey": "wellbeing"
+      },
+      {
+        "kind": "question.added",
+        "bump": "major",
+        "breaking": false,
+        "message": "Added “I’ve been feeling useful” (swemwbs.useful) in the section “How you've been feeling”.",
+        "itemKey": "swemwbs.useful",
+        "sectionKey": "wellbeing"
+      },
+      {
+        "kind": "question.added",
+        "bump": "major",
+        "breaking": false,
+        "message": "Added “I’ve been feeling relaxed” (swemwbs.relaxed) in the section “How you've been feeling”.",
+        "itemKey": "swemwbs.relaxed",
+        "sectionKey": "wellbeing"
+      },
+      {
+        "kind": "question.added",
+        "bump": "major",
+        "breaking": false,
+        "message": "Added “I’ve been dealing with problems well” (swemwbs.problems) in the section “How you've been feeling”.",
+        "itemKey": "swemwbs.problems",
+        "sectionKey": "wellbeing"
+      },
+      {
+        "kind": "question.added",
+        "bump": "major",
+        "breaking": false,
+        "message": "Added “I’ve been thinking clearly” (swemwbs.thinking) in the section “How you've been feeling”.",
+        "itemKey": "swemwbs.thinking",
+        "sectionKey": "wellbeing"
+      },
+      {
+        "kind": "question.added",
+        "bump": "major",
+        "breaking": false,
+        "message": "Added “I’ve been feeling close to other people” (swemwbs.close) in the section “How you've been feeling”.",
+        "itemKey": "swemwbs.close",
+        "sectionKey": "wellbeing"
+      },
+      {
+        "kind": "question.added",
+        "bump": "major",
+        "breaking": false,
+        "message": "Added “I’ve been able to make up my own mind about thi…” (swemwbs.mind) in the section “How you've been feeling”.",
+        "itemKey": "swemwbs.mind",
+        "sectionKey": "wellbeing"
+      },
+      {
+        "kind": "question.added",
+        "bump": "major",
+        "breaking": false,
+        "message": "Added “I feel upset.” (stai5_s.upset) in the section “How you've been feeling”.",
+        "itemKey": "stai5_s.upset",
+        "sectionKey": "wellbeing"
+      },
+      {
+        "kind": "question.added",
+        "bump": "major",
+        "breaking": false,
+        "message": "Added “I feel frightened.” (stai5_s.frightened) in the section “How you've been feeling”.",
+        "itemKey": "stai5_s.frightened",
+        "sectionKey": "wellbeing"
+      },
+      {
+        "kind": "question.added",
+        "bump": "major",
+        "breaking": false,
+        "message": "Added “I feel nervous.” (stai5_s.nervous) in the section “How you've been feeling”.",
+        "itemKey": "stai5_s.nervous",
+        "sectionKey": "wellbeing"
+      },
+      {
+        "kind": "question.added",
+        "bump": "major",
+        "breaking": false,
+        "message": "Added “I am jittery.” (stai5_s.jittery) in the section “How you've been feeling”.",
+        "itemKey": "stai5_s.jittery",
+        "sectionKey": "wellbeing"
+      },
+      {
+        "kind": "question.added",
+        "bump": "major",
+        "breaking": false,
+        "message": "Added “I feel confused.” (stai5_s.confused) in the section “How you've been feeling”.",
+        "itemKey": "stai5_s.confused",
+        "sectionKey": "wellbeing"
+      },
+      {
+        "kind": "question.added",
+        "bump": "major",
+        "breaking": false,
+        "message": "Added “Feeling nervous, anxious or on edge” (phq4.nervous) in the section “How you've been feeling”.",
+        "itemKey": "phq4.nervous",
+        "sectionKey": "wellbeing"
+      },
+      {
+        "kind": "question.added",
+        "bump": "major",
+        "breaking": false,
+        "message": "Added “Not being able to stop or control worrying” (phq4.worrying) in the section “How you've been feeling”.",
+        "itemKey": "phq4.worrying",
+        "sectionKey": "wellbeing"
+      },
+      {
+        "kind": "question.added",
+        "bump": "major",
+        "breaking": false,
+        "message": "Added “Little interest or pleasure in doing things” (phq4.interest) in the section “How you've been feeling”.",
+        "itemKey": "phq4.interest",
+        "sectionKey": "wellbeing"
+      },
+      {
+        "kind": "question.added",
+        "bump": "major",
+        "breaking": false,
+        "message": "Added “Feeling down, depressed, or hopeless” (phq4.down) in the section “How you've been feeling”.",
+        "itemKey": "phq4.down",
+        "sectionKey": "wellbeing"
+      },
+      {
+        "kind": "question.added",
+        "bump": "major",
+        "breaking": false,
+        "message": "Added “Do you have your own smartphone?” (ybm_smartphone.own) in the section “Phones and social media”.",
+        "itemKey": "ybm_smartphone.own",
+        "sectionKey": "phones"
+      },
+      {
+        "kind": "question.added",
+        "bump": "major",
+        "breaking": false,
+        "message": "Added “How many smartphones do you currently own?” (ybm_smartphone.number_of_phone) in the section “Phones and social media”.",
+        "itemKey": "ybm_smartphone.number_of_phone",
+        "sectionKey": "phones"
+      },
+      {
+        "kind": "question.added",
+        "bump": "major",
+        "breaking": false,
+        "message": "Added “What type of smartphone are you using? Particip…” (ybm_smartphone.new_question) in the section “Phones and social media”.",
+        "itemKey": "ybm_smartphone.new_question",
+        "sectionKey": "phones"
+      },
+      {
+        "kind": "question.added",
+        "bump": "major",
+        "breaking": false,
+        "message": "Added “Please tell us what” (ybm_smartphone.new_question_other) in the section “Phones and social media”.",
+        "itemKey": "ybm_smartphone.new_question_other",
+        "sectionKey": "phones"
+      },
+      {
+        "kind": "question.added",
+        "bump": "major",
+        "breaking": false,
+        "message": "Added “At what age did you get your first smartphone?…” (ybm_smartphone.age_smartphone) in the section “Phones and social media”.",
+        "itemKey": "ybm_smartphone.age_smartphone",
+        "sectionKey": "phones"
+      },
+      {
+        "kind": "question.added",
+        "bump": "major",
+        "breaking": false,
+        "message": "Added “Do you currently use social media?” (ybm_smartphone.sm_use) in the section “Phones and social media”.",
+        "itemKey": "ybm_smartphone.sm_use",
+        "sectionKey": "phones"
+      },
+      {
+        "kind": "question.added",
+        "bump": "major",
+        "breaking": false,
+        "message": "Added “Just to check — do you use any of these?” (ybm_smartphone.sm_use_confirm) in the section “Phones and social media”.",
+        "itemKey": "ybm_smartphone.sm_use_confirm",
+        "sectionKey": "phones"
+      },
+      {
+        "kind": "question.added",
+        "bump": "major",
+        "breaking": false,
+        "message": "Added “At what age did you start using social media? P…” (ybm_smartphone.age_sm) in the section “Phones and social media”.",
+        "itemKey": "ybm_smartphone.age_sm",
+        "sectionKey": "phones"
+      },
+      {
+        "kind": "question.added",
+        "bump": "major",
+        "breaking": false,
+        "message": "Added “How often do you use AI chatbots or assistants?” (ybm_ai_use.frequency) in the section “Phones and social media”.",
+        "itemKey": "ybm_ai_use.frequency",
+        "sectionKey": "phones"
+      },
+      {
+        "kind": "question.added",
+        "bump": "major",
+        "breaking": false,
+        "message": "Added “What do you use them for?” (ybm_ai_use.purpose) in the section “Phones and social media”.",
+        "itemKey": "ybm_ai_use.purpose",
+        "sectionKey": "phones"
+      },
+      {
+        "kind": "question.added",
+        "bump": "major",
+        "breaking": false,
+        "message": "Added “What else do you use them for?” (ybm_ai_use.purpose_other) in the section “Phones and social media”.",
+        "itemKey": "ybm_ai_use.purpose_other",
+        "sectionKey": "phones"
+      },
+      {
+        "kind": "question.added",
+        "bump": "major",
+        "breaking": false,
+        "message": "Added “After using AI chatbots, how do you usually fee…” (ybm_ai_use.feeling) in the section “Phones and social media”.",
+        "itemKey": "ybm_ai_use.feeling",
+        "sectionKey": "phones"
+      },
+      {
+        "kind": "question.added",
+        "bump": "major",
+        "breaking": false,
+        "message": "Added “Do you think you spend too much time on social…” (ybm_social_media.overuse) in the section “Your social media”.",
+        "itemKey": "ybm_social_media.overuse",
+        "sectionKey": "social_media"
+      },
+      {
+        "kind": "question.added",
+        "bump": "major",
+        "breaking": false,
+        "message": "Added “Which of these apps do you have on your phone?” (ybm_social_media.apps_owned) in the section “Your social media”.",
+        "itemKey": "ybm_social_media.apps_owned",
+        "sectionKey": "social_media"
+      },
+      {
+        "kind": "question.added",
+        "bump": "major",
+        "breaking": false,
+        "message": "Added “On a typical day, how much time do you usually…” (ybm_social_media.minutes_per_app) in the section “Your social media”.",
+        "itemKey": "ybm_social_media.minutes_per_app",
+        "sectionKey": "social_media"
+      },
+      {
+        "kind": "question.added",
+        "bump": "major",
+        "breaking": false,
+        "message": "Added “On the social media site you use the most, is y…” (ybm_social_media.account_privacy) in the section “Your social media”.",
+        "itemKey": "ybm_social_media.account_privacy",
+        "sectionKey": "social_media"
+      },
+      {
+        "kind": "question.added",
+        "bump": "major",
+        "breaking": false,
+        "message": "Added “On the social media platform you use most often…” (ybm_social_media.active_passive) in the section “Your social media”.",
+        "itemKey": "ybm_social_media.active_passive",
+        "sectionKey": "social_media"
+      },
+      {
+        "kind": "question.added",
+        "bump": "major",
+        "breaking": false,
+        "message": "Added “Why do you use social media? Select all that ap…” (ybm_social_media.functions) in the section “Your social media”.",
+        "itemKey": "ybm_social_media.functions",
+        "sectionKey": "social_media"
+      },
+      {
+        "kind": "question.added",
+        "bump": "major",
+        "breaking": false,
+        "message": "Added “On a typical night, how many times do you wake…” (ybm_social_media.night_checks) in the section “Your social media”.",
+        "itemKey": "ybm_social_media.night_checks",
+        "sectionKey": "social_media"
+      },
+      {
+        "kind": "question.added",
+        "bump": "major",
+        "breaking": false,
+        "message": "Added “How long after waking do you typically check so…” (ybm_social_media.morning_latency) in the section “Your social media”.",
+        "itemKey": "ybm_social_media.morning_latency",
+        "sectionKey": "social_media"
+      },
+      {
+        "kind": "question.added",
+        "bump": "major",
+        "breaking": false,
+        "message": "Added “How much time do you spend using social media o…” (ybm_social_media.time_school_day) in the section “Your social media”.",
+        "itemKey": "ybm_social_media.time_school_day",
+        "sectionKey": "social_media"
+      },
+      {
+        "kind": "question.added",
+        "bump": "major",
+        "breaking": false,
+        "message": "Added “How much time do you spend using social media o…” (ybm_social_media.time_nonschool_day) in the section “Your social media”.",
+        "itemKey": "ybm_social_media.time_nonschool_day",
+        "sectionKey": "social_media"
+      },
+      {
+        "kind": "question.added",
+        "bump": "major",
+        "breaking": false,
+        "message": "Added “I lose track of how much time I spend on social…” (ybm_social_media.lose_track) in the section “Your social media”.",
+        "itemKey": "ybm_social_media.lose_track",
+        "sectionKey": "social_media"
+      },
+      {
+        "kind": "question.added",
+        "bump": "major",
+        "breaking": false,
+        "message": "Added “Do you use any features designed to reduce your…” (ybm_social_media.limit_features) in the section “Your social media”.",
+        "itemKey": "ybm_social_media.limit_features",
+        "sectionKey": "social_media"
+      },
+      {
+        "kind": "question.added",
+        "bump": "major",
+        "breaking": false,
+        "message": "Added “What effect do you think abstaining from social…” (ybm_social_media.abstain_effect) in the section “Your social media”.",
+        "itemKey": "ybm_social_media.abstain_effect",
+        "sectionKey": "social_media"
+      },
+      {
+        "kind": "question.added",
+        "bump": "major",
+        "breaking": false,
+        "message": "Added “How long do you think you could go without soci…” (ybm_social_media.abstain_days) in the section “Your social media”.",
+        "itemKey": "ybm_social_media.abstain_days",
+        "sectionKey": "social_media"
+      },
+      {
+        "kind": "question.added",
+        "bump": "major",
+        "breaking": false,
+        "message": "Added “Does your family manage or control your social…” (ybm_social_media.family_control) in the section “Your social media”.",
+        "itemKey": "ybm_social_media.family_control",
+        "sectionKey": "social_media"
+      },
+      {
+        "kind": "question.added",
+        "bump": "major",
+        "breaking": false,
+        "message": "Added “How does your family manage or control your soc…” (ybm_social_media.family_control_how) in the section “Your social media”.",
+        "itemKey": "ybm_social_media.family_control_how",
+        "sectionKey": "social_media"
+      },
+      {
+        "kind": "question.added",
+        "bump": "major",
+        "breaking": false,
+        "message": "Added “What else does your family do?” (ybm_social_media.family_control_other) in the section “Your social media”.",
+        "itemKey": "ybm_social_media.family_control_other",
+        "sectionKey": "social_media"
+      },
+      {
+        "kind": "question.added",
+        "bump": "major",
+        "breaking": false,
+        "message": "Added “I can control my screen behaviours” (ybm_screen_attitudes.control) in the section “Your social media”.",
+        "itemKey": "ybm_screen_attitudes.control",
+        "sectionKey": "social_media"
+      },
+      {
+        "kind": "question.added",
+        "bump": "major",
+        "breaking": false,
+        "message": "Added “I feel dependent on screens in order to functio…” (ybm_screen_attitudes.dependent) in the section “Your social media”.",
+        "itemKey": "ybm_screen_attitudes.dependent",
+        "sectionKey": "social_media"
+      },
+      {
+        "kind": "question.added",
+        "bump": "major",
+        "breaking": false,
+        "message": "Added “I feel addicted to any screen based activities” (ybm_screen_attitudes.addicted) in the section “Your social media”.",
+        "itemKey": "ybm_screen_attitudes.addicted",
+        "sectionKey": "social_media"
+      },
+      {
+        "kind": "question.added",
+        "bump": "major",
+        "breaking": false,
+        "message": "Added “The impacts of social media on my mental wellbe…” (ybm_screen_attitudes.impact_positive) in the section “Your social media”.",
+        "itemKey": "ybm_screen_attitudes.impact_positive",
+        "sectionKey": "social_media"
+      },
+      {
+        "kind": "question.added",
+        "bump": "major",
+        "breaking": false,
+        "message": "Added “The impacts of social media on my wellbeing are…” (ybm_screen_attitudes.impact_negative) in the section “Your social media”.",
+        "itemKey": "ybm_screen_attitudes.impact_negative",
+        "sectionKey": "social_media"
+      },
+      {
+        "kind": "question.added",
+        "bump": "major",
+        "breaking": false,
+        "message": "Added “Social media is essential for day-to-day life” (ybm_screen_attitudes.impact_essential) in the section “Your social media”.",
+        "itemKey": "ybm_screen_attitudes.impact_essential",
+        "sectionKey": "social_media"
+      },
+      {
+        "kind": "question.added",
+        "bump": "major",
+        "breaking": false,
+        "message": "Added “I avoid some social media” (ybm_screen_attitudes.impact_avoid) in the section “Your social media”.",
+        "itemKey": "ybm_screen_attitudes.impact_avoid",
+        "sectionKey": "social_media"
+      },
+      {
+        "kind": "question.added",
+        "bump": "major",
+        "breaking": false,
+        "message": "Added “I feel an urge to seek bad news on social media…” (doomscroll4.q1) in the section “Your social media”.",
+        "itemKey": "doomscroll4.q1",
+        "sectionKey": "social_media"
+      },
+      {
+        "kind": "question.added",
+        "bump": "major",
+        "breaking": false,
+        "message": "Added “I lose track of time when I read bad news on so…” (doomscroll4.q2) in the section “Your social media”.",
+        "itemKey": "doomscroll4.q2",
+        "sectionKey": "social_media"
+      },
+      {
+        "kind": "question.added",
+        "bump": "major",
+        "breaking": false,
+        "message": "Added “I find myself continuously browsing negative ne…” (doomscroll4.q3) in the section “Your social media”.",
+        "itemKey": "doomscroll4.q3",
+        "sectionKey": "social_media"
+      },
+      {
+        "kind": "question.added",
+        "bump": "major",
+        "breaking": false,
+        "message": "Added “I feel like I am addicted to negative news.” (doomscroll4.q4) in the section “Your social media”.",
+        "itemKey": "doomscroll4.q4",
+        "sectionKey": "social_media"
+      },
+      {
+        "kind": "question.added",
+        "bump": "major",
+        "breaking": false,
+        "message": "Added “I worry about making mistakes” (bisbas12_ybm.bis1) in the section “Right now”.",
+        "itemKey": "bisbas12_ybm.bis1",
+        "sectionKey": "right_now"
+      },
+      {
+        "kind": "question.added",
+        "bump": "major",
+        "breaking": false,
+        "message": "Added “Criticism or scolding hurts me quite a bit” (bisbas12_ybm.bis2) in the section “Right now”.",
+        "itemKey": "bisbas12_ybm.bis2",
+        "sectionKey": "right_now"
+      },
+      {
+        "kind": "question.added",
+        "bump": "major",
+        "breaking": false,
+        "message": "Added “I feel pretty worried or upset when I think or…” (bisbas12_ybm.bis3) in the section “Right now”.",
+        "itemKey": "bisbas12_ybm.bis3",
+        "sectionKey": "right_now"
+      },
+      {
+        "kind": "question.added",
+        "bump": "major",
+        "breaking": false,
+        "message": "Added “I feel worried when I think I have done poorly…” (bisbas12_ybm.bis4) in the section “Right now”.",
+        "itemKey": "bisbas12_ybm.bis4",
+        "sectionKey": "right_now"
+      },
+      {
+        "kind": "question.added",
+        "bump": "major",
+        "breaking": false,
+        "message": "Added “When I get something I want, I feel excited and…” (bisbas12_ybm.rr1) in the section “Right now”.",
+        "itemKey": "bisbas12_ybm.rr1",
+        "sectionKey": "right_now"
+      },
+      {
+        "kind": "question.added",
+        "bump": "major",
+        "breaking": false,
+        "message": "Added “When I'm doing well at something I love to keep…” (bisbas12_ybm.rr2) in the section “Right now”.",
+        "itemKey": "bisbas12_ybm.rr2",
+        "sectionKey": "right_now"
+      },
+      {
+        "kind": "question.added",
+        "bump": "major",
+        "breaking": false,
+        "message": "Added “It would excite me to win a contest” (bisbas12_ybm.rr3) in the section “Right now”.",
+        "itemKey": "bisbas12_ybm.rr3",
+        "sectionKey": "right_now"
+      },
+      {
+        "kind": "question.added",
+        "bump": "major",
+        "breaking": false,
+        "message": "Added “When I see an opportunity for something I like…” (bisbas12_ybm.rr4) in the section “Right now”.",
+        "itemKey": "bisbas12_ybm.rr4",
+        "sectionKey": "right_now"
+      },
+      {
+        "kind": "question.added",
+        "bump": "major",
+        "breaking": false,
+        "message": "Added “When I want something I usually go all-out to g…” (bisbas12_ybm.dr1) in the section “Right now”.",
+        "itemKey": "bisbas12_ybm.dr1",
+        "sectionKey": "right_now"
+      },
+      {
+        "kind": "question.added",
+        "bump": "major",
+        "breaking": false,
+        "message": "Added “I go out of my way to get things I want” (bisbas12_ybm.dr2) in the section “Right now”.",
+        "itemKey": "bisbas12_ybm.dr2",
+        "sectionKey": "right_now"
+      },
+      {
+        "kind": "question.added",
+        "bump": "major",
+        "breaking": false,
+        "message": "Added “If I see a chance to get something I want I mov…” (bisbas12_ybm.dr3) in the section “Right now”.",
+        "itemKey": "bisbas12_ybm.dr3",
+        "sectionKey": "right_now"
+      },
+      {
+        "kind": "question.added",
+        "bump": "major",
+        "breaking": false,
+        "message": "Added “When I go after something I use a no holds barr…” (bisbas12_ybm.dr4) in the section “Right now”.",
+        "itemKey": "bisbas12_ybm.dr4",
+        "sectionKey": "right_now"
+      }
+    ],
+    "counts": {
+      "added": 125,
+      "removed": 0,
+      "archived": 0,
+      "changed": 0,
+      "moved": 0
+    }
+  },
+  "basedOnVersion": "12.0.0",
+  "source": "studio",
+  "bump": "major",
+  "imports": [
+    {
+      "id": "imp_3krix1f7jmodcrm4",
+      "at": "2026-10-16T09:48:01.038Z",
+      "by": "bbMYvw5F6zg9KIPHJInh1o08C9u1",
+      "byEmail": "faisalmushtaq@gmail.com",
+      "origin": {
+        "kind": "release",
+        "study": "ybm",
+        "surveyId": "ybm_nd2026_standard",
+        "version": "12.0.0",
+        "hash": "sha256:92b28e0802629d1e342be502ce84278125e5989dfb1bed1523a44872e1de6ab9"
+      },
+      "items": {
+        "ybm_intro_consent.intro": "ybm_intro_consent.intro",
+        "ybm_intro_consent.consent": "ybm_intro_consent.consent",
+        "ybm_intro_consent.why_it_matters": "ybm_intro_consent.why_it_matters",
+        "ybm_identity.first_name": "ybm_identity.first_name",
+        "ybm_identity.last_name": "ybm_identity.last_name",
+        "ybm_identity.dob": "ybm_identity.dob",
+        "ybm_identity.home_address": "ybm_identity.home_address",
+        "ybm_demographics.ethnicity": "ybm_demographics.ethnicity",
+        "ybm_demographics.first_language_english": "ybm_demographics.first_language_english",
+        "ybm_demographics.speaks_other_language": "ybm_demographics.speaks_other_language",
+        "ybm_demographics.other_languages": "ybm_demographics.other_languages",
+        "ybm_demographics.other_language_named": "ybm_demographics.other_language_named",
+        "ybm_demographics.understand_urdu": "ybm_demographics.understand_urdu",
+        "ybm_demographics.speak_urdu": "ybm_demographics.speak_urdu",
+        "ybm_demographics.understand_punjabi": "ybm_demographics.understand_punjabi",
+        "ybm_demographics.speak_punjabi": "ybm_demographics.speak_punjabi",
+        "ybm_demographics.understand_polish": "ybm_demographics.understand_polish",
+        "ybm_demographics.speak_polish": "ybm_demographics.speak_polish",
+        "ybm_demographics.understand_arabic": "ybm_demographics.understand_arabic",
+        "ybm_demographics.speak_arabic": "ybm_demographics.speak_arabic",
+        "ybm_demographics.understand_mandarin": "ybm_demographics.understand_mandarin",
+        "ybm_demographics.speak_mandarin": "ybm_demographics.speak_mandarin",
+        "ybm_demographics.understand_cantonese": "ybm_demographics.understand_cantonese",
+        "ybm_demographics.speak_cantonese": "ybm_demographics.speak_cantonese",
+        "ybm_demographics.understand_gujarati": "ybm_demographics.understand_gujarati",
+        "ybm_demographics.speak_gujarati": "ybm_demographics.speak_gujarati",
+        "ybm_demographics.understand_bengali": "ybm_demographics.understand_bengali",
+        "ybm_demographics.speak_bengali": "ybm_demographics.speak_bengali",
+        "ybm_demographics.understand_portuguese": "ybm_demographics.understand_portuguese",
+        "ybm_demographics.speak_portuguese": "ybm_demographics.speak_portuguese",
+        "ybm_demographics.understand_spanish": "ybm_demographics.understand_spanish",
+        "ybm_demographics.speak_spanish": "ybm_demographics.speak_spanish",
+        "ybm_demographics.understand_russian": "ybm_demographics.understand_russian",
+        "ybm_demographics.speak_russian": "ybm_demographics.speak_russian",
+        "ybm_demographics.understand_french": "ybm_demographics.understand_french",
+        "ybm_demographics.speak_french": "ybm_demographics.speak_french",
+        "ybm_demographics.understand_tamil": "ybm_demographics.understand_tamil",
+        "ybm_demographics.speak_tamil": "ybm_demographics.speak_tamil",
+        "ybm_demographics.understand_bsl": "ybm_demographics.understand_bsl",
+        "ybm_demographics.speak_bsl": "ybm_demographics.speak_bsl",
+        "ybm_demographics.understand_turkish": "ybm_demographics.understand_turkish",
+        "ybm_demographics.speak_turkish": "ybm_demographics.speak_turkish",
+        "ybm_demographics.understand_other_language": "ybm_demographics.understand_other_language",
+        "ybm_demographics.speak_other_language": "ybm_demographics.speak_other_language",
+        "ybm_demographics.gender": "ybm_demographics.gender",
+        "ybm_demographics.medication": "ybm_demographics.medication",
+        "ybm_eeg_practical.hair_type": "ybm_eeg_practical.hair_type",
+        "ehi_sf.writing": "ehi_sf.writing",
+        "ehi_sf.throwing": "ehi_sf.throwing",
+        "ehi_sf.toothbrush": "ehi_sf.toothbrush",
+        "ehi_sf.spoon": "ehi_sf.spoon",
+        "ehi_sf.lq_feedback": "ehi_sf.lq_feedback",
+        "sqs.q1": "sqs.q1",
+        "kss.q1": "kss.q1",
+        "swemwbs.optimistic": "swemwbs.optimistic",
+        "swemwbs.useful": "swemwbs.useful",
+        "swemwbs.relaxed": "swemwbs.relaxed",
+        "swemwbs.problems": "swemwbs.problems",
+        "swemwbs.thinking": "swemwbs.thinking",
+        "swemwbs.close": "swemwbs.close",
+        "swemwbs.mind": "swemwbs.mind",
+        "ybm_smartphone.own": "ybm_smartphone.own",
+        "ybm_smartphone.age_smartphone": "ybm_smartphone.age_smartphone",
+        "ybm_smartphone.sm_use": "ybm_smartphone.sm_use",
+        "ybm_smartphone.sm_use_confirm": "ybm_smartphone.sm_use_confirm",
+        "ybm_smartphone.age_sm": "ybm_smartphone.age_sm",
+        "ybm_ai_use.frequency": "ybm_ai_use.frequency",
+        "ybm_ai_use.purpose": "ybm_ai_use.purpose",
+        "ybm_ai_use.purpose_other": "ybm_ai_use.purpose_other",
+        "ybm_ai_use.feeling": "ybm_ai_use.feeling",
+        "ybm_social_media.overuse": "ybm_social_media.overuse",
+        "ybm_social_media.apps_owned": "ybm_social_media.apps_owned",
+        "ybm_social_media.account_privacy": "ybm_social_media.account_privacy",
+        "ybm_social_media.active_passive": "ybm_social_media.active_passive",
+        "ybm_social_media.functions": "ybm_social_media.functions",
+        "ybm_social_media.night_checks": "ybm_social_media.night_checks",
+        "ybm_social_media.morning_latency": "ybm_social_media.morning_latency",
+        "ybm_social_media.time_school_day": "ybm_social_media.time_school_day",
+        "ybm_social_media.time_nonschool_day": "ybm_social_media.time_nonschool_day",
+        "ybm_social_media.lose_track": "ybm_social_media.lose_track",
+        "ybm_social_media.limit_features": "ybm_social_media.limit_features",
+        "ybm_social_media.abstain_effect": "ybm_social_media.abstain_effect",
+        "ybm_social_media.abstain_days": "ybm_social_media.abstain_days",
+        "ybm_social_media.family_control": "ybm_social_media.family_control",
+        "ybm_social_media.family_control_how": "ybm_social_media.family_control_how",
+        "ybm_social_media.family_control_other": "ybm_social_media.family_control_other",
+        "ybm_screen_attitudes.control": "ybm_screen_attitudes.control",
+        "ybm_screen_attitudes.dependent": "ybm_screen_attitudes.dependent",
+        "ybm_screen_attitudes.addicted": "ybm_screen_attitudes.addicted",
+        "ybm_screen_attitudes.impact_positive": "ybm_screen_attitudes.impact_positive",
+        "ybm_screen_attitudes.impact_negative": "ybm_screen_attitudes.impact_negative",
+        "ybm_screen_attitudes.impact_essential": "ybm_screen_attitudes.impact_essential",
+        "ybm_screen_attitudes.impact_avoid": "ybm_screen_attitudes.impact_avoid",
+        "doomscroll4.q1": "doomscroll4.q1",
+        "doomscroll4.q2": "doomscroll4.q2",
+        "doomscroll4.q3": "doomscroll4.q3",
+        "doomscroll4.q4": "doomscroll4.q4",
+        "stai5_s.upset": "stai5_s.upset",
+        "stai5_s.frightened": "stai5_s.frightened",
+        "stai5_s.nervous": "stai5_s.nervous",
+        "stai5_s.jittery": "stai5_s.jittery",
+        "stai5_s.confused": "stai5_s.confused",
+        "bisbas12_ybm.bis1": "bisbas12_ybm.bis1",
+        "bisbas12_ybm.bis2": "bisbas12_ybm.bis2",
+        "bisbas12_ybm.bis3": "bisbas12_ybm.bis3",
+        "bisbas12_ybm.bis4": "bisbas12_ybm.bis4",
+        "bisbas12_ybm.rr1": "bisbas12_ybm.rr1",
+        "bisbas12_ybm.rr2": "bisbas12_ybm.rr2",
+        "bisbas12_ybm.rr3": "bisbas12_ybm.rr3",
+        "bisbas12_ybm.rr4": "bisbas12_ybm.rr4",
+        "bisbas12_ybm.dr1": "bisbas12_ybm.dr1",
+        "bisbas12_ybm.dr2": "bisbas12_ybm.dr2",
+        "bisbas12_ybm.dr3": "bisbas12_ybm.dr3",
+        "bisbas12_ybm.dr4": "bisbas12_ybm.dr4"
+      }
+    },
+    {
+      "id": "imp_tz5bsxa3frg7386d",
+      "at": "2026-10-20T19:54:55.899Z",
+      "by": "repository",
+      "byEmail": "repository",
+      "origin": {
+        "kind": "validated",
+        "instrument": "phq4",
+        "refKey": "phq4@1.0/en-GB/self/standard"
+      },
+      "items": {
+        "phq4.nervous": "phq4.nervous",
+        "phq4.worrying": "phq4.worrying",
+        "phq4.interest": "phq4.interest",
+        "phq4.down": "phq4.down"
+      }
+    },
+    {
+      "id": "imp_vcw8hsgb98h9zdve",
+      "at": "2026-10-20T20:30:24.116Z",
+      "by": "repository",
+      "byEmail": "repository",
+      "origin": {
+        "kind": "validated",
+        "instrument": "macarthur_sss_adult",
+        "refKey": "macarthur_sss_adult@1.0/en-GB/self/standard"
+      },
+      "items": {
+        "macarthur_sss_adult.society": "macarthur_sss_adult.society",
+        "macarthur_sss_adult.community": "macarthur_sss_adult.community"
+      }
+    }
+  ],
+  "itemKeys": [
+    "ybm_intro_consent.intro",
+    "ybm_intro_consent.consent",
+    "ybm_intro_consent.why_it_matters",
+    "social_media_break_lab_studio.new_question",
+    "ybm_identity.first_name",
+    "ybm_identity.last_name",
+    "ybm_identity.dob",
+    "ybm_identity.home_address",
+    "ybm_demographics.ethnicity",
+    "ybm_demographics.first_language_english",
+    "ybm_demographics.speaks_other_language",
+    "ybm_demographics.other_languages",
+    "ybm_demographics.other_language_named",
+    "ybm_demographics.understand_urdu",
+    "ybm_demographics.speak_urdu",
+    "ybm_demographics.understand_punjabi",
+    "ybm_demographics.speak_punjabi",
+    "ybm_demographics.understand_polish",
+    "ybm_demographics.speak_polish",
+    "ybm_demographics.understand_arabic",
+    "ybm_demographics.speak_arabic",
+    "ybm_demographics.understand_mandarin",
+    "ybm_demographics.speak_mandarin",
+    "ybm_demographics.understand_cantonese",
+    "ybm_demographics.speak_cantonese",
+    "ybm_demographics.understand_gujarati",
+    "ybm_demographics.speak_gujarati",
+    "ybm_demographics.understand_bengali",
+    "ybm_demographics.speak_bengali",
+    "ybm_demographics.understand_portuguese",
+    "ybm_demographics.speak_portuguese",
+    "ybm_demographics.understand_spanish",
+    "ybm_demographics.speak_spanish",
+    "ybm_demographics.understand_russian",
+    "ybm_demographics.speak_russian",
+    "ybm_demographics.understand_french",
+    "ybm_demographics.speak_french",
+    "ybm_demographics.understand_tamil",
+    "ybm_demographics.speak_tamil",
+    "ybm_demographics.understand_bsl",
+    "ybm_demographics.speak_bsl",
+    "ybm_demographics.understand_turkish",
+    "ybm_demographics.speak_turkish",
+    "ybm_demographics.understand_other_language",
+    "ybm_demographics.speak_other_language",
+    "ybm_demographics.gender",
+    "ybm_demographics.medication",
+    "ybm_eeg_practical.hair_type",
+    "ehi_sf.writing",
+    "ehi_sf.throwing",
+    "ehi_sf.toothbrush",
+    "ehi_sf.spoon",
+    "ehi_sf.lq_feedback",
+    "macarthur_sss_adult.society",
+    "macarthur_sss_adult.community",
+    "sqs.q1",
+    "kss.q1",
+    "swemwbs.optimistic",
+    "swemwbs.useful",
+    "swemwbs.relaxed",
+    "swemwbs.problems",
+    "swemwbs.thinking",
+    "swemwbs.close",
+    "swemwbs.mind",
+    "stai5_s.upset",
+    "stai5_s.frightened",
+    "stai5_s.nervous",
+    "stai5_s.jittery",
+    "stai5_s.confused",
+    "phq4.nervous",
+    "phq4.worrying",
+    "phq4.interest",
+    "phq4.down",
+    "ybm_smartphone.own",
+    "ybm_smartphone.number_of_phone",
+    "ybm_smartphone.new_question",
+    "ybm_smartphone.new_question_other",
+    "ybm_smartphone.age_smartphone",
+    "ybm_smartphone.sm_use",
+    "ybm_smartphone.sm_use_confirm",
+    "ybm_smartphone.age_sm",
+    "ybm_ai_use.frequency",
+    "ybm_ai_use.purpose",
+    "ybm_ai_use.purpose_other",
+    "ybm_ai_use.feeling",
+    "ybm_social_media.overuse",
+    "ybm_social_media.apps_owned",
+    "ybm_social_media.minutes_per_app",
+    "ybm_social_media.account_privacy",
+    "ybm_social_media.active_passive",
+    "ybm_social_media.functions",
+    "ybm_social_media.night_checks",
+    "ybm_social_media.morning_latency",
+    "ybm_social_media.time_school_day",
+    "ybm_social_media.time_nonschool_day",
+    "ybm_social_media.lose_track",
+    "ybm_social_media.limit_features",
+    "ybm_social_media.abstain_effect",
+    "ybm_social_media.abstain_days",
+    "ybm_social_media.family_control",
+    "ybm_social_media.family_control_how",
+    "ybm_social_media.family_control_other",
+    "ybm_screen_attitudes.control",
+    "ybm_screen_attitudes.dependent",
+    "ybm_screen_attitudes.addicted",
+    "ybm_screen_attitudes.impact_positive",
+    "ybm_screen_attitudes.impact_negative",
+    "ybm_screen_attitudes.impact_essential",
+    "ybm_screen_attitudes.impact_avoid",
+    "doomscroll4.q1",
+    "doomscroll4.q2",
+    "doomscroll4.q3",
+    "doomscroll4.q4",
+    "bisbas12_ybm.bis1",
+    "bisbas12_ybm.bis2",
+    "bisbas12_ybm.bis3",
+    "bisbas12_ybm.bis4",
+    "bisbas12_ybm.rr1",
+    "bisbas12_ybm.rr2",
+    "bisbas12_ybm.rr3",
+    "bisbas12_ybm.rr4",
+    "bisbas12_ybm.dr1",
+    "bisbas12_ybm.dr2",
+    "bisbas12_ybm.dr3",
+    "bisbas12_ybm.dr4"
+  ],
+  "variables": [
+    "study_intro",
+    "consent",
+    "why_accurate",
+    "new_question_3",
+    "first_name",
+    "last_name",
+    "dob",
+    "home_address",
+    "ethnicity",
+    "first_language_english",
+    "speaks_other_language",
+    "other_languages",
+    "other_language_named",
+    "understand_urdu",
+    "speak_urdu",
+    "understand_punjabi",
+    "speak_punjabi",
+    "understand_polish",
+    "speak_polish",
+    "understand_arabic",
+    "speak_arabic",
+    "understand_mandarin",
+    "speak_mandarin",
+    "understand_cantonese",
+    "speak_cantonese",
+    "understand_gujarati",
+    "speak_gujarati",
+    "understand_bengali",
+    "speak_bengali",
+    "understand_portuguese",
+    "speak_portuguese",
+    "understand_spanish",
+    "speak_spanish",
+    "understand_russian",
+    "speak_russian",
+    "understand_french",
+    "speak_french",
+    "understand_tamil",
+    "speak_tamil",
+    "understand_bsl",
+    "speak_bsl",
+    "understand_turkish",
+    "speak_turkish",
+    "understand_other_language",
+    "speak_other_language",
+    "gender",
+    "mh_medication",
+    "hair_type",
+    "ehi_writing",
+    "ehi_throwing",
+    "ehi_toothbrush",
+    "ehi_spoon",
+    "ehi_lq_feedback",
+    "sss_society",
+    "sss_community",
+    "sqs_q1",
+    "kss_q1",
+    "swemwbs_q1",
+    "swemwbs_q2",
+    "swemwbs_q3",
+    "swemwbs_q4",
+    "swemwbs_q5",
+    "swemwbs_q6",
+    "swemwbs_q7",
+    "stai5_q1",
+    "stai5_q2",
+    "stai5_q3",
+    "stai5_q4",
+    "stai5_q5",
+    "phq4_q1",
+    "phq4_q2",
+    "phq4_q3",
+    "phq4_q4",
+    "smartphone_own",
+    "number_of_phone",
+    "new_question_2",
+    "new_question_2_other",
+    "smartphone_age",
+    "sm_use",
+    "sm_use_confirm",
+    "sm_age",
+    "ai_use_frequency",
+    "ai_use_purpose",
+    "ai_use_purpose_other",
+    "ai_use_feeling",
+    "sm_overuse",
+    "sm_apps_owned",
+    "app_minutes2",
+    "sm_account_privacy",
+    "sm_active_passive",
+    "sm_functions",
+    "sm_night_checks",
+    "sm_morning_latency",
+    "sm_time_school_day",
+    "sm_time_nonschool_day",
+    "sm_lose_track",
+    "sm_limit_features",
+    "sm_abstain_effect",
+    "sm_abstain_days",
+    "sm_family_control",
+    "sm_family_control_how",
+    "sm_family_control_other",
+    "screen_control",
+    "screen_dependent",
+    "screen_addicted",
+    "sm_impact_positive",
+    "sm_impact_negative",
+    "sm_impact_essential",
+    "sm_impact_avoid",
+    "doomscroll_q1",
+    "doomscroll_q2",
+    "doomscroll_q3",
+    "doomscroll_q4",
+    "bisbas12_bis1",
+    "bisbas12_bis2",
+    "bisbas12_bis3",
+    "bisbas12_bis4",
+    "bisbas12_rr1",
+    "bisbas12_rr2",
+    "bisbas12_rr3",
+    "bisbas12_rr4",
+    "bisbas12_dr1",
+    "bisbas12_dr2",
+    "bisbas12_dr3",
+    "bisbas12_dr4"
+  ]
+}

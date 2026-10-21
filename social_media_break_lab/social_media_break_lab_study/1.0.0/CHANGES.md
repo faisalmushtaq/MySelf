@@ -1,0 +1,143 @@
+# social_media_break_lab_study 1.0.0
+
+Study `social_media_break_lab` · published 2026-10-21T07:16:50.090Z by miftafai@gmail.com · release `sha256:e8c705d377d34e4a1b7d3162586a8f83678ea4164bd6688a225e6da3abd40df8`
+
+## Release note
+
+Published by Miftah
+
+## What changed
+
+- Added the section “Welcome”.
+- Added the section “About you”.
+- Added the section “Hands and standing”.
+- Added the section “Sleep”.
+- Added the section “How you've been feeling”.
+- Added the section “Phones and social media”.
+- Added the section “Your social media”.
+- Added the section “Right now”.
+- Added “MyPhone/MyBrain Intervention Study” (ybm_intro_consent.intro) in the section “Welcome”.
+- Added “Please tap each statement to show you understan…” (ybm_intro_consent.consent) in the section “Welcome”.
+- Added “Why your answers matter” (ybm_intro_consent.why_it_matters) in the section “Welcome”.
+- Added “Participant ID” (social_media_break_lab_studio.new_question) in the section “Welcome”.
+- Added “First Name” (ybm_identity.first_name) in the section “About you”.
+- Added “Last Name” (ybm_identity.last_name) in the section “About you”.
+- Added “What's your date of birth?” (ybm_identity.dob) in the section “About you”.
+- Added “What's your home address?” (ybm_identity.home_address) in the section “About you”.
+- Added “What best describes your ethnic origin?” (ybm_demographics.ethnicity) in the section “About you”.
+- Added “Was English the first language you learned to s…” (ybm_demographics.first_language_english) in the section “About you”.
+- Added “Do you speak or understand any language other t…” (ybm_demographics.speaks_other_language) in the section “About you”.
+- Added “Which other languages do you speak or understan…” (ybm_demographics.other_languages) in the section “About you”.
+- Added “Which other language?” (ybm_demographics.other_language_named) in the section “About you”.
+- Added “How well do you understand Urdu when someone sp…” (ybm_demographics.understand_urdu) in the section “About you”.
+- Added “How well can you speak Urdu?” (ybm_demographics.speak_urdu) in the section “About you”.
+- Added “How well do you understand Punjabi when someone…” (ybm_demographics.understand_punjabi) in the section “About you”.
+- Added “How well can you speak Punjabi?” (ybm_demographics.speak_punjabi) in the section “About you”.
+- Added “How well do you understand Polish when someone…” (ybm_demographics.understand_polish) in the section “About you”.
+- Added “How well can you speak Polish?” (ybm_demographics.speak_polish) in the section “About you”.
+- Added “How well do you understand Arabic when someone…” (ybm_demographics.understand_arabic) in the section “About you”.
+- Added “How well can you speak Arabic?” (ybm_demographics.speak_arabic) in the section “About you”.
+- Added “How well do you understand Mandarin Chinese whe…” (ybm_demographics.understand_mandarin) in the section “About you”.
+- Added “How well can you speak Mandarin Chinese?” (ybm_demographics.speak_mandarin) in the section “About you”.
+- Added “How well do you understand Cantonese Chinese wh…” (ybm_demographics.understand_cantonese) in the section “About you”.
+- Added “How well can you speak Cantonese Chinese?” (ybm_demographics.speak_cantonese) in the section “About you”.
+- Added “How well do you understand Gujarati when someon…” (ybm_demographics.understand_gujarati) in the section “About you”.
+- Added “How well can you speak Gujarati?” (ybm_demographics.speak_gujarati) in the section “About you”.
+- Added “How well do you understand Bengali (including S…” (ybm_demographics.understand_bengali) in the section “About you”.
+- Added “How well can you speak Bengali (including Sylhe…” (ybm_demographics.speak_bengali) in the section “About you”.
+- Added “How well do you understand Portuguese when some…” (ybm_demographics.understand_portuguese) in the section “About you”.
+- Added “How well can you speak Portuguese?” (ybm_demographics.speak_portuguese) in the section “About you”.
+- Added “How well do you understand Spanish when someone…” (ybm_demographics.understand_spanish) in the section “About you”.
+- Added “How well can you speak Spanish?” (ybm_demographics.speak_spanish) in the section “About you”.
+- Added “How well do you understand Russian when someone…” (ybm_demographics.understand_russian) in the section “About you”.
+- Added “How well can you speak Russian?” (ybm_demographics.speak_russian) in the section “About you”.
+- Added “How well do you understand French when someone…” (ybm_demographics.understand_french) in the section “About you”.
+- Added “How well can you speak French?” (ybm_demographics.speak_french) in the section “About you”.
+- Added “How well do you understand Tamil when someone s…” (ybm_demographics.understand_tamil) in the section “About you”.
+- Added “How well can you speak Tamil?” (ybm_demographics.speak_tamil) in the section “About you”.
+- Added “How well do you understand British Sign Languag…” (ybm_demographics.understand_bsl) in the section “About you”.
+- Added “How well can you sign in British Sign Language?” (ybm_demographics.speak_bsl) in the section “About you”.
+- Added “How well do you understand Turkish when someone…” (ybm_demographics.understand_turkish) in the section “About you”.
+- Added “How well can you speak Turkish?” (ybm_demographics.speak_turkish) in the section “About you”.
+- Added “How well do you understand {language} when some…” (ybm_demographics.understand_other_language) in the section “About you”.
+- Added “How well can you speak {language}?” (ybm_demographics.speak_other_language) in the section “About you”.
+- Added “Gender” (ybm_demographics.gender) in the section “About you”.
+- Added “Are you currently taking any prescribed medicat…” (ybm_demographics.medication) in the section “About you”.
+- Added “Which of these is most like your own hair?” (ybm_eeg_practical.hair_type) in the section “About you”.
+- Added “Which hand do you write with?” (ehi_sf.writing) in the section “Hands and standing”.
+- Added “Which hand do you throw a ball with?” (ehi_sf.throwing) in the section “Hands and standing”.
+- Added “Which hand do you hold your toothbrush in?” (ehi_sf.toothbrush) in the section “Hands and standing”.
+- Added “Which hand do you hold a spoon in?” (ehi_sf.spoon) in the section “Hands and standing”.
+- Added “Your answers suggest you're {band}” (ehi_sf.lq_feedback) in the section “Hands and standing”.
+- Added “Where would you be on this ladder?” (macarthur_sss_adult.society) in the section “Hands and standing”.
+- Added “Where would you be on this ladder?” (macarthur_sss_adult.community) in the section “Hands and standing”.
+- Added “During the past 7 days, how would you rate your…” (sqs.q1) in the section “Sleep”.
+- Added “How sleepy are you feeling right now?” (kss.q1) in the section “Sleep”.
+- Added “I’ve been feeling optimistic about the future” (swemwbs.optimistic) in the section “How you've been feeling”.
+- Added “I’ve been feeling useful” (swemwbs.useful) in the section “How you've been feeling”.
+- Added “I’ve been feeling relaxed” (swemwbs.relaxed) in the section “How you've been feeling”.
+- Added “I’ve been dealing with problems well” (swemwbs.problems) in the section “How you've been feeling”.
+- Added “I’ve been thinking clearly” (swemwbs.thinking) in the section “How you've been feeling”.
+- Added “I’ve been feeling close to other people” (swemwbs.close) in the section “How you've been feeling”.
+- Added “I’ve been able to make up my own mind about thi…” (swemwbs.mind) in the section “How you've been feeling”.
+- Added “I feel upset.” (stai5_s.upset) in the section “How you've been feeling”.
+- Added “I feel frightened.” (stai5_s.frightened) in the section “How you've been feeling”.
+- Added “I feel nervous.” (stai5_s.nervous) in the section “How you've been feeling”.
+- Added “I am jittery.” (stai5_s.jittery) in the section “How you've been feeling”.
+- Added “I feel confused.” (stai5_s.confused) in the section “How you've been feeling”.
+- Added “Feeling nervous, anxious or on edge” (phq4.nervous) in the section “How you've been feeling”.
+- Added “Not being able to stop or control worrying” (phq4.worrying) in the section “How you've been feeling”.
+- Added “Little interest or pleasure in doing things” (phq4.interest) in the section “How you've been feeling”.
+- Added “Feeling down, depressed, or hopeless” (phq4.down) in the section “How you've been feeling”.
+- Added “Do you have your own smartphone?” (ybm_smartphone.own) in the section “Phones and social media”.
+- Added “How many smartphones do you currently own?” (ybm_smartphone.number_of_phone) in the section “Phones and social media”.
+- Added “What type of smartphone are you using? Particip…” (ybm_smartphone.new_question) in the section “Phones and social media”.
+- Added “Please tell us what” (ybm_smartphone.new_question_other) in the section “Phones and social media”.
+- Added “At what age did you get your first smartphone?…” (ybm_smartphone.age_smartphone) in the section “Phones and social media”.
+- Added “Do you currently use social media?” (ybm_smartphone.sm_use) in the section “Phones and social media”.
+- Added “Just to check — do you use any of these?” (ybm_smartphone.sm_use_confirm) in the section “Phones and social media”.
+- Added “At what age did you start using social media? P…” (ybm_smartphone.age_sm) in the section “Phones and social media”.
+- Added “How often do you use AI chatbots or assistants?” (ybm_ai_use.frequency) in the section “Phones and social media”.
+- Added “What do you use them for?” (ybm_ai_use.purpose) in the section “Phones and social media”.
+- Added “What else do you use them for?” (ybm_ai_use.purpose_other) in the section “Phones and social media”.
+- Added “After using AI chatbots, how do you usually fee…” (ybm_ai_use.feeling) in the section “Phones and social media”.
+- Added “Do you think you spend too much time on social…” (ybm_social_media.overuse) in the section “Your social media”.
+- Added “Which of these apps do you have on your phone?” (ybm_social_media.apps_owned) in the section “Your social media”.
+- Added “On a typical day, how much time do you usually…” (ybm_social_media.minutes_per_app) in the section “Your social media”.
+- Added “On the social media site you use the most, is y…” (ybm_social_media.account_privacy) in the section “Your social media”.
+- Added “On the social media platform you use most often…” (ybm_social_media.active_passive) in the section “Your social media”.
+- Added “Why do you use social media? Select all that ap…” (ybm_social_media.functions) in the section “Your social media”.
+- Added “On a typical night, how many times do you wake…” (ybm_social_media.night_checks) in the section “Your social media”.
+- Added “How long after waking do you typically check so…” (ybm_social_media.morning_latency) in the section “Your social media”.
+- Added “How much time do you spend using social media o…” (ybm_social_media.time_school_day) in the section “Your social media”.
+- Added “How much time do you spend using social media o…” (ybm_social_media.time_nonschool_day) in the section “Your social media”.
+- Added “I lose track of how much time I spend on social…” (ybm_social_media.lose_track) in the section “Your social media”.
+- Added “Do you use any features designed to reduce your…” (ybm_social_media.limit_features) in the section “Your social media”.
+- Added “What effect do you think abstaining from social…” (ybm_social_media.abstain_effect) in the section “Your social media”.
+- Added “How long do you think you could go without soci…” (ybm_social_media.abstain_days) in the section “Your social media”.
+- Added “Does your family manage or control your social…” (ybm_social_media.family_control) in the section “Your social media”.
+- Added “How does your family manage or control your soc…” (ybm_social_media.family_control_how) in the section “Your social media”.
+- Added “What else does your family do?” (ybm_social_media.family_control_other) in the section “Your social media”.
+- Added “I can control my screen behaviours” (ybm_screen_attitudes.control) in the section “Your social media”.
+- Added “I feel dependent on screens in order to functio…” (ybm_screen_attitudes.dependent) in the section “Your social media”.
+- Added “I feel addicted to any screen based activities” (ybm_screen_attitudes.addicted) in the section “Your social media”.
+- Added “The impacts of social media on my mental wellbe…” (ybm_screen_attitudes.impact_positive) in the section “Your social media”.
+- Added “The impacts of social media on my wellbeing are…” (ybm_screen_attitudes.impact_negative) in the section “Your social media”.
+- Added “Social media is essential for day-to-day life” (ybm_screen_attitudes.impact_essential) in the section “Your social media”.
+- Added “I avoid some social media” (ybm_screen_attitudes.impact_avoid) in the section “Your social media”.
+- Added “I feel an urge to seek bad news on social media…” (doomscroll4.q1) in the section “Your social media”.
+- Added “I lose track of time when I read bad news on so…” (doomscroll4.q2) in the section “Your social media”.
+- Added “I find myself continuously browsing negative ne…” (doomscroll4.q3) in the section “Your social media”.
+- Added “I feel like I am addicted to negative news.” (doomscroll4.q4) in the section “Your social media”.
+- Added “I worry about making mistakes” (bisbas12_ybm.bis1) in the section “Right now”.
+- Added “Criticism or scolding hurts me quite a bit” (bisbas12_ybm.bis2) in the section “Right now”.
+- Added “I feel pretty worried or upset when I think or…” (bisbas12_ybm.bis3) in the section “Right now”.
+- Added “I feel worried when I think I have done poorly…” (bisbas12_ybm.bis4) in the section “Right now”.
+- Added “When I get something I want, I feel excited and…” (bisbas12_ybm.rr1) in the section “Right now”.
+- Added “When I'm doing well at something I love to keep…” (bisbas12_ybm.rr2) in the section “Right now”.
+- Added “It would excite me to win a contest” (bisbas12_ybm.rr3) in the section “Right now”.
+- Added “When I see an opportunity for something I like…” (bisbas12_ybm.rr4) in the section “Right now”.
+- Added “When I want something I usually go all-out to g…” (bisbas12_ybm.dr1) in the section “Right now”.
+- Added “I go out of my way to get things I want” (bisbas12_ybm.dr2) in the section “Right now”.
+- Added “If I see a chance to get something I want I mov…” (bisbas12_ybm.dr3) in the section “Right now”.
+- Added “When I go after something I use a no holds barr…” (bisbas12_ybm.dr4) in the section “Right now”.
