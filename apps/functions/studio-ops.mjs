@@ -27,6 +27,10 @@ import {
  *   insert --study S --survey V --pieces a,b --section K [--after ITEM] [--replace INSTRUMENT]
  *                             library questionnaires or modules into V's draft;
  *                             with --replace, in place of that questionnaire
+ *   retitle --study S --survey V --title T
+ *                             the survey's title, on its draft and in the Studio
+ *   form-label --study S --survey V --instrument I --label L
+ *                             a questionnaire's form label (researchers only see it)
  *   dob-ages --study S --survey V --min-age A --max-age B
  *                             who may take part, by age: the survey's own
  *                             limits on its date of birth (no unlock needed)
@@ -225,6 +229,47 @@ if (command === "list") {
     },
     `Date of birth: ages ${minAge} to ${maxAge}`,
   );
+} else if (command === "retitle") {
+  // The survey's title (participants see it), on its draft and its Studio listing.
+  const study = studyArg();
+  const surveyId = surveyArg();
+  const title = (flag("title") ?? "").trim();
+  if (!title || title.length > 200) fail("Give the new title with --title (at most 200 characters).");
+  await editDraft(
+    study,
+    surveyId,
+    (draft) => {
+      console.log(`  title was: “${draft.composition.title}”`);
+      draft.composition.title = title;
+      console.log(`  becomes:   “${title}”`);
+      return draft;
+    },
+    `Title: ${title}`,
+  );
+  if (apply) await db.doc(paths.studioSurvey(study, surveyId)).set({ title, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+} else if (command === "form-label") {
+  // A questionnaire's form label: a name for researchers, never shown to participants.
+  const study = studyArg();
+  const surveyId = surveyArg();
+  const instrument = flag("instrument") ?? fail("Say which questionnaire with --instrument.");
+  const label = (flag("label") ?? "").trim();
+  if (!label) fail("Give the new label with --label.");
+  await editDraft(
+    study,
+    surveyId,
+    (draft) => {
+      const defs = Object.values(draft.instruments).filter((d) => d.instrument === instrument);
+      if (defs.length === 0) fail(`“${instrument}” is not in this survey's draft.`);
+      for (const def of defs) {
+        for (const form of def.forms) {
+          console.log(`  ${instrument}: “${form.label}” → “${label}”`);
+          form.label = label;
+        }
+      }
+      return draft;
+    },
+    `Form label of ${instrument}: ${label}`,
+  );
 } else {
-  fail("Commands: list, grant-owners, insert, dob-ages.");
+  fail("Commands: list, grant-owners, insert, dob-ages, retitle, form-label.");
 }

@@ -13,7 +13,7 @@ import type { ProvenanceInput } from "@myself/schema";
  * `involvement` line (group, what they did, when).
  */
 
-const QSF = "The YBM 2026 Qualtrics survey (NotreDame2026 QSF), encoded into the library in 2026.";
+const QSF = "The YBM 2026 Qualtrics survey (Yorkshire Brain Map 2026 QSF), encoded into the library in 2026.";
 const QSF_UNKNOWN =
   "The survey file does not record who first wrote these questions, or whether any were taken from elsewhere. To confirm with the team that wrote the 2026 survey.";
 const TEAM = "YBM research team";

@@ -50,7 +50,7 @@ export interface StartScreenProps {
   notice?: StartNotice | null;
   /** `study/survey` when the iPad runs a survey other than this build's default, for the build line. */
   surveyLabel?: string | null;
-  /** The release's short label for participants ("Notre Dame · 2026"), if it has one. */
+  /** The release's short label for participants ("Leeds schools · 2026"), if it has one. */
   studyLabel: string | undefined;
   /** The release's rule for the study code: its format, label and instructions. */
   codeRule: ReleaseManifest["composition"]["participantCode"];

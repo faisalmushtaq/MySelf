@@ -842,6 +842,18 @@ describe("updating a module copy, three ways", () => {
   });
 });
 
+describe("names researchers see (D-69)", () => {
+  it("renaming a protected module's form label needs no unlock and is a patch", () => {
+    const live = extractDraft(r800);
+    const draft = structuredClone(live);
+    for (const def of Object.values(draft.instruments)) {
+      if (def.instrument === "ybm_intro_consent") for (const form of def.forms) form.label = "YBM introduction + consent";
+    }
+    expect(errors(draft, { baseline: live })).toEqual([]);
+    expect(diffDrafts(live, draft).bump).toBe("patch");
+  });
+});
+
 describe("provenance records (D-68)", () => {
   const record = {
     kind: "validated" as const,

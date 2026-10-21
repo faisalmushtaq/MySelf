@@ -54,7 +54,7 @@ export function WelcomeEditor() {
           hideLabel
           field="studyLabel"
           value={c.studyLabel ?? ""}
-          placeholder="e.g. Notre Dame · 2026"
+          placeholder="e.g. Leeds schools · 2026"
           readOnly={readOnly}
           hint="Shown above the code box. The survey's title isn't shown to participants."
           issues={issuesAt(issues, "studyLabel")}

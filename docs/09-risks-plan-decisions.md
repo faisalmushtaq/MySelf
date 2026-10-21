@@ -758,3 +758,23 @@ absent-minded statements with adapted SUQ-A items (cite it, note adult
 validation) and the multitasking statement with MMM-S items; pilot the
 wording with young people (cognitive interviews, 8–11 especially). The
 records in `ybm_sm_patterns` and `ybm_phone_pickups` cite these.
+
+### "Notre Dame" out of titles and labels (2026-10-21, D-69)
+
+**Asked.** "Remove any reference to Notre Dame please on titles and labels.
+That is Yorkshire Brain Map."
+
+**Changed.** The survey's title is "Yorkshire Brain Map — standard
+questionnaire" (it was "…NotreDame 2026 standard questionnaire"); the consent
+module's form label is "YBM introduction + consent"; the KSS change note, the
+Studio's example welcome label ("e.g. Leeds schools · 2026") and the headings of
+docs/01 and docs/02 no longer name Notre Dame. A form's label is a name for
+researchers that participants never see, so renaming it is now a patch and needs
+no unlock (it used to count as a change of wording).
+
+**Kept.** The survey's ID `ybm_nd2026_standard` (in every participant link,
+stored sitting and release key, so renaming it would break them), the names of
+the original Qualtrics files in source-materials, and releases already published,
+which stay exactly as frozen. The live survey takes the new title and label in
+its next published version: `studio-ops` `retitle` and `form-label` set them in
+the draft, and the team publishes from the Studio.

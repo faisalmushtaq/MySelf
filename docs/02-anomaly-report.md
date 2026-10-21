@@ -1,4 +1,4 @@
-# Anomaly Report — Yorkshire Brain Map (NotreDame2026) Qualtrics Export
+# Anomaly Report — Yorkshire Brain Map 2026 Qualtrics Export
 
 > **Updated 2026-08-02 after receipt of the QSF.** See [10-qsf-findings.md](10-qsf-findings.md) for machine-level resolutions. Status changes: **A-2, A-3 CONFIRMED** as live errors; **A-4 WITHDRAWN** (Word-export artefact — QSF logic is correct); **A-11, A-14, A-37(part), A-39, A-40, A-41, A-42 RESOLVED**; new anomalies **A-43** (age dropdowns missing option "5") and **A-44** (RCADS instructions promise skipping but the question is force-response) added below.
 

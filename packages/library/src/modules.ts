@@ -120,7 +120,7 @@ export const ybmIntroConsent: ModuleInput = {
   forms: [
     {
       language: "en-GB",
-      label: "YBM NotreDame 2026 introduction + consent",
+      label: "YBM introduction + consent",
       items: [
         {
           responseType: "info",

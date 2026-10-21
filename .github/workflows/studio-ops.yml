@@ -6,6 +6,7 @@ name: "Studio: study space housekeeping"
 #                 the project owner role and the dashboard's access list
 #   insert        library questionnaires or modules into a survey's draft
 #   dob-ages      the ages a survey's date of birth accepts
+#   retitle       a survey's title; form-label  a questionnaire's form label
 # Without "apply" it is a dry run. Drafts are saved, never published. The
 # repository is public, so are these logs: emails are printed masked.
 
@@ -15,7 +16,7 @@ on:
       command:
         description: "What to do"
         type: choice
-        options: [list, grant-owners, insert, dob-ages]
+        options: [list, grant-owners, insert, dob-ages, retitle, form-label]
         default: list
       study:
         description: "Study space id (from list)"
@@ -47,6 +48,18 @@ on:
         default: ""
       max_age:
         description: "Oldest age (dob-ages)"
+        type: string
+        default: ""
+      title:
+        description: "New survey title (retitle)"
+        type: string
+        default: ""
+      instrument:
+        description: "Questionnaire key (form-label)"
+        type: string
+        default: ""
+      label:
+        description: "New form label (form-label)"
         type: string
         default: ""
       apply:
@@ -97,11 +110,15 @@ jobs:
           REPLACE: ${{ inputs.replace }}
           MIN_AGE: ${{ inputs.min_age }}
           MAX_AGE: ${{ inputs.max_age }}
+          TITLE: ${{ inputs.title }}
+          INSTRUMENT: ${{ inputs.instrument }}
+          LABEL: ${{ inputs.label }}
           APPLY: ${{ inputs.apply && '--apply' || '' }}
         run: |
           node studio-ops.mjs "$COMMAND" --project myself-research \
             ${STUDY:+--study "$STUDY"} ${SURVEY:+--survey "$SURVEY"} ${SECTION:+--section "$SECTION"} \
-            ${AFTER:+--after "$AFTER"} ${PIECES:+--pieces "$PIECES"} ${REPLACE:+--replace "$REPLACE"} ${MIN_AGE:+--min-age "$MIN_AGE"} ${MAX_AGE:+--max-age "$MAX_AGE"} $APPLY
+            ${AFTER:+--after "$AFTER"} ${PIECES:+--pieces "$PIECES"} ${REPLACE:+--replace "$REPLACE"} ${MIN_AGE:+--min-age "$MIN_AGE"} ${MAX_AGE:+--max-age "$MAX_AGE"} \
+            ${TITLE:+--title "$TITLE"} ${INSTRUMENT:+--instrument "$INSTRUMENT"} ${LABEL:+--label "$LABEL"} $APPLY
 
       - name: Shred the credential
         if: always()
