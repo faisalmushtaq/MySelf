@@ -1,0 +1,887 @@
+<!doctype html><html lang="en-GB"><head><meta charset="utf-8"><title>Social Media Break Lab Study — version 8.0.0</title>
+<style>
+  @page { size: A4; margin: 18mm 16mm; }
+  body { font: 10.5pt/1.45 -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; color: #1a1a1a; margin: 0; }
+  h1 { font-size: 18pt; margin: 0 0 4pt; } h2 { font-size: 14pt; margin: 18pt 0 6pt; border-bottom: 1px solid #ccc; padding-bottom: 3pt; break-after: avoid; }
+  h3 { font-size: 11.5pt; margin: 12pt 0 4pt; color: #333; break-after: avoid; } h4 { font-size: 10.5pt; margin: 0; }
+  .facts { border-collapse: collapse; margin: 8pt 0 12pt; } .facts td { padding: 2pt 10pt 2pt 0; vertical-align: top; } .facts td:first-child { color: #555; }
+  code { font: 9pt ui-monospace, Menlo, Consolas, monospace; color: #444; word-break: break-all; }
+  .q { break-inside: avoid; margin: 0 0 9pt; padding: 0 0 6pt; border-bottom: 1px dotted #ddd; }
+  .qhead { display: flex; gap: 8pt; } .num { min-width: 20pt; font-weight: 600; color: #555; }
+  .meta { margin: 1pt 0 0; font-size: 8.5pt; color: #666; } .cond { margin: 3pt 0 3pt 28pt; font-size: 9pt; color: #7a4b00; }
+  .lede, .detail, .options, .fields, .statements { margin-left: 28pt; } .lede p { margin: 3pt 0; color: #333; }
+  .options { border-collapse: collapse; font-size: 9.5pt; margin-top: 3pt; } .options td { padding: 1pt 8pt 1pt 0; } .options .code { color: #666; text-align: right; }
+  .detail { font-size: 9.5pt; color: #333; margin-top: 3pt; } .tag { font-size: 8pt; font-weight: 400; color: #666; border: 1px solid #ccc; border-radius: 3pt; padding: 0 3pt; }
+  .changes li { margin: 2pt 0; } .note { white-space: pre-wrap; }
+</style></head><body>
+<h1>Social Media Break Lab Study</h1>
+<table class="facts"><tbody>
+  <tr><td>Study / survey</td><td><code>social_media_break_lab</code> / <code>social_media_break_lab_study</code></td></tr>
+  <tr><td>Version</td><td>8.0.0 (from 7.0.0)</td></tr>
+  <tr><td>Published</td><td>2026-10-26T13:46:52.112Z by miftafai@gmail.com</td></tr>
+  <tr><td>Release hash</td><td><code>sha256:09b37e84e8796fbbb73dacfe2cea923e4297eb0c45c0eeeac90e7a2118fc9983</code></td></tr>
+  <tr><td>Questions</td><td>136</td></tr>
+</tbody></table>
+<h2>Release note</h2><p class="note">newest version</p>
+<h2>What changed</h2><ul class="changes"><li>Archived “What&#39;s your date of birth? new” (ybm_identity.dob2). Its ID and reporting label stay reserved.</li></ul>
+<section class="section"><h2>Welcome</h2><div class="block"><h3>YBM introduction and consent</h3>
+            
+            <section class="q">
+    <div class="qhead"><span class="num">1</span><div><h4>MyPhone/MyBrain Intervention Study</h4>
+    <p class="meta">Information · <code>study_intro</code> · <code>ybm_intro_consent.intro</code></p></div></div>
+    
+    <div class="lede"><p>You are invited to take part in a research study conducted by the University of Leeds. Before deciding whether to participate, please read the information below carefully. If anything is unclear, please ask a member of the research team. Taking part is voluntary, and you may withdraw from the study at any time without giving a reason.</p><p>As part of this study, we will ask you to complete questionnaires about your wellbeing and digital behaviour, alongside laboratory measures including EEG, ECG, and eye tracking. Your information will be handled confidentially and stored securely in accordance with University of Leeds data-protection procedures.</p><p>This questionnaire should take approximately 10 minutes to complete. Please answer the questions carefully and as accurately as you can.</p><p>This study has received ethical approval from the University of Leeds School of Psychology Research Ethics Committee (Ethics Reference: SoPrec 4202; approved 11 June 2026).</p></div>
+    
+  </section><section class="q">
+    <div class="qhead"><span class="num">2</span><div><h4>Please tap each statement to show you understand and agree to it, and that you consent to take part. We&#39;ll move on once they&#39;re all ticked.</h4>
+    <p class="meta">Statements to tick · Required · <code>consent</code> · <code>ybm_intro_consent.consent</code></p></div></div>
+    
+    <div class="lede"><p>Please tap each statement below to confirm that you understand and agree to it, and that you consent to take part in the study. We will move on once all statements are ticked.</p><p>As part of this study, we will collect questionnaire responses, laboratory data such as EEG, ECG and eye-tracking data, and information about your smartphone and social media use as described in the study information.</p><p>Your identifying information will be stored separately from your research data and used only where needed to manage your participation and link your study data using your participant ID.</p></div>
+    <ol class="statements"><li>I confirm that I am aged 18 or over.</li><li>I understand that anonymized results from this study may be disseminated through conference presentations, publication in peer reviewed journals, compiled as part of a report, used in future projects, included on institutional websites, presented in electronic theses and may be made available on online data repositories.</li><li>I understand that my name, date of birth and address will be kept separately from my research data and used only to link my information to my participant ID, including to help retrieve my participant ID if I forget it when signing in to the MyPhoneMyBrain/Break website. I understand that I will not be identified or identifiable in any reports resulting from the research.</li><li>I understand that if I choose to withdraw my data by contacting the primary researcher within 24 hours of submission (up until {withdrawal_date}) that my responses will be removed from the dataset and not used for analysis</li><li>I understand that I am free to withdraw at any time without giving any reason and without there being any negative consequences</li><li>I understand that Brick will be used to restrict access to agreed social media applications on my smartphone.</li><li>I understand that donating the requested summary smartphone usage information is a required part of the study.</li><li>I understand how my research data will be stored, used, and protected.</li><li>I have read and understood the information on the study presented above and have been offered the opportunity to ask the research team questions via email (m.faizah@leeds.ac.uk)</li><li>I agree to take part in this study</li></ol><p class="detail">Moves on by itself once every statement is ticked.</p>
+  </section><section class="q">
+    <div class="qhead"><span class="num">3</span><div><h4>Why your answers matter</h4>
+    <p class="meta">Information · <code>why_accurate</code> · <code>ybm_intro_consent.why_it_matters</code></p></div></div>
+    
+    <div class="lede"><p>There are no right or wrong answers here</p><p>What you tell us goes into research on how sleep, screens and feelings fit together for people your age, and on what actually helps. That only works if the answers are really yours, including the ones that aren&#39;t flattering.</p><p>A rushed or made-up answer doesn&#39;t just lose one number. It makes the whole picture slightly less true — for everyone the research is meant to help.</p><p>So take your time. And if you&#39;d rather not answer something, leave it blank — that&#39;s always allowed.</p></div>
+    
+  </section></div></section><section class="section"><h2>About you</h2><div class="block"><h3>YBM participant identifiers</h3>
+            
+            <section class="q">
+    <div class="qhead"><span class="num">4</span><div><h4>First Name</h4>
+    <p class="meta">Short text · Required · <code>first_name</code> · <code>ybm_identity.first_name</code></p></div></div>
+    
+    
+    
+  </section><section class="q">
+    <div class="qhead"><span class="num">5</span><div><h4>Last Name</h4>
+    <p class="meta">Short text · Required · <code>last_name</code> · <code>ybm_identity.last_name</code></p></div></div>
+    
+    
+    
+  </section><section class="q">
+    <div class="qhead"><span class="num">6</span><div><h4>What&#39;s your date of birth?</h4>
+    <p class="meta">Date · Required · <code>dob</code> · <code>ybm_identity.dob</code></p></div></div>
+    
+    
+    
+  </section><section class="q">
+    <div class="qhead"><span class="num">7</span><div><h4>What&#39;s your home address?</h4>
+    <p class="meta">Form · Asked (can be skipped) · <code>home_address</code> · <code>ybm_identity.home_address</code></p></div></div>
+    
+    <div class="lede"><p>The address you live at most of the time. If you live in more than one home, put the one you stay at most. Fill in what you know — it&#39;s fine to leave out anything you&#39;re not sure of.</p></div>
+    <ul class="fields"><li>Postcode</li><li>House number or name</li><li>Street</li></ul>
+  </section></div><div class="block"><h3>YBM demographics</h3>
+            
+            <section class="q">
+    <div class="qhead"><span class="num">8</span><div><h4>What best describes your ethnic origin?</h4>
+    <p class="meta">Single choice · Required · <code>ethnicity</code> · <code>ybm_demographics.ethnicity</code></p></div></div>
+    
+    <div class="lede"><p>Ethnic origin refers to your cultural background or where your family comes from, including your ancestors, country of origin, and cultural traditions you identify with.</p></div>
+    <table class="options"><tbody><tr><td class="code">13</td><td>English, Welsh, Scottish, Northern Irish or British</td></tr><tr><td class="code">2</td><td>Pakistani</td></tr><tr><td class="code">17</td><td>Any other White background</td></tr><tr><td class="code">1</td><td>Indian</td></tr><tr><td class="code">7</td><td>African</td></tr><tr><td class="code">18</td><td>Any other ethnic group</td></tr><tr><td class="code">5</td><td>Any other Asian background</td></tr><tr><td class="code">9</td><td>White and Black Caribbean</td></tr><tr><td class="code">11</td><td>White and Asian</td></tr><tr><td class="code">3</td><td>Bangladeshi</td></tr><tr><td class="code">6</td><td>Caribbean</td></tr><tr><td class="code">14</td><td>Irish</td></tr><tr><td class="code">12</td><td>Any other Mixed or multiple ethnic backgrounds</td></tr><tr><td class="code">4</td><td>Chinese</td></tr><tr><td class="code">19</td><td>Arab</td></tr><tr><td class="code">8</td><td>Any other Black, Black British, or Caribbean background</td></tr><tr><td class="code">10</td><td>White and Black African</td></tr><tr><td class="code">16</td><td>Roma</td></tr><tr><td class="code">15</td><td>Gypsy or Irish Traveller</td></tr><tr><td class="code">20</td><td>Prefer not to say</td></tr></tbody></table>
+  </section><section class="q">
+    <div class="qhead"><span class="num">9</span><div><h4>Was English the first language you learned to speak?</h4>
+    <p class="meta">Single choice · Required · <code>first_language_english</code> · <code>ybm_demographics.first_language_english</code></p></div></div>
+    
+    
+    <table class="options"><tbody><tr><td class="code">1</td><td>Yes</td></tr><tr><td class="code">2</td><td>No</td></tr><tr><td class="code">3</td><td>I learned English and another language at the same time</td></tr></tbody></table>
+  </section><section class="q">
+    <div class="qhead"><span class="num">10</span><div><h4>Do you speak or understand any language other than English?</h4>
+    <p class="meta">Single choice · Required · <code>speaks_other_language</code> · <code>ybm_demographics.speaks_other_language</code></p></div></div>
+    
+    <div class="lede"><p>Count any language you use at home, with family or friends, or have learned at school.</p></div>
+    <table class="options"><tbody><tr><td class="code">1</td><td>Yes</td></tr><tr><td class="code">2</td><td>No</td></tr></tbody></table>
+  </section><section class="q">
+    <div class="qhead"><span class="num">11</span><div><h4>Which other languages do you speak or understand?</h4>
+    <p class="meta">Multiple choice (all that apply) · Asked (can be skipped) · <code>other_languages</code> · <code>ybm_demographics.other_languages</code></p></div></div>
+    <p class="cond">Shown only if “Do you speak or understand any language other than English?” is “Yes”</p>
+    <div class="lede"><p>Choose all that apply.</p></div>
+    <table class="options"><tbody><tr><td class="code">1</td><td>Urdu</td></tr><tr><td class="code">2</td><td>Punjabi</td></tr><tr><td class="code">3</td><td>Polish</td></tr><tr><td class="code">4</td><td>Arabic</td></tr><tr><td class="code">16</td><td>Mandarin Chinese</td></tr><tr><td class="code">17</td><td>Cantonese Chinese</td></tr><tr><td class="code">6</td><td>Gujarati</td></tr><tr><td class="code">7</td><td>Bengali (including Sylheti)</td></tr><tr><td class="code">8</td><td>Portuguese</td></tr><tr><td class="code">9</td><td>Spanish</td></tr><tr><td class="code">10</td><td>Russian</td></tr><tr><td class="code">11</td><td>French</td></tr><tr><td class="code">12</td><td>Tamil</td></tr><tr><td class="code">13</td><td>British Sign Language</td></tr><tr><td class="code">14</td><td>Turkish</td></tr><tr><td class="code">15</td><td>Another language <em>(described in a box)</em></td></tr></tbody></table>
+  </section><section class="q">
+    <div class="qhead"><span class="num">12</span><div><h4>Which other language?</h4>
+    <p class="meta">Short text · Asked (can be skipped) · <code>other_language_named</code> · <code>ybm_demographics.other_language_named</code></p></div></div>
+    <p class="cond">Shown only if “Which other languages do you speak or understand?” includes “Another language”</p>
+    <div class="lede"><p>If there is more than one, name the one you use most.</p></div>
+    
+  </section><section class="q">
+    <div class="qhead"><span class="num">13</span><div><h4>How well do you understand Urdu when someone speaks it?</h4>
+    <p class="meta">Single choice · Asked (can be skipped) · <code>understand_urdu</code> · <code>ybm_demographics.understand_urdu</code></p></div></div>
+    <p class="cond">Shown only if “Which other languages do you speak or understand?” includes “Urdu”</p>
+    
+    <table class="options"><tbody><tr><td class="code">1</td><td>Very well</td></tr><tr><td class="code">2</td><td>Well</td></tr><tr><td class="code">3</td><td>Not very well</td></tr><tr><td class="code">4</td><td>Only a few words</td></tr><tr><td class="code">5</td><td>Not at all</td></tr></tbody></table>
+  </section><section class="q">
+    <div class="qhead"><span class="num">14</span><div><h4>How well can you speak Urdu?</h4>
+    <p class="meta">Single choice · Asked (can be skipped) · <code>speak_urdu</code> · <code>ybm_demographics.speak_urdu</code></p></div></div>
+    <p class="cond">Shown only if “Which other languages do you speak or understand?” includes “Urdu”</p>
+    <div class="lede"><p>Think about having a conversation in it, not just understanding it.</p></div>
+    <table class="options"><tbody><tr><td class="code">1</td><td>Very well</td></tr><tr><td class="code">2</td><td>Well</td></tr><tr><td class="code">3</td><td>Not very well</td></tr><tr><td class="code">4</td><td>Only a few words</td></tr><tr><td class="code">5</td><td>Not at all</td></tr></tbody></table>
+  </section><section class="q">
+    <div class="qhead"><span class="num">15</span><div><h4>How well do you understand Punjabi when someone speaks it?</h4>
+    <p class="meta">Single choice · Asked (can be skipped) · <code>understand_punjabi</code> · <code>ybm_demographics.understand_punjabi</code></p></div></div>
+    <p class="cond">Shown only if “Which other languages do you speak or understand?” includes “Punjabi”</p>
+    
+    <table class="options"><tbody><tr><td class="code">1</td><td>Very well</td></tr><tr><td class="code">2</td><td>Well</td></tr><tr><td class="code">3</td><td>Not very well</td></tr><tr><td class="code">4</td><td>Only a few words</td></tr><tr><td class="code">5</td><td>Not at all</td></tr></tbody></table>
+  </section><section class="q">
+    <div class="qhead"><span class="num">16</span><div><h4>How well can you speak Punjabi?</h4>
+    <p class="meta">Single choice · Asked (can be skipped) · <code>speak_punjabi</code> · <code>ybm_demographics.speak_punjabi</code></p></div></div>
+    <p class="cond">Shown only if “Which other languages do you speak or understand?” includes “Punjabi”</p>
+    <div class="lede"><p>Think about having a conversation in it, not just understanding it.</p></div>
+    <table class="options"><tbody><tr><td class="code">1</td><td>Very well</td></tr><tr><td class="code">2</td><td>Well</td></tr><tr><td class="code">3</td><td>Not very well</td></tr><tr><td class="code">4</td><td>Only a few words</td></tr><tr><td class="code">5</td><td>Not at all</td></tr></tbody></table>
+  </section><section class="q">
+    <div class="qhead"><span class="num">17</span><div><h4>How well do you understand Polish when someone speaks it?</h4>
+    <p class="meta">Single choice · Asked (can be skipped) · <code>understand_polish</code> · <code>ybm_demographics.understand_polish</code></p></div></div>
+    <p class="cond">Shown only if “Which other languages do you speak or understand?” includes “Polish”</p>
+    
+    <table class="options"><tbody><tr><td class="code">1</td><td>Very well</td></tr><tr><td class="code">2</td><td>Well</td></tr><tr><td class="code">3</td><td>Not very well</td></tr><tr><td class="code">4</td><td>Only a few words</td></tr><tr><td class="code">5</td><td>Not at all</td></tr></tbody></table>
+  </section><section class="q">
+    <div class="qhead"><span class="num">18</span><div><h4>How well can you speak Polish?</h4>
+    <p class="meta">Single choice · Asked (can be skipped) · <code>speak_polish</code> · <code>ybm_demographics.speak_polish</code></p></div></div>
+    <p class="cond">Shown only if “Which other languages do you speak or understand?” includes “Polish”</p>
+    <div class="lede"><p>Think about having a conversation in it, not just understanding it.</p></div>
+    <table class="options"><tbody><tr><td class="code">1</td><td>Very well</td></tr><tr><td class="code">2</td><td>Well</td></tr><tr><td class="code">3</td><td>Not very well</td></tr><tr><td class="code">4</td><td>Only a few words</td></tr><tr><td class="code">5</td><td>Not at all</td></tr></tbody></table>
+  </section><section class="q">
+    <div class="qhead"><span class="num">19</span><div><h4>How well do you understand Arabic when someone speaks it?</h4>
+    <p class="meta">Single choice · Asked (can be skipped) · <code>understand_arabic</code> · <code>ybm_demographics.understand_arabic</code></p></div></div>
+    <p class="cond">Shown only if “Which other languages do you speak or understand?” includes “Arabic”</p>
+    
+    <table class="options"><tbody><tr><td class="code">1</td><td>Very well</td></tr><tr><td class="code">2</td><td>Well</td></tr><tr><td class="code">3</td><td>Not very well</td></tr><tr><td class="code">4</td><td>Only a few words</td></tr><tr><td class="code">5</td><td>Not at all</td></tr></tbody></table>
+  </section><section class="q">
+    <div class="qhead"><span class="num">20</span><div><h4>How well can you speak Arabic?</h4>
+    <p class="meta">Single choice · Asked (can be skipped) · <code>speak_arabic</code> · <code>ybm_demographics.speak_arabic</code></p></div></div>
+    <p class="cond">Shown only if “Which other languages do you speak or understand?” includes “Arabic”</p>
+    <div class="lede"><p>Think about having a conversation in it, not just understanding it.</p></div>
+    <table class="options"><tbody><tr><td class="code">1</td><td>Very well</td></tr><tr><td class="code">2</td><td>Well</td></tr><tr><td class="code">3</td><td>Not very well</td></tr><tr><td class="code">4</td><td>Only a few words</td></tr><tr><td class="code">5</td><td>Not at all</td></tr></tbody></table>
+  </section><section class="q">
+    <div class="qhead"><span class="num">21</span><div><h4>How well do you understand Mandarin Chinese when someone speaks it?</h4>
+    <p class="meta">Single choice · Asked (can be skipped) · <code>understand_mandarin</code> · <code>ybm_demographics.understand_mandarin</code></p></div></div>
+    <p class="cond">Shown only if “Which other languages do you speak or understand?” includes “Mandarin Chinese”</p>
+    
+    <table class="options"><tbody><tr><td class="code">1</td><td>Very well</td></tr><tr><td class="code">2</td><td>Well</td></tr><tr><td class="code">3</td><td>Not very well</td></tr><tr><td class="code">4</td><td>Only a few words</td></tr><tr><td class="code">5</td><td>Not at all</td></tr></tbody></table>
+  </section><section class="q">
+    <div class="qhead"><span class="num">22</span><div><h4>How well can you speak Mandarin Chinese?</h4>
+    <p class="meta">Single choice · Asked (can be skipped) · <code>speak_mandarin</code> · <code>ybm_demographics.speak_mandarin</code></p></div></div>
+    <p class="cond">Shown only if “Which other languages do you speak or understand?” includes “Mandarin Chinese”</p>
+    <div class="lede"><p>Think about having a conversation in it, not just understanding it.</p></div>
+    <table class="options"><tbody><tr><td class="code">1</td><td>Very well</td></tr><tr><td class="code">2</td><td>Well</td></tr><tr><td class="code">3</td><td>Not very well</td></tr><tr><td class="code">4</td><td>Only a few words</td></tr><tr><td class="code">5</td><td>Not at all</td></tr></tbody></table>
+  </section><section class="q">
+    <div class="qhead"><span class="num">23</span><div><h4>How well do you understand Cantonese Chinese when someone speaks it?</h4>
+    <p class="meta">Single choice · Asked (can be skipped) · <code>understand_cantonese</code> · <code>ybm_demographics.understand_cantonese</code></p></div></div>
+    <p class="cond">Shown only if “Which other languages do you speak or understand?” includes “Cantonese Chinese”</p>
+    
+    <table class="options"><tbody><tr><td class="code">1</td><td>Very well</td></tr><tr><td class="code">2</td><td>Well</td></tr><tr><td class="code">3</td><td>Not very well</td></tr><tr><td class="code">4</td><td>Only a few words</td></tr><tr><td class="code">5</td><td>Not at all</td></tr></tbody></table>
+  </section><section class="q">
+    <div class="qhead"><span class="num">24</span><div><h4>How well can you speak Cantonese Chinese?</h4>
+    <p class="meta">Single choice · Asked (can be skipped) · <code>speak_cantonese</code> · <code>ybm_demographics.speak_cantonese</code></p></div></div>
+    <p class="cond">Shown only if “Which other languages do you speak or understand?” includes “Cantonese Chinese”</p>
+    <div class="lede"><p>Think about having a conversation in it, not just understanding it.</p></div>
+    <table class="options"><tbody><tr><td class="code">1</td><td>Very well</td></tr><tr><td class="code">2</td><td>Well</td></tr><tr><td class="code">3</td><td>Not very well</td></tr><tr><td class="code">4</td><td>Only a few words</td></tr><tr><td class="code">5</td><td>Not at all</td></tr></tbody></table>
+  </section><section class="q">
+    <div class="qhead"><span class="num">25</span><div><h4>How well do you understand Gujarati when someone speaks it?</h4>
+    <p class="meta">Single choice · Asked (can be skipped) · <code>understand_gujarati</code> · <code>ybm_demographics.understand_gujarati</code></p></div></div>
+    <p class="cond">Shown only if “Which other languages do you speak or understand?” includes “Gujarati”</p>
+    
+    <table class="options"><tbody><tr><td class="code">1</td><td>Very well</td></tr><tr><td class="code">2</td><td>Well</td></tr><tr><td class="code">3</td><td>Not very well</td></tr><tr><td class="code">4</td><td>Only a few words</td></tr><tr><td class="code">5</td><td>Not at all</td></tr></tbody></table>
+  </section><section class="q">
+    <div class="qhead"><span class="num">26</span><div><h4>How well can you speak Gujarati?</h4>
+    <p class="meta">Single choice · Asked (can be skipped) · <code>speak_gujarati</code> · <code>ybm_demographics.speak_gujarati</code></p></div></div>
+    <p class="cond">Shown only if “Which other languages do you speak or understand?” includes “Gujarati”</p>
+    <div class="lede"><p>Think about having a conversation in it, not just understanding it.</p></div>
+    <table class="options"><tbody><tr><td class="code">1</td><td>Very well</td></tr><tr><td class="code">2</td><td>Well</td></tr><tr><td class="code">3</td><td>Not very well</td></tr><tr><td class="code">4</td><td>Only a few words</td></tr><tr><td class="code">5</td><td>Not at all</td></tr></tbody></table>
+  </section><section class="q">
+    <div class="qhead"><span class="num">27</span><div><h4>How well do you understand Bengali (including Sylheti) when someone speaks it?</h4>
+    <p class="meta">Single choice · Asked (can be skipped) · <code>understand_bengali</code> · <code>ybm_demographics.understand_bengali</code></p></div></div>
+    <p class="cond">Shown only if “Which other languages do you speak or understand?” includes “Bengali (including Sylheti)”</p>
+    
+    <table class="options"><tbody><tr><td class="code">1</td><td>Very well</td></tr><tr><td class="code">2</td><td>Well</td></tr><tr><td class="code">3</td><td>Not very well</td></tr><tr><td class="code">4</td><td>Only a few words</td></tr><tr><td class="code">5</td><td>Not at all</td></tr></tbody></table>
+  </section><section class="q">
+    <div class="qhead"><span class="num">28</span><div><h4>How well can you speak Bengali (including Sylheti)?</h4>
+    <p class="meta">Single choice · Asked (can be skipped) · <code>speak_bengali</code> · <code>ybm_demographics.speak_bengali</code></p></div></div>
+    <p class="cond">Shown only if “Which other languages do you speak or understand?” includes “Bengali (including Sylheti)”</p>
+    <div class="lede"><p>Think about having a conversation in it, not just understanding it.</p></div>
+    <table class="options"><tbody><tr><td class="code">1</td><td>Very well</td></tr><tr><td class="code">2</td><td>Well</td></tr><tr><td class="code">3</td><td>Not very well</td></tr><tr><td class="code">4</td><td>Only a few words</td></tr><tr><td class="code">5</td><td>Not at all</td></tr></tbody></table>
+  </section><section class="q">
+    <div class="qhead"><span class="num">29</span><div><h4>How well do you understand Portuguese when someone speaks it?</h4>
+    <p class="meta">Single choice · Asked (can be skipped) · <code>understand_portuguese</code> · <code>ybm_demographics.understand_portuguese</code></p></div></div>
+    <p class="cond">Shown only if “Which other languages do you speak or understand?” includes “Portuguese”</p>
+    
+    <table class="options"><tbody><tr><td class="code">1</td><td>Very well</td></tr><tr><td class="code">2</td><td>Well</td></tr><tr><td class="code">3</td><td>Not very well</td></tr><tr><td class="code">4</td><td>Only a few words</td></tr><tr><td class="code">5</td><td>Not at all</td></tr></tbody></table>
+  </section><section class="q">
+    <div class="qhead"><span class="num">30</span><div><h4>How well can you speak Portuguese?</h4>
+    <p class="meta">Single choice · Asked (can be skipped) · <code>speak_portuguese</code> · <code>ybm_demographics.speak_portuguese</code></p></div></div>
+    <p class="cond">Shown only if “Which other languages do you speak or understand?” includes “Portuguese”</p>
+    <div class="lede"><p>Think about having a conversation in it, not just understanding it.</p></div>
+    <table class="options"><tbody><tr><td class="code">1</td><td>Very well</td></tr><tr><td class="code">2</td><td>Well</td></tr><tr><td class="code">3</td><td>Not very well</td></tr><tr><td class="code">4</td><td>Only a few words</td></tr><tr><td class="code">5</td><td>Not at all</td></tr></tbody></table>
+  </section><section class="q">
+    <div class="qhead"><span class="num">31</span><div><h4>How well do you understand Spanish when someone speaks it?</h4>
+    <p class="meta">Single choice · Asked (can be skipped) · <code>understand_spanish</code> · <code>ybm_demographics.understand_spanish</code></p></div></div>
+    <p class="cond">Shown only if “Which other languages do you speak or understand?” includes “Spanish”</p>
+    
+    <table class="options"><tbody><tr><td class="code">1</td><td>Very well</td></tr><tr><td class="code">2</td><td>Well</td></tr><tr><td class="code">3</td><td>Not very well</td></tr><tr><td class="code">4</td><td>Only a few words</td></tr><tr><td class="code">5</td><td>Not at all</td></tr></tbody></table>
+  </section><section class="q">
+    <div class="qhead"><span class="num">32</span><div><h4>How well can you speak Spanish?</h4>
+    <p class="meta">Single choice · Asked (can be skipped) · <code>speak_spanish</code> · <code>ybm_demographics.speak_spanish</code></p></div></div>
+    <p class="cond">Shown only if “Which other languages do you speak or understand?” includes “Spanish”</p>
+    <div class="lede"><p>Think about having a conversation in it, not just understanding it.</p></div>
+    <table class="options"><tbody><tr><td class="code">1</td><td>Very well</td></tr><tr><td class="code">2</td><td>Well</td></tr><tr><td class="code">3</td><td>Not very well</td></tr><tr><td class="code">4</td><td>Only a few words</td></tr><tr><td class="code">5</td><td>Not at all</td></tr></tbody></table>
+  </section><section class="q">
+    <div class="qhead"><span class="num">33</span><div><h4>How well do you understand Russian when someone speaks it?</h4>
+    <p class="meta">Single choice · Asked (can be skipped) · <code>understand_russian</code> · <code>ybm_demographics.understand_russian</code></p></div></div>
+    <p class="cond">Shown only if “Which other languages do you speak or understand?” includes “Russian”</p>
+    
+    <table class="options"><tbody><tr><td class="code">1</td><td>Very well</td></tr><tr><td class="code">2</td><td>Well</td></tr><tr><td class="code">3</td><td>Not very well</td></tr><tr><td class="code">4</td><td>Only a few words</td></tr><tr><td class="code">5</td><td>Not at all</td></tr></tbody></table>
+  </section><section class="q">
+    <div class="qhead"><span class="num">34</span><div><h4>How well can you speak Russian?</h4>
+    <p class="meta">Single choice · Asked (can be skipped) · <code>speak_russian</code> · <code>ybm_demographics.speak_russian</code></p></div></div>
+    <p class="cond">Shown only if “Which other languages do you speak or understand?” includes “Russian”</p>
+    <div class="lede"><p>Think about having a conversation in it, not just understanding it.</p></div>
+    <table class="options"><tbody><tr><td class="code">1</td><td>Very well</td></tr><tr><td class="code">2</td><td>Well</td></tr><tr><td class="code">3</td><td>Not very well</td></tr><tr><td class="code">4</td><td>Only a few words</td></tr><tr><td class="code">5</td><td>Not at all</td></tr></tbody></table>
+  </section><section class="q">
+    <div class="qhead"><span class="num">35</span><div><h4>How well do you understand French when someone speaks it?</h4>
+    <p class="meta">Single choice · Asked (can be skipped) · <code>understand_french</code> · <code>ybm_demographics.understand_french</code></p></div></div>
+    <p class="cond">Shown only if “Which other languages do you speak or understand?” includes “French”</p>
+    
+    <table class="options"><tbody><tr><td class="code">1</td><td>Very well</td></tr><tr><td class="code">2</td><td>Well</td></tr><tr><td class="code">3</td><td>Not very well</td></tr><tr><td class="code">4</td><td>Only a few words</td></tr><tr><td class="code">5</td><td>Not at all</td></tr></tbody></table>
+  </section><section class="q">
+    <div class="qhead"><span class="num">36</span><div><h4>How well can you speak French?</h4>
+    <p class="meta">Single choice · Asked (can be skipped) · <code>speak_french</code> · <code>ybm_demographics.speak_french</code></p></div></div>
+    <p class="cond">Shown only if “Which other languages do you speak or understand?” includes “French”</p>
+    <div class="lede"><p>Think about having a conversation in it, not just understanding it.</p></div>
+    <table class="options"><tbody><tr><td class="code">1</td><td>Very well</td></tr><tr><td class="code">2</td><td>Well</td></tr><tr><td class="code">3</td><td>Not very well</td></tr><tr><td class="code">4</td><td>Only a few words</td></tr><tr><td class="code">5</td><td>Not at all</td></tr></tbody></table>
+  </section><section class="q">
+    <div class="qhead"><span class="num">37</span><div><h4>How well do you understand Tamil when someone speaks it?</h4>
+    <p class="meta">Single choice · Asked (can be skipped) · <code>understand_tamil</code> · <code>ybm_demographics.understand_tamil</code></p></div></div>
+    <p class="cond">Shown only if “Which other languages do you speak or understand?” includes “Tamil”</p>
+    
+    <table class="options"><tbody><tr><td class="code">1</td><td>Very well</td></tr><tr><td class="code">2</td><td>Well</td></tr><tr><td class="code">3</td><td>Not very well</td></tr><tr><td class="code">4</td><td>Only a few words</td></tr><tr><td class="code">5</td><td>Not at all</td></tr></tbody></table>
+  </section><section class="q">
+    <div class="qhead"><span class="num">38</span><div><h4>How well can you speak Tamil?</h4>
+    <p class="meta">Single choice · Asked (can be skipped) · <code>speak_tamil</code> · <code>ybm_demographics.speak_tamil</code></p></div></div>
+    <p class="cond">Shown only if “Which other languages do you speak or understand?” includes “Tamil”</p>
+    <div class="lede"><p>Think about having a conversation in it, not just understanding it.</p></div>
+    <table class="options"><tbody><tr><td class="code">1</td><td>Very well</td></tr><tr><td class="code">2</td><td>Well</td></tr><tr><td class="code">3</td><td>Not very well</td></tr><tr><td class="code">4</td><td>Only a few words</td></tr><tr><td class="code">5</td><td>Not at all</td></tr></tbody></table>
+  </section><section class="q">
+    <div class="qhead"><span class="num">39</span><div><h4>How well do you understand British Sign Language when someone signs it?</h4>
+    <p class="meta">Single choice · Asked (can be skipped) · <code>understand_bsl</code> · <code>ybm_demographics.understand_bsl</code></p></div></div>
+    <p class="cond">Shown only if “Which other languages do you speak or understand?” includes “British Sign Language”</p>
+    
+    <table class="options"><tbody><tr><td class="code">1</td><td>Very well</td></tr><tr><td class="code">2</td><td>Well</td></tr><tr><td class="code">3</td><td>Not very well</td></tr><tr><td class="code">4</td><td>Only a few words</td></tr><tr><td class="code">5</td><td>Not at all</td></tr></tbody></table>
+  </section><section class="q">
+    <div class="qhead"><span class="num">40</span><div><h4>How well can you sign in British Sign Language?</h4>
+    <p class="meta">Single choice · Asked (can be skipped) · <code>speak_bsl</code> · <code>ybm_demographics.speak_bsl</code></p></div></div>
+    <p class="cond">Shown only if “Which other languages do you speak or understand?” includes “British Sign Language”</p>
+    <div class="lede"><p>Think about having a conversation in it yourself.</p></div>
+    <table class="options"><tbody><tr><td class="code">1</td><td>Very well</td></tr><tr><td class="code">2</td><td>Well</td></tr><tr><td class="code">3</td><td>Not very well</td></tr><tr><td class="code">4</td><td>Only a few words</td></tr><tr><td class="code">5</td><td>Not at all</td></tr></tbody></table>
+  </section><section class="q">
+    <div class="qhead"><span class="num">41</span><div><h4>How well do you understand Turkish when someone speaks it?</h4>
+    <p class="meta">Single choice · Asked (can be skipped) · <code>understand_turkish</code> · <code>ybm_demographics.understand_turkish</code></p></div></div>
+    <p class="cond">Shown only if “Which other languages do you speak or understand?” includes “Turkish”</p>
+    
+    <table class="options"><tbody><tr><td class="code">1</td><td>Very well</td></tr><tr><td class="code">2</td><td>Well</td></tr><tr><td class="code">3</td><td>Not very well</td></tr><tr><td class="code">4</td><td>Only a few words</td></tr><tr><td class="code">5</td><td>Not at all</td></tr></tbody></table>
+  </section><section class="q">
+    <div class="qhead"><span class="num">42</span><div><h4>How well can you speak Turkish?</h4>
+    <p class="meta">Single choice · Asked (can be skipped) · <code>speak_turkish</code> · <code>ybm_demographics.speak_turkish</code></p></div></div>
+    <p class="cond">Shown only if “Which other languages do you speak or understand?” includes “Turkish”</p>
+    <div class="lede"><p>Think about having a conversation in it, not just understanding it.</p></div>
+    <table class="options"><tbody><tr><td class="code">1</td><td>Very well</td></tr><tr><td class="code">2</td><td>Well</td></tr><tr><td class="code">3</td><td>Not very well</td></tr><tr><td class="code">4</td><td>Only a few words</td></tr><tr><td class="code">5</td><td>Not at all</td></tr></tbody></table>
+  </section><section class="q">
+    <div class="qhead"><span class="num">43</span><div><h4>How well do you understand {language} when someone speaks it?</h4>
+    <p class="meta">Single choice · Asked (can be skipped) · <code>understand_other_language</code> · <code>ybm_demographics.understand_other_language</code></p></div></div>
+    <p class="cond">Shown only if “Which other languages do you speak or understand?” includes “Another language”</p>
+    
+    <table class="options"><tbody><tr><td class="code">1</td><td>Very well</td></tr><tr><td class="code">2</td><td>Well</td></tr><tr><td class="code">3</td><td>Not very well</td></tr><tr><td class="code">4</td><td>Only a few words</td></tr><tr><td class="code">5</td><td>Not at all</td></tr></tbody></table>
+  </section><section class="q">
+    <div class="qhead"><span class="num">44</span><div><h4>How well can you speak {language}?</h4>
+    <p class="meta">Single choice · Asked (can be skipped) · <code>speak_other_language</code> · <code>ybm_demographics.speak_other_language</code></p></div></div>
+    <p class="cond">Shown only if “Which other languages do you speak or understand?” includes “Another language”</p>
+    <div class="lede"><p>Think about having a conversation in it, not just understanding it.</p></div>
+    <table class="options"><tbody><tr><td class="code">1</td><td>Very well</td></tr><tr><td class="code">2</td><td>Well</td></tr><tr><td class="code">3</td><td>Not very well</td></tr><tr><td class="code">4</td><td>Only a few words</td></tr><tr><td class="code">5</td><td>Not at all</td></tr></tbody></table>
+  </section><section class="q">
+    <div class="qhead"><span class="num">45</span><div><h4>Gender</h4>
+    <p class="meta">Single choice · Required · <code>gender</code> · <code>ybm_demographics.gender</code></p></div></div>
+    
+    
+    <table class="options"><tbody><tr><td class="code">1</td><td>Male</td></tr><tr><td class="code">2</td><td>Female</td></tr><tr><td class="code">3</td><td>Non-binary / third gender</td></tr><tr><td class="code">4</td><td>Prefer not to say</td></tr></tbody></table>
+  </section><section class="q">
+    <div class="qhead"><span class="num">46</span><div><h4>Are you currently taking any prescribed medication for a mental health or psychiatric condition?</h4>
+    <p class="meta">Single choice · Required · <code>mh_medication</code> · <code>ybm_demographics.medication</code></p></div></div>
+    
+    <div class="lede"><p>For example, antidepressants. We only use this to describe who took part — it never affects whether you can take part, and it is not shared with anyone else.</p></div>
+    <table class="options"><tbody><tr><td class="code">1</td><td>Yes</td></tr><tr><td class="code">2</td><td>No</td></tr></tbody></table>
+  </section></div><div class="block"><h3>YBM EEG practicalities</h3>
+            
+            <section class="q">
+    <div class="qhead"><span class="num">47</span><div><h4>Which of these is most like your own hair?</h4>
+    <p class="meta">Single choice · Required · <code>hair_type</code> · <code>ybm_eeg_practical.hair_type</code></p></div></div>
+    
+    <div class="lede"><p>Pick the one closest to yours — it helps us fit the EEG cap. Choose just one.</p></div>
+    <table class="options"><tbody><tr><td class="code">1</td><td>Straight, fine</td></tr><tr><td class="code">2</td><td>Straight, medium</td></tr><tr><td class="code">3</td><td>Straight, coarse</td></tr><tr><td class="code">4</td><td>Loose waves</td></tr><tr><td class="code">5</td><td>Defined waves</td></tr><tr><td class="code">6</td><td>Strong waves</td></tr><tr><td class="code">7</td><td>Loose curls</td></tr><tr><td class="code">8</td><td>Springy curls</td></tr><tr><td class="code">9</td><td>Tight curls</td></tr><tr><td class="code">10</td><td>Soft coils</td></tr><tr><td class="code">11</td><td>Zig-zag coils</td></tr><tr><td class="code">12</td><td>Tight coils</td></tr></tbody></table>
+  </section></div></section><section class="section"><h2>Hands and standing</h2><div class="block"><h3>Edinburgh Handedness Inventory – Short Form <span class="tag">validated, used as licensed</span></h3>
+            
+            <section class="q">
+    <div class="qhead"><span class="num">48</span><div><h4>Which hand do you write with?</h4>
+    <p class="meta">Single choice · Required · <code>ehi_writing</code> · <code>ehi_sf.writing</code></p></div></div>
+    
+    
+    <table class="options"><tbody><tr><td class="code">1</td><td>Always right</td></tr><tr><td class="code">2</td><td>Usually right</td></tr><tr><td class="code">3</td><td>Both equally</td></tr><tr><td class="code">4</td><td>Usually left</td></tr><tr><td class="code">5</td><td>Always left</td></tr></tbody></table>
+  </section><section class="q">
+    <div class="qhead"><span class="num">49</span><div><h4>Which hand do you throw a ball with?</h4>
+    <p class="meta">Single choice · Required · <code>ehi_throwing</code> · <code>ehi_sf.throwing</code></p></div></div>
+    
+    
+    <table class="options"><tbody><tr><td class="code">1</td><td>Always right</td></tr><tr><td class="code">2</td><td>Usually right</td></tr><tr><td class="code">3</td><td>Both equally</td></tr><tr><td class="code">4</td><td>Usually left</td></tr><tr><td class="code">5</td><td>Always left</td></tr></tbody></table>
+  </section><section class="q">
+    <div class="qhead"><span class="num">50</span><div><h4>Which hand do you hold your toothbrush in?</h4>
+    <p class="meta">Single choice · Required · <code>ehi_toothbrush</code> · <code>ehi_sf.toothbrush</code></p></div></div>
+    
+    
+    <table class="options"><tbody><tr><td class="code">1</td><td>Always right</td></tr><tr><td class="code">2</td><td>Usually right</td></tr><tr><td class="code">3</td><td>Both equally</td></tr><tr><td class="code">4</td><td>Usually left</td></tr><tr><td class="code">5</td><td>Always left</td></tr></tbody></table>
+  </section><section class="q">
+    <div class="qhead"><span class="num">51</span><div><h4>Which hand do you hold a spoon in?</h4>
+    <p class="meta">Single choice · Required · <code>ehi_spoon</code> · <code>ehi_sf.spoon</code></p></div></div>
+    
+    
+    <table class="options"><tbody><tr><td class="code">1</td><td>Always right</td></tr><tr><td class="code">2</td><td>Usually right</td></tr><tr><td class="code">3</td><td>Both equally</td></tr><tr><td class="code">4</td><td>Usually left</td></tr><tr><td class="code">5</td><td>Always left</td></tr></tbody></table>
+  </section><section class="q">
+    <div class="qhead"><span class="num">52</span><div><h4>Your answers suggest you&#39;re {band}</h4>
+    <p class="meta">Information · <code>ehi_lq_feedback</code> · <code>ehi_sf.lq_feedback</code></p></div></div>
+    
+    <div class="lede"><p>Your handedness score is {lq}, on a scale from -100 (always the left hand) to +100 (always the right hand).</p></div>
+    
+  </section></div><div class="block"><h3>MacArthur Scale of Subjective Social Status – Adult Version</h3>
+            
+            <section class="q">
+    <div class="qhead"><span class="num">53</span><div><h4>Where would you be on this ladder?</h4>
+    <p class="meta">Ladder · Required · <code>sss_society</code> · <code>macarthur_sss_adult.society</code></p></div></div>
+    
+    <div class="lede"><p>Think of this ladder as representing where people stand in society in the UK.</p><p>At the top are the people who are best off — those who have the most money, the most education, and the most respected jobs.</p><p>At the bottom are the people who are worst off — those who have the least money, the least education, and the least respected jobs, or no job.</p><p>Where would you place yourself on this ladder at this time in your life?</p></div>
+    <p class="detail">10 rungs</p>
+  </section><section class="q">
+    <div class="qhead"><span class="num">54</span><div><h4>Where would you be on this ladder?</h4>
+    <p class="meta">Ladder · Required · <code>sss_community</code> · <code>macarthur_sss_adult.community</code></p></div></div>
+    
+    <div class="lede"><p>Think of this ladder as representing where people stand in their communities.</p><p>People define community in different ways. Please think about the community that is most meaningful to you.</p><p>At the top of the ladder are the people who have the highest standing in their community. At the bottom are the people who have the lowest standing.</p><p>Where would you place yourself on this ladder at this time in your life?</p></div>
+    <p class="detail">10 rungs</p>
+  </section></div></section><section class="section"><h2>Sleep</h2><div class="block"><h3>Sleep Quality Scale <span class="tag">validated, used as licensed</span></h3>
+            
+            <section class="q">
+    <div class="qhead"><span class="num">55</span><div><h4>During the past 7 days, how would you rate your sleep quality overall?</h4>
+    <p class="meta">Single choice · Required · <code>sqs_q1</code> · <code>sqs.q1</code></p></div></div>
+    
+    <div class="lede"><p>Think about how many hours you slept, how easily you fell asleep, how often you woke up in the night, whether you woke up earlier than you needed to, and how refreshed you felt when you got up.</p></div>
+    <table class="options"><tbody><tr><td class="code">0</td><td>0</td></tr><tr><td class="code">1</td><td>1</td></tr><tr><td class="code">2</td><td>2</td></tr><tr><td class="code">3</td><td>3</td></tr><tr><td class="code">4</td><td>4</td></tr><tr><td class="code">5</td><td>5</td></tr><tr><td class="code">6</td><td>6</td></tr><tr><td class="code">7</td><td>7</td></tr><tr><td class="code">8</td><td>8</td></tr><tr><td class="code">9</td><td>9</td></tr><tr><td class="code">10</td><td>10</td></tr></tbody></table>
+  </section></div><div class="block"><h3>Karolinska Sleepiness Scale <span class="tag">validated, used as licensed</span></h3>
+            
+            <section class="q">
+    <div class="qhead"><span class="num">56</span><div><h4>How sleepy are you feeling right now?</h4>
+    <p class="meta">Single choice · Required · <code>kss_q1</code> · <code>kss.q1</code></p></div></div>
+    
+    
+    <table class="options"><tbody><tr><td class="code">1</td><td>Extremely alert</td></tr><tr><td class="code">2</td><td>Very alert</td></tr><tr><td class="code">3</td><td>Alert</td></tr><tr><td class="code">4</td><td>Rather alert</td></tr><tr><td class="code">5</td><td>Neither alert nor sleepy</td></tr><tr><td class="code">6</td><td>Some signs of sleepiness</td></tr><tr><td class="code">7</td><td>Sleepy, but no effort to keep awake</td></tr><tr><td class="code">8</td><td>Sleepy, some effort to keep awake</td></tr><tr><td class="code">9</td><td>Very sleepy, great effort to keep awake, fighting sleep</td></tr></tbody></table>
+  </section></div></section><section class="section"><h2>How you&#39;ve been feeling</h2><div class="block"><h3>Short Warwick–Edinburgh Mental Wellbeing Scale <span class="tag">validated, used as licensed</span></h3>
+            
+            <section class="q">
+    <div class="qhead"><span class="num">57</span><div><h4>I’ve been feeling optimistic about the future</h4>
+    <p class="meta">Single choice · Required · <code>swemwbs_q1</code> · <code>swemwbs.optimistic</code></p></div></div>
+    
+    
+    <table class="options"><tbody><tr><td class="code">1</td><td>None of the time</td></tr><tr><td class="code">2</td><td>Rarely</td></tr><tr><td class="code">3</td><td>Some of the time</td></tr><tr><td class="code">4</td><td>Often</td></tr><tr><td class="code">5</td><td>All of the time</td></tr></tbody></table>
+  </section><section class="q">
+    <div class="qhead"><span class="num">58</span><div><h4>I’ve been feeling useful</h4>
+    <p class="meta">Single choice · Required · <code>swemwbs_q2</code> · <code>swemwbs.useful</code></p></div></div>
+    
+    
+    <table class="options"><tbody><tr><td class="code">1</td><td>None of the time</td></tr><tr><td class="code">2</td><td>Rarely</td></tr><tr><td class="code">3</td><td>Some of the time</td></tr><tr><td class="code">4</td><td>Often</td></tr><tr><td class="code">5</td><td>All of the time</td></tr></tbody></table>
+  </section><section class="q">
+    <div class="qhead"><span class="num">59</span><div><h4>I’ve been feeling relaxed</h4>
+    <p class="meta">Single choice · Required · <code>swemwbs_q3</code> · <code>swemwbs.relaxed</code></p></div></div>
+    
+    
+    <table class="options"><tbody><tr><td class="code">1</td><td>None of the time</td></tr><tr><td class="code">2</td><td>Rarely</td></tr><tr><td class="code">3</td><td>Some of the time</td></tr><tr><td class="code">4</td><td>Often</td></tr><tr><td class="code">5</td><td>All of the time</td></tr></tbody></table>
+  </section><section class="q">
+    <div class="qhead"><span class="num">60</span><div><h4>I’ve been dealing with problems well</h4>
+    <p class="meta">Single choice · Required · <code>swemwbs_q4</code> · <code>swemwbs.problems</code></p></div></div>
+    
+    
+    <table class="options"><tbody><tr><td class="code">1</td><td>None of the time</td></tr><tr><td class="code">2</td><td>Rarely</td></tr><tr><td class="code">3</td><td>Some of the time</td></tr><tr><td class="code">4</td><td>Often</td></tr><tr><td class="code">5</td><td>All of the time</td></tr></tbody></table>
+  </section><section class="q">
+    <div class="qhead"><span class="num">61</span><div><h4>I’ve been thinking clearly</h4>
+    <p class="meta">Single choice · Required · <code>swemwbs_q5</code> · <code>swemwbs.thinking</code></p></div></div>
+    
+    
+    <table class="options"><tbody><tr><td class="code">1</td><td>None of the time</td></tr><tr><td class="code">2</td><td>Rarely</td></tr><tr><td class="code">3</td><td>Some of the time</td></tr><tr><td class="code">4</td><td>Often</td></tr><tr><td class="code">5</td><td>All of the time</td></tr></tbody></table>
+  </section><section class="q">
+    <div class="qhead"><span class="num">62</span><div><h4>I’ve been feeling close to other people</h4>
+    <p class="meta">Single choice · Required · <code>swemwbs_q6</code> · <code>swemwbs.close</code></p></div></div>
+    
+    
+    <table class="options"><tbody><tr><td class="code">1</td><td>None of the time</td></tr><tr><td class="code">2</td><td>Rarely</td></tr><tr><td class="code">3</td><td>Some of the time</td></tr><tr><td class="code">4</td><td>Often</td></tr><tr><td class="code">5</td><td>All of the time</td></tr></tbody></table>
+  </section><section class="q">
+    <div class="qhead"><span class="num">63</span><div><h4>I’ve been able to make up my own mind about things</h4>
+    <p class="meta">Single choice · Required · <code>swemwbs_q7</code> · <code>swemwbs.mind</code></p></div></div>
+    
+    
+    <table class="options"><tbody><tr><td class="code">1</td><td>None of the time</td></tr><tr><td class="code">2</td><td>Rarely</td></tr><tr><td class="code">3</td><td>Some of the time</td></tr><tr><td class="code">4</td><td>Often</td></tr><tr><td class="code">5</td><td>All of the time</td></tr></tbody></table>
+  </section></div><div class="block"><h3>STAI-5 (state anxiety short form) <span class="tag">validated, used as licensed</span></h3>
+            
+            <section class="q">
+    <div class="qhead"><span class="num">64</span><div><h4>I feel upset.</h4>
+    <p class="meta">Single choice · Required · <code>stai5_q1</code> · <code>stai5_s.upset</code></p></div></div>
+    
+    
+    <table class="options"><tbody><tr><td class="code">1</td><td>Not at all</td></tr><tr><td class="code">2</td><td>Somewhat</td></tr><tr><td class="code">3</td><td>Moderately</td></tr><tr><td class="code">4</td><td>Very much</td></tr></tbody></table>
+  </section><section class="q">
+    <div class="qhead"><span class="num">65</span><div><h4>I feel frightened.</h4>
+    <p class="meta">Single choice · Required · <code>stai5_q2</code> · <code>stai5_s.frightened</code></p></div></div>
+    
+    
+    <table class="options"><tbody><tr><td class="code">1</td><td>Not at all</td></tr><tr><td class="code">2</td><td>Somewhat</td></tr><tr><td class="code">3</td><td>Moderately</td></tr><tr><td class="code">4</td><td>Very much</td></tr></tbody></table>
+  </section><section class="q">
+    <div class="qhead"><span class="num">66</span><div><h4>I feel nervous.</h4>
+    <p class="meta">Single choice · Required · <code>stai5_q3</code> · <code>stai5_s.nervous</code></p></div></div>
+    
+    
+    <table class="options"><tbody><tr><td class="code">1</td><td>Not at all</td></tr><tr><td class="code">2</td><td>Somewhat</td></tr><tr><td class="code">3</td><td>Moderately</td></tr><tr><td class="code">4</td><td>Very much</td></tr></tbody></table>
+  </section><section class="q">
+    <div class="qhead"><span class="num">67</span><div><h4>I am jittery.</h4>
+    <p class="meta">Single choice · Required · <code>stai5_q4</code> · <code>stai5_s.jittery</code></p></div></div>
+    
+    
+    <table class="options"><tbody><tr><td class="code">1</td><td>Not at all</td></tr><tr><td class="code">2</td><td>Somewhat</td></tr><tr><td class="code">3</td><td>Moderately</td></tr><tr><td class="code">4</td><td>Very much</td></tr></tbody></table>
+  </section><section class="q">
+    <div class="qhead"><span class="num">68</span><div><h4>I feel confused.</h4>
+    <p class="meta">Single choice · Required · <code>stai5_q5</code> · <code>stai5_s.confused</code></p></div></div>
+    
+    
+    <table class="options"><tbody><tr><td class="code">1</td><td>Not at all</td></tr><tr><td class="code">2</td><td>Somewhat</td></tr><tr><td class="code">3</td><td>Moderately</td></tr><tr><td class="code">4</td><td>Very much</td></tr></tbody></table>
+  </section></div><div class="block"><h3>Patient Health Questionnaire-4 <span class="tag">validated, used as licensed</span></h3>
+            
+            <section class="q">
+    <div class="qhead"><span class="num">69</span><div><h4>Feeling nervous, anxious or on edge</h4>
+    <p class="meta">Single choice · Required · <code>phq4_q1</code> · <code>phq4.nervous</code></p></div></div>
+    
+    
+    <table class="options"><tbody><tr><td class="code">0</td><td>Not at all</td></tr><tr><td class="code">1</td><td>Several days</td></tr><tr><td class="code">2</td><td>More than half the days</td></tr><tr><td class="code">3</td><td>Nearly every day</td></tr></tbody></table>
+  </section><section class="q">
+    <div class="qhead"><span class="num">70</span><div><h4>Not being able to stop or control worrying</h4>
+    <p class="meta">Single choice · Required · <code>phq4_q2</code> · <code>phq4.worrying</code></p></div></div>
+    
+    
+    <table class="options"><tbody><tr><td class="code">0</td><td>Not at all</td></tr><tr><td class="code">1</td><td>Several days</td></tr><tr><td class="code">2</td><td>More than half the days</td></tr><tr><td class="code">3</td><td>Nearly every day</td></tr></tbody></table>
+  </section><section class="q">
+    <div class="qhead"><span class="num">71</span><div><h4>Little interest or pleasure in doing things</h4>
+    <p class="meta">Single choice · Required · <code>phq4_q3</code> · <code>phq4.interest</code></p></div></div>
+    
+    
+    <table class="options"><tbody><tr><td class="code">0</td><td>Not at all</td></tr><tr><td class="code">1</td><td>Several days</td></tr><tr><td class="code">2</td><td>More than half the days</td></tr><tr><td class="code">3</td><td>Nearly every day</td></tr></tbody></table>
+  </section><section class="q">
+    <div class="qhead"><span class="num">72</span><div><h4>Feeling down, depressed, or hopeless</h4>
+    <p class="meta">Single choice · Required · <code>phq4_q4</code> · <code>phq4.down</code></p></div></div>
+    
+    
+    <table class="options"><tbody><tr><td class="code">0</td><td>Not at all</td></tr><tr><td class="code">1</td><td>Several days</td></tr><tr><td class="code">2</td><td>More than half the days</td></tr><tr><td class="code">3</td><td>Nearly every day</td></tr></tbody></table>
+  </section></div></section><section class="section"><h2>Phones and social media</h2><div class="block"><h3>YBM smartphone and social-media ownership</h3>
+            
+            <section class="q">
+    <div class="qhead"><span class="num">73</span><div><h4>Do you have your own smartphone?</h4>
+    <p class="meta">Single choice · Required · <code>smartphone_own</code> · <code>ybm_smartphone.own</code></p></div></div>
+    
+    
+    <table class="options"><tbody><tr><td class="code">1</td><td>Yes</td></tr><tr><td class="code">2</td><td>No</td></tr></tbody></table>
+  </section><section class="q">
+    <div class="qhead"><span class="num">74</span><div><h4>How many smartphones do you currently own?</h4>
+    <p class="meta">Number · Asked (can be skipped) · <code>number_of_phone</code> · <code>ybm_smartphone.number_of_phone</code></p></div></div>
+    <p class="cond">Shown only if “Do you have your own smartphone?” is “Yes”</p>
+    
+    <p class="detail">A number.</p>
+  </section><section class="q">
+    <div class="qhead"><span class="num">75</span><div><h4>What type of smartphone are you using? Participants tick all that apply.</h4>
+    <p class="meta">Multiple choice (all that apply) · Asked (can be skipped) · <code>new_question_2</code> · <code>ybm_smartphone.new_question</code></p></div></div>
+    
+    
+    <table class="options"><tbody><tr><td class="code">1</td><td>Iphone</td></tr><tr><td class="code">2</td><td>Android</td></tr><tr><td class="code">4</td><td>Other <em>(described in a box)</em></td></tr></tbody></table>
+  </section><section class="q">
+    <div class="qhead"><span class="num">76</span><div><h4>Please tell us what</h4>
+    <p class="meta">Short text · Asked (can be skipped) · <code>new_question_2_other</code> · <code>ybm_smartphone.new_question_other</code></p></div></div>
+    <p class="cond">Shown only if “What type of smartphone are you using? Participants tick…” includes “Other”</p>
+    
+    
+  </section><section class="q">
+    <div class="qhead"><span class="num">77</span><div><h4>At what age did you get your first smartphone? Please answer in years.</h4>
+    <p class="meta">Single choice · Required · <code>smartphone_age</code> · <code>ybm_smartphone.age_smartphone</code></p></div></div>
+    <p class="cond">Shown only if “Do you have your own smartphone?” is “Yes”</p>
+    
+    <table class="options"><tbody><tr><td class="code">1</td><td>Younger than 5</td></tr><tr><td class="code">2</td><td>5</td></tr><tr><td class="code">3</td><td>6</td></tr><tr><td class="code">4</td><td>7</td></tr><tr><td class="code">5</td><td>8</td></tr><tr><td class="code">6</td><td>9</td></tr><tr><td class="code">7</td><td>10</td></tr><tr><td class="code">8</td><td>11</td></tr><tr><td class="code">9</td><td>12</td></tr><tr><td class="code">10</td><td>13</td></tr><tr><td class="code">11</td><td>14</td></tr><tr><td class="code">12</td><td>15</td></tr><tr><td class="code">13</td><td>16</td></tr><tr><td class="code">14</td><td>17</td></tr><tr><td class="code">15</td><td>18</td></tr><tr><td class="code">16</td><td>19</td></tr><tr><td class="code">17</td><td>20</td></tr><tr><td class="code">18</td><td>21</td></tr><tr><td class="code">19</td><td>22</td></tr><tr><td class="code">20</td><td>23</td></tr><tr><td class="code">21</td><td>24</td></tr><tr><td class="code">22</td><td>25</td></tr><tr><td class="code">99</td><td>I’m not sure / I can’t remember</td></tr></tbody></table>
+  </section><section class="q">
+    <div class="qhead"><span class="num">78</span><div><h4>Do you currently use social media?</h4>
+    <p class="meta">Single choice · Required · <code>sm_use</code> · <code>ybm_smartphone.sm_use</code></p></div></div>
+    
+    <div class="lede"><p>We mean apps where you can see or share things other people have posted — even if you mostly just watch.</p></div>
+    <table class="options"><tbody><tr><td class="code">1</td><td>Yes</td></tr><tr><td class="code">2</td><td>No</td></tr></tbody></table>
+  </section><section class="q">
+    <div class="qhead"><span class="num">79</span><div><h4>Just to check — do you use any of these?</h4>
+    <p class="meta">Single choice · Asked (can be skipped) · <code>sm_use_confirm</code> · <code>ybm_smartphone.sm_use_confirm</code></p></div></div>
+    <p class="cond">Shown only if “Do you currently use social media?” is “No”</p>
+    <div class="lede"><p>TikTok · Instagram · Snapchat · YouTube · WhatsApp · Discord · Reddit · X (Twitter) · Twitch · BeReal · Facebook · Pinterest</p><p>Watching or reading without posting still counts. Messaging apps you use to keep up with friends count too.</p></div>
+    <table class="options"><tbody><tr><td class="code">1</td><td>Yes</td></tr><tr><td class="code">2</td><td>No</td></tr></tbody></table>
+  </section><section class="q">
+    <div class="qhead"><span class="num">80</span><div><h4>At what age did you start using social media? Please answer in years.</h4>
+    <p class="meta">Single choice · Required · <code>sm_age</code> · <code>ybm_smartphone.age_sm</code></p></div></div>
+    <p class="cond">Shown only if “Do you currently use social media?” is “Yes” or “Just to check — do you use any of these?” is “Yes”</p>
+    
+    <table class="options"><tbody><tr><td class="code">1</td><td>Younger than 5</td></tr><tr><td class="code">2</td><td>5</td></tr><tr><td class="code">3</td><td>6</td></tr><tr><td class="code">4</td><td>7</td></tr><tr><td class="code">5</td><td>8</td></tr><tr><td class="code">6</td><td>9</td></tr><tr><td class="code">7</td><td>10</td></tr><tr><td class="code">8</td><td>11</td></tr><tr><td class="code">9</td><td>12</td></tr><tr><td class="code">10</td><td>13</td></tr><tr><td class="code">11</td><td>14</td></tr><tr><td class="code">12</td><td>15</td></tr><tr><td class="code">13</td><td>16</td></tr><tr><td class="code">14</td><td>17</td></tr><tr><td class="code">15</td><td>18</td></tr><tr><td class="code">16</td><td>19</td></tr><tr><td class="code">17</td><td>20</td></tr><tr><td class="code">18</td><td>21</td></tr><tr><td class="code">19</td><td>22</td></tr><tr><td class="code">20</td><td>23</td></tr><tr><td class="code">21</td><td>24</td></tr><tr><td class="code">22</td><td>25</td></tr><tr><td class="code">99</td><td>I’m not sure / I can’t remember</td></tr></tbody></table>
+  </section></div><div class="block"><h3>YBM AI chatbot use</h3>
+            
+            <section class="q">
+    <div class="qhead"><span class="num">81</span><div><h4>How often do you use AI chatbots or assistants?</h4>
+    <p class="meta">Single choice · Asked (can be skipped) · <code>ai_use_frequency</code> · <code>ybm_ai_use.frequency</code></p></div></div>
+    
+    <div class="lede"><p>For example ChatGPT, Snapchat&#39;s My AI, Gemini, Copilot or Character.AI.</p></div>
+    <table class="options"><tbody><tr><td class="code">1</td><td>Never</td></tr><tr><td class="code">2</td><td>Less than once a week</td></tr><tr><td class="code">3</td><td>A few times a week</td></tr><tr><td class="code">4</td><td>Once a day</td></tr><tr><td class="code">5</td><td>Several times a day</td></tr></tbody></table>
+  </section><section class="q">
+    <div class="qhead"><span class="num">82</span><div><h4>What do you use them for?</h4>
+    <p class="meta">Multiple choice (all that apply) · Asked (can be skipped) · <code>ai_use_purpose</code> · <code>ybm_ai_use.purpose</code></p></div></div>
+    <p class="cond">Shown only if “How often do you use AI chatbots or assistants?” is answered with something other than “Never”</p>
+    <div class="lede"><p>Choose all that apply.</p></div>
+    <table class="options"><tbody><tr><td class="code">1</td><td>Schoolwork or homework</td></tr><tr><td class="code">2</td><td>Looking things up or answering questions</td></tr><tr><td class="code">3</td><td>Creative things, like stories, pictures or music</td></tr><tr><td class="code">4</td><td>Just for fun or to pass the time</td></tr><tr><td class="code">5</td><td>Advice about problems or decisions</td></tr><tr><td class="code">6</td><td>Talking about my feelings or when I&#39;m upset</td></tr><tr><td class="code">7</td><td>Chatting to it as a friend or for company</td></tr><tr><td class="code">8</td><td>Something else <em>(described in a box)</em></td></tr></tbody></table>
+  </section><section class="q">
+    <div class="qhead"><span class="num">83</span><div><h4>What else do you use them for?</h4>
+    <p class="meta">Short text · Asked (can be skipped) · <code>ai_use_purpose_other</code> · <code>ybm_ai_use.purpose_other</code></p></div></div>
+    <p class="cond">Shown only if “What do you use them for?” includes “Something else”</p>
+    
+    
+  </section><section class="q">
+    <div class="qhead"><span class="num">84</span><div><h4>After using AI chatbots, how do you usually feel?</h4>
+    <p class="meta">Single choice · Asked (can be skipped) · <code>ai_use_feeling</code> · <code>ybm_ai_use.feeling</code></p></div></div>
+    <p class="cond">Shown only if “How often do you use AI chatbots or assistants?” is answered with something other than “Never”</p>
+    
+    <table class="options"><tbody><tr><td class="code">1</td><td>Better</td></tr><tr><td class="code">2</td><td>About the same</td></tr><tr><td class="code">3</td><td>Worse</td></tr><tr><td class="code">4</td><td>It depends</td></tr></tbody></table>
+  </section></div></section><section class="section"><h2>Your social media</h2><p class="cond">Shown only if “Do you currently use social media?” is “Yes” or “Just to check — do you use any of these?” is “Yes”</p><div class="block"><h3>YBM social-media use (adapted from AoW)</h3>
+            
+            <section class="q">
+    <div class="qhead"><span class="num">85</span><div><h4>Which of these apps do you have on your phone?</h4>
+    <p class="meta">Sort into groups · Required · <code>sm_apps_owned</code> · <code>ybm_social_media.apps_owned</code></p></div></div>
+    
+    
+    <table class="options"><tbody><tr><td class="code">1</td><td>Facebook</td></tr><tr><td class="code">2</td><td>Snapchat</td></tr><tr><td class="code">3</td><td>Instagram</td></tr><tr><td class="code">4</td><td>TikTok or Douyin</td></tr><tr><td class="code">5</td><td>YouTube, including Youtube Shorts</td></tr><tr><td class="code">6</td><td>X (Twitter)</td></tr><tr><td class="code">7</td><td>Discord</td></tr><tr><td class="code">8</td><td>Twitch</td></tr><tr><td class="code">9</td><td>Reddit</td></tr><tr><td class="code">10</td><td>Kick</td></tr><tr><td class="code">11</td><td>Threads</td></tr></tbody></table><p class="detail">Groups: I have these apps on my phone, I don&#39;t have these apps on my phone</p>
+  </section></div><div class="block"><h3>Time on each app</h3>
+            
+            <section class="q">
+    <div class="qhead"><span class="num">86</span><div><h4>On a typical day, how much time do you usually spend on each of the following apps?</h4>
+    <p class="meta">Time for each chosen option · Asked (can be skipped) · <code>app_minutes</code> · <code>ybm_app_time.minutes_per_app</code></p></div></div>
+    
+    <div class="lede"><p>You may refer to your phone&#39;s Screen Time or Digital Wellbeing summary.</p></div>
+    <p class="detail">Hours and minutes for each option put in “have” at <code>ybm_social_media.apps_owned</code>, stored per option as <code>app_minutes_&lt;code&gt;</code> (total minutes).</p>
+  </section></div><div class="block"><h3>YBM social-media use (adapted from AoW)</h3>
+            
+            <section class="q">
+    <div class="qhead"><span class="num">87</span><div><h4>Do you think you spend too much time on social media?</h4>
+    <p class="meta">Single choice · Required · <code>sm_overuse</code> · <code>ybm_social_media.overuse</code></p></div></div>
+    
+    
+    <table class="options"><tbody><tr><td class="code">1</td><td>Yes</td></tr><tr><td class="code">2</td><td>No</td></tr><tr><td class="code">3</td><td>Unsure</td></tr></tbody></table>
+  </section><section class="q">
+    <div class="qhead"><span class="num">88</span><div><h4>On the social media site you use the most, is your account public or private?</h4>
+    <p class="meta">Single choice · Asked (can be skipped) · <code>sm_account_privacy</code> · <code>ybm_social_media.account_privacy</code></p></div></div>
+    
+    
+    <table class="options"><tbody><tr><td class="code">1</td><td>Public</td></tr><tr><td class="code">2</td><td>Private</td></tr><tr><td class="code">3</td><td>Unsure</td></tr></tbody></table>
+  </section><section class="q">
+    <div class="qhead"><span class="num">89</span><div><h4>On the social media platform you use most often, would you describe yourself as more of an active or passive user?</h4>
+    <p class="meta">Single choice · Asked (can be skipped) · <code>sm_active_passive</code> · <code>ybm_social_media.active_passive</code></p></div></div>
+    
+    
+    <table class="options"><tbody><tr><td class="code">1</td><td>Mostly active: I often post, comment, message, or share content</td></tr><tr><td class="code">2</td><td>Mostly passive: I mostly look, scroll, or watch without posting much</td></tr><tr><td class="code">3</td><td>Both equally</td></tr></tbody></table>
+  </section><section class="q">
+    <div class="qhead"><span class="num">90</span><div><h4>Why do you use social media? Select all that apply.</h4>
+    <p class="meta">Multiple choice (all that apply) · Asked (can be skipped) · <code>sm_functions</code> · <code>ybm_social_media.functions</code></p></div></div>
+    
+    
+    <table class="options"><tbody><tr><td class="code">1</td><td>Stay in touch with friends or family</td></tr><tr><td class="code">2</td><td>Entertainment</td></tr><tr><td class="code">3</td><td>When I am bored</td></tr><tr><td class="code">4</td><td>Keep up with news or current events</td></tr><tr><td class="code">5</td><td>Follow influencers or celebrities</td></tr><tr><td class="code">6</td><td>Find information or learn new things</td></tr><tr><td class="code">7</td><td>Share my own content or express myself</td></tr><tr><td class="code">8</td><td>Feel connected to online communities</td></tr><tr><td class="code">9</td><td>School or studying</td></tr><tr><td class="code">10</td><td>Shopping or discovering products</td></tr><tr><td class="code">11</td><td>Keep up with trends or viral content</td></tr></tbody></table>
+  </section><section class="q">
+    <div class="qhead"><span class="num">91</span><div><h4>On a typical night, how many times do you wake up and check social media?</h4>
+    <p class="meta">Single choice · Asked (can be skipped) · <code>sm_night_checks</code> · <code>ybm_social_media.night_checks</code></p></div></div>
+    
+    
+    <table class="options"><tbody><tr><td class="code">1</td><td>Never</td></tr><tr><td class="code">2</td><td>1 or 2 times</td></tr><tr><td class="code">3</td><td>3 to 5 times</td></tr><tr><td class="code">4</td><td>More than 5 times</td></tr></tbody></table>
+  </section><section class="q">
+    <div class="qhead"><span class="num">92</span><div><h4>How long after waking do you typically check social media?</h4>
+    <p class="meta">Single choice · Asked (can be skipped) · <code>sm_morning_latency</code> · <code>ybm_social_media.morning_latency</code></p></div></div>
+    
+    
+    <table class="options"><tbody><tr><td class="code">1</td><td>&lt;5 minutes</td></tr><tr><td class="code">2</td><td>5 to 10 minutes</td></tr><tr><td class="code">3</td><td>11 to 30 minutes</td></tr><tr><td class="code">4</td><td>31 to 60 minutes</td></tr><tr><td class="code">5</td><td>More than 60 minutes</td></tr></tbody></table>
+  </section><section class="q">
+    <div class="qhead"><span class="num">93</span><div><h4>On a typical weekday (Monday–Friday), how much time do you spend using social media?</h4>
+    <p class="meta">Single choice · Required · <code>sm_time_school_day</code> · <code>ybm_social_media.time_school_day</code></p></div></div>
+    
+    
+    <table class="options"><tbody><tr><td class="code">1</td><td>Less than 30 minutes</td></tr><tr><td class="code">2</td><td>30 minutes to just under 1 hour</td></tr><tr><td class="code">3</td><td>1 hour to just under 2 hours</td></tr><tr><td class="code">4</td><td>2 hours to just under 3 hours</td></tr><tr><td class="code">5</td><td>3 hours to just under 4 hours</td></tr><tr><td class="code">6</td><td>4 hours to just under 5 hours</td></tr><tr><td class="code">7</td><td>5 hours to just under 6 hours</td></tr><tr><td class="code">8</td><td>6 hours to just under 7 hours</td></tr><tr><td class="code">9</td><td>7 hours or more</td></tr></tbody></table>
+  </section><section class="q">
+    <div class="qhead"><span class="num">94</span><div><h4>On a typical weekend day, holiday, or other day off, how much time do you spend using social media?</h4>
+    <p class="meta">Single choice · Required · <code>sm_time_nonschool_day</code> · <code>ybm_social_media.time_nonschool_day</code></p></div></div>
+    
+    
+    <table class="options"><tbody><tr><td class="code">1</td><td>Less than 30 minutes</td></tr><tr><td class="code">2</td><td>30 minutes to just under 1 hour</td></tr><tr><td class="code">3</td><td>1 hour to just under 2 hours</td></tr><tr><td class="code">4</td><td>2 hours to just under 3 hours</td></tr><tr><td class="code">5</td><td>3 hours to just under 4 hours</td></tr><tr><td class="code">6</td><td>4 hours to just under 5 hours</td></tr><tr><td class="code">7</td><td>5 hours to just under 6 hours</td></tr><tr><td class="code">8</td><td>6 hours to just under 7 hours</td></tr><tr><td class="code">9</td><td>7 hours or more</td></tr></tbody></table>
+  </section><section class="q">
+    <div class="qhead"><span class="num">95</span><div><h4>I lose track of how much time I spend on social media</h4>
+    <p class="meta">Single choice · Required · <code>sm_lose_track</code> · <code>ybm_social_media.lose_track</code></p></div></div>
+    
+    
+    <table class="options"><tbody><tr><td class="code">1</td><td>Strongly Agree</td></tr><tr><td class="code">2</td><td>Agree</td></tr><tr><td class="code">3</td><td>Neither agree nor disagree</td></tr><tr><td class="code">4</td><td>Disagree</td></tr><tr><td class="code">5</td><td>Strongly disagree</td></tr><tr><td class="code">6</td><td>Don’t know</td></tr></tbody></table>
+  </section><section class="q">
+    <div class="qhead"><span class="num">96</span><div><h4>Do you use any features designed to reduce your social media use and/or screentime (e.g., screentime limits, break reminders, sleep hours reminders)?</h4>
+    <p class="meta">Single choice · Required · <code>sm_limit_features</code> · <code>ybm_social_media.limit_features</code></p></div></div>
+    
+    
+    <table class="options"><tbody><tr><td class="code">1</td><td>Yes</td></tr><tr><td class="code">2</td><td>No</td></tr><tr><td class="code">3</td><td>Sometimes</td></tr></tbody></table>
+  </section><section class="q">
+    <div class="qhead"><span class="num">97</span><div><h4>What effect do you think abstaining from social media would have on you?</h4>
+    <p class="meta">Single choice · Required · <code>sm_abstain_effect</code> · <code>ybm_social_media.abstain_effect</code></p></div></div>
+    
+    
+    <table class="options"><tbody><tr><td class="code">1</td><td>Very negatively</td></tr><tr><td class="code">2</td><td>Somewhat negatively</td></tr><tr><td class="code">3</td><td>No effect</td></tr><tr><td class="code">4</td><td>Somewhat positively</td></tr><tr><td class="code">5</td><td>Very positively</td></tr></tbody></table>
+  </section><section class="q">
+    <div class="qhead"><span class="num">98</span><div><h4>How long do you think you could go without social media?</h4>
+    <p class="meta">Number · Asked (can be skipped) · <code>sm_abstain_days</code> · <code>ybm_social_media.abstain_days</code></p></div></div>
+    
+    <div class="lede"><p>We mean platforms like TikTok, Instagram, Facebook, Snapchat, X (Twitter), Reddit, YouTube and Threads — not messaging apps such as WhatsApp.</p></div>
+    <p class="detail">A number from 0 to 3650 (days).</p>
+  </section><section class="q">
+    <div class="qhead"><span class="num">99</span><div><h4>Does your family manage or control your social media use?</h4>
+    <p class="meta">Single choice · Asked (can be skipped) · <code>sm_family_control</code> · <code>ybm_social_media.family_control</code></p></div></div>
+    
+    
+    <table class="options"><tbody><tr><td class="code">1</td><td>Yes</td></tr><tr><td class="code">2</td><td>No</td></tr></tbody></table>
+  </section><section class="q">
+    <div class="qhead"><span class="num">100</span><div><h4>How does your family manage or control your social media use?</h4>
+    <p class="meta">Multiple choice (all that apply) · Asked (can be skipped) · <code>sm_family_control_how</code> · <code>ybm_social_media.family_control_how</code></p></div></div>
+    <p class="cond">Shown only if “Does your family manage or control your social media use?” is “Yes”</p>
+    <div class="lede"><p>Choose all that apply.</p></div>
+    <table class="options"><tbody><tr><td class="code">1</td><td>They set time limits or times when I can&#39;t use it</td></tr><tr><td class="code">2</td><td>They use parental controls or a monitoring app</td></tr><tr><td class="code">3</td><td>They decide which apps or sites I can use</td></tr><tr><td class="code">4</td><td>They check my messages, posts or who I follow</td></tr><tr><td class="code">5</td><td>They know my passwords or can get into my accounts</td></tr><tr><td class="code">6</td><td>They take my phone or device away at certain times</td></tr><tr><td class="code">7</td><td>They have to agree before I get a new app or account</td></tr><tr><td class="code">8</td><td>Something else <em>(described in a box)</em></td></tr></tbody></table>
+  </section><section class="q">
+    <div class="qhead"><span class="num">101</span><div><h4>What else does your family do?</h4>
+    <p class="meta">Short text · Asked (can be skipped) · <code>sm_family_control_other</code> · <code>ybm_social_media.family_control_other</code></p></div></div>
+    <p class="cond">Shown only if “How does your family manage or control your social media…” includes “Something else”</p>
+    
+    
+  </section></div><div class="block"><h3>YBM screen control and social-media impact</h3>
+            
+            <section class="q">
+    <div class="qhead"><span class="num">102</span><div><h4>I can control my screen behaviours</h4>
+    <p class="meta">Single choice · Required · <code>screen_control</code> · <code>ybm_screen_attitudes.control</code></p></div></div>
+    
+    
+    <table class="options"><tbody><tr><td class="code">1</td><td>Strongly agree</td></tr><tr><td class="code">2</td><td>Somewhat agree</td></tr><tr><td class="code">3</td><td>Neither agree nor disagree</td></tr><tr><td class="code">4</td><td>Somewhat disagree</td></tr><tr><td class="code">5</td><td>Strongly disagree</td></tr></tbody></table>
+  </section><section class="q">
+    <div class="qhead"><span class="num">103</span><div><h4>I feel dependent on screens in order to function effectively in day-to-day life</h4>
+    <p class="meta">Single choice · Required · <code>screen_dependent</code> · <code>ybm_screen_attitudes.dependent</code></p></div></div>
+    
+    
+    <table class="options"><tbody><tr><td class="code">1</td><td>Strongly agree</td></tr><tr><td class="code">2</td><td>Somewhat agree</td></tr><tr><td class="code">3</td><td>Neither agree nor disagree</td></tr><tr><td class="code">4</td><td>Somewhat disagree</td></tr><tr><td class="code">5</td><td>Strongly disagree</td></tr></tbody></table>
+  </section><section class="q">
+    <div class="qhead"><span class="num">104</span><div><h4>I feel addicted to any screen based activities</h4>
+    <p class="meta">Single choice · Required · <code>screen_addicted</code> · <code>ybm_screen_attitudes.addicted</code></p></div></div>
+    
+    
+    <table class="options"><tbody><tr><td class="code">1</td><td>Strongly agree</td></tr><tr><td class="code">2</td><td>Somewhat agree</td></tr><tr><td class="code">3</td><td>Neither agree nor disagree</td></tr><tr><td class="code">4</td><td>Somewhat disagree</td></tr><tr><td class="code">5</td><td>Strongly disagree</td></tr></tbody></table>
+  </section><section class="q">
+    <div class="qhead"><span class="num">105</span><div><h4>The impacts of social media on my mental wellbeing are mostly positive</h4>
+    <p class="meta">Single choice · Required · <code>sm_impact_positive</code> · <code>ybm_screen_attitudes.impact_positive</code></p></div></div>
+    
+    
+    <table class="options"><tbody><tr><td class="code">1</td><td>Strongly agree</td></tr><tr><td class="code">2</td><td>Somewhat agree</td></tr><tr><td class="code">3</td><td>Neither agree nor disagree</td></tr><tr><td class="code">4</td><td>Somewhat disagree</td></tr><tr><td class="code">5</td><td>Strongly disagree</td></tr></tbody></table>
+  </section><section class="q">
+    <div class="qhead"><span class="num">106</span><div><h4>The impacts of social media on my wellbeing are mostly negative</h4>
+    <p class="meta">Single choice · Required · <code>sm_impact_negative</code> · <code>ybm_screen_attitudes.impact_negative</code></p></div></div>
+    
+    
+    <table class="options"><tbody><tr><td class="code">1</td><td>Strongly agree</td></tr><tr><td class="code">2</td><td>Somewhat agree</td></tr><tr><td class="code">3</td><td>Neither agree nor disagree</td></tr><tr><td class="code">4</td><td>Somewhat disagree</td></tr><tr><td class="code">5</td><td>Strongly disagree</td></tr></tbody></table>
+  </section><section class="q">
+    <div class="qhead"><span class="num">107</span><div><h4>Social media is essential for day-to-day life</h4>
+    <p class="meta">Single choice · Required · <code>sm_impact_essential</code> · <code>ybm_screen_attitudes.impact_essential</code></p></div></div>
+    
+    
+    <table class="options"><tbody><tr><td class="code">1</td><td>Strongly agree</td></tr><tr><td class="code">2</td><td>Somewhat agree</td></tr><tr><td class="code">3</td><td>Neither agree nor disagree</td></tr><tr><td class="code">4</td><td>Somewhat disagree</td></tr><tr><td class="code">5</td><td>Strongly disagree</td></tr></tbody></table>
+  </section><section class="q">
+    <div class="qhead"><span class="num">108</span><div><h4>I avoid some social media</h4>
+    <p class="meta">Single choice · Required · <code>sm_impact_avoid</code> · <code>ybm_screen_attitudes.impact_avoid</code></p></div></div>
+    
+    
+    <table class="options"><tbody><tr><td class="code">1</td><td>Strongly agree</td></tr><tr><td class="code">2</td><td>Somewhat agree</td></tr><tr><td class="code">3</td><td>Neither agree nor disagree</td></tr><tr><td class="code">4</td><td>Somewhat disagree</td></tr><tr><td class="code">5</td><td>Strongly disagree</td></tr></tbody></table>
+  </section></div><div class="block"><h3>Social media patterns and attention</h3>
+            
+            <section class="q">
+    <div class="qhead"><span class="num">109</span><div><h4>At what times of day do you usually use social media?</h4>
+    <p class="meta">Multiple choice (all that apply) · Asked (can be skipped) · <code>smp_times_of_day</code> · <code>ybm_sm_patterns.times_of_day</code></p></div></div>
+    
+    <div class="lede"><p>Choose all that apply.</p></div>
+    <table class="options"><tbody><tr><td class="code">1</td><td>Before school or work</td></tr><tr><td class="code">2</td><td>During the school or work day</td></tr><tr><td class="code">3</td><td>Straight after school or work</td></tr><tr><td class="code">4</td><td>In the evening</td></tr><tr><td class="code">5</td><td>Late at night, after 10pm</td></tr><tr><td class="code">6</td><td>When I wake up in the night</td></tr></tbody></table>
+  </section><section class="q">
+    <div class="qhead"><span class="num">110</span><div><h4>When do you use social media the most?</h4>
+    <p class="meta">Single choice · Asked (can be skipped) · <code>smp_peak_time</code> · <code>ybm_sm_patterns.peak_time</code></p></div></div>
+    
+    
+    <table class="options"><tbody><tr><td class="code">1</td><td>Before school or work</td></tr><tr><td class="code">2</td><td>During the school or work day</td></tr><tr><td class="code">3</td><td>Straight after school or work</td></tr><tr><td class="code">4</td><td>In the evening</td></tr><tr><td class="code">5</td><td>Late at night, after 10pm</td></tr><tr><td class="code">6</td><td>When I wake up in the night</td></tr></tbody></table>
+  </section><section class="q">
+    <div class="qhead"><span class="num">111</span><div><h4>Which best describes how you use social media during a day?</h4>
+    <p class="meta">Single choice · Asked (can be skipped) · <code>smp_session_pattern</code> · <code>ybm_sm_patterns.session_pattern</code></p></div></div>
+    
+    
+    <table class="options"><tbody><tr><td class="code">1</td><td>A few longer sessions</td></tr><tr><td class="code">2</td><td>Lots of short checks spread through the day</td></tr><tr><td class="code">3</td><td>A mix of both</td></tr><tr><td class="code">4</td><td>It changes a lot from day to day</td></tr></tbody></table>
+  </section><section class="q">
+    <div class="qhead"><span class="num">112</span><div><h4>On a typical day, about how many times do you think you pick up or glance at your phone, even without unlocking it?</h4>
+    <p class="meta">Single choice · Asked (can be skipped) · <code>smp_pickups_estimate</code> · <code>ybm_sm_patterns.pickups_estimate</code></p></div></div>
+    
+    
+    <table class="options"><tbody><tr><td class="code">1</td><td>Fewer than 10</td></tr><tr><td class="code">2</td><td>10 to 30</td></tr><tr><td class="code">3</td><td>31 to 60</td></tr><tr><td class="code">4</td><td>61 to 100</td></tr><tr><td class="code">5</td><td>More than 100</td></tr><tr><td class="code">6</td><td>I have no idea</td></tr></tbody></table>
+  </section><section class="q">
+    <div class="qhead"><span class="num">113</span><div><h4>I scroll past videos or posts without watching or reading them all the way through.</h4>
+    <p class="meta">Single choice · Asked (can be skipped) · <code>smp_scroll_past</code> · <code>ybm_sm_patterns.scroll_past</code></p></div></div>
+    
+    
+    <table class="options"><tbody><tr><td class="code">1</td><td>Never</td></tr><tr><td class="code">2</td><td>Sometimes</td></tr><tr><td class="code">3</td><td>Often</td></tr><tr><td class="code">4</td><td>Always</td></tr></tbody></table>
+  </section><section class="q">
+    <div class="qhead"><span class="num">114</span><div><h4>I skip ahead or speed up videos instead of watching them normally.</h4>
+    <p class="meta">Single choice · Asked (can be skipped) · <code>smp_speed_up</code> · <code>ybm_sm_patterns.speed_up</code></p></div></div>
+    
+    
+    <table class="options"><tbody><tr><td class="code">1</td><td>Never</td></tr><tr><td class="code">2</td><td>Sometimes</td></tr><tr><td class="code">3</td><td>Often</td></tr><tr><td class="code">4</td><td>Always</td></tr></tbody></table>
+  </section><section class="q">
+    <div class="qhead"><span class="num">115</span><div><h4>When I&#39;m on social media, I&#39;m really paying attention to what I&#39;m watching or reading.</h4>
+    <p class="meta">Single choice · Asked (can be skipped) · <code>smp_attend</code> · <code>ybm_sm_patterns.attend</code></p></div></div>
+    
+    
+    <table class="options"><tbody><tr><td class="code">1</td><td>Never</td></tr><tr><td class="code">2</td><td>Sometimes</td></tr><tr><td class="code">3</td><td>Often</td></tr><tr><td class="code">4</td><td>Always</td></tr></tbody></table>
+  </section><section class="q">
+    <div class="qhead"><span class="num">116</span><div><h4>I do other things while I scroll, like homework, TV or talking to people.</h4>
+    <p class="meta">Single choice · Asked (can be skipped) · <code>smp_multitask</code> · <code>ybm_sm_patterns.multitask</code></p></div></div>
+    
+    
+    <table class="options"><tbody><tr><td class="code">1</td><td>Never</td></tr><tr><td class="code">2</td><td>Sometimes</td></tr><tr><td class="code">3</td><td>Often</td></tr><tr><td class="code">4</td><td>Always</td></tr></tbody></table>
+  </section><section class="q">
+    <div class="qhead"><span class="num">117</span><div><h4>I realise I&#39;ve been scrolling without really taking anything in.</h4>
+    <p class="meta">Single choice · Asked (can be skipped) · <code>smp_mindless</code> · <code>ybm_sm_patterns.mindless</code></p></div></div>
+    
+    
+    <table class="options"><tbody><tr><td class="code">1</td><td>Never</td></tr><tr><td class="code">2</td><td>Sometimes</td></tr><tr><td class="code">3</td><td>Often</td></tr><tr><td class="code">4</td><td>Always</td></tr></tbody></table>
+  </section><section class="q">
+    <div class="qhead"><span class="num">118</span><div><h4>I open a social media app without really meaning to.</h4>
+    <p class="meta">Single choice · Asked (can be skipped) · <code>smp_unintended_open</code> · <code>ybm_sm_patterns.unintended_open</code></p></div></div>
+    
+    
+    <table class="options"><tbody><tr><td class="code">1</td><td>Never</td></tr><tr><td class="code">2</td><td>Sometimes</td></tr><tr><td class="code">3</td><td>Often</td></tr><tr><td class="code">4</td><td>Always</td></tr></tbody></table>
+  </section></div><div class="block"><h3>Phone pickups from Screen Time</h3>
+            
+            <section class="q">
+    <div class="qhead"><span class="num">119</span><div><h4>Please look at your phone&#39;s Screen Time or Digital Wellbeing. Can you see how many times you picked up or unlocked your phone yesterday?</h4>
+    <p class="meta">Single choice · Asked (can be skipped) · <code>phone_pickups_available</code> · <code>ybm_phone_pickups.available</code></p></div></div>
+    
+    <div class="lede"><p>On an iPhone: Settings → Screen Time → See All App &amp; Website Activity → Pickups. On Android: Settings → Digital Wellbeing → Unlocks.</p></div>
+    <table class="options"><tbody><tr><td class="code">1</td><td>Yes, I can see it</td></tr><tr><td class="code">2</td><td>I can&#39;t find it</td></tr><tr><td class="code">3</td><td>My phone doesn&#39;t show this</td></tr><tr><td class="code">4</td><td>I don&#39;t have my phone with me</td></tr></tbody></table>
+  </section><section class="q">
+    <div class="qhead"><span class="num">120</span><div><h4>What number does it show for yesterday?</h4>
+    <p class="meta">Number · Asked (can be skipped) · <code>phone_pickups</code> · <code>ybm_phone_pickups.count</code></p></div></div>
+    <p class="cond">Shown only if “Please look at your phone&#39;s Screen Time or Digital…” is “Yes, I can see it”</p>
+    
+    <p class="detail">A number from 0 to 2000 (pickups).</p>
+  </section></div><div class="block"><h3>Doomscrolling items (4) <span class="tag">validated, used as licensed</span></h3>
+            
+            <section class="q">
+    <div class="qhead"><span class="num">121</span><div><h4>I feel an urge to seek bad news on social media, more and more often.</h4>
+    <p class="meta">Single choice · Asked (can be skipped) · <code>doomscroll_q1</code> · <code>doomscroll4.q1</code></p></div></div>
+    
+    
+    <table class="options"><tbody><tr><td class="code">1</td><td>Strongly disagree</td></tr><tr><td class="code">2</td><td>Disagree</td></tr><tr><td class="code">3</td><td>Somewhat disagree</td></tr><tr><td class="code">4</td><td>Neutral</td></tr><tr><td class="code">5</td><td>Somewhat agree</td></tr><tr><td class="code">6</td><td>Agree</td></tr><tr><td class="code">7</td><td>Strongly agree</td></tr></tbody></table>
+  </section><section class="q">
+    <div class="qhead"><span class="num">122</span><div><h4>I lose track of time when I read bad news on social media.</h4>
+    <p class="meta">Single choice · Asked (can be skipped) · <code>doomscroll_q2</code> · <code>doomscroll4.q2</code></p></div></div>
+    
+    
+    <table class="options"><tbody><tr><td class="code">1</td><td>Strongly disagree</td></tr><tr><td class="code">2</td><td>Disagree</td></tr><tr><td class="code">3</td><td>Somewhat disagree</td></tr><tr><td class="code">4</td><td>Neutral</td></tr><tr><td class="code">5</td><td>Somewhat agree</td></tr><tr><td class="code">6</td><td>Agree</td></tr><tr><td class="code">7</td><td>Strongly agree</td></tr></tbody></table>
+  </section><section class="q">
+    <div class="qhead"><span class="num">123</span><div><h4>I find myself continuously browsing negative news.</h4>
+    <p class="meta">Single choice · Asked (can be skipped) · <code>doomscroll_q3</code> · <code>doomscroll4.q3</code></p></div></div>
+    
+    
+    <table class="options"><tbody><tr><td class="code">1</td><td>Strongly disagree</td></tr><tr><td class="code">2</td><td>Disagree</td></tr><tr><td class="code">3</td><td>Somewhat disagree</td></tr><tr><td class="code">4</td><td>Neutral</td></tr><tr><td class="code">5</td><td>Somewhat agree</td></tr><tr><td class="code">6</td><td>Agree</td></tr><tr><td class="code">7</td><td>Strongly agree</td></tr></tbody></table>
+  </section><section class="q">
+    <div class="qhead"><span class="num">124</span><div><h4>I feel like I am addicted to negative news.</h4>
+    <p class="meta">Single choice · Asked (can be skipped) · <code>doomscroll_q4</code> · <code>doomscroll4.q4</code></p></div></div>
+    
+    
+    <table class="options"><tbody><tr><td class="code">1</td><td>Strongly disagree</td></tr><tr><td class="code">2</td><td>Disagree</td></tr><tr><td class="code">3</td><td>Somewhat disagree</td></tr><tr><td class="code">4</td><td>Neutral</td></tr><tr><td class="code">5</td><td>Somewhat agree</td></tr><tr><td class="code">6</td><td>Agree</td></tr><tr><td class="code">7</td><td>Strongly agree</td></tr></tbody></table>
+  </section></div></section><section class="section"><h2>Right now</h2><div class="block"><h3>BIS/BAS – 12-item YBM subset <span class="tag">validated, used as licensed</span></h3>
+            
+            <section class="q">
+    <div class="qhead"><span class="num">125</span><div><h4>I worry about making mistakes</h4>
+    <p class="meta">Single choice · Asked (can be skipped) · <code>bisbas12_bis1</code> · <code>bisbas12_ybm.bis1</code></p></div></div>
+    
+    
+    <table class="options"><tbody><tr><td class="code">1</td><td>Very true for me</td></tr><tr><td class="code">2</td><td>Somewhat true for me</td></tr><tr><td class="code">3</td><td>Somewhat false for me</td></tr><tr><td class="code">4</td><td>Very false for me</td></tr></tbody></table>
+  </section><section class="q">
+    <div class="qhead"><span class="num">126</span><div><h4>Criticism or scolding hurts me quite a bit</h4>
+    <p class="meta">Single choice · Asked (can be skipped) · <code>bisbas12_bis2</code> · <code>bisbas12_ybm.bis2</code></p></div></div>
+    
+    
+    <table class="options"><tbody><tr><td class="code">1</td><td>Very true for me</td></tr><tr><td class="code">2</td><td>Somewhat true for me</td></tr><tr><td class="code">3</td><td>Somewhat false for me</td></tr><tr><td class="code">4</td><td>Very false for me</td></tr></tbody></table>
+  </section><section class="q">
+    <div class="qhead"><span class="num">127</span><div><h4>I feel pretty worried or upset when I think or know somebody is angry at me</h4>
+    <p class="meta">Single choice · Asked (can be skipped) · <code>bisbas12_bis3</code> · <code>bisbas12_ybm.bis3</code></p></div></div>
+    
+    
+    <table class="options"><tbody><tr><td class="code">1</td><td>Very true for me</td></tr><tr><td class="code">2</td><td>Somewhat true for me</td></tr><tr><td class="code">3</td><td>Somewhat false for me</td></tr><tr><td class="code">4</td><td>Very false for me</td></tr></tbody></table>
+  </section><section class="q">
+    <div class="qhead"><span class="num">128</span><div><h4>I feel worried when I think I have done poorly at something important</h4>
+    <p class="meta">Single choice · Asked (can be skipped) · <code>bisbas12_bis4</code> · <code>bisbas12_ybm.bis4</code></p></div></div>
+    
+    
+    <table class="options"><tbody><tr><td class="code">1</td><td>Very true for me</td></tr><tr><td class="code">2</td><td>Somewhat true for me</td></tr><tr><td class="code">3</td><td>Somewhat false for me</td></tr><tr><td class="code">4</td><td>Very false for me</td></tr></tbody></table>
+  </section><section class="q">
+    <div class="qhead"><span class="num">129</span><div><h4>When I get something I want, I feel excited and energised</h4>
+    <p class="meta">Single choice · Asked (can be skipped) · <code>bisbas12_rr1</code> · <code>bisbas12_ybm.rr1</code></p></div></div>
+    
+    
+    <table class="options"><tbody><tr><td class="code">1</td><td>Very true for me</td></tr><tr><td class="code">2</td><td>Somewhat true for me</td></tr><tr><td class="code">3</td><td>Somewhat false for me</td></tr><tr><td class="code">4</td><td>Very false for me</td></tr></tbody></table>
+  </section><section class="q">
+    <div class="qhead"><span class="num">130</span><div><h4>When I&#39;m doing well at something I love to keep at it</h4>
+    <p class="meta">Single choice · Asked (can be skipped) · <code>bisbas12_rr2</code> · <code>bisbas12_ybm.rr2</code></p></div></div>
+    
+    
+    <table class="options"><tbody><tr><td class="code">1</td><td>Very true for me</td></tr><tr><td class="code">2</td><td>Somewhat true for me</td></tr><tr><td class="code">3</td><td>Somewhat false for me</td></tr><tr><td class="code">4</td><td>Very false for me</td></tr></tbody></table>
+  </section><section class="q">
+    <div class="qhead"><span class="num">131</span><div><h4>It would excite me to win a contest</h4>
+    <p class="meta">Single choice · Asked (can be skipped) · <code>bisbas12_rr3</code> · <code>bisbas12_ybm.rr3</code></p></div></div>
+    
+    
+    <table class="options"><tbody><tr><td class="code">1</td><td>Very true for me</td></tr><tr><td class="code">2</td><td>Somewhat true for me</td></tr><tr><td class="code">3</td><td>Somewhat false for me</td></tr><tr><td class="code">4</td><td>Very false for me</td></tr></tbody></table>
+  </section><section class="q">
+    <div class="qhead"><span class="num">132</span><div><h4>When I see an opportunity for something I like I get excited right away</h4>
+    <p class="meta">Single choice · Asked (can be skipped) · <code>bisbas12_rr4</code> · <code>bisbas12_ybm.rr4</code></p></div></div>
+    
+    
+    <table class="options"><tbody><tr><td class="code">1</td><td>Very true for me</td></tr><tr><td class="code">2</td><td>Somewhat true for me</td></tr><tr><td class="code">3</td><td>Somewhat false for me</td></tr><tr><td class="code">4</td><td>Very false for me</td></tr></tbody></table>
+  </section><section class="q">
+    <div class="qhead"><span class="num">133</span><div><h4>When I want something I usually go all-out to get it</h4>
+    <p class="meta">Single choice · Asked (can be skipped) · <code>bisbas12_dr1</code> · <code>bisbas12_ybm.dr1</code></p></div></div>
+    
+    
+    <table class="options"><tbody><tr><td class="code">1</td><td>Very true for me</td></tr><tr><td class="code">2</td><td>Somewhat true for me</td></tr><tr><td class="code">3</td><td>Somewhat false for me</td></tr><tr><td class="code">4</td><td>Very false for me</td></tr></tbody></table>
+  </section><section class="q">
+    <div class="qhead"><span class="num">134</span><div><h4>I go out of my way to get things I want</h4>
+    <p class="meta">Single choice · Asked (can be skipped) · <code>bisbas12_dr2</code> · <code>bisbas12_ybm.dr2</code></p></div></div>
+    
+    
+    <table class="options"><tbody><tr><td class="code">1</td><td>Very true for me</td></tr><tr><td class="code">2</td><td>Somewhat true for me</td></tr><tr><td class="code">3</td><td>Somewhat false for me</td></tr><tr><td class="code">4</td><td>Very false for me</td></tr></tbody></table>
+  </section><section class="q">
+    <div class="qhead"><span class="num">135</span><div><h4>If I see a chance to get something I want I move on it right away</h4>
+    <p class="meta">Single choice · Asked (can be skipped) · <code>bisbas12_dr3</code> · <code>bisbas12_ybm.dr3</code></p></div></div>
+    
+    
+    <table class="options"><tbody><tr><td class="code">1</td><td>Very true for me</td></tr><tr><td class="code">2</td><td>Somewhat true for me</td></tr><tr><td class="code">3</td><td>Somewhat false for me</td></tr><tr><td class="code">4</td><td>Very false for me</td></tr></tbody></table>
+  </section><section class="q">
+    <div class="qhead"><span class="num">136</span><div><h4>When I go after something I use a no holds barred approach</h4>
+    <p class="meta">Single choice · Asked (can be skipped) · <code>bisbas12_dr4</code> · <code>bisbas12_ybm.dr4</code></p></div></div>
+    
+    
+    <table class="options"><tbody><tr><td class="code">1</td><td>Very true for me</td></tr><tr><td class="code">2</td><td>Somewhat true for me</td></tr><tr><td class="code">3</td><td>Somewhat false for me</td></tr><tr><td class="code">4</td><td>Very false for me</td></tr></tbody></table>
+  </section></div></section>
+<p class="meta" style="margin-top:18pt">A readable record of the published version. The release JSON with the same hash is the authoritative copy.</p>
+</body></html>
