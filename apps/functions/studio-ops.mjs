@@ -13,6 +13,7 @@ import {
   repositoryModuleFragment,
   serialiseDraft,
   suggestBump,
+  validateDraft,
   validatedFragment,
 } from "@myself/studio";
 
@@ -31,6 +32,8 @@ import {
  *                             the survey's title, on its draft and in the Studio
  *   form-label --study S --survey V --instrument I --label L
  *                             a questionnaire's form label (researchers only see it)
+ *   remove-blocks --study S --survey V --instruments a,b
+ *                             whole questionnaires out of the draft (archived, restorable)
  *   dob-ages --study S --survey V --min-age A --max-age B
  *                             who may take part, by age: the survey's own
  *                             limits on its date of birth (no unlock needed)
@@ -96,6 +99,10 @@ async function editDraft(study, surveyId, change, what) {
   const live = await liveDraft(study, surveyId, survey);
   const summary = diffDrafts(live, next);
   console.log(`${what}. The draft would then differ from the live version by: ${JSON.stringify(summary.counts)} (${suggestBump(summary) ?? "no change"}).`);
+  // What publishing this draft would be refused for, so the team is not surprised in the Studio.
+  const blocking = validateDraft(next, live ? { baseline: live } : {}).filter((i) => i.severity === "error");
+  console.log(blocking.length === 0 ? "No problems that would stop it being published." : `Would stop it being published (${blocking.length}):`);
+  for (const i of blocking.slice(0, 20)) console.log(`  - ${i.message}`);
   if (!apply) {
     console.log("Dry run: nothing saved. Run again with apply to save the draft (it is not published).");
     return;
@@ -262,6 +269,35 @@ if (command === "list") {
   list("Draft:", draft);
   console.log("\nArchived in the draft:");
   for (const a of draft.archived) if (shows(a.itemKey, a.item, a.item?.stem?.text)) console.log(`  ${a.itemKey}  var=${a.item?.variable}  ${a.item?.responseType}  archived ${a.archivedAt}`);
+} else if (command === "remove-blocks") {
+  // Whole questionnaires out of a draft. Their questions are archived (restorable),
+  // and answers already recorded stay readable.
+  const study = studyArg();
+  const surveyId = surveyArg();
+  const instruments = (flag("instruments") ?? "").split(",").map((x) => x.trim()).filter(Boolean);
+  if (instruments.length === 0) fail("Say which questionnaires with --instruments (keys, comma-separated).");
+  const at = new Date().toISOString();
+  await editDraft(
+    study,
+    surveyId,
+    (draft) => {
+      let d = draft;
+      for (const instrument of instruments) {
+        let removed = 0;
+        for (;;) {
+          const place = outline(d).sections.flatMap((s) => s.blocks.map((b) => ({ s, b }))).find(({ b }) => b.instrument === instrument);
+          if (!place) break;
+          const out = removeBlock(d, place.s.key, place.b.componentIndex, { by: ACTOR.uid, at });
+          d = out.draft;
+          removed += 1;
+          console.log(`  ${instrument}: removed from “${place.s.key}” (${out.archived.length} question(s) archived, restorable)`);
+        }
+        if (removed === 0) console.log(`  ${instrument}: not in this draft`);
+      }
+      return d;
+    },
+    `Remove ${instruments.join(", ")}`,
+  );
 } else if (command === "retitle") {
   // The survey's title (participants see it), on its draft and its Studio listing.
   const study = studyArg();
@@ -304,5 +340,5 @@ if (command === "list") {
     `Form label of ${instrument}: ${label}`,
   );
 } else {
-  fail("Commands: list, questions, grant-owners, insert, dob-ages, retitle, form-label.");
+  fail("Commands: list, questions, grant-owners, insert, remove-blocks, dob-ages, retitle, form-label.");
 }
