@@ -6,6 +6,7 @@ name: "Studio: study space housekeeping"
 #   grant-owners  everyone on a study space's Studio list: Studio admin there,
 #                 the project owner role and the dashboard's access list
 #   insert        library questionnaires or modules into a survey's draft
+#   remove-blocks whole questionnaires out of a draft (archived, restorable)
 #   dob-ages      the ages a survey's date of birth accepts
 #   retitle       a survey's title; form-label  a questionnaire's form label
 # Without "apply" it is a dry run. Drafts are saved, never published. The
@@ -17,7 +18,7 @@ on:
       command:
         description: "What to do"
         type: choice
-        options: [list, questions, grant-owners, insert, dob-ages, retitle, form-label]
+        options: [list, questions, grant-owners, insert, remove-blocks, dob-ages, retitle, form-label]
         default: list
       study:
         description: "Study space id (from list)"
@@ -57,6 +58,10 @@ on:
         default: ""
       title:
         description: "New survey title (retitle)"
+        type: string
+        default: ""
+      instruments:
+        description: "Questionnaire keys, comma-separated (remove-blocks)"
         type: string
         default: ""
       instrument:
@@ -117,6 +122,7 @@ jobs:
           MAX_AGE: ${{ inputs.max_age }}
           MATCH: ${{ inputs.match }}
           TITLE: ${{ inputs.title }}
+          INSTRUMENTS: ${{ inputs.instruments }}
           INSTRUMENT: ${{ inputs.instrument }}
           LABEL: ${{ inputs.label }}
           APPLY: ${{ inputs.apply && '--apply' || '' }}
@@ -124,7 +130,7 @@ jobs:
           node studio-ops.mjs "$COMMAND" --project myself-research \
             ${STUDY:+--study "$STUDY"} ${SURVEY:+--survey "$SURVEY"} ${SECTION:+--section "$SECTION"} \
             ${AFTER:+--after "$AFTER"} ${PIECES:+--pieces "$PIECES"} ${REPLACE:+--replace "$REPLACE"} ${MIN_AGE:+--min-age "$MIN_AGE"} ${MAX_AGE:+--max-age "$MAX_AGE"} \
-            ${MATCH:+--match "$MATCH"} ${TITLE:+--title "$TITLE"} ${INSTRUMENT:+--instrument "$INSTRUMENT"} ${LABEL:+--label "$LABEL"} $APPLY
+            ${MATCH:+--match "$MATCH"} ${TITLE:+--title "$TITLE"} ${INSTRUMENTS:+--instruments "$INSTRUMENTS"} ${INSTRUMENT:+--instrument "$INSTRUMENT"} ${LABEL:+--label "$LABEL"} $APPLY
 
       - name: Shred the credential
         if: always()
