@@ -733,3 +733,15 @@ button.sto-type-option:hover {
     transition: none;
   }
 }
+
+/* How many follow-up questions are folded under a question. */
+.sto-followups {
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--st-text-tertiary);
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--st-bg-subtle);
+  border: 1px solid var(--st-border);
+  line-height: 18px;
+}

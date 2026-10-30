@@ -355,6 +355,8 @@ export interface OutlineQuestion {
   required: "hard" | "soft" | "optional";
   allowDecline: boolean;
   hasCondition: boolean;
+  /** The questions its condition reads ("<instrument>.<item>"), each once; empty without one. */
+  dependsOn: string[];
   identifying: boolean;
   tier: EditTier;
   indexInPlacement: number;
@@ -468,6 +470,21 @@ export function outline(draft: StudioDraft): Outline {
   };
 }
 
+/** Every question a condition reads, each once (as logic.ts `conditionTargets`, which imports this module). */
+function conditionReads(expr: ItemDefinition["displayIf"] | null | undefined): string[] {
+  const out: string[] = [];
+  const walk = (e: NonNullable<ItemDefinition["displayIf"]>) => {
+    if (e.op === "all" || e.op === "any") e.args.forEach(walk);
+    else if (e.op === "not") walk(e.arg);
+    else if ("target" in e && e.target) {
+      const k = `${e.target.item.instrument}.${e.target.item.item}`;
+      if (!out.includes(k)) out.push(k);
+    }
+  };
+  if (expr) walk(expr);
+  return out;
+}
+
 function outlineBlock(draft: StudioDraft, p: Placement, tier: EditTier, next: () => number): OutlineBlock {
   const component = draft.composition.sections[p.sectionIndex]!.components[p.componentIndex]!;
   return {
@@ -492,6 +509,7 @@ function outlineBlock(draft: StudioDraft, p: Placement, tier: EditTier, next: ()
         required: item.required ?? "soft",
         allowDecline: item.allowDecline ?? false,
         hasCondition: item.displayIf != null,
+        dependsOn: conditionReads(item.displayIf),
         identifying: item.identifying ?? false,
         tier,
         indexInPlacement,

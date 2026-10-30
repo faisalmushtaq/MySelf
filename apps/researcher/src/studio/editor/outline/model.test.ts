@@ -7,6 +7,8 @@ import {
   blockExpandKey,
   buildTree,
   findMatches,
+  followUpParents,
+  followUpsExpandKey,
   indexIssues,
   questionName,
   tabStopFor,
@@ -49,16 +51,25 @@ describe("the outline of the live survey", () => {
     expect(sdq.label).toBe("Strengths and Difficulties Questionnaire (self-report) (licensed — locked)");
     expect(sdq.expanded).toBe(false);
     expect(sdq.block?.questionCount).toBe(25);
-    // Editable modules sit straight under their section.
+    // Editable modules sit straight under their section, each follow-up folded
+    // under the question it depends on: all of gaming hangs off "how many hours".
     const gaming = t.byId.get("section:gaming")!;
-    expect(gaming.children.filter((c) => c.kind === "question")).toHaveLength(8);
-    expect(gaming.children[0]!.level).toBe(2);
+    const hours = gaming.children.filter((c) => c.kind === "question");
+    expect(hours.map((c) => c.id)).toEqual(["ybm_gaming.hours_week"]);
+    expect(hours[0]!.level).toBe(2);
+    expect(hours[0]!.expanded).toBe(false);
+    expect(hours[0]!.question!.followUps).toBe(7);
     // The identity module is protected, so it has a header that says so.
     expect(t.byId.get("block:about_you:0")!.label).toMatch(/protected — unlock to edit/);
   });
 
   it("counts every question once and numbers them in the order participants meet them", () => {
-    const all = tree({ expanded: new Map(o.sections.flatMap((s) => s.blocks.map((b) => [blockExpandKey(s.key, b.refKey), true] as const))) });
+    const all = tree({
+      expanded: new Map([
+        ...o.sections.flatMap((s) => s.blocks.map((b) => [blockExpandKey(s.key, b.refKey), true] as const)),
+        ...o.sections.flatMap((s) => s.blocks.flatMap((b) => b.questions.map((q) => [followUpsExpandKey(q.itemKey), true] as const))),
+      ]),
+    });
     const numbers = all.visible.filter((n) => n.kind === "question").map((n) => n.question!.number);
     expect(numbers).toHaveLength(147);
     expect(numbers).toEqual(numbers.map((_, i) => i + 1));
@@ -178,7 +189,9 @@ describe("filtering the outline", () => {
 describe("finding rows", () => {
   it("names the rows a selection sits under, so a jump can open them", () => {
     expect(ancestorsOf(o, { kind: "question", itemKey: "sdq25_s.q7" })).toEqual(["section:wellbeing", "block:wellbeing:1"]);
-    expect(ancestorsOf(o, { kind: "question", itemKey: "ybm_gaming.social_pct" })).toEqual(["section:gaming"]);
+    // A follow-up is opened through the question it is folded under.
+    expect(ancestorsOf(o, { kind: "question", itemKey: "ybm_gaming.social_pct" })).toEqual(["section:gaming", "ybm_gaming.hours_week"]);
+    expect(ancestorsOf(o, { kind: "question", itemKey: "ybm_gaming.game_time_3" })).toEqual(["section:gaming", "ybm_gaming.hours_week", "ybm_gaming.top_games"]);
     expect(ancestorsOf(o, { kind: "block", sectionKey: "sleep", componentIndex: 0 })).toEqual(["section:sleep"]);
     expect(ancestorsOf(o, { kind: "welcome" })).toEqual([]);
   });
@@ -193,8 +206,9 @@ describe("finding rows", () => {
     expect(open.shown.has("sdq25_s.q7")).toBe(false);
     expect(open.shown.has("block:wellbeing:1")).toBe(true);
     expect([...open.shown]).toEqual(open.visible.map((n) => n.id));
-    // A drawn stop stays where it is.
-    expect(tabStopFor(open, "ybm_gaming.social_pct", null)).toBe("ybm_gaming.social_pct");
+    // A drawn stop stays where it is; a folded follow-up's is the question it is folded under.
+    expect(tabStopFor(open, "ybm_gaming.hours_week", null)).toBe("ybm_gaming.hours_week");
+    expect(tabStopFor(open, "ybm_gaming.social_pct", null)).toBe("ybm_gaming.hours_week");
     // Hidden inside a folded block: the block holds the stop, as focus moves to a collapsed parent.
     expect(tabStopFor(open, "sdq25_s.q7", null)).toBe("block:wellbeing:1");
 
@@ -244,5 +258,39 @@ describe("questionName", () => {
   it("calls a question with no text yet by the one name used everywhere", () => {
     expect(questionName("")).toBe(UNTITLED_QUESTION);
     expect(questionName("   \n ")).toBe(UNTITLED_QUESTION);
+  });
+});
+
+describe("follow-up questions", () => {
+  const q = (itemKey: string, ...dependsOn: string[]) => ({ itemKey, dependsOn });
+  it("fold under the question they depend on, level by level, for as long as the run goes on", () => {
+    const parents = followUpParents([
+      q("d.first_language_english"),
+      q("d.speaks_other_language"),
+      q("d.other_languages", "d.speaks_other_language"),
+      q("d.understand_urdu", "d.other_languages"),
+      q("d.speak_urdu", "d.other_languages"),
+      q("d.understand_polish", "d.other_languages"),
+      q("d.gender"),
+      // Reads a question before the run was broken: not folded back into it.
+      q("d.medication", "d.other_languages"),
+    ]);
+    expect(Object.fromEntries(parents)).toEqual({
+      "d.first_language_english": null,
+      "d.speaks_other_language": null,
+      "d.other_languages": "d.speaks_other_language",
+      "d.understand_urdu": "d.other_languages",
+      "d.speak_urdu": "d.other_languages",
+      "d.understand_polish": "d.other_languages",
+      "d.gender": null,
+      "d.medication": null,
+    });
+  });
+
+  it("show their problems on the question they are folded under, and come back flat in a search", () => {
+    const t = tree();
+    expect(t.byId.get("ybm_gaming.hours_week")!.children).toEqual([]);
+    const found = tree({ query: "game" });
+    expect(found.visible.some((n) => n.id === "ybm_gaming.game_time_1")).toBe(true);
   });
 });

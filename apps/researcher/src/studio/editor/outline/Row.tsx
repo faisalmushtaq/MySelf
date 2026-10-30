@@ -320,6 +320,11 @@ function Trailing({ node, issueId }: { node: TreeNode; issueId: string }) {
             ) : null}
             <span className="sto-num">{q.number}</span>
           </span>
+          {q.followUps && !node.expanded ? (
+            <span className="sto-followups" aria-hidden="true" data-tip={`${q.followUps} follow-up ${q.followUps === 1 ? "question" : "questions"}, asked depending on the answer`}>
+              +{q.followUps}
+            </span>
+          ) : null}
           {q.required === "hard" ? <Indicator icon="asterisk" tip="Required" /> : null}
           {q.hasCondition ? <Indicator icon="branch" tip="Has a condition" /> : null}
           {q.identifying ? <Indicator icon="user" tip="Identifying" /> : null}
@@ -392,6 +397,7 @@ function RowText({ node, labelId, descId }: { node: TreeNode; labelId: string; d
           <span id={descId} className="st-sr">
             {TYPE_LABELS.get(q.studioType) ?? "Question"}, question {q.number}, ID {q.itemKey}
             {flags.length > 0 ? `, ${flags.join(", ")}` : ""}
+            {q.followUps ? `, ${q.followUps} follow-up ${q.followUps === 1 ? "question" : "questions"}${node.expanded ? "" : ", folded"}` : ""}
           </span>
         </>
       );
