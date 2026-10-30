@@ -189,6 +189,8 @@ export interface QuestionInfo {
   number: number;
   sectionKey: string;
   componentIndex: number;
+  /** How many follow-up questions are folded under it (all levels); 0 for none. */
+  followUps?: number;
 }
 
 export interface BlockInfo {
@@ -319,8 +321,45 @@ export function expandKeyOf(node: Pick<TreeNode, "id" | "expandKey">): string {
 /** Expanded unless the person said otherwise: licensed and protected blocks start folded. */
 export function defaultExpanded(kind: NodeKind, block?: Pick<BlockInfo, "tier">): boolean {
   if (kind === "archive") return false;
+  // A question's follow-ups start folded: a long run of them is what made the outline hard to read.
+  if (kind === "question") return false;
   if (kind === "block") return block?.tier === "editable";
   return true;
+}
+
+/**
+ * Which question each question is a follow-up of, within one block: the
+ * nearest question before it, on the run it continues, that its condition
+ * reads. "Which languages?" follows "Do you speak another language?", and the
+ * 33 "How well…" questions follow "Which languages?", so the outline folds
+ * them under it. A question whose condition reads nothing just before it
+ * starts a new run. Null for a question that is nobody's follow-up.
+ */
+export function followUpParents(questions: readonly Pick<OutlineQuestion, "itemKey" | "dependsOn">[]): Map<string, string | null> {
+  const out = new Map<string, string | null>();
+  const stack: string[] = [];
+  for (const q of questions) {
+    let at = -1;
+    for (let k = stack.length - 1; k >= 0; k--) {
+      if ((q.dependsOn ?? []).includes(stack[k]!)) {
+        at = k;
+        break;
+      }
+    }
+    if (at < 0) {
+      stack.length = 0;
+      out.set(q.itemKey, null);
+    } else {
+      stack.length = at + 1;
+      out.set(q.itemKey, stack[at]!);
+    }
+    stack.push(q.itemKey);
+  }
+  return out;
+}
+
+export function followUpsExpandKey(itemKey: string): string {
+  return `followups:${itemKey}`;
 }
 
 /** What a question with no text yet is called wherever it is listed: the outline, the section page, the checks. */
@@ -427,7 +466,8 @@ export function buildTree(o: Outline, index: IssueIndex, opts: TreeOptions): Tre
         lastItemKey: block.questions[block.questions.length - 1]?.itemKey ?? null,
       };
       const level = header ? 3 : 2;
-      const questions: TreeNode[] = [];
+      type Spec = { q: OutlineQuestion; issues: IssueCount; textMatch: [number, number][]; idMatch: [number, number][] };
+      const specs: Spec[] = [];
       for (const q of block.questions) {
         const qIssues = index.question.get(q.itemKey) ?? NO_ISSUES;
         total = addCounts(total, qIssues);
@@ -436,7 +476,24 @@ export function buildTree(o: Outline, index: IssueIndex, opts: TreeOptions): Tre
         const conditional = q.hasCondition || block.hasCondition || section.hasCondition;
         if (filtering && !leafPasses(qIssues, titleMatches || textMatch.length > 0 || idMatch.length > 0, conditional)) continue;
         if (filtering) matches += 1;
-        questions.push(questionNode(q, info, level, qIssues, textMatch, idMatch));
+        specs.push({ q, issues: qIssues, textMatch, idMatch });
+      }
+      let questions: TreeNode[];
+      if (filtering) {
+        // A search or filter lists what it found flat, so nothing found is folded away.
+        questions = specs.map((s) => questionNode(s.q, info, level, s.issues, s.textMatch, s.idMatch, [], s.issues));
+      } else {
+        const parents = followUpParents(specs.map((s) => s.q));
+        const kids = new Map<string, Spec[]>();
+        for (const s of specs) {
+          const p = parents.get(s.q.itemKey);
+          if (p) kids.set(p, [...(kids.get(p) ?? []), s]);
+        }
+        // Each question's own problems with all of its follow-ups', at every level.
+        const withFollowUps = (s: Spec): IssueCount => (kids.get(s.q.itemKey) ?? []).reduce((sum, c) => addCounts(sum, withFollowUps(c)), s.issues);
+        const build = (s: Spec, lvl: number): TreeNode =>
+          questionNode(s.q, info, lvl, s.issues, s.textMatch, s.idMatch, (kids.get(s.q.itemKey) ?? []).map((c) => build(c, lvl + 1)), withFollowUps(s));
+        questions = specs.filter((s) => !parents.get(s.q.itemKey)).map((s) => build(s, level));
       }
       if (header) {
         const nameMatch = findMatches(block.name, query);
@@ -525,8 +582,14 @@ export function buildTree(o: Outline, index: IssueIndex, opts: TreeOptions): Tre
     issues: IssueCount,
     textMatch: [number, number][],
     idMatch: [number, number][],
+    followUps: TreeNode[],
+    foldedIssues: IssueCount,
   ): TreeNode {
     const n = q.position + 1;
+    const expandKey = followUpsExpandKey(q.itemKey);
+    const expanded = followUps.length > 0 && expandedOf(expandKey, "question");
+    // Folded, a question carries its follow-ups' problems, so none is hidden.
+    const shownIssues = expanded || followUps.length === 0 ? issues : foldedIssues;
     const info: QuestionInfo = {
       itemKey: q.itemKey,
       instrument: q.instrument,
@@ -547,16 +610,18 @@ export function buildTree(o: Outline, index: IssueIndex, opts: TreeOptions): Tre
         level,
         parentId: null,
         label: q.text.trim() ? shortText(q.text, 90) : UNTITLED_QUESTION,
-        expandable: false,
-        expanded: false,
-        children: [],
+        expandable: followUps.length > 0,
+        expanded,
+        ...(followUps.length > 0 ? { expandKey } : {}),
+        children: expanded ? followUps : [],
         selection: { kind: "question", itemKey: q.itemKey },
-        issues,
+        issues: shownIssues,
         textMatch,
         idMatch,
-        question: info,
+        question: { ...info, followUps: countFollowUps(followUps) },
       },
-      [q.text, q.studioType, q.required, q.hasCondition, q.identifying, q.tier, n, block.componentIndex],
+      [q.text, q.studioType, q.required, q.hasCondition, q.identifying, q.tier, n, block.componentIndex, countFollowUps(followUps)],
+      followUps,
     );
   }
 
@@ -772,7 +837,11 @@ export function ancestorsOf(o: Outline, selection: Selection | null): string[] {
           if (!block.questions.some((q) => q.itemKey === selection.itemKey)) continue;
           const out = [`section:${section.key}`];
           if (blockHasHeader(block)) out.push(`block:${section.key}:${block.componentIndex}`);
-          return out;
+          // The questions it is folded under, outermost first.
+          const parents = followUpParents(block.questions);
+          const chain: string[] = [];
+          for (let p = parents.get(selection.itemKey); p; p = parents.get(p)) chain.unshift(p);
+          return [...out, ...chain];
         }
       }
       return o.archived.some((a) => a.itemKey === selection.itemKey) ? ["archive"] : [];
@@ -792,4 +861,8 @@ export function typeahead(visible: readonly TreeNode[], fromIndex: number, prefi
     if (label.startsWith(p)) return i;
   }
   return -1;
+}
+
+function countFollowUps(nodes: readonly TreeNode[]): number {
+  return nodes.reduce((n, c) => n + 1 + (c.question?.followUps ?? 0), 0);
 }
