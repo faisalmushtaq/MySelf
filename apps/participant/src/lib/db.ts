@@ -8,7 +8,6 @@ import {
   type AccessibilityPreferences,
 } from "./accessibility.js";
 import { ulid } from "./ulid.js";
-import type { PinRecord } from "./pin.js";
 import type { DobGuard } from "./dob.js";
 import type { DeviceEventUpload, SittingUploadItem } from "@myself/store";
 
@@ -169,13 +168,17 @@ export interface SelectionRow {
 }
 
 /**
- * The shared-iPad guards (lib/pin.ts, lib/dob.ts): the staff PIN, kept only as
- * a salted hash, and the wrong-date-of-birth count for each code that has had
- * one. Kept here rather than in the browser's other storage so they last
- * exactly as long as the sittings they protect, and go with them when the
- * site's data is cleared — which is how a forgotten PIN is reset (docs/15).
+ * The shared-iPad guards (lib/dob.ts): the wrong-date-of-birth count for each
+ * code that has had one. Kept here rather than in the browser's other storage
+ * so they last exactly as long as the sittings they protect, and go with them
+ * when the site's data is cleared. (The staff PIN once kept here was removed, D-71.)
  */
-export type GuardRow = ({ id: "staff-pin" } & PinRecord) | ({ id: `resume:${string}`; participantCode: string } & DobGuard);
+/**
+ * A row left by the staff PIN (removed, D-71) is still read without error on an
+ * iPad that set one; nothing writes or checks it now.
+ */
+type RetiredPinRow = { id: "staff-pin" } & Record<string, unknown>;
+export type GuardRow = RetiredPinRow | ({ id: `resume:${string}`; participantCode: string } & DobGuard);
 
 /** How the handover panel names this device. */
 export interface Enrolment {
@@ -857,17 +860,6 @@ export async function pruneCachedReleases(keep: readonly string[]): Promise<stri
     if (drop.length > 0) await db.releases.bulkDelete(drop);
     return drop;
   });
-}
-
-export async function getStaffPin(): Promise<PinRecord | undefined> {
-  const row = await db.guards.get("staff-pin");
-  if (!row || row.id !== "staff-pin") return undefined;
-  const { id: _id, ...record } = row;
-  return record;
-}
-
-export async function saveStaffPin(record: PinRecord): Promise<void> {
-  await db.guards.put({ id: "staff-pin", ...record });
 }
 
 const resumeGuardId = (participantCode: string) => `resume:${participantCode}` as const;

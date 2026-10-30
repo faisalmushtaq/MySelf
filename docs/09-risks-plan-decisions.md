@@ -814,3 +814,26 @@ participant asked to stop or was upset. The store's replay and assessment
 carry `endedByStaff {reason, at}`; such a sitting counts as finished
 (complete or incomplete as its required answers decide), and the dashboard
 marks it as ended by a researcher.
+
+### No staff PIN; the home address is hard to leave blank (2026-10-30, D-71)
+
+**Asked.** "Just remove the pin option." And: people "shouldn't be able to skip
+the home address question without quite a few prompts stopping them… this is
+important for our UPRNs."
+
+**Changed.** The staff PIN is gone from the iPad: five taps on the build line
+open the handover panel, and five on the progress bar the wrap-up (D-70). What
+it guarded is still guarded otherwise: the export needs the study passphrase,
+Clear removes only sittings the study has confirmed, and the gestures are not
+shown anywhere. A PIN already set on an iPad is left in its database, unread.
+The fielding runbook (docs/15) says so.
+
+Leaving the home address blank is asked about three times, each with a reason:
+"Your address really matters to this study…", then "Not sure of your postcode?
+… Your house number and street on their own help a lot.", then "Last check:
+leave your address blank?". "I'll fill it in" goes back and the asking starts
+again. It is still a choice — the third "Yes, skip it" lets them go — and a
+partial address counts as an answer, as the question already says. Each ask is
+logged (`skip.prompted`, ask n of 3). Other questions still ask once. This is
+in the app, for the question with the postcode check, so no survey needs
+republishing.

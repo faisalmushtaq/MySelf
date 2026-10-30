@@ -11,9 +11,9 @@ import { SurveyChoiceSection, type SurveyChoiceSectionProps } from "./SurveyChoi
  * three things to do about it — sync, export to an encrypted file, and clear
  * what the study has already confirmed.
  *
- * Opened by five taps on the build line (see `handoverTaps` in App) AND the
- * staff PIN (lib/pin.ts, `StaffPinGate`), because the device spends its day in
- * participants' hands and this panel can export every sitting on it. Every
+ * Opened by five taps on the build line (see `handoverTaps` in App). There is
+ * no PIN (removed at the PI's request, D-71): the export still needs the study
+ * passphrase, and Clear only removes sittings the study has confirmed. Every
  * value it shows and every piece of state it changes belongs to App, which
  * closes it — and forgets the passphrase — when a sitting starts, and when it
  * has been left untouched for two minutes (lib/idle.ts).

@@ -2,7 +2,7 @@ import { useState } from "react";
 
 /**
  * The researcher's wrap-up (D-70): opened mid-sitting with five taps on the
- * progress bar and the staff PIN, for when the session is over and the
+ * progress bar, for when the session is over and the
  * participant has not finished. Everything answered is kept; the questions
  * not reached are recorded as such, and the sitting is marked as ended by a
  * researcher, with the reason, so the dashboard can tell it apart from someone

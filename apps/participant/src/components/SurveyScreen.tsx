@@ -46,6 +46,26 @@ export interface EffortPolicy extends DwellPolicy {
  */
 const NO_STUCK_PROMPT = new Set<string>(["info", "text_short", "text_long", "form_fields", "checkbox_set"]);
 
+/**
+ * Leaving the home address blank (D-71): it is how answers are linked to
+ * records (UPRN), so a skip is asked about three times, each time with a
+ * reason to fill in what they know. Still a choice: the third "Yes, skip" lets
+ * them go. Any other question asks once.
+ */
+const ADDRESS_SKIP_PROMPTS = [
+  {
+    question: "Your address really matters to this study.",
+    detail: "It is how we link your answers to your health and education records. Could you fill in what you know — even just your street?",
+    go: "Skip anyway",
+  },
+  {
+    question: "Not sure of your postcode?",
+    detail: "That's fine — leave it out. Your house number and street on their own help a lot.",
+    go: "Skip anyway",
+  },
+  { question: "Last check: leave your address blank?", detail: null, go: "Yes, skip it" },
+] as const;
+
 /** Five taps within this long on the progress bar open the researcher's wrap-up (D-70). */
 const STAFF_TAPS = 5;
 const STAFF_TAP_WINDOW_MS = 4000;
@@ -113,7 +133,9 @@ export function SurveyScreen(props: SurveyScreenProps) {
     () => new Walker(units, store, allowBack, new Date(startTime)),
     [units, store, allowBack, startTime],
   );
-  const [confirmingSkip, setConfirmingSkip] = useState(false);
+  /** How many times leaving this question blank has been asked about (0: not yet). */
+  const [skipAsked, setSkipAsked] = useState(0);
+  const confirmingSkip = skipAsked > 0;
   // Draft validity reported by the control on screen (formats, required parts).
   const [draft, setDraft] = useState<{ ok: boolean; complete: boolean } | null>(null);
   const [helpOpen, setHelpOpen] = useState(false);
@@ -128,7 +150,7 @@ export function SurveyScreen(props: SurveyScreenProps) {
   const headingRef = useRef<HTMLHeadingElement | null>(null);
 
   useEffect(() => {
-    setConfirmingSkip(false);
+    setSkipAsked(0);
     setDraft(null);
     setHelpOpen(false);
     setMoreOpen(false);
@@ -318,6 +340,8 @@ export function SurveyScreen(props: SurveyScreenProps) {
   // a good answer), and clearing a field back to blank stops counting as one
   // even if an earlier value was already recorded.
   const satisfied = (draft !== null ? draft.complete : answered) && consentComplete;
+  /** The home address, which records are linked by (D-52, D-71): its form carries the postcode check. */
+  const isAddress = item.responseType === "form_fields" && "postcodeCheck" in item && item.postcodeCheck != null;
   const canAdvance =
     item.responseType === "info" ||
     (!draftBlocked && (item.required === "hard" ? satisfied : true));
@@ -362,9 +386,11 @@ export function SurveyScreen(props: SurveyScreenProps) {
     if (item.required === "hard") return; // button disabled anyway
     // Blank and skippable — including a field the participant has just emptied,
     // which is recorded as a skip so the data matches what was left on screen.
-    // Ask once, in place, before letting it go.
-    if (effort.confirmSkip && !confirmingSkip) {
-      setConfirmingSkip(true);
+    // Ask once, in place, before letting it go — the home address three times (D-71).
+    const asks = isAddress ? ADDRESS_SKIP_PROMPTS.length : effort.confirmSkip ? 1 : 0;
+    if (skipAsked < asks) {
+      if (isAddress) props.onEvent("skip.prompted", { ask: skipAsked + 1, of: asks });
+      setSkipAsked(skipAsked + 1);
       return;
     }
     props.onEvent("skip.confirmed");
@@ -579,7 +605,16 @@ export function SurveyScreen(props: SurveyScreenProps) {
             the question above it. */}
         {confirmingSkip ? (
           <div className="skip-confirm" role="alertdialog" aria-label="Skip this question?">
-            <p className="skip-question">Leave this one blank?</p>
+            {isAddress ? (
+              <div className="skip-question">
+                <p className="skip-lead">{ADDRESS_SKIP_PROMPTS[Math.min(skipAsked, ADDRESS_SKIP_PROMPTS.length) - 1]!.question}</p>
+                {ADDRESS_SKIP_PROMPTS[Math.min(skipAsked, ADDRESS_SKIP_PROMPTS.length) - 1]!.detail ? (
+                  <p className="skip-detail">{ADDRESS_SKIP_PROMPTS[Math.min(skipAsked, ADDRESS_SKIP_PROMPTS.length) - 1]!.detail}</p>
+                ) : null}
+              </div>
+            ) : (
+              <p className="skip-question">Leave this one blank?</p>
+            )}
             {/* "Skip" sits first and quiet, where the Next button was, so the
                 tap that opened this strip does not land straight on it.
                 "I'll answer it" takes the prominent right-hand position the
@@ -587,17 +622,17 @@ export function SurveyScreen(props: SurveyScreenProps) {
                 longer the accidental one. */}
             <div className="skip-actions">
               <button type="button" className="skip-go" onClick={handleNext}>
-                Skip
+                {isAddress ? ADDRESS_SKIP_PROMPTS[Math.min(skipAsked, ADDRESS_SKIP_PROMPTS.length) - 1]!.go : "Skip"}
               </button>
               <button
                 type="button"
                 className="skip-back"
                 onClick={() => {
-                  setConfirmingSkip(false);
+                  setSkipAsked(0);
                   props.onEvent("skip.abandoned");
                 }}
               >
-                I'll answer it
+                {isAddress ? "I'll fill it in" : "I'll answer it"}
               </button>
             </div>
           </div>
