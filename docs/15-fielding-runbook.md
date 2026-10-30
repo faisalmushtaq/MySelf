@@ -111,22 +111,12 @@ money, so they have a daily limit per iPad and a ceiling across the whole study
 **Adding a device mid-study needs no action at all.** Open the URL on it — and add
 it to the Home Screen, for the reason above.
 
-**Set the staff PIN before the iPad goes near a participant.** The first time the
-handover panel is opened on an iPad (five taps on the build line), it asks you to
-choose a staff PIN of 4 to 8 digits, typed twice. From then on the panel — and with
-it the export, the survey switch and Clear — opens only with that PIN. Use the same
-PIN on every iPad of a study and keep it with the study passphrase, not on the
-device. Five wrong PINs lock the panel for five minutes. The PIN is kept only on
-that iPad, as a salted hash; nobody, including the study, can read it back.
-
-**A forgotten PIN can only be reset by clearing the site's data** (Settings →
-Apps → Safari → Advanced → Website Data → remove the MySelf site, or delete the
-Home Screen app). **That also deletes every sitting on the iPad that has not been
-uploaded, permanently** — the encryption key goes with it. So before resetting:
-get the iPad onto a working network and let it upload (the start screen's small
-print counts what is awaiting sync, no PIN needed) until it reads **0 sessions
-awaiting sync** and no participant is part-way through. Only then clear it, and set
-a new PIN on first opening.
+**The researcher panels open with five taps, and no PIN** (removed at the PI's
+request, D-71). On the start screen, five taps on the build line open the handover
+panel (sync, export, survey switch, Clear). During a sitting, five taps on the
+progress bar open the wrap-up, which ends a sitting that has run out of time (D-70).
+The export still needs the study passphrase, and Clear only removes sittings the
+study has confirmed; keep the gesture between staff.
 
 ## 3. On the day
 
@@ -217,8 +207,7 @@ than the study saying it stored every event.
 
 ## 4. End of the day
 
-On each iPad, open the handover panel (five taps on the build line, then the
-staff PIN — §2). It reads,
+On each iPad, open the handover panel (five taps on the build line — §2). It reads,
 in plain numbers, how many sittings are awaiting upload, confirmed by the study,
 needing review, and unfinished.
 

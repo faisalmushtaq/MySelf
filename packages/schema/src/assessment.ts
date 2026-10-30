@@ -278,6 +278,8 @@ export const responseEvent = z.object({
     "hint.shown",
     "skip.confirmed",
     "skip.abandoned",
+    /** One of the extra asks before the home address is left blank; `ask` of `of` (D-71). */
+    "skip.prompted",
     "effort.checkin_shown",
     "effort.checkin_returned",
     // Timing paradata (D-23). item.left closes every viewing of an item and

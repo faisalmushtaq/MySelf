@@ -223,8 +223,16 @@ async function skip(page: Page): Promise<boolean> {
   const next = nextButton(page);
   if (!(await next.isEnabled({ timeout: 500 }).catch(() => false))) return false;
   await next.click();
+  // Most questions ask once; the home address asks three times (D-71).
   const go = page.locator("button.skip-go");
-  if (await go.isVisible({ timeout: 1_000 }).catch(() => false)) await go.click();
+  const here = await position(page);
+  for (let asks = 0; asks < 3; asks += 1) {
+    if (!(await go.isVisible({ timeout: 1_000 }).catch(() => false))) break;
+    await go.click({ timeout: 2_000 }).catch(() => undefined);
+    // Let the screen settle: moved on, or the next ask in place of this one.
+    await page.waitForTimeout(300);
+    if ((await position(page)) !== here) break;
+  }
   return true;
 }
 

@@ -162,7 +162,7 @@ async function start(page: Page, code: string): Promise<void> {
   await expect(page.locator(".survey")).toBeVisible();
 }
 
-/** The handover panel: five taps on the build line and the staff PIN, as staff open it. */
+/** The handover panel: five taps on the build line, as staff open it. */
 async function openPanel(page: Page): Promise<void> {
   await openStaffPanel(page);
   await expect(page.getByRole("heading", { name: "Survey on this iPad" })).toBeVisible();

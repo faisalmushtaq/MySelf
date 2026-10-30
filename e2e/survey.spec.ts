@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { openStaffPanel, STAFF_PIN } from "./support/staff.js";
+import { openStaffPanel } from "./support/staff.js";
 import { accepted, advance, installClock, position, settle } from "./support/walker.js";
 
 /**
@@ -653,19 +653,39 @@ test.describe("a shared iPad", () => {
     expect(skipped, `no skippable choice question reached after ${where}`).toBe(true);
   });
 
+  test("asks three times, with reasons, before the home address is left blank (D-71)", async ({ page }) => {
+    await startSitting(page);
+    const address = page.locator(".survey-body").getByLabel("Postcode");
+    for (let i = 0; i < 40 && (await address.count()) === 0; i += 1) await step(page);
+    await expect(address).toBeVisible();
+    const where = await position(page);
+    const strip = page.locator(".skip-confirm");
+
+    await page.locator("button.next").click();
+    await expect(strip).toContainText("Your address really matters to this study.");
+    // "I'll fill it in" goes back to the question, and the asking starts again.
+    await strip.getByRole("button", { name: "I'll fill it in" }).click();
+    await expect(strip).toHaveCount(0);
+    await page.locator("button.next").click();
+    await expect(strip).toContainText("Your address really matters");
+    await strip.getByRole("button", { name: "Skip anyway" }).click();
+    await expect(strip).toContainText("Not sure of your postcode?");
+    await strip.getByRole("button", { name: "Skip anyway" }).click();
+    await expect(strip).toContainText("Last check: leave your address blank?");
+    expect(await position(page)).toBe(where);
+    await strip.getByRole("button", { name: "Yes, skip it" }).click();
+    await expect.poll(() => position(page)).not.toBe(where);
+  });
+
   test("a researcher ends a sitting that has run out of time, keeping what was answered (D-70)", async ({ page }) => {
     await startSitting(page);
     for (let i = 0; i < 4; i += 1) await step(page);
 
-    // Five taps on the progress bar, then the staff PIN (chosen here: a fresh device).
+    // Five taps on the progress bar open it; four do nothing.
     const bar = page.locator(".survey .segments");
-    for (let i = 0; i < 5; i += 1) await bar.click();
-    const gate = page.locator(".wrapup-overlay form.staff-pin");
-    await expect(gate).toBeVisible();
-    const inputs = gate.locator('input[type="password"]');
-    await inputs.nth(0).fill(STAFF_PIN);
-    await inputs.nth(1).fill(STAFF_PIN);
-    await gate.getByRole("button", { name: "Set PIN and open" }).click();
+    for (let i = 0; i < 4; i += 1) await bar.click();
+    await expect(page.locator(".wrapup-card")).toHaveCount(0);
+    await bar.click();
 
     // Backing out leaves the survey exactly where it was.
     const card = page.locator(".wrapup-card");
@@ -675,10 +695,8 @@ test.describe("a shared iPad", () => {
     await expect(card).toHaveCount(0);
     expect(await position(page)).toBe(where);
 
-    // Then for real: the PIN this time, "Time's up", and the participant is thanked.
+    // Then for real: "Time's up", and the participant is thanked.
     for (let i = 0; i < 5; i += 1) await bar.click();
-    await page.locator(".wrapup-overlay form.staff-pin input[type=\"password\"]").first().fill(STAFF_PIN);
-    await page.locator(".wrapup-overlay form.staff-pin").getByRole("button", { name: "Open" }).click();
     await expect(card.getByRole("radio", { name: "Time's up" })).toBeChecked();
     await card.getByRole("button", { name: "End the sitting" }).click();
     await expect(page.locator(".screen.finish")).toContainText("That's all for today");
@@ -716,88 +734,21 @@ test.describe("a shared iPad", () => {
     expect(await countRows(page, "sessions")).toBe(2);
   });
 
-  test("puts the staff panel behind a PIN set on first use, with a lockout", async ({ page }) => {
+  test("opens the staff panel with five taps, and closes it when left untouched", async ({ page }) => {
     await page.clock.install();
     await page.goto("./");
     const buildLine = page.locator("p.demo-note");
-    const gate = page.locator("form.staff-pin");
-    const tap5 = async () => {
-      for (let i = 0; i < 5; i += 1) await buildLine.click();
-    };
-
-    // First use: choose a PIN. Nothing of the panel, the export least of all, is there yet.
-    await tap5();
-    await expect(gate).toContainText("Set a staff PIN for this iPad");
+    for (let i = 0; i < 4; i += 1) await buildLine.click();
     await expect(page.locator(".handover")).toHaveCount(0);
-    await expect(page.getByRole("button", { name: /export/i })).toHaveCount(0);
-    const [first, second] = [gate.locator('input[type="password"]').nth(0), gate.locator('input[type="password"]').nth(1)];
-    await first.fill("2468");
-    await second.fill("2469");
-    await gate.getByRole("button", { name: "Set PIN and open" }).click();
-    await expect(gate).toContainText("not the same");
-    await first.fill(STAFF_PIN);
-    await second.fill(STAFF_PIN);
-    await gate.getByRole("button", { name: "Set PIN and open" }).click();
-    await expect(page.locator(".handover")).toBeVisible();
-
-    // Never stored as itself.
-    expect(JSON.stringify(await guardRows(page))).not.toContain(STAFF_PIN);
-
-    // Closed, and opened again: now it asks for the PIN, also after a reload.
-    await tap5();
-    await expect(page.locator(".handover")).toHaveCount(0);
-    await page.reload();
-    await tap5();
-    await expect(gate).toContainText("Staff PIN");
-    await expect(gate.locator('input[type="password"]')).toHaveCount(1);
-
-    // Five wrong tries lock it for five minutes; the right PIN is refused meanwhile.
-    const pin = gate.locator('input[type="password"]');
-    for (let left = 4; left >= 1; left -= 1) {
-      await pin.fill("1111");
-      await gate.getByRole("button", { name: "Open" }).click();
-      await expect(gate).toContainText(`${left} ${left === 1 ? "try" : "tries"} left`);
-    }
-    await pin.fill("1111");
-    await gate.getByRole("button", { name: "Open" }).click();
-    await expect(gate).toContainText("Too many wrong PINs");
-    await pin.fill(STAFF_PIN);
-    await gate.getByRole("button", { name: "Open" }).click();
-    await expect(gate).toContainText("Too many wrong PINs");
-    await expect(page.locator(".handover")).toHaveCount(0);
-
-    // Five minutes on. The gate, left that long, has closed itself (lib/idle.ts).
-    await page.clock.fastForward("05:01");
-    await expect(gate).toHaveCount(0);
-    await tap5();
-    await pin.fill(STAFF_PIN);
-    await gate.getByRole("button", { name: "Open" }).click();
+    await buildLine.click();
     await expect(page.locator(".handover")).toBeVisible();
     await expect(page.getByRole("button", { name: "Export completed sessions" })).toBeVisible();
 
-    // Left open and untouched, it locks itself again.
+    // Left open and untouched, it closes itself (lib/idle.ts).
     await page.clock.fastForward("02:01");
     await expect(page.locator(".handover")).toHaveCount(0);
   });
 });
-
-/** The shared-iPad guards as stored: the PIN record and any code's wrong-date count. */
-async function guardRows(page: Page): Promise<unknown[]> {
-  return page.evaluate(
-    () =>
-      new Promise<unknown[]>((resolve, reject) => {
-        const open = indexedDB.open("myself");
-        open.onerror = () => reject(new Error("could not open the device database"));
-        open.onsuccess = () => {
-          const database = open.result;
-          if (!database.objectStoreNames.contains("guards")) return resolve([]);
-          const all = database.transaction("guards", "readonly").objectStore("guards").getAll();
-          all.onsuccess = () => resolve(all.result as unknown[]);
-          all.onerror = () => reject(new Error("could not read guards"));
-        };
-      }),
-  );
-}
 
 /** How many rows a table of the device database holds. */
 async function countRows(page: Page, table: string): Promise<number> {

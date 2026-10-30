@@ -15,10 +15,8 @@ import {
   deviceSummary,
   unfinishedElsewhere,
   getResumeGuard,
-  getStaffPin,
   lockedResumeCodes,
   saveResumeGuard,
-  saveStaffPin,
   type Enrolment,
   type RecordedAnswer,
   type SelectionRow,
@@ -27,7 +25,6 @@ import {
 } from "./lib/db.js";
 import { dobUnit, resumeRule, tryDob, unitKey } from "./lib/dob.js";
 import { HAND_BACK_IDLE, SURVEY_IDLE, useIdleTimer, type IdlePolicy } from "./lib/idle.js";
-import { newPinRecord, pinComplaint, PIN_LOCKOUT_MS, tryPin } from "./lib/pin.js";
 import {
   applyAccessibilityPreferences,
   DEFAULT_ACCESSIBILITY_PREFERENCES,
@@ -65,7 +62,6 @@ import { SurveyScreen } from "./components/SurveyScreen.js";
 import { CheckInScreen } from "./screens/CheckInScreen.js";
 import { DobCheckScreen } from "./screens/DobCheckScreen.js";
 import { IdleNotice } from "./screens/IdleNotice.js";
-import { StaffPinGate } from "./screens/StaffPinGate.js";
 import { FinishScreen } from "./screens/FinishScreen.js";
 import { EndedScreen } from "./screens/EndedScreen.js";
 import { WrapUpPanel, type WrapUpReason } from "./screens/WrapUpPanel.js";
@@ -285,60 +281,32 @@ export default function App({ initial, initialRuntime }: { initial: Startup; ini
   // participants' hands, so it sits behind a deliberate gesture on the build
   // line rather than a button anyone can find by wandering.
   const handoverTaps = useRef(0);
-  /** Bumped whenever the PIN gate closes, so a check still running then is ignored. */
-  const pinGateGeneration = useRef(0);
   const syncBusyRef = useRef(false);
   const [handoverOpen, setHandoverOpen] = useState(false);
   const [handoverNote, setHandoverNote] = useState<string | null>(null);
   /**
-   * The staff PIN in front of the panel (lib/pin.ts): `set` on a device that
-   * has none yet, `enter` after. Null while neither the gate nor the panel is up.
-   */
-  const [pinGate, setPinGate] = useState<"set" | "enter" | null>(null);
-  /**
-   * What the PIN opens: the handover panel (from the start screen) or the
-   * wrap-up (five taps on the progress bar during a sitting, D-70).
+   * What five taps open: the handover panel (from the start screen) or the
+   * wrap-up (on the progress bar during a sitting, D-70). No PIN: removed at
+   * the PI's request (D-71); the gesture is what keeps participants out.
    */
   const staffTarget = useRef<"handover" | "wrapup">("handover");
   const [wrapUpOpen, setWrapUpOpen] = useState(false);
   const [wrapUpBusy, setWrapUpBusy] = useState(false);
-  const [pinNote, setPinNote] = useState<string | null>(null);
-  const [pinBusy, setPinBusy] = useState(false);
   /** Codes refused three wrong dates of birth here, for the panel. */
   const [lockedCodes, setLockedCodes] = useState<string[]>([]);
   /** The date-of-birth check's last verdict, while it is on screen. */
   const [dobNote, setDobNote] = useState<{ text: string | null; locked: boolean }>({ text: null, locked: false });
 
-  /** Shut the panel and its PIN gate, and forget the passphrase typed into it. */
+  /** Shut the panel, and forget the passphrase typed into it. */
   const closeStaffPanel = useCallback(() => {
     handoverTaps.current = 0;
-    // A PIN still being checked belongs to the gate just closed: its result is dropped.
-    pinGateGeneration.current += 1;
     setHandoverOpen(false);
     setWrapUpOpen(false);
     staffTarget.current = "handover";
-    setPinGate(null);
-    setPinNote(null);
     setPassphrase("");
   }, []);
 
-  /** Five taps on the build line: the PIN gate (or, if the panel is up, close it). */
-  const toggleStaffPanel = useCallback(() => {
-    if (handoverOpen || pinGate) {
-      closeStaffPanel();
-      return;
-    }
-    void getStaffPin()
-      .then((record) => {
-        setPinNote(null);
-        setPinGate(record ? "enter" : "set");
-      })
-      .catch(() => setPinGate("set"));
-  }, [handoverOpen, pinGate, closeStaffPanel]);
-
   const openStaffPanel = useCallback(() => {
-    setPinGate(null);
-    setPinNote(null);
     if (staffTarget.current === "wrapup") {
       const now = phaseRef.current;
       if (now.kind === "running" || now.kind === "checkin" || now.kind === "pace") {
@@ -353,75 +321,16 @@ export default function App({ initial, initialRuntime }: { initial: Startup; ini
       .catch(() => setLockedCodes([]));
   }, []);
 
-  /** The first time on this iPad: staff choose the PIN (lib/pin.ts). */
-  const setStaffPin = useCallback(
-    async (pin: string, again: string) => {
-      const problem = pinComplaint(pin) ?? (pin === again ? null : "The two PINs are not the same. Type it twice.");
-      if (problem) {
-        setPinNote(problem);
-        return;
-      }
-      const generation = pinGateGeneration.current;
-      setPinBusy(true);
-      try {
-        // Never over one already set: that would let anyone choose a new PIN.
-        if (await getStaffPin()) {
-          if (pinGateGeneration.current !== generation) return;
-          setPinGate("enter");
-          setPinNote("A PIN has already been set on this iPad. Enter it to open the panel.");
-          return;
-        }
-        await saveStaffPin(await newPinRecord(pin, new Date()));
-        if (pinGateGeneration.current !== generation) return;
-        openStaffPanel();
-      } catch (error) {
-        setPinNote(error instanceof Error ? error.message : "The PIN could not be saved.");
-      } finally {
-        setPinBusy(false);
-      }
-    },
-    [openStaffPanel],
-  );
+  /** Five taps on the build line: the panel (or, if it is up, close it). */
+  const toggleStaffPanel = useCallback(() => {
+    if (handoverOpen) {
+      closeStaffPanel();
+      return;
+    }
+    staffTarget.current = "handover";
+    openStaffPanel();
+  }, [handoverOpen, closeStaffPanel, openStaffPanel]);
 
-  const enterStaffPin = useCallback(
-    async (pin: string) => {
-      // Judged when it was typed: a PIN typed during the lockout stays refused
-      // even if the lockout ends while it is being checked.
-      const typedAt = new Date();
-      const generation = pinGateGeneration.current;
-      const stale = () => pinGateGeneration.current !== generation;
-      setPinBusy(true);
-      try {
-        const record = await getStaffPin();
-        if (stale()) return;
-        if (!record) {
-          setPinGate("set");
-          return;
-        }
-        const attempt = await tryPin(record, pin, typedAt);
-        await saveStaffPin(attempt.record);
-        // The gate closed (left idle, or tapped shut) while this was checked:
-        // nothing opens behind it.
-        if (stale()) return;
-        if (attempt.kind === "accepted") {
-          openStaffPanel();
-        } else if (attempt.kind === "locked") {
-          setPinNote(
-            `Too many wrong PINs. The panel is locked until ${attempt.until.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} (${PIN_LOCKOUT_MS / 60_000} minutes).`,
-          );
-        } else {
-          setPinNote(
-            `That PIN isn't right. ${attempt.triesLeft} ${attempt.triesLeft === 1 ? "try" : "tries"} left before the panel locks for ${PIN_LOCKOUT_MS / 60_000} minutes.`,
-          );
-        }
-      } catch {
-        setPinNote("The PIN could not be checked. Try again.");
-      } finally {
-        setPinBusy(false);
-      }
-    },
-    [openStaffPanel],
-  );
   // Consecutive skips, and where the run began, so a check-in can offer to
   // take the participant back to the first one they left blank.
   const skipRun = useRef<{ count: number; firstIndex: number | null }>({ count: 0, firstIndex: null });
@@ -1362,21 +1271,16 @@ export default function App({ initial, initialRuntime }: { initial: Startup; ini
       ? HAND_BACK_IDLE
       : phase.kind === "running" || phase.kind === "checkin" || phase.kind === "pace"
         ? SURVEY_IDLE
-        : handoverOpen || pinGate
+        : handoverOpen
           ? HAND_BACK_IDLE
           : null;
 
-  /** Five taps on the progress bar mid-sitting: the staff PIN, then the wrap-up (D-70). */
+  /** Five taps on the progress bar mid-sitting: the wrap-up (D-70). */
   const askForWrapUp = useCallback(() => {
-    if (pinGate || wrapUpOpen) return;
+    if (wrapUpOpen) return;
     staffTarget.current = "wrapup";
-    void getStaffPin()
-      .then((record) => {
-        setPinNote(record ? null : "No staff PIN is set on this iPad yet. Set one now; you will need it to open the panel from now on.");
-        setPinGate(record ? "enter" : "set");
-      })
-      .catch(() => setPinGate("set"));
-  }, [pinGate, wrapUpOpen]);
+    openStaffPanel();
+  }, [wrapUpOpen, openStaffPanel]);
 
   /** Back to the survey without ending it. */
   const cancelWrapUp = useCallback(() => {
@@ -1576,16 +1480,6 @@ export default function App({ initial, initialRuntime }: { initial: Startup; ini
             }
           }}
         >
-          {/* The PIN first (lib/pin.ts): nothing of the panel, the export above all, is reachable without it. */}
-          {pinGate && !handoverOpen && (
-            <StaffPinGate
-              mode={pinGate}
-              note={pinNote}
-              busy={pinBusy}
-              onSet={(pin, again) => void setStaffPin(pin, again)}
-              onEnter={(pin) => void enterStaffPin(pin)}
-            />
-          )}
           {handoverOpen && (
             <HandoverPanel
               counts={counts}
@@ -1693,27 +1587,7 @@ export default function App({ initial, initialRuntime }: { initial: Startup; ini
         />
       )}
 
-      {/* The researcher's way out of a sitting that has run out of time (D-70):
-          the staff PIN, then the wrap-up. Over the survey, which stays as it was. */}
-      {(phase.kind === "running" || phase.kind === "checkin" || phase.kind === "pace") && staffTarget.current === "wrapup" && pinGate && (
-        <div className="wrapup-overlay" role="dialog" aria-modal="true" aria-label="Researcher only">
-          <div className="wrapup-card">
-            <h2>Researcher only</h2>
-            <StaffPinGate
-              mode={pinGate}
-              note={pinNote}
-              busy={pinBusy}
-              onSet={(pin, again) => void setStaffPin(pin, again)}
-              onEnter={(pin) => void enterStaffPin(pin)}
-            />
-            <div className="wrapup-actions">
-              <button type="button" className="wrapup-back" onClick={cancelWrapUp}>
-                Back to the survey
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* The researcher's way out of a sitting that has run out of time (D-70). Over the survey, which stays as it was. */}
       {(phase.kind === "running" || phase.kind === "checkin" || phase.kind === "pace") && wrapUpOpen && (
         <WrapUpPanel {...wrapUpCounts()} busy={wrapUpBusy} onEnd={(reason) => void endSitting(reason)} onCancel={cancelWrapUp} />
       )}

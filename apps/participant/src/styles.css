@@ -2436,3 +2436,15 @@ input[type="range"] {
   font-size: 0.9rem;
   color: var(--text);
 }
+
+/* Asked about leaving the home address blank (D-71): a reason under the question. */
+.skip-question .skip-lead {
+  margin: 0;
+  font-weight: 500;
+}
+.skip-question .skip-detail {
+  margin: 0.25rem 0 0;
+  font-weight: 400;
+  font-size: 0.95rem;
+  max-width: 38rem;
+}
