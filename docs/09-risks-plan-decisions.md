@@ -778,3 +778,39 @@ the original Qualtrics files in source-materials, and releases already published
 which stay exactly as frozen. The live survey takes the new title and label in
 its next published version: `studio-ops` `retitle` and `form-label` set them in
 the draft, and the team publishes from the Studio.
+
+### Taking too long: reassurance, and a researcher's wrap-up (2026-10-30, D-70)
+
+**Asked.** "Participants completing the survey in time… add in some prompts if
+people are taking too long on an item… an emergency exit for the research team
+to execute when participants have taken too long and the session is over…
+where the researcher takes the iPad off and wraps it up." Chosen: a hidden tap
+and the staff PIN; reassure and offer to skip; participants are never shown a
+time limit.
+
+**Stuck on a question.** Someone still on an unanswered question, without
+touching the screen, for several times as long as it takes to read (the
+existing dwell wait: 20 to 90 seconds by length) sees, once per question:
+"Take your time. If you're not sure, choose the answer that fits best." with
+"Skip this one" (not on a hard-required question) and "OK". Any touch restarts
+the wait. Never on text, consent or information screens. Logged as
+`effort.stuck_prompt_shown` and `effort.stuck_skip`; a skip from it is an
+ordinary `item.skipped`. Studio: Survey settings › Pacing, two switches
+(`effort.stuckPrompt`, `effort.stuckPromptOffersSkip`); absent means on, so
+every survey has it from the next app update without republishing, and
+releases already published read back unchanged.
+
+**The researcher's wrap-up.** Five quick taps on the progress bar, then the
+staff PIN (the same one as the handover panel; set there if the iPad has none),
+open "End this sitting?": how many questions were answered, and why it is
+ending (time's up; the participant asked to stop; upset or unwell; technical
+problem; something else). "Back to the survey" leaves everything as it was.
+"End the sitting" keeps every answer, records the rest as not reached, writes
+`session.ended_by_staff` with the reason and counts, completes the sitting so
+it uploads like any other, and shows the participant "That's all for today —
+thank you!", nothing about time. "Ready for the next person" readies the iPad.
+Ending is not withdrawal: answers are kept, and the panel says so where the
+participant asked to stop or was upset. The store's replay and assessment
+carry `endedByStaff {reason, at}`; such a sitting counts as finished
+(complete or incomplete as its required answers decide), and the dashboard
+marks it as ended by a researcher.

@@ -1603,6 +1603,119 @@ input[type="range"] {
   cursor: pointer;
 }
 
+/* ── Stuck on a question: reassurance and a way past (D-70) ────────────── */
+.stuck-prompt {
+  background: var(--off-white);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius);
+  padding: 1rem 1.15rem;
+  max-width: 46rem;
+  margin-top: 1rem;
+}
+
+.stuck-text {
+  margin: 0 0 0.75rem;
+  font-size: 1rem;
+  line-height: 1.5;
+}
+
+.stuck-actions {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.stuck-skip,
+.stuck-ok {
+  min-height: 44px;
+  border-radius: 999px;
+  padding: 0.35rem 1.1rem;
+  font-family: var(--font-ui);
+  font-size: 0.95rem;
+  cursor: pointer;
+  background: none;
+  border: 1px solid var(--hairline-strong);
+  color: var(--text);
+}
+
+.stuck-ok {
+  border-color: var(--accent);
+  color: var(--accent);
+  font-weight: 500;
+}
+
+/* ── The researcher's wrap-up (D-70) ───────────────────────────────────── */
+.wrapup-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  z-index: 50;
+}
+
+.wrapup-card {
+  background: var(--paper);
+  color: var(--text);
+  border-radius: var(--radius);
+  padding: 1.5rem;
+  width: 100%;
+  max-width: 34rem;
+  max-height: 100%;
+  overflow: auto;
+}
+
+.wrapup-card h2 {
+  margin: 0 0 0.5rem;
+}
+
+.wrapup-reasons {
+  border: none;
+  padding: 0;
+  margin: 1rem 0;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.wrapup-reasons label {
+  display: flex;
+  gap: 0.6rem;
+  align-items: center;
+  min-height: 44px;
+  font-size: 1rem;
+}
+
+.wrapup-actions {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  margin-top: 1rem;
+}
+
+.wrapup-end {
+  min-height: 44px;
+  border-radius: 999px;
+  padding: 0.4rem 1.2rem;
+  border: none;
+  background: var(--warn);
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.wrapup-back {
+  min-height: 44px;
+  border-radius: 999px;
+  padding: 0.4rem 1.2rem;
+  border: 1px solid var(--hairline-strong);
+  background: none;
+  color: var(--text);
+  cursor: pointer;
+}
+
 /* ── Skip confirmation (occupies the footer, shifts nothing) ───────────── */
 .skip-confirm {
   display: flex;
