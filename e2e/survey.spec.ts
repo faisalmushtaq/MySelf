@@ -615,6 +615,79 @@ test.describe("a shared iPad", () => {
     expect(await position(page)).toBe(where);
   });
 
+  test("reassures someone stuck on a question, once, and lets them skip it (D-70)", async ({ page }) => {
+    await page.clock.install();
+    await startSitting(page);
+    await walkPastDateOfBirth(page);
+    // On to a choice question, where a long pause means stuck rather than writing.
+    for (let i = 0; i < 40 && (await page.locator('.survey [role="radiogroup"]:visible').count()) === 0; i += 1) await step(page);
+    const where = await position(page);
+    await expect(page.locator(".stuck-prompt")).toHaveCount(0);
+
+    const prompt = page.locator(".stuck-prompt");
+    const skip = prompt.getByRole("button", { name: "Skip this one" });
+    let skipped = false;
+    for (let screens = 0; screens < 15 && !skipped; screens += 1) {
+      if ((await page.locator('.survey [role="radiogroup"]:visible').count()) === 0) {
+        await step(page);
+        continue;
+      }
+      const here = await position(page);
+      await page.clock.fastForward("01:35");
+      await expect(prompt).toContainText("Take your time");
+      if ((await skip.count()) > 0) {
+        await skip.click();
+        await expect.poll(() => position(page)).not.toBe(here);
+        await expect(prompt).toHaveCount(0);
+        skipped = true;
+        break;
+      }
+      // A hard-required question offers no skip. OK puts the reassurance away,
+      // and it is not shown again on this question.
+      await prompt.getByRole("button", { name: "OK" }).click();
+      await expect(prompt).toHaveCount(0);
+      await page.clock.fastForward("01:35");
+      await expect(prompt).toHaveCount(0);
+      await step(page);
+    }
+    expect(skipped, `no skippable choice question reached after ${where}`).toBe(true);
+  });
+
+  test("a researcher ends a sitting that has run out of time, keeping what was answered (D-70)", async ({ page }) => {
+    await startSitting(page);
+    for (let i = 0; i < 4; i += 1) await step(page);
+
+    // Five taps on the progress bar, then the staff PIN (chosen here: a fresh device).
+    const bar = page.locator(".survey .segments");
+    for (let i = 0; i < 5; i += 1) await bar.click();
+    const gate = page.locator(".wrapup-overlay form.staff-pin");
+    await expect(gate).toBeVisible();
+    const inputs = gate.locator('input[type="password"]');
+    await inputs.nth(0).fill(STAFF_PIN);
+    await inputs.nth(1).fill(STAFF_PIN);
+    await gate.getByRole("button", { name: "Set PIN and open" }).click();
+
+    // Backing out leaves the survey exactly where it was.
+    const card = page.locator(".wrapup-card");
+    await expect(card).toContainText("End this sitting?");
+    const where = await position(page);
+    await card.getByRole("button", { name: "Back to the survey" }).click();
+    await expect(card).toHaveCount(0);
+    expect(await position(page)).toBe(where);
+
+    // Then for real: the PIN this time, "Time's up", and the participant is thanked.
+    for (let i = 0; i < 5; i += 1) await bar.click();
+    await page.locator(".wrapup-overlay form.staff-pin input[type=\"password\"]").first().fill(STAFF_PIN);
+    await page.locator(".wrapup-overlay form.staff-pin").getByRole("button", { name: "Open" }).click();
+    await expect(card.getByRole("radio", { name: "Time's up" })).toBeChecked();
+    await card.getByRole("button", { name: "End the sitting" }).click();
+    await expect(page.locator(".screen.finish")).toContainText("That's all for today");
+    expect(await sessionStates(page)).toEqual(["awaiting_sync"]);
+
+    await page.getByRole("button", { name: "Ready for the next person" }).click();
+    await expect(page.locator(".screen.start")).toBeVisible();
+  });
+
   test("hands a finished sitting back after two idle minutes, and the review list goes with it", async ({ page }) => {
     test.slow();
     await installClock(page);
@@ -767,6 +840,22 @@ async function countStoredEvents(page: Page): Promise<number> {
           const count = database.transaction("events", "readonly").objectStore("events").count();
           count.onsuccess = () => resolve(count.result);
           count.onerror = () => reject(new Error("could not count events"));
+        };
+      }),
+  );
+}
+
+/** The state of every sitting on the device: finished ones wait for upload (`awaiting_sync`). */
+async function sessionStates(page: Page): Promise<string[]> {
+  return page.evaluate(
+    () =>
+      new Promise<string[]>((resolve, reject) => {
+        const open = indexedDB.open("myself");
+        open.onerror = () => reject(new Error("could not open the device database"));
+        open.onsuccess = () => {
+          const all = open.result.transaction("sessions", "readonly").objectStore("sessions").getAll();
+          all.onsuccess = () => resolve((all.result as { state?: string }[]).map((r) => String(r.state)));
+          all.onerror = () => reject(new Error("could not read sessions"));
         };
       }),
   );

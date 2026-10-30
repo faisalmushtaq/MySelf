@@ -166,6 +166,17 @@ export const assessmentDraft = z.object({
        * and without accusation, whether they want to slow down. 0 disables.
        */
       tooFastRunPrompt: z.number().int().min(0).default(5),
+      /**
+       * Someone still on an unanswered question, untouched, past the dwell
+       * wait above is offered reassurance on screen ("Take your time…"), once
+       * per question (D-70). Off leaves only the quiet help offer of an item
+       * that has a hint.
+       */
+      // Optional rather than defaulted, and on unless set to false: a release
+      // published before these existed must read back exactly as it was frozen.
+      stuckPrompt: z.boolean().optional(),
+      /** The reassurance also offers "Skip this one", on questions that are not hard-required. Absent means on. */
+      stuckPromptOffersSkip: z.boolean().optional(),
     })
     .default({
       confirmSkip: true,
@@ -285,6 +296,14 @@ export const responseEvent = z.object({
      *  it — so a corrected answer is distinguishable from a first one (D-30). */
     "review.opened",
     "review.edited",
+    /** Reassurance offered to someone stuck on a question, and a skip taken from it (D-70). */
+    "effort.stuck_prompt_shown",
+    "effort.stuck_skip",
+    /** A researcher opened the wrap-up during a sitting, and left it without ending (D-70). */
+    "staff.wrapup_opened",
+    "staff.wrapup_cancelled",
+    /** A researcher ended the sitting before the end; `reason` says why (D-70). */
+    "session.ended_by_staff",
   ]),
   itemRef: z
     .object({ instrument: slug, item: slug, revision: z.number().int().positive() })

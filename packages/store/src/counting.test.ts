@@ -200,3 +200,28 @@ describe("a hidden question's answer (completeness@2)", () => {
     expect(assessed.rulesVersion).toBe("completeness@2");
   });
 });
+
+describe("a sitting a researcher ended (D-70)", () => {
+  const ev = (seq: number, type: string, payload?: Record<string, unknown>) => ({
+    eventId: `e${seq}`,
+    sessionId: "s1",
+    seq,
+    type,
+    ...(payload ? { payload } : {}),
+    tWall: new Date(Date.UTC(2026, 10, 2, 10, 0, seq)).toISOString(),
+    tMono: seq * 1000,
+  });
+
+  it("is finished, says who ended it and why, and is told apart from one that reached the end", () => {
+    const ended = replaySitting({
+      complete: true,
+      events: [ev(0, "session.started"), ev(1, "session.ended_by_staff", { reason: "time", answered: 12, total: 80 }), ev(2, "session.completed", { totalMs: 900_000, endedBy: "staff", reason: "time" })],
+    });
+    expect(ended.terminal).toBe(true);
+    expect(ended.endedByStaff).toEqual({ reason: "time", at: "2026-11-02T10:00:01.000Z" });
+    expect(assessSitting(ended, null, { requiredLevels: ["hard", "soft"], sittingStart: "2026-11-02T10:00:00.000Z" }).endedByStaff?.reason).toBe("time");
+
+    const finished = replaySitting({ complete: true, events: [ev(0, "session.started"), ev(1, "session.completed", { totalMs: 900_000 })] });
+    expect(finished.endedByStaff).toBeUndefined();
+  });
+});

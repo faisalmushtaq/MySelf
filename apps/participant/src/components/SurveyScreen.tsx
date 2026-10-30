@@ -34,7 +34,21 @@ export interface EffortPolicy extends DwellPolicy {
   tooFastWordsPerSecond: number;
   tooFastMaxSeconds: number;
   tooFastRunPrompt: number;
+  /** Reassure someone stuck on an unanswered question (D-70); on unless the release says otherwise. */
+  stuckPrompt?: boolean | undefined;
+  /** …and offer to skip it, when it is not hard-required. */
+  stuckPromptOffersSkip?: boolean | undefined;
 }
+
+/**
+ * Questions where a long pause is the work itself — writing, reading consent
+ * statements — and is not a sign of being stuck.
+ */
+const NO_STUCK_PROMPT = new Set<string>(["info", "text_short", "text_long", "form_fields", "checkbox_set"]);
+
+/** Five taps within this long on the progress bar open the researcher's wrap-up (D-70). */
+const STAFF_TAPS = 5;
+const STAFF_TAP_WINDOW_MS = 4000;
 
 export interface SurveyScreenProps {
   units: PresentableUnit[];
@@ -84,6 +98,11 @@ export interface SurveyScreenProps {
    */
   reviewEdit?: boolean;
   onEvent: (type: string, payload?: Record<string, unknown>) => void;
+  /**
+   * Five taps on the progress bar: a researcher asking for the wrap-up (D-70).
+   * Absent where there is no researcher to ask for (a preview).
+   */
+  onStaffGesture?: () => void;
 }
 
 export function SurveyScreen(props: SurveyScreenProps) {
@@ -102,6 +121,9 @@ export function SurveyScreen(props: SurveyScreenProps) {
   /** Message when this answer contradicts an earlier one (D-25). */
   const [inconsistency, setInconsistency] = useState<string | null>(null);
   const [dwelling, setDwelling] = useState(false);
+  /** Reassurance shown to someone stuck on this question, until they answer or close it (D-70). */
+  const [stuck, setStuck] = useState(false);
+  const staffTaps = useRef<number[]>([]);
   const advanceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const headingRef = useRef<HTMLHeadingElement | null>(null);
 
@@ -112,6 +134,7 @@ export function SurveyScreen(props: SurveyScreenProps) {
     setMoreOpen(false);
     setInconsistency(null);
     setDwelling(false);
+    setStuck(false);
     headingRef.current?.focus();
     return () => {
       if (advanceTimer.current) clearTimeout(advanceTimer.current);
@@ -123,16 +146,35 @@ export function SurveyScreen(props: SurveyScreenProps) {
    * to read it, quietly offer help rather than leaving them stuck. The offer
    * appears once per item and is recorded as paradata (response-time flag).
    */
+  // The wait restarts whenever the participant touches the screen: someone
+  // trying answers, scrolling or typing is working, not stuck (D-70).
+  const dwellTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const dwellShown = useRef(false);
+  const armDwell = useRef<() => void>(() => {});
   useEffect(() => {
+    dwellShown.current = false;
     if (unit?.item.responseType === "info") return;
     const item = unit?.item;
     const statements = item?.responseType === "checkbox_set" ? item.statements.map((st) => st.text.text) : [];
     const waitMs = dwellHintMs(wordCount(item?.stem.text, item?.lede?.text, ...statements), effort);
-    const t = setTimeout(() => {
-      setDwelling(true);
-      props.onEvent("hint.shown", { reason: "dwell", afterMs: waitMs });
-    }, waitMs);
-    return () => clearTimeout(t);
+    armDwell.current = () => {
+      if (dwellTimer.current) clearTimeout(dwellTimer.current);
+      if (dwellShown.current) return;
+      dwellTimer.current = setTimeout(() => {
+        dwellShown.current = true;
+        setDwelling(true);
+        props.onEvent("hint.shown", { reason: "dwell", afterMs: waitMs });
+        const answeredNow = item && unit ? store.get({ instrument: unit.instrument, item: item.key, revision: item.revision })?.status === "answered" : true;
+        if (item && effort.stuckPrompt !== false && !NO_STUCK_PROMPT.has(item.responseType) && !answeredNow) {
+          setStuck(true);
+          props.onEvent("effort.stuck_prompt_shown", { afterMs: waitMs });
+        }
+      }, waitMs);
+    };
+    armDwell.current();
+    return () => {
+      if (dwellTimer.current) clearTimeout(dwellTimer.current);
+    };
   }, [index, effort]);
 
   /**
@@ -353,8 +395,20 @@ export function SurveyScreen(props: SurveyScreenProps) {
    */
   const unitKey = `${unit.instrument}.${item.key}#${item.revision}`;
 
+  /** Five quick taps on the progress bar: the researcher's wrap-up (D-70). Nothing a participant sees changes. */
+  const onProgressTap = () => {
+    if (!props.onStaffGesture) return;
+    const now = Date.now();
+    staffTaps.current = [...staffTaps.current.filter((t) => now - t < STAFF_TAP_WINDOW_MS), now];
+    if (staffTaps.current.length >= STAFF_TAPS) {
+      staffTaps.current = [];
+      props.onStaffGesture();
+    }
+  };
+  const stuckSkip = stuck && !answered && effort.stuckPromptOffersSkip !== false && item.required !== "hard";
+
   return (
-    <div className="screen survey">
+    <div className="screen survey" onPointerDown={() => armDwell.current()} onKeyDown={() => armDwell.current()}>
       <header className="survey-header">
         {/* Named, not just an arrow: a bare chevron in a corner is missed, and
             people who want to change an answer need to see the way back. */}
@@ -378,7 +432,7 @@ export function SurveyScreen(props: SurveyScreenProps) {
         ) : (
           <span className="back-spacer" />
         )}
-        <div className="segments" aria-label={`Section ${progress.activeIndex + 1} of ${progress.sections.length}`}>
+        <div className="segments" aria-label={`Section ${progress.activeIndex + 1} of ${progress.sections.length}`} onClick={onProgressTap}>
           {progress.sections.map((s, i) => (
             <span key={s} className={`segment${i < progress.activeIndex ? " done" : i === progress.activeIndex ? " active" : ""}`} />
           ))}
@@ -463,6 +517,32 @@ export function SurveyScreen(props: SurveyScreenProps) {
           <p className="error inconsistency" role="alert">
             {inconsistency}
           </p>
+        )}
+
+        {/* Someone still on an unanswered question long after they could have
+            read it: reassure, once, and offer a way past (D-70). */}
+        {stuck && !answered && (
+          <div className="stuck-prompt" role="status">
+            <p className="stuck-text">Take your time. If you're not sure, choose the answer that fits best.</p>
+            {item.hint && <p className="help-hint">{item.hint}</p>}
+            <div className="stuck-actions">
+              {stuckSkip && (
+                <button
+                  type="button"
+                  className="stuck-skip"
+                  onClick={() => {
+                    props.onEvent("effort.stuck_skip");
+                    props.onAdvance(index, "skip");
+                  }}
+                >
+                  Skip this one
+                </button>
+              )}
+              <button type="button" className="stuck-ok" onClick={() => setStuck(false)}>
+                OK
+              </button>
+            </div>
+          </div>
         )}
 
         {/* Context and help: opened by the participant, or offered after a long

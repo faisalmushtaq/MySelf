@@ -67,6 +67,8 @@ import { DobCheckScreen } from "./screens/DobCheckScreen.js";
 import { IdleNotice } from "./screens/IdleNotice.js";
 import { StaffPinGate } from "./screens/StaffPinGate.js";
 import { FinishScreen } from "./screens/FinishScreen.js";
+import { EndedScreen } from "./screens/EndedScreen.js";
+import { WrapUpPanel, type WrapUpReason } from "./screens/WrapUpPanel.js";
 import { HandoverPanel } from "./screens/HandoverPanel.js";
 import { PaceScreen } from "./screens/PaceScreen.js";
 import { SaveFailedScreen } from "./screens/SaveFailedScreen.js";
@@ -102,6 +104,8 @@ type Phase =
   /** The answer list, reached from the finish screen on request (D-31). */
   | { kind: "review"; session: SessionRow }
   | { kind: "finished"; session: SessionRow }
+  /** A researcher ended the sitting before the end (D-70): thanks, then the next person. */
+  | { kind: "ended"; session: SessionRow }
   /**
    * A code matched an unfinished sitting that holds a date of birth: it is
    * carried on only once the same date is entered again (lib/dob.ts). The
@@ -291,6 +295,13 @@ export default function App({ initial, initialRuntime }: { initial: Startup; ini
    * has none yet, `enter` after. Null while neither the gate nor the panel is up.
    */
   const [pinGate, setPinGate] = useState<"set" | "enter" | null>(null);
+  /**
+   * What the PIN opens: the handover panel (from the start screen) or the
+   * wrap-up (five taps on the progress bar during a sitting, D-70).
+   */
+  const staffTarget = useRef<"handover" | "wrapup">("handover");
+  const [wrapUpOpen, setWrapUpOpen] = useState(false);
+  const [wrapUpBusy, setWrapUpBusy] = useState(false);
   const [pinNote, setPinNote] = useState<string | null>(null);
   const [pinBusy, setPinBusy] = useState(false);
   /** Codes refused three wrong dates of birth here, for the panel. */
@@ -304,6 +315,8 @@ export default function App({ initial, initialRuntime }: { initial: Startup; ini
     // A PIN still being checked belongs to the gate just closed: its result is dropped.
     pinGateGeneration.current += 1;
     setHandoverOpen(false);
+    setWrapUpOpen(false);
+    staffTarget.current = "handover";
     setPinGate(null);
     setPinNote(null);
     setPassphrase("");
@@ -326,6 +339,14 @@ export default function App({ initial, initialRuntime }: { initial: Startup; ini
   const openStaffPanel = useCallback(() => {
     setPinGate(null);
     setPinNote(null);
+    if (staffTarget.current === "wrapup") {
+      const now = phaseRef.current;
+      if (now.kind === "running" || now.kind === "checkin" || now.kind === "pace") {
+        setWrapUpOpen(true);
+        void appendEvent(now.session, "staff.wrapup_opened", undefined, undefined, now.index, tMono());
+      }
+      return;
+    }
     setHandoverOpen(true);
     void lockedResumeCodes()
       .then(setLockedCodes)
@@ -703,7 +724,7 @@ export default function App({ initial, initialRuntime }: { initial: Startup; ini
   }, [phase.kind, online, checkRelease, followLink]);
 
   useEffect(() => {
-    if (online && (phase.kind === "start" || phase.kind === "finished")) void runSync();
+    if (online && (phase.kind === "start" || phase.kind === "finished" || phase.kind === "ended")) void runSync();
   }, [online, phase.kind, runSync]);
 
   // Safari cannot continue uploads after the PWA closes. While it remains in
@@ -1101,7 +1122,7 @@ export default function App({ initial, initialRuntime }: { initial: Startup; ini
    *  returning to a question is visible in the log rather than inferred. */
   const enterItem = useCallback(
     (index: number) => {
-      if (phase.kind === "start" || phase.kind === "finished") return;
+      if (phase.kind === "start" || phase.kind === "finished" || phase.kind === "ended") return;
       const key = unitKeyOf(index);
       if (!key) return;
       const { visit, returning, tooFastMs } = timing.current.enter(key, wordsAt(index));
@@ -1113,7 +1134,7 @@ export default function App({ initial, initialRuntime }: { initial: Startup; ini
   /** Close a viewing of an item, recording how long it was on screen. */
   const leaveItem = useCallback(
     async (index: number, answered: boolean) => {
-      if (phase.kind === "start" || phase.kind === "finished") return;
+      if (phase.kind === "start" || phase.kind === "finished" || phase.kind === "ended") return;
       const key = unitKeyOf(index);
       if (!key) return;
       const payload = timing.current.leave(key, answered);
@@ -1337,13 +1358,79 @@ export default function App({ initial, initialRuntime }: { initial: Startup; ini
    */
   const idlePolicy: IdlePolicy | null = saveError
     ? null
-    : phase.kind === "finished" || phase.kind === "review" || phase.kind === "verify" || (phase.kind === "running" && phase.fromReview)
+    : phase.kind === "finished" || phase.kind === "ended" || phase.kind === "review" || phase.kind === "verify" || (phase.kind === "running" && phase.fromReview)
       ? HAND_BACK_IDLE
       : phase.kind === "running" || phase.kind === "checkin" || phase.kind === "pace"
         ? SURVEY_IDLE
         : handoverOpen || pinGate
           ? HAND_BACK_IDLE
           : null;
+
+  /** Five taps on the progress bar mid-sitting: the staff PIN, then the wrap-up (D-70). */
+  const askForWrapUp = useCallback(() => {
+    if (pinGate || wrapUpOpen) return;
+    staffTarget.current = "wrapup";
+    void getStaffPin()
+      .then((record) => {
+        setPinNote(record ? null : "No staff PIN is set on this iPad yet. Set one now; you will need it to open the panel from now on.");
+        setPinGate(record ? "enter" : "set");
+      })
+      .catch(() => setPinGate("set"));
+  }, [pinGate, wrapUpOpen]);
+
+  /** Back to the survey without ending it. */
+  const cancelWrapUp = useCallback(() => {
+    const now = phaseRef.current;
+    if (wrapUpOpen && (now.kind === "running" || now.kind === "checkin" || now.kind === "pace")) {
+      void appendEvent(now.session, "staff.wrapup_cancelled", undefined, undefined, now.index, tMono());
+    }
+    closeStaffPanel();
+  }, [wrapUpOpen, closeStaffPanel]);
+
+  /**
+   * End the sitting where it is (D-70). Everything answered stays; the rest is
+   * "not reached", as for any sitting that stops; the log says a researcher
+   * ended it and why, then completes it so it is queued for upload like any
+   * other. Through `persist`, like every write that must not be lost.
+   */
+  const endSitting = useCallback(
+    async (reason: WrapUpReason) => {
+      const now = phaseRef.current;
+      if (now.kind !== "running" && now.kind !== "checkin" && now.kind !== "pace") return;
+      setWrapUpBusy(true);
+      try {
+        const counts = wrapUpCounts();
+        const ended = await persist(() =>
+          appendEvent(now.session, "session.ended_by_staff", unitKeyOf(now.index), { reason, ...counts }, now.index, tMono()),
+        );
+        if (!ended) return;
+        const wrote = await persist(() =>
+          appendEvent(now.session, "session.completed", undefined, { ...timing.current.summary(), endedBy: "staff", reason }, now.index, tMono()),
+        );
+        if (!wrote) return;
+        if (!(await persist(() => completeSession(now.session)))) return;
+        closeStaffPanel();
+        const next: Phase = { kind: "ended", session: now.session };
+        phaseRef.current = next;
+        setPhase(next);
+      } finally {
+        setWrapUpBusy(false);
+      }
+    },
+    [persist, closeStaffPanel, runtime],
+  );
+
+  /** How far the sitting got, for the wrap-up and its record: answered questions, of those it has. */
+  function wrapUpCounts(): { answered: number; total: number } {
+    let answered = 0;
+    let total = 0;
+    for (const u of flattened.units) {
+      if (u.item.responseType === "info") continue;
+      total += 1;
+      if (storeRef.current.get({ instrument: u.instrument, item: u.item.key, revision: u.item.revision })?.status === "answered") answered += 1;
+    }
+    return { answered, total };
+  }
 
   const onIdle = useCallback(() => {
     const now = phaseRef.current;
@@ -1353,6 +1440,7 @@ export default function App({ initial, initialRuntime }: { initial: Startup; ini
         return;
       case "verify":
       case "finished":
+      case "ended":
         handover();
         return;
       case "review":
@@ -1366,6 +1454,7 @@ export default function App({ initial, initialRuntime }: { initial: Startup; ini
       // falls through: a question in the middle of a sitting
       case "checkin":
       case "pace": {
+        closeStaffPanel();
         const away = timing.current.suspend();
         void appendEvent(now.session, "session.suspended", undefined, { ...(away ?? {}), reason: "idle" }, now.index, tMono());
         handover();
@@ -1600,7 +1689,33 @@ export default function App({ initial, initialRuntime }: { initial: Startup; ini
           onBack={(f) => void goBack(f)}
           onEvent={emit}
           reviewEdit={phase.fromReview === true}
+          {...(phase.fromReview ? {} : { onStaffGesture: askForWrapUp })}
         />
+      )}
+
+      {/* The researcher's way out of a sitting that has run out of time (D-70):
+          the staff PIN, then the wrap-up. Over the survey, which stays as it was. */}
+      {(phase.kind === "running" || phase.kind === "checkin" || phase.kind === "pace") && staffTarget.current === "wrapup" && pinGate && (
+        <div className="wrapup-overlay" role="dialog" aria-modal="true" aria-label="Researcher only">
+          <div className="wrapup-card">
+            <h2>Researcher only</h2>
+            <StaffPinGate
+              mode={pinGate}
+              note={pinNote}
+              busy={pinBusy}
+              onSet={(pin, again) => void setStaffPin(pin, again)}
+              onEnter={(pin) => void enterStaffPin(pin)}
+            />
+            <div className="wrapup-actions">
+              <button type="button" className="wrapup-back" onClick={cancelWrapUp}>
+                Back to the survey
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {(phase.kind === "running" || phase.kind === "checkin" || phase.kind === "pace") && wrapUpOpen && (
+        <WrapUpPanel {...wrapUpCounts()} busy={wrapUpBusy} onEnd={(reason) => void endSitting(reason)} onCancel={cancelWrapUp} />
       )}
 
       {phase.kind === "pace" && (
@@ -1680,6 +1795,8 @@ export default function App({ initial, initialRuntime }: { initial: Startup; ini
           onHandBack={handover}
         />
       )}
+
+      {phase.kind === "ended" && <EndedScreen onDone={handover} />}
 
       {idle.stage.kind === "warning" && (
         <IdleNotice

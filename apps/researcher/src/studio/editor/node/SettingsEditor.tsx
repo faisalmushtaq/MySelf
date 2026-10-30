@@ -64,6 +64,35 @@ export function SettingsEditor() {
           info="When off, there is no Back button: each answer is final once the participant moves on. They can still change answers from the review screen at the end, if the survey has one."
         />
       </Panel>
+      <Panel
+        title="Pacing"
+        info="Help for participants who are taking a long time. Researchers can also end a sitting that has run out of time: five taps on the progress bar, then the staff PIN."
+      >
+        <SwitchRow
+          label="Reassure someone stuck on a question"
+          field="effort.stuckPrompt"
+          checked={c.effort?.stuckPrompt !== false}
+          disabled={readOnly}
+          onChange={(stuckPrompt) => {
+            if (ctx.run("Change whether stuck participants are reassured", (d) => updateSettings(d, { effort: { stuckPrompt } }).draft)) {
+              ctx.announce(stuckPrompt ? "Stuck participants are reassured." : "No reassurance for stuck participants.");
+            }
+          }}
+          info="After someone has sat on an unanswered question, without touching the screen, for several times as long as it takes to read (20 to 90 seconds), a note says: “Take your time. If you're not sure, choose the answer that fits best.” Once per question; never on text, consent or information screens."
+        />
+        <SwitchRow
+          label="…and offer to skip it"
+          field="effort.stuckPromptOffersSkip"
+          checked={c.effort?.stuckPrompt !== false && c.effort?.stuckPromptOffersSkip !== false}
+          disabled={readOnly || c.effort?.stuckPrompt === false}
+          onChange={(stuckPromptOffersSkip) => {
+            if (ctx.run("Change whether stuck participants can skip", (d) => updateSettings(d, { effort: { stuckPromptOffersSkip } }).draft)) {
+              ctx.announce(stuckPromptOffersSkip ? "Stuck participants are offered a skip." : "Stuck participants are not offered a skip.");
+            }
+          }}
+          info="Adds a “Skip this one” button to the note. Never on a question that must be answered."
+        />
+      </Panel>
       <Panel title="About this survey" info="Set when the survey was created. Changing any of these would make it a different survey.">
         <Facts
           rows={[
