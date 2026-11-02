@@ -583,15 +583,18 @@ test.describe("a shared iPad", () => {
     expect(await countRows(page, "sessions")).toBe(1);
   });
 
-  test("goes back to the start after ten idle minutes, keeping the sitting for its date of birth", async ({ page }) => {
+  test("never times out in a sitting's first 90 minutes, then goes back after ten idle ones, keeping the sitting (D-74)", async ({ page }) => {
     await page.clock.install();
     await startSitting(page);
     await walkPastDateOfBirth(page);
     const where = await position(page);
 
-    await page.clock.fastForward("09:30");
+    // Left alone for most of the 90 minutes (a headset going on, say): still there, no warning.
+    await page.clock.fastForward("01:25:00");
     await expect(page.locator(".idle-notice")).toHaveCount(0);
-    await page.clock.fastForward("00:31");
+    await expect(page.locator(".survey")).toBeVisible();
+    // Untouched through the end of the window: asked at once, with the full countdown.
+    await page.clock.fastForward("05:30");
     const notice = page.locator(".idle-notice");
     await expect(notice).toContainText("Are you still there?");
     await expect(notice).toContainText(/back to the start in \d+ seconds/);
@@ -704,7 +707,8 @@ test.describe("a shared iPad", () => {
     for (let i = 0; i < 2; i += 1) await step(page);
     const where = await position(page);
 
-    await page.clock.fastForward("11:05");
+    // Past the 90 minutes a sitting is given, untouched: back to the start (D-74).
+    await page.clock.fastForward("01:31:05");
     await expect(page.locator(".screen.start")).toBeVisible();
     await openStaffPanel(page);
     await page.locator(".handover").getByRole("button", { name: new RegExp(`Carry on ${CODE}`) }).click();

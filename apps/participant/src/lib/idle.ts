@@ -18,6 +18,30 @@ import { useCallback, useEffect, useRef, useState } from "react";
 export interface IdlePolicy {
   quietMs: number;
   countdownMs: number;
+  /**
+   * Nothing times out before this moment (epoch ms): a sitting's first 90
+   * minutes (D-74). From then on the quiet period counts from the later of the
+   * last touch and the window's end less `quietMs`, so a screen left alone
+   * through the window's end is asked "Are you still there?" there and then,
+   * with the full countdown, rather than sent back without warning.
+   */
+  notBeforeMs?: number;
+}
+
+/** How long a sitting runs before an idle screen can take the iPad back (D-74). */
+export const SITTING_WINDOW_MS = 90 * 60_000;
+
+/** The quiet period a sitting's screen has, opened `startedAt`: nothing before 90 minutes, then `base`. */
+export function sittingIdle(base: IdlePolicy, startedAt: string): IdlePolicy {
+  const started = Date.parse(startedAt);
+  return Number.isFinite(started) ? { ...base, notBeforeMs: started + SITTING_WINDOW_MS } : base;
+}
+
+/** Idle time as a policy counts it, from the last touch (see `notBeforeMs`). */
+export function idleSince(now: number, lastActivity: number, policy: IdlePolicy): number {
+  if (policy.notBeforeMs === undefined) return now - lastActivity;
+  if (now < policy.notBeforeMs) return 0;
+  return now - Math.max(lastActivity, policy.notBeforeMs - policy.quietMs);
 }
 
 /**
@@ -84,7 +108,7 @@ export function useIdleTimer(
     stillHere();
     if (!policy) return;
     const tick = () => {
-      const next = idleStage(Date.now() - last.current, policy);
+      const next = idleStage(idleSince(Date.now(), last.current, policy), policy);
       setStage((shown) =>
         shown.kind === next.kind && (next.kind !== "warning" || (shown.kind === "warning" && shown.secondsLeft === next.secondsLeft))
           ? shown
