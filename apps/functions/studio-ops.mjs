@@ -14,6 +14,7 @@ import {
   removeBlock,
   reorderSection,
   repositoryModuleFragment,
+  restoreQuestion,
   serialiseDraft,
   suggestBump,
   validateDraft,
@@ -301,6 +302,26 @@ if (command === "list") {
     },
     `Remove ${instruments.join(", ")}`,
   );
+} else if (command === "restore") {
+  // Archived questions back into the draft, each where it was (same ID, variable and answers).
+  const study = studyArg();
+  const surveyId = surveyArg();
+  const items = (flag("items") ?? "").split(",").map((x) => x.trim()).filter(Boolean);
+  if (items.length === 0) fail("Say which questions with --items (IDs, comma-separated).");
+  await editDraft(
+    study,
+    surveyId,
+    (draft) => {
+      let d = draft;
+      for (const itemKey of items) {
+        const out = restoreQuestion(d, itemKey);
+        d = out.draft;
+        console.log(`  ${itemKey}: restored${out.restored.length > 1 ? ` (with ${out.restored.length - 1} more)` : ""}`);
+      }
+      return d;
+    },
+    `Restore ${items.length} question(s)`,
+  );
 } else if (command === "add-option") {
   // An answer option on a question (and every question sharing its list), with a new code; first on screen with --first.
   const study = studyArg();
@@ -369,5 +390,5 @@ if (command === "list") {
     `Form label of ${instrument}: ${label}`,
   );
 } else {
-  fail("Commands: list, questions, grant-owners, insert, remove-blocks, reorder, add-option, dob-ages, retitle, form-label.");
+  fail("Commands: list, questions, grant-owners, insert, remove-blocks, restore, reorder, add-option, dob-ages, retitle, form-label.");
 }
