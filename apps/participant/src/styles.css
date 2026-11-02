@@ -332,7 +332,11 @@ textarea {
    hero, vertically centred, never a centred-everything splash. */
 .screen.start,
 .screen.finish {
+  /* "safe": centred while it fits; once the staff panel makes it taller than
+     the screen, it starts at the top and scrolls, rather than spilling above
+     the top where nothing can reach it (D-73). Older Safari keeps plain centring. */
   justify-content: center;
+  justify-content: safe center;
   align-items: flex-start;
   gap: 0;
 }
@@ -2447,4 +2451,17 @@ input[type="range"] {
   font-weight: 400;
   font-size: 0.95rem;
   max-width: 38rem;
+}
+
+/* Pause for headsets going on (D-73), above ending the sitting in the researcher panel. */
+.wrapup-pause {
+  border-bottom: 1px solid var(--hairline);
+  padding-bottom: 1rem;
+  margin-bottom: 1rem;
+}
+.wrapup-pause p {
+  margin: 0 0 0.75rem;
+}
+.wrapup-card h3 {
+  margin: 0 0 0.5rem;
 }

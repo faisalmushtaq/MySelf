@@ -51,6 +51,9 @@ export interface HandoverPanelProps {
   /** Codes refused three wrong dates of birth on this iPad (lib/dob.ts), and the way to allow one again. */
   lockedCodes: string[];
   onAllowResume: (code: string) => void;
+  /** Unfinished sittings of this survey from today, which staff can carry on without a date of birth (D-73). */
+  unfinished: { sessionId: string; code: string; startedAt: string; updatedAt: string }[];
+  onCarryOn: (sessionId: string) => void;
 }
 
 export function HandoverPanel({
@@ -75,6 +78,8 @@ export function HandoverPanel({
   handoverNote,
   lockedCodes,
   onAllowResume,
+  unfinished,
+  onCarryOn,
 }: HandoverPanelProps) {
   return (
     <div className="handover">
@@ -120,6 +125,22 @@ export function HandoverPanel({
         Allowing it again gives three more tries; check who is holding the iPad
         first. The sitting itself is untouched either way and still uploads.
       */}
+      {unfinished.length > 0 && (
+        <div className="resume-locks">
+          <h3>Carry on an unfinished sitting</h3>
+          <p className="hint">
+            Sittings on this iPad that stopped part-way today — timed out while a headset went on, say. Carrying one on starts at the question
+            it stopped on, with no date of birth asked. Check who is holding the iPad first.
+          </p>
+          <div className="handover-actions">
+            {unfinished.map((u) => (
+              <button key={u.sessionId} type="button" className="secondary" onClick={() => onCarryOn(u.sessionId)}>
+                Carry on {u.code} (started {time(u.startedAt)}, last {time(u.updatedAt)})
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
       {lockedCodes.length > 0 && (
         <div className="resume-locks">
           <h3>Codes that can&apos;t carry on here</h3>
@@ -258,4 +279,10 @@ export function HandoverPanel({
       {handoverNote && <p className="hint">{handoverNote}</p>}
     </div>
   );
+}
+
+/** A time of day, as staff read it on the panel. */
+function time(iso: string): string {
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? "?" : d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }

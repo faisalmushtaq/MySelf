@@ -677,6 +677,42 @@ test.describe("a shared iPad", () => {
     await expect.poll(() => position(page)).not.toBe(where);
   });
 
+  test("a researcher pauses a sitting for the headset, and it carries on where it was (D-73)", async ({ page }) => {
+    await page.clock.install();
+    await startSitting(page);
+    for (let i = 0; i < 3; i += 1) await step(page);
+    const where = await position(page);
+
+    const bar = page.locator(".survey .segments");
+    for (let i = 0; i < 5; i += 1) await bar.click();
+    await page.locator(".wrapup-card").getByRole("button", { name: "Pause the survey" }).click();
+    const paused = page.locator(".screen.paused");
+    await expect(paused).toContainText("Paused");
+    await expect(page.locator(".survey")).toHaveCount(0);
+
+    // Fitting a headset takes longer than the ten minutes a question waits: a pause does not time out.
+    await page.clock.fastForward("15:00");
+    await expect(paused).toBeVisible();
+    await paused.getByRole("button", { name: "Carry on" }).click();
+    await expect(page.locator(".survey")).toBeVisible();
+    expect(await position(page)).toBe(where);
+  });
+
+  test("staff carry on a sitting that timed out before the date of birth, from the panel (D-73)", async ({ page }) => {
+    await page.clock.install();
+    await startSitting(page);
+    for (let i = 0; i < 2; i += 1) await step(page);
+    const where = await position(page);
+
+    await page.clock.fastForward("11:05");
+    await expect(page.locator(".screen.start")).toBeVisible();
+    await openStaffPanel(page);
+    await page.locator(".handover").getByRole("button", { name: new RegExp(`Carry on ${CODE}`) }).click();
+    await expect(page.locator(".survey")).toBeVisible();
+    expect(await position(page)).toBe(where);
+    expect(await countRows(page, "sessions")).toBe(1);
+  });
+
   test("a researcher ends a sitting that has run out of time, keeping what was answered (D-70)", async ({ page }) => {
     await startSitting(page);
     for (let i = 0; i < 4; i += 1) await step(page);

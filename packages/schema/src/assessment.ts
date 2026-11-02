@@ -306,6 +306,11 @@ export const responseEvent = z.object({
     "staff.wrapup_cancelled",
     /** A researcher ended the sitting before the end; `reason` says why (D-70). */
     "session.ended_by_staff",
+    /** A researcher paused the sitting (headsets going on), and it carried on (D-73). */
+    "session.paused",
+    "session.unpaused",
+    /** A researcher carried on an unfinished sitting from the staff panel, without its date of birth (D-73). */
+    "session.resumed_by_staff",
   ]),
   itemRef: z
     .object({ instrument: slug, item: slug, revision: z.number().int().positive() })

@@ -34,6 +34,13 @@ export const HAND_BACK_IDLE: IdlePolicy = { quietMs: 100_000, countdownMs: 20_00
  */
 export const SURVEY_IDLE: IdlePolicy = { quietMs: 10 * 60_000, countdownMs: 60_000 };
 
+/**
+ * A sitting a researcher has paused (D-73), for headsets going on: an hour,
+ * then the usual minute's countdown. The paused screen shows nothing of the
+ * sitting, and it stays resumable after.
+ */
+export const PAUSED_IDLE: IdlePolicy = { quietMs: 60 * 60_000, countdownMs: 60_000 };
+
 /** Where an idle screen stands, given how long it has been left. Pure, so the arithmetic is tested. */
 export type IdleStage = { kind: "active" } | { kind: "warning"; secondsLeft: number } | { kind: "expired" };
 

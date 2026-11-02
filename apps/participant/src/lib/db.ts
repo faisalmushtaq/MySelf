@@ -449,6 +449,21 @@ export async function findResumableSession(participantCode: string, scope: Resum
 }
 
 /**
+ * Unfinished sittings of this survey on this iPad, touched within `withinMs`,
+ * newest first: what staff can carry on from the panel (D-73).
+ */
+export async function recentUnfinished(choice: { study: string; surveyId: string }, withinMs: number, now = new Date()): Promise<SessionRow[]> {
+  const running = await db.sessions.where("state").equals("in_progress").toArray();
+  const since = now.getTime() - withinMs;
+  return running
+    .filter((row) => {
+      const own = choiceOfRow(row, ROW_DEFAULTS);
+      return own.study === choice.study && own.surveyId === choice.surveyId && Date.parse(row.updatedAt) >= since;
+    })
+    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+}
+
+/**
  * Unfinished sittings on this iPad of any survey but `choice`, for the handover
  * panel's warning before a switch: they stay here, keep uploading their
  * checkpoints into their own study, and can be finished after switching back.

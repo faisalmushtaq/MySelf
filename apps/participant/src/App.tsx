@@ -16,6 +16,7 @@ import {
   unfinishedElsewhere,
   getResumeGuard,
   lockedResumeCodes,
+  recentUnfinished,
   saveResumeGuard,
   type Enrolment,
   type RecordedAnswer,
@@ -24,7 +25,7 @@ import {
   type StoredSessionCounts,
 } from "./lib/db.js";
 import { dobUnit, resumeRule, tryDob, unitKey } from "./lib/dob.js";
-import { HAND_BACK_IDLE, SURVEY_IDLE, useIdleTimer, type IdlePolicy } from "./lib/idle.js";
+import { HAND_BACK_IDLE, PAUSED_IDLE, SURVEY_IDLE, useIdleTimer, type IdlePolicy } from "./lib/idle.js";
 import {
   applyAccessibilityPreferences,
   DEFAULT_ACCESSIBILITY_PREFERENCES,
@@ -64,6 +65,7 @@ import { DobCheckScreen } from "./screens/DobCheckScreen.js";
 import { IdleNotice } from "./screens/IdleNotice.js";
 import { FinishScreen } from "./screens/FinishScreen.js";
 import { EndedScreen } from "./screens/EndedScreen.js";
+import { PausedScreen } from "./screens/PausedScreen.js";
 import { WrapUpPanel, type WrapUpReason } from "./screens/WrapUpPanel.js";
 import { HandoverPanel } from "./screens/HandoverPanel.js";
 import { PaceScreen } from "./screens/PaceScreen.js";
@@ -90,6 +92,9 @@ import type { PanelCheck } from "./screens/SurveyChoiceSection.js";
  */
 const RELEASE_CHECK_MS = 5 * 60_000;
 
+/** How recent an unfinished sitting must be for staff to carry it on from the panel: today's (D-73). */
+const UNFINISHED_WITHIN_MS = 12 * 60 * 60_000;
+
 type Phase =
   | { kind: "start" }
   /** `fromReview` means this screen was opened to correct an answer, so
@@ -102,6 +107,8 @@ type Phase =
   | { kind: "finished"; session: SessionRow }
   /** A researcher ended the sitting before the end (D-70): thanks, then the next person. */
   | { kind: "ended"; session: SessionRow }
+  /** A researcher paused the sitting (D-73): nothing of it shown until "Carry on". */
+  | { kind: "paused"; session: SessionRow; index: number }
   /**
    * A code matched an unfinished sitting that holds a date of birth: it is
    * carried on only once the same date is entered again (lib/dob.ts). The
@@ -292,6 +299,8 @@ export default function App({ initial, initialRuntime }: { initial: Startup; ini
   const staffTarget = useRef<"handover" | "wrapup">("handover");
   const [wrapUpOpen, setWrapUpOpen] = useState(false);
   const [wrapUpBusy, setWrapUpBusy] = useState(false);
+  /** Today's unfinished sittings of this survey, for the panel's "Carry on" (D-73). */
+  const [unfinishedHere, setUnfinishedHere] = useState<SessionRow[]>([]);
   /** Codes refused three wrong dates of birth here, for the panel. */
   const [lockedCodes, setLockedCodes] = useState<string[]>([]);
   /** The date-of-birth check's last verdict, while it is on screen. */
@@ -316,6 +325,9 @@ export default function App({ initial, initialRuntime }: { initial: Startup; ini
       return;
     }
     setHandoverOpen(true);
+    void recentUnfinished(choiceRef.current, UNFINISHED_WITHIN_MS)
+      .then(setUnfinishedHere)
+      .catch(() => setUnfinishedHere([]));
     void lockedResumeCodes()
       .then(setLockedCodes)
       .catch(() => setLockedCodes([]));
@@ -826,6 +838,35 @@ export default function App({ initial, initialRuntime }: { initial: Startup; ini
     [busy, begin],
   );
 
+  /**
+   * Staff carry on an unfinished sitting from the panel (D-73): the one that
+   * timed out while a headset went on. No date of birth is asked — the
+   * researcher is vouching for who holds the iPad — and the log says so.
+   */
+  const staffCarryOn = useCallback(
+    async (sessionId: string) => {
+      const row = unfinishedHere.find((u) => u.sessionId === sessionId);
+      if (!row || busy) return;
+      setBusy(true);
+      starting.current = true;
+      closeStaffPanel();
+      try {
+        const found = await sittingToResume(row.participantCode, runtime, resumeLookup, choiceRef.current);
+        if (!found.session || found.session.sessionId !== sessionId) {
+          setCodeError("That sitting can't be carried on here any more. Ask the participant to type their code.");
+          return;
+        }
+        await appendEvent(found.session, "session.resumed_by_staff", undefined, undefined, found.session.currentIndex, tMono());
+        setCode(row.participantCode);
+        await begin(row.participantCode, found.session, found.runtime, null);
+      } finally {
+        starting.current = false;
+        setBusy(false);
+      }
+    },
+    [unfinishedHere, busy, runtime, resumeLookup, begin, closeStaffPanel],
+  );
+
   const start = useCallback(async () => {
     const trimmed = code.trim();
     if (trimmed.length < 2 || busy) return;
@@ -1271,7 +1312,9 @@ export default function App({ initial, initialRuntime }: { initial: Startup; ini
       ? HAND_BACK_IDLE
       : phase.kind === "running" || phase.kind === "checkin" || phase.kind === "pace"
         ? SURVEY_IDLE
-        : handoverOpen
+        : phase.kind === "paused"
+          ? PAUSED_IDLE
+          : handoverOpen
           ? HAND_BACK_IDLE
           : null;
 
@@ -1281,6 +1324,31 @@ export default function App({ initial, initialRuntime }: { initial: Startup; ini
     staffTarget.current = "wrapup";
     openStaffPanel();
   }, [wrapUpOpen, openStaffPanel]);
+
+  /**
+   * Pause for headsets going on (D-73): the clock that times answers stops,
+   * the screen shows only "Paused", and the idle wait is an hour.
+   */
+  const pauseSitting = useCallback(() => {
+    const now = phaseRef.current;
+    if (now.kind !== "running" && now.kind !== "checkin" && now.kind !== "pace") return;
+    timing.current.suspend();
+    void appendEvent(now.session, "session.paused", undefined, { by: "staff" }, now.index, tMono());
+    closeStaffPanel();
+    const next: Phase = { kind: "paused", session: now.session, index: now.index };
+    phaseRef.current = next;
+    setPhase(next);
+  }, [closeStaffPanel]);
+
+  const carryOnFromPause = useCallback(() => {
+    const now = phaseRef.current;
+    if (now.kind !== "paused") return;
+    const back = timing.current.resume();
+    void appendEvent(now.session, "session.unpaused", undefined, { ...(back ?? {}) }, now.index, tMono());
+    const next: Phase = { kind: "running", session: now.session, index: now.index };
+    phaseRef.current = next;
+    setPhase(next);
+  }, []);
 
   /** Back to the survey without ending it. */
   const cancelWrapUp = useCallback(() => {
@@ -1357,7 +1425,8 @@ export default function App({ initial, initialRuntime }: { initial: Startup; ini
         }
       // falls through: a question in the middle of a sitting
       case "checkin":
-      case "pace": {
+      case "pace":
+      case "paused": {
         closeStaffPanel();
         const away = timing.current.suspend();
         void appendEvent(now.session, "session.suspended", undefined, { ...(away ?? {}), reason: "idle" }, now.index, tMono());
@@ -1517,6 +1586,8 @@ export default function App({ initial, initialRuntime }: { initial: Startup; ini
               syncNote={syncNote}
               handoverNote={handoverNote}
               lockedCodes={lockedCodes}
+              unfinished={unfinishedHere.map((u) => ({ sessionId: u.sessionId, code: u.participantCode, startedAt: u.startedAt, updatedAt: u.updatedAt }))}
+              onCarryOn={(sessionId) => void staffCarryOn(sessionId)}
               onAllowResume={(allowed) => {
                 void (async () => {
                   await saveResumeGuard(allowed, null);
@@ -1589,7 +1660,7 @@ export default function App({ initial, initialRuntime }: { initial: Startup; ini
 
       {/* The researcher's way out of a sitting that has run out of time (D-70). Over the survey, which stays as it was. */}
       {(phase.kind === "running" || phase.kind === "checkin" || phase.kind === "pace") && wrapUpOpen && (
-        <WrapUpPanel {...wrapUpCounts()} busy={wrapUpBusy} onEnd={(reason) => void endSitting(reason)} onCancel={cancelWrapUp} />
+        <WrapUpPanel {...wrapUpCounts()} busy={wrapUpBusy} onEnd={(reason) => void endSitting(reason)} onCancel={cancelWrapUp} onPause={pauseSitting} />
       )}
 
       {phase.kind === "pace" && (
@@ -1671,10 +1742,11 @@ export default function App({ initial, initialRuntime }: { initial: Startup; ini
       )}
 
       {phase.kind === "ended" && <EndedScreen onDone={handover} />}
+      {phase.kind === "paused" && <PausedScreen onCarryOn={carryOnFromPause} />}
 
       {idle.stage.kind === "warning" && (
         <IdleNotice
-          kind={idlePolicy === SURVEY_IDLE ? "survey" : "hand-back"}
+          kind={idlePolicy === SURVEY_IDLE || idlePolicy === PAUSED_IDLE ? "survey" : "hand-back"}
           secondsLeft={idle.stage.secondsLeft}
           onStillHere={idle.stillHere}
         />
