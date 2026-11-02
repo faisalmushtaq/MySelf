@@ -25,14 +25,26 @@ export interface WrapUpPanelProps {
   busy: boolean;
   onEnd: (reason: WrapUpReason) => void;
   onCancel: () => void;
+  /** Pause instead (D-73): headsets going on, say. */
+  onPause: () => void;
 }
 
-export function WrapUpPanel({ answered, total, busy, onEnd, onCancel }: WrapUpPanelProps) {
+export function WrapUpPanel({ answered, total, busy, onEnd, onCancel, onPause }: WrapUpPanelProps) {
   const [reason, setReason] = useState<WrapUpReason>("time");
   return (
     <div className="wrapup-overlay" role="dialog" aria-modal="true" aria-labelledby="wrapup-title">
       <div className="wrapup-card">
-        <h2 id="wrapup-title">End this sitting?</h2>
+        <h2 id="wrapup-title">Researcher</h2>
+        <div className="wrapup-pause">
+          <p>
+            <strong>Need a few minutes?</strong> Pause the survey while the headset goes on. The screen shows only &ldquo;Paused&rdquo;, and
+            the survey carries on where it was.
+          </p>
+          <button type="button" className="wrapup-back" onClick={onPause} disabled={busy}>
+            Pause the survey
+          </button>
+        </div>
+        <h3>End this sitting?</h3>
         <p>
           {answered} of about {total} questions answered. Everything answered is kept, and the rest are recorded as not reached. The participant then sees a
           thank-you screen.

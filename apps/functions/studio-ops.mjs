@@ -4,9 +4,11 @@ import { getAuth } from "firebase-admin/auth";
 import { FieldValue, getFirestore } from "firebase-admin/firestore";
 import { paths } from "@myself/firebase";
 import {
+  addOption,
   diffDrafts,
   extractDraft,
   insertFragment,
+  moveOption,
   outline,
   parseDraft,
   removeBlock,
@@ -299,6 +301,24 @@ if (command === "list") {
     },
     `Remove ${instruments.join(", ")}`,
   );
+} else if (command === "add-option") {
+  // An answer option on a question (and every question sharing its list), with a new code; first on screen with --first.
+  const study = studyArg();
+  const surveyId = surveyArg();
+  const itemKey = flag("item") ?? fail("Say which question with --item (its ID).");
+  const label = (flag("label") ?? "").trim();
+  if (!label) fail("Give the option's words with --label.");
+  const first = args.includes("--first");
+  await editDraft(
+    study,
+    surveyId,
+    (draft) => {
+      const added = addOption(draft, itemKey, { label });
+      console.log(`  ${itemKey}: “${label}” added as code ${added.code}${first ? ", shown first" : ""}`);
+      return first ? moveOption(added.draft, itemKey, added.code, 0).draft : added.draft;
+    },
+    `Option “${label}” on ${itemKey}`,
+  );
 } else if (command === "reorder") {
   // A section's questions in the order given (every one, by ID); locked questionnaires move whole.
   const study = studyArg();
@@ -349,5 +369,5 @@ if (command === "list") {
     `Form label of ${instrument}: ${label}`,
   );
 } else {
-  fail("Commands: list, questions, grant-owners, insert, remove-blocks, reorder, dob-ages, retitle, form-label.");
+  fail("Commands: list, questions, grant-owners, insert, remove-blocks, reorder, add-option, dob-ages, retitle, form-label.");
 }

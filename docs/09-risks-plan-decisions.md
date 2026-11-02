@@ -862,3 +862,33 @@ a given order; checked against 13.0.0 with no publish problems.
 day) and the night-checks count; "I realise I've been scrolling without taking
 anything in" and "I lose track of how much time I spend" (attention vs time,
 placed together); "really paying attention" and active/passive use.
+
+### Pausing for headsets, carrying on after a timeout, and "don't use it" (2026-11-02, D-73)
+
+**Asked.** "Add a resume option onto the survey? It keeps timing out when we are
+applying the headsets so we have to ask them to start again and lose time." And
+the daily social-media time question "needs a 'don't use it at all' option".
+
+**Why it happened.** A question waits ten minutes untouched, then a minute's
+countdown, then the iPad goes back to the start. Typing the same code carries a
+sitting on only once it holds a date of birth (checked again, lib/dob.ts); a
+sitting stopped before that question started afresh — the case when headsets go
+on early.
+
+**Changed.**
+- *Pause.* The researcher panel (five taps on the progress bar) offers "Pause the
+  survey" above ending it. The screen shows only "Paused" and "Carry on"; the
+  answer timing stops; it waits an hour before the usual countdown, and the
+  sitting stays resumable after. Logged `session.paused` / `session.unpaused`.
+- *Carry on from the panel.* The start screen's staff panel lists this survey's
+  unfinished sittings on the iPad from the last twelve hours, "Carry on <code>
+  (started …, last …)". It resumes at the question it stopped on with no date of
+  birth asked — the researcher vouches for who holds the iPad — logged
+  `session.resumed_by_staff`. Typing the code still works as before.
+- The start screen scrolls rather than hiding its Start button when the panel is
+  taller than the screen.
+- *"I don't use it at all"* is added to the daily-time list (code 10, shown
+  first) on the YBM draft, so both the school-day and non-school-day questions
+  have it. Code 10 means none: it is not above 9 ("7 hours or more") on the scale,
+  so recode it to 0 minutes (or as its own group) before treating the bands as
+  ordered. `studio-ops add-option` adds an option with a new code.
