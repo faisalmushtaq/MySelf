@@ -25,7 +25,7 @@ import {
   type StoredSessionCounts,
 } from "./lib/db.js";
 import { dobUnit, resumeRule, tryDob, unitKey } from "./lib/dob.js";
-import { HAND_BACK_IDLE, PAUSED_IDLE, SURVEY_IDLE, useIdleTimer, type IdlePolicy } from "./lib/idle.js";
+import { HAND_BACK_IDLE, PAUSED_IDLE, SURVEY_IDLE, sittingIdle, useIdleTimer, type IdlePolicy } from "./lib/idle.js";
 import {
   applyAccessibilityPreferences,
   DEFAULT_ACCESSIBILITY_PREFERENCES,
@@ -1306,14 +1306,18 @@ export default function App({ initial, initialRuntime }: { initial: Startup; ini
    * Going back is `handover`, which empties the answer store, so nothing of
    * the sitting — above all the review list — can be shown after it.
    */
+  // A sitting does not time out in its first 90 minutes (D-74); one policy per sitting, so the timer is not restarted by every render.
+  const sittingStartedAt = phase.kind === "running" || phase.kind === "checkin" || phase.kind === "pace" || phase.kind === "paused" ? phase.session.startedAt : null;
+  const surveyIdle = useMemo(() => (sittingStartedAt ? sittingIdle(SURVEY_IDLE, sittingStartedAt) : SURVEY_IDLE), [sittingStartedAt]);
+  const pausedIdle = useMemo(() => (sittingStartedAt ? sittingIdle(PAUSED_IDLE, sittingStartedAt) : PAUSED_IDLE), [sittingStartedAt]);
   const idlePolicy: IdlePolicy | null = saveError
     ? null
     : phase.kind === "finished" || phase.kind === "ended" || phase.kind === "review" || phase.kind === "verify" || (phase.kind === "running" && phase.fromReview)
       ? HAND_BACK_IDLE
       : phase.kind === "running" || phase.kind === "checkin" || phase.kind === "pace"
-        ? SURVEY_IDLE
+        ? surveyIdle
         : phase.kind === "paused"
-          ? PAUSED_IDLE
+          ? pausedIdle
           : handoverOpen
           ? HAND_BACK_IDLE
           : null;
@@ -1746,7 +1750,7 @@ export default function App({ initial, initialRuntime }: { initial: Startup; ini
 
       {idle.stage.kind === "warning" && (
         <IdleNotice
-          kind={idlePolicy === SURVEY_IDLE || idlePolicy === PAUSED_IDLE ? "survey" : "hand-back"}
+          kind={idlePolicy === surveyIdle || idlePolicy === pausedIdle ? "survey" : "hand-back"}
           secondsLeft={idle.stage.secondsLeft}
           onStillHere={idle.stillHere}
         />

@@ -892,3 +892,18 @@ on early.
   have it. Code 10 means none: it is not above 9 ("7 hours or more") on the scale,
   so recode it to 0 minutes (or as its own group) before treating the bands as
   ordered. `studio-ops add-option` adds an option with a new code.
+
+### No timeout in a sitting's first 90 minutes (2026-11-02, D-74)
+
+**Asked.** "Maybe people shouldn't time out — perhaps they have 90 minutes to
+complete from beginning."
+
+**Changed.** From the moment a sitting starts (its first start, also when it is
+carried on later), nothing on its screens times out for 90 minutes, however long
+they are left — a question, a check-in, or "Paused". After that the usual rule
+applies: ten quiet minutes, then "Are you still there?" for a minute, then the
+start screen, the sitting kept and resumable. A screen left untouched through the
+90-minute mark is asked straight away, with the full minute's countdown. The
+finish and review screens keep their two minutes: the sitting is saved there, and
+they show the participant's name and answers. `lib/idle.ts` `sittingIdle`,
+`SITTING_WINDOW_MS`.
