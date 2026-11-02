@@ -10,6 +10,7 @@ import {
   outline,
   parseDraft,
   removeBlock,
+  reorderSection,
   repositoryModuleFragment,
   serialiseDraft,
   suggestBump,
@@ -298,6 +299,14 @@ if (command === "list") {
     },
     `Remove ${instruments.join(", ")}`,
   );
+} else if (command === "reorder") {
+  // A section's questions in the order given (every one, by ID); locked questionnaires move whole.
+  const study = studyArg();
+  const surveyId = surveyArg();
+  const sectionKey = flag("section") ?? fail("Say which section with --section.");
+  const order = (flag("order") ?? "").split(",").map((x) => x.trim()).filter(Boolean);
+  if (order.length === 0) fail("Give the order with --order (question IDs, comma-separated).");
+  await editDraft(study, surveyId, (draft) => reorderSection(draft, sectionKey, order).draft, `Reorder “${sectionKey}”`);
 } else if (command === "retitle") {
   // The survey's title (participants see it), on its draft and its Studio listing.
   const study = studyArg();
@@ -340,5 +349,5 @@ if (command === "list") {
     `Form label of ${instrument}: ${label}`,
   );
 } else {
-  fail("Commands: list, questions, grant-owners, insert, remove-blocks, dob-ages, retitle, form-label.");
+  fail("Commands: list, questions, grant-owners, insert, remove-blocks, reorder, dob-ages, retitle, form-label.");
 }

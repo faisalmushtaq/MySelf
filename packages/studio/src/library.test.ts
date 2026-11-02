@@ -38,7 +38,7 @@ import {
   type InsertOptions,
 } from "./library.js";
 import { lockBaseline } from "./locked.js";
-import { findQuestion, StudioOpError } from "./model.js";
+import { findQuestion, outline, StudioOpError } from "./model.js";
 import { BUILT_IN_PROTOCOLS } from "./mystory.js";
 import * as ops from "./ops.js";
 import { validateDraft } from "./validate.js";
@@ -839,6 +839,19 @@ describe("updating a module copy, three ways", () => {
     expect(refusal(() => planModuleUpdate(d, "imp_test", v2, v1)).code).toBe("invalid");
     expect(refusal(() => planModuleUpdate(d, "imp_test", { ...v1, origin: { ...v1Origin, moduleId: "other" } }, v2)).code).toBe("invalid");
     expect(refusal(() => planModuleUpdate(d, "imp_nope", v1, v2)).code).toBe("not_found");
+  });
+});
+
+describe("putting a section in order (D-72)", () => {
+  it("follows the order given, moving a locked questionnaire whole, and refuses an order that misses a question", () => {
+    const live = extractDraft(r800);
+    const keys = outline(live).sections.find((s) => s.key === "social_media")!.blocks.flatMap((b) => b.questions.map((q) => q.itemKey));
+    const doom = keys.filter((k) => k.startsWith("doomscroll4."));
+    const rest = keys.filter((k) => !k.startsWith("doomscroll4."));
+    const order = [...doom, ...rest.slice(1), rest[0]!];
+    const { draft } = ops.reorderSection(live, "social_media", order);
+    expect(outline(draft).sections.find((s) => s.key === "social_media")!.blocks.flatMap((b) => b.questions.map((q) => q.itemKey))).toEqual(order);
+    expect(() => ops.reorderSection(live, "social_media", order.slice(1))).toThrow(/Missing/);
   });
 });
 
