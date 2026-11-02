@@ -1016,6 +1016,46 @@ function orderForm(d: StudioDraft, refKey: string, keys: string[]): void {
 }
 
 /** Move a question within the placement that shows it. */
+/**
+ * Put a section's questions in the order given (every question in it, by ID),
+ * as a researcher would by dragging each in turn to the end. Questions of a
+ * locked questionnaire travel as their whole block, where its first question is
+ * named. Refuses an order that leaves out, or adds, a question.
+ */
+export function reorderSection(draft: StudioDraft, sectionKey: string, order: readonly string[]): { draft: StudioDraft } {
+  let d = draft;
+  const sectionIndex = sectionIndexOf(d, sectionKey);
+  const inSection = () =>
+    placements(d)
+      .filter((p) => p.sectionIndex === sectionIndex)
+      .flatMap((p) => p.items.map((i) => `${p.instrument}.${i.key}`));
+  const now = inSection();
+  const missing = now.filter((k) => !order.includes(k));
+  const extra = order.filter((k) => !now.includes(k));
+  if (missing.length > 0 || extra.length > 0 || new Set(order).size !== order.length) {
+    throw new StudioOpError(
+      `The order must name each question in the section once.${missing.length ? ` Missing: ${missing.join(", ")}.` : ""}${extra.length ? ` Not in the section: ${extra.join(", ")}.` : ""}`,
+      "invalid",
+    );
+  }
+  const moved = new Set<string>();
+  for (const key of order) {
+    const instrument = key.slice(0, key.indexOf("."));
+    if (editTier(d, instrument) !== "editable") {
+      // A locked questionnaire is moved whole, once.
+      if (moved.has(instrument)) continue;
+      moved.add(instrument);
+      const comps = d.composition.sections[sectionIndex]!.components;
+      const at = comps.findIndex((c) => isPlaced(c) && c.ref.instrument === instrument);
+      if (at < 0) continue;
+      d = moveBlock(d, { sectionKey, componentIndex: at }, { sectionKey, index: comps.length - 1 }).draft;
+      continue;
+    }
+    d = moveQuestion(d, key, { sectionKey, index: inSection().length - 1 }).draft;
+  }
+  return { draft: d };
+}
+
 export function reorderQuestion(draft: StudioDraft, itemKey: string, toIndexInPlacement: number): { draft: StudioDraft } {
   const d = clone(draft);
   const q = live(d, itemKey);

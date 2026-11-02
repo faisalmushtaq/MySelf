@@ -837,3 +837,28 @@ partial address counts as an answer, as the question already says. Each ask is
 logged (`skip.prompted`, ask n of 3). Other questions still ask once. This is
 in the app, for the question with the postcode check, so no survey needs
 republishing.
+
+### YBM: the phenotype questions in a sensible order, and views on AI (2026-11-02, D-72)
+
+**Asked.** The phenotype feedback (D-67) "was for YBM"; "think about ordering of
+the questions, they should move smoothly… make sure new questions don't
+duplicate others. And perhaps we could have a question or two on how they use AI
+and perceptions towards it."
+
+**Changed.** `ybm_sm_patterns` is in the YBM draft (not `ybm_phone_pickups`:
+no phones in school). The social-media section is reordered to run from what
+to how much to when to how to how it feels: apps used and time on each; time on
+school and non-school days; times of day, most-used time, sessions or checks,
+first check after waking, night checks; estimated pickups; account, active or
+passive, reasons; the six attention statements with "I lose track of time";
+too much time, limit features, abstaining, family; screen attitudes; the
+doomscrolling items (licensed, kept whole) last. `ybm_ai_views` (two
+study-written questions: trust in what chatbots say, with "I've never used
+one"; good or bad for young people, with "not sure") follows the AI-use
+questions in Phones. `studio-ops reorder` and `reorderSection` put a section in
+a given order; checked against 13.0.0 with no publish problems.
+
+**Duplication.** None outright. Close: "when I wake up in the night" (times of
+day) and the night-checks count; "I realise I've been scrolling without taking
+anything in" and "I lose track of how much time I spend" (attention vs time,
+placed together); "really paying attention" and active/passive use.

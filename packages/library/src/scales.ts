@@ -843,6 +843,41 @@ export const sleepKnow12: ResponseScale = {
   ],
 };
 
+// --- Views on AI chatbots (D-72, study-written) -------------------------------
+
+/** Good or bad for young people, 1 = very bad … 5 = very good; 6 = not sure. */
+export const aiGoodBad: ResponseScale = {
+  key: "scale.ai_good_bad",
+  version: "1.0.0",
+  name: "Whether AI chatbots are good or bad for young people",
+  direction: "ascending",
+  options: [
+    opt(1, "Very bad"),
+    opt(2, "Quite bad"),
+    opt(3, "Neither good nor bad"),
+    opt(4, "Quite good"),
+    opt(5, "Very good"),
+    opt(6, "I'm not sure", undefined, "dont_know"),
+  ],
+  scoringNote: "1-5 ascending; 6 = not sure (missing for analysis).",
+};
+
+/** Trust in what AI chatbots say, 1 = not at all … 4 = completely; 5 = never used one. */
+export const aiTrust: ResponseScale = {
+  key: "scale.ai_trust",
+  version: "1.0.0",
+  name: "How much what AI chatbots say is trusted",
+  direction: "ascending",
+  options: [
+    opt(1, "Not at all"),
+    opt(2, "A little"),
+    opt(3, "Quite a lot"),
+    opt(4, "Completely"),
+    opt(5, "I've never used one", undefined, "not_applicable"),
+  ],
+  scoringNote: "1-4 ascending; 5 = never used one (not applicable).",
+};
+
 // --- Social-media patterns and attention (D-67, study-written) ---------------
 
 /** Times of day; 1-6 in the order a day runs. */
@@ -962,4 +997,6 @@ export const allScales: ResponseScale[] = [
   phonePickupsEstimate,
   phonePickupsAvailable,
   neverAlways4,
+  aiGoodBad,
+  aiTrust,
 ];

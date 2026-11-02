@@ -917,6 +917,37 @@ export const ybmAiUse: ModuleInput = {
 
 // ---------------------------------------------------------------------------
 
+/**
+ * How young people see AI chatbots (D-72): two study-written questions asked
+ * of everyone, after the questions on how they use them (ybm_ai_use). Trust
+ * has its own "never used one" answer rather than a condition, so the module
+ * stands on its own wherever it is added.
+ */
+export const ybmAiViews: ModuleInput = {
+  ...moduleBase,
+  instrument: "ybm_ai_views",
+  name: "YBM views on AI chatbots",
+  construct: "Trust in AI chatbots and whether they are good or bad for young people",
+  forms: [
+    {
+      language: "en-GB",
+      label: "Views on AI chatbots (study-written, D-72)",
+      items: [
+        single("trust", "ai_trust", "", "How much do you trust what AI chatbots tell you?", "scale.ai_trust", {
+          researcherNote: "Study-written (D-72). 5 = never used one; check against ai_use_frequency = Never.",
+        }),
+        single("good_or_bad", "ai_good_bad", "", "Do you think AI chatbots are good or bad for young people your age?", "scale.ai_good_bad", {
+          researcherNote: "Study-written (D-72). Asked of everyone, users or not.",
+        }),
+      ],
+    },
+  ],
+  timeEstimates: est(20, 15),
+  changelog: "1.0 (D-72): two questions on trust in AI chatbots and whether they are good or bad for young people.",
+};
+
+// ---------------------------------------------------------------------------
+
 export const ybmScreenAttitudes: ModuleInput = {
   ...moduleBase,
   instrument: "ybm_screen_attitudes",
@@ -1235,4 +1266,5 @@ export const allModules: ModuleInput[] = attachProvenance([
   ybmAppTime,
   ybmSmPatterns,
   ybmPhonePickups,
+  ybmAiViews,
 ]);

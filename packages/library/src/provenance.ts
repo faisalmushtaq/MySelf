@@ -164,6 +164,13 @@ export const LIBRARY_PROVENANCE: Record<string, ProvenanceInput> = {
     evidence: "None yet; there is no short validated measure of adolescents' AI use (D-59).",
     decisions: ["D-59"],
   },
+  ybm_ai_views: {
+    kind: "researcher_developed",
+    developedBy: TEAM,
+    involvement: [{ group: "YBM research team", role: "asked for questions on perceptions of AI", when: "2026-11" }],
+    evidence: "None yet; study-written, like ybm_ai_use (D-59).",
+    decisions: ["D-72"],
+  },
   ybm_screen_attitudes: { kind: "researcher_developed", developedBy: TEAM, basedOn: QSF, notes: QSF_UNKNOWN, decisions: ["D-07"] },
   ybm_gaming: { kind: "researcher_developed", developedBy: TEAM, basedOn: QSF, notes: QSF_UNKNOWN, decisions: ["D-03"] },
   ybm_future_self: { kind: "researcher_developed", developedBy: TEAM, basedOn: QSF, notes: QSF_UNKNOWN, decisions: ["D-15"] },

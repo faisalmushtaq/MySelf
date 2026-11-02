@@ -7,6 +7,7 @@ name: "Studio: study space housekeeping"
 #                 the project owner role and the dashboard's access list
 #   insert        library questionnaires or modules into a survey's draft
 #   remove-blocks whole questionnaires out of a draft (archived, restorable)
+#   reorder       a section's questions in a given order
 #   dob-ages      the ages a survey's date of birth accepts
 #   retitle       a survey's title; form-label  a questionnaire's form label
 # Without "apply" it is a dry run. Drafts are saved, never published. The
@@ -18,7 +19,7 @@ on:
       command:
         description: "What to do"
         type: choice
-        options: [list, questions, grant-owners, insert, remove-blocks, dob-ages, retitle, form-label]
+        options: [list, questions, grant-owners, insert, remove-blocks, reorder, dob-ages, retitle, form-label]
         default: list
       study:
         description: "Study space id (from list)"
@@ -50,6 +51,10 @@ on:
         default: ""
       max_age:
         description: "Oldest age (dob-ages)"
+        type: string
+        default: ""
+      order:
+        description: "Question IDs in order, comma-separated (reorder)"
         type: string
         default: ""
       match:
@@ -120,6 +125,7 @@ jobs:
           REPLACE: ${{ inputs.replace }}
           MIN_AGE: ${{ inputs.min_age }}
           MAX_AGE: ${{ inputs.max_age }}
+          ORDER: ${{ inputs.order }}
           MATCH: ${{ inputs.match }}
           TITLE: ${{ inputs.title }}
           INSTRUMENTS: ${{ inputs.instruments }}
@@ -130,7 +136,7 @@ jobs:
           node studio-ops.mjs "$COMMAND" --project myself-research \
             ${STUDY:+--study "$STUDY"} ${SURVEY:+--survey "$SURVEY"} ${SECTION:+--section "$SECTION"} \
             ${AFTER:+--after "$AFTER"} ${PIECES:+--pieces "$PIECES"} ${REPLACE:+--replace "$REPLACE"} ${MIN_AGE:+--min-age "$MIN_AGE"} ${MAX_AGE:+--max-age "$MAX_AGE"} \
-            ${MATCH:+--match "$MATCH"} ${TITLE:+--title "$TITLE"} ${INSTRUMENTS:+--instruments "$INSTRUMENTS"} ${INSTRUMENT:+--instrument "$INSTRUMENT"} ${LABEL:+--label "$LABEL"} $APPLY
+            ${ORDER:+--order "$ORDER"} ${MATCH:+--match "$MATCH"} ${TITLE:+--title "$TITLE"} ${INSTRUMENTS:+--instruments "$INSTRUMENTS"} ${INSTRUMENT:+--instrument "$INSTRUMENT"} ${LABEL:+--label "$LABEL"} $APPLY
 
       - name: Shred the credential
         if: always()
