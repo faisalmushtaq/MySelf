@@ -157,8 +157,15 @@ const notice = (page: Page) => page.locator(".survey-notice");
 const heading = (page: Page) => page.locator(".survey h1");
 
 async function start(page: Page, code: string): Promise<void> {
-  await page.locator("input.code").fill(code);
-  await page.locator("button.next.big").click();
+  // On a slow WebKit run the first keystrokes can land before the start screen
+  // has finished settling after a reload, leaving Start disabled with an empty
+  // code: type it again until Start takes it, as a person would.
+  const button = page.locator("button.next.big");
+  await expect(async () => {
+    await page.locator("input.code").fill(code);
+    await expect(button).toBeEnabled({ timeout: 2_000 });
+  }).toPass({ timeout: 20_000 });
+  await button.click();
   await expect(page.locator(".survey")).toBeVisible();
 }
 
