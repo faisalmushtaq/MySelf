@@ -5,6 +5,7 @@ import { FieldValue, getFirestore } from "firebase-admin/firestore";
 import { paths } from "@myself/firebase";
 import {
   addOption,
+  archiveQuestion,
   diffDrafts,
   extractDraft,
   insertFragment,
@@ -321,6 +322,25 @@ if (command === "list") {
       return d;
     },
     `Restore ${items.length} question(s)`,
+  );
+} else if (command === "archive") {
+  // Single questions out of a draft (archived, restorable with restore); not for licensed questionnaires.
+  const study = studyArg();
+  const surveyId = surveyArg();
+  const items = (flag("items") ?? "").split(",").map((x) => x.trim()).filter(Boolean);
+  if (items.length === 0) fail("Say which questions with --items (IDs, comma-separated).");
+  await editDraft(
+    study,
+    surveyId,
+    (draft) => {
+      let d = draft;
+      for (const itemKey of items) {
+        d = archiveQuestion(d, itemKey, ACTOR).draft;
+        console.log(`  ${itemKey}: archived (restorable)`);
+      }
+      return d;
+    },
+    `Archive ${items.length} question(s)`,
   );
 } else if (command === "add-option") {
   // An answer option on a question (and every question sharing its list), with a new code; first on screen with --first.
