@@ -13,7 +13,8 @@ import type { RecordedAnswer } from "./db.js";
  * THE RULE, the simplest one that is safe:
  *
  *   - The sitting holds a date of birth: resume only once the same date is
- *     entered again (`verify`). Three wrong dates and the code cannot be
+ *     entered again, with the initials of the name it holds (`verify`; D-75),
+ *     and the participant has said yes to "is this you?" on seeing the name. Three wrong dates and the code cannot be
  *     resumed on this iPad until staff allow it in the handover panel.
  *   - It holds no date of birth and NO ANSWER AT ALL (stopped on the welcome
  *     or consent screens): resume as before (`open`). There is nothing on it
@@ -32,7 +33,84 @@ import type { RecordedAnswer } from "./db.js";
 
 export const DOB_MAX_ATTEMPTS = 3;
 
-export type ResumeRule = { kind: "verify"; dob: string } | { kind: "open" } | { kind: "fresh" };
+export type ResumeRule = { kind: "verify"; dob: string; who: Who } | { kind: "open" } | { kind: "fresh" };
+
+/**
+ * WHO A SITTING IS (D-75). Twins share a date of birth, so a code and a date
+ * were not enough: one twin carried on the other's sitting, and nothing said
+ * whose it was until the end. So a sitting that holds a name is also checked
+ * by the initials typed with the date, and, once both match, the first name
+ * is shown ("Welcome back, Sam — is this you?") before anything else is.
+ */
+export interface Who {
+  /** As recorded, for the "is this you?" screen; null if none was given. */
+  firstName: string | null;
+  /** The initials the name gives, upper case, letters only; null when there is nothing to check. */
+  initials: { first: string | null; last: string[] } | null;
+}
+
+/** The questions in this release that ask for the first and last name: identifying short-text items stored as first_name / last_name. */
+export function nameKeys(units: readonly PresentableUnit[]): { first?: string; last?: string } {
+  const named = (name: string) =>
+    units.find((u) => u.item.identifying && u.item.responseType === "text_short" && (u.item.variable === name || u.item.key === name));
+  const first = named("first_name");
+  const last = named("last_name");
+  return { ...(first ? { first: unitKey(first) } : {}), ...(last ? { last: unitKey(last) } : {}) };
+}
+
+/** A name's letters, accents taken off, upper case: "Zoë-Ann" -> "ZOEANN". */
+const letters = (text: string) =>
+  text
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toUpperCase()
+    .replace(/[^A-Z\s'-]/g, "");
+
+/** The first letter of each part of a name: "de Silva" -> ["D", "S"], "O'Neill" -> ["O"]. */
+const wordInitials = (text: string) =>
+  letters(text)
+    .split(/[\s-]+/)
+    .map((w) => w.replace(/[^A-Z]/g, "")[0])
+    .filter((c): c is string => Boolean(c));
+
+const textAnswer = (answers: ReadonlyMap<string, RecordedAnswer>, key: string | undefined) => {
+  const a = key ? answers.get(key) : undefined;
+  return a?.status === "answered" && a.value?.kind === "text" && a.value.value.trim() ? a.value.value.trim() : null;
+};
+
+/** Who a sitting is, from its answers. */
+export function whoOf(answers: ReadonlyMap<string, RecordedAnswer>, keys: { first?: string; last?: string }): Who {
+  const firstName = textAnswer(answers, keys.first);
+  const lastName = textAnswer(answers, keys.last);
+  const first = firstName ? (wordInitials(firstName)[0] ?? null) : null;
+  const last = lastName ? wordInitials(lastName) : [];
+  return { firstName, initials: first || last.length > 0 ? { first, last } : null };
+}
+
+/** Initials for the staff list: "S.K.", or null. */
+export function initialsLabel(who: Who): string | null {
+  if (!who.initials) return null;
+  const parts = [who.initials.first, who.initials.last[0] ?? null].filter(Boolean);
+  return parts.length ? `${parts.join(".")}.` : null;
+}
+
+/**
+ * Whether typed initials are this sitting's. The first letter is the first
+ * name's; the last is any part of the surname's ("de Silva": D or S). A middle
+ * initial in between is allowed. Nothing typed never matches a sitting that has
+ * initials to check.
+ */
+export function initialsMatch(who: Who, typed: string): boolean {
+  if (!who.initials) return true;
+  const t = letters(typed).replace(/[^A-Z]/g, "");
+  const { first, last } = who.initials;
+  if (first && last.length > 0) return t.length >= 2 && t[0] === first && last.includes(t[t.length - 1]!);
+  if (first) return t[0] === first;
+  return t.length > 0 && last.includes(t[t.length - 1]!);
+}
+
+/** Whether the screen should ask for initials at all. */
+export const asksInitials = (who: Who) => who.initials !== null;
 
 /**
  * The question in this release that asks for the date of birth: a date item
@@ -59,11 +137,15 @@ export function dobMatches(recorded: string, typed: string): boolean {
 }
 
 /** Which of the three rules above a sitting falls under, from its decrypted answers. */
-export function resumeRule(answers: ReadonlyMap<string, RecordedAnswer>, dobKey: string | undefined): ResumeRule {
+export function resumeRule(
+  answers: ReadonlyMap<string, RecordedAnswer>,
+  dobKey: string | undefined,
+  names: { first?: string; last?: string } = {},
+): ResumeRule {
   const dob = dobKey ? answers.get(dobKey) : undefined;
   if (dob?.status === "answered" && dob.value?.kind === "date") {
     const day = dayOf(dob.value.iso);
-    if (day) return { kind: "verify", dob: day };
+    if (day) return { kind: "verify", dob: day, who: whoOf(answers, names) };
   }
   for (const answer of answers.values()) if (answer.status === "answered") return { kind: "fresh" };
   return { kind: "open" };
@@ -86,9 +168,10 @@ export type DobAttempt =
  * code is refused without looking at the date, so the right one cannot be
  * found by carrying on guessing. A right date clears the count.
  */
-export function tryDob(recorded: string, typed: string, guard: DobGuard | null, now: Date): DobAttempt {
+export function tryDob(recorded: string, typed: string, guard: DobGuard | null, now: Date, initials?: { who: Who; typed: string }): DobAttempt {
   if (guard?.lockedAt) return { kind: "locked", guard };
-  if (dobMatches(recorded, typed)) return { kind: "accepted", guard: null };
+  // One answer for both: a wrong try never says which of the two was right.
+  if (dobMatches(recorded, typed) && (!initials || initialsMatch(initials.who, initials.typed))) return { kind: "accepted", guard: null };
   const failures = (guard?.failures ?? 0) + 1;
   if (failures >= DOB_MAX_ATTEMPTS) return { kind: "locked", guard: { failures, lockedAt: now.toISOString() } };
   return { kind: "refused", guard: { failures, lockedAt: null }, triesLeft: DOB_MAX_ATTEMPTS - failures };

@@ -24,7 +24,7 @@ import {
   type SessionRow,
   type StoredSessionCounts,
 } from "./lib/db.js";
-import { dobUnit, resumeRule, tryDob, unitKey } from "./lib/dob.js";
+import { asksInitials, dobUnit, initialsLabel, nameKeys, resumeRule, tryDob, unitKey, whoOf, type Who } from "./lib/dob.js";
 import { HAND_BACK_IDLE, PAUSED_IDLE, SURVEY_IDLE, sittingIdle, useIdleTimer, type IdlePolicy } from "./lib/idle.js";
 import {
   applyAccessibilityPreferences,
@@ -62,6 +62,7 @@ import { ReviewScreen } from "./components/ReviewScreen.js";
 import { SurveyScreen } from "./components/SurveyScreen.js";
 import { CheckInScreen } from "./screens/CheckInScreen.js";
 import { DobCheckScreen } from "./screens/DobCheckScreen.js";
+import { IsThisYouScreen } from "./screens/IsThisYouScreen.js";
 import { IdleNotice } from "./screens/IdleNotice.js";
 import { FinishScreen } from "./screens/FinishScreen.js";
 import { EndedScreen } from "./screens/EndedScreen.js";
@@ -121,7 +122,23 @@ type Phase =
       answers: Map<string, RecordedAnswer>;
       dob: string;
       item: ItemDefinition;
+      who: Who;
+    }
+  /**
+   * The checks passed, or staff chose the sitting from the panel: its first
+   * name is shown, "is this you?", before anything of it is (D-75).
+   */
+  | {
+      kind: "confirm";
+      session: SessionRow;
+      runtime: Runtime;
+      answers: Map<string, RecordedAnswer>;
+      firstName: string;
+      byStaff: boolean;
     };
+
+/** Said on the start screen after "No, that's not me" (D-75). */
+const NOT_THEIR_SITTING = "That sitting isn't yours, so it hasn't been opened. Please check your code with a member of the research team.";
 
 /** Said on the start screen to a code that has had three wrong dates of birth on this iPad. */
 const RESUME_LOCKED = "This code can't be carried on with on this iPad. Please ask a member of the research team.";
@@ -301,6 +318,8 @@ export default function App({ initial, initialRuntime }: { initial: Startup; ini
   const [wrapUpBusy, setWrapUpBusy] = useState(false);
   /** Today's unfinished sittings of this survey, for the panel's "Carry on" (D-73). */
   const [unfinishedHere, setUnfinishedHere] = useState<SessionRow[]>([]);
+  /** The initials of each sitting in the staff list, so staff can tell twins' codes apart (D-75). */
+  const [unfinishedInitials, setUnfinishedInitials] = useState<Record<string, string>>({});
   /** Codes refused three wrong dates of birth here, for the panel. */
   const [lockedCodes, setLockedCodes] = useState<string[]>([]);
   /** The date-of-birth check's last verdict, while it is on screen. */
@@ -326,8 +345,20 @@ export default function App({ initial, initialRuntime }: { initial: Startup; ini
     }
     setHandoverOpen(true);
     void recentUnfinished(choiceRef.current, UNFINISHED_WITHIN_MS)
-      .then(setUnfinishedHere)
-      .catch(() => setUnfinishedHere([]));
+      .then(async (rows) => {
+        setUnfinishedHere(rows);
+        const keys = nameKeys(runtimeRef.current?.flattened.units ?? []);
+        const labels: Record<string, string> = {};
+        for (const row of rows) {
+          const label = initialsLabel(whoOf(await loadAnswers(row.sessionId), keys));
+          if (label) labels[row.sessionId] = label;
+        }
+        setUnfinishedInitials(labels);
+      })
+      .catch(() => {
+        setUnfinishedHere([]);
+        setUnfinishedInitials({});
+      });
     void lockedResumeCodes()
       .then(setLockedCodes)
       .catch(() => setLockedCodes([]));
@@ -810,23 +841,30 @@ export default function App({ initial, initialRuntime }: { initial: Startup; ini
    * iPad, and the third wrong one locks the code until staff allow it again.
    */
   const confirmDob = useCallback(
-    async (typed: string) => {
+    async (typed: string, typedInitials: string) => {
       const verify = phaseRef.current;
       if (verify.kind !== "verify" || busy) return;
       setBusy(true);
       starting.current = true;
       try {
         const code = verify.session.participantCode;
-        const attempt = tryDob(verify.dob, typed, await getResumeGuard(code), new Date());
+        const withInitials = asksInitials(verify.who);
+        const attempt = tryDob(verify.dob, typed, await getResumeGuard(code), new Date(), withInitials ? { who: verify.who, typed: typedInitials } : undefined);
         await saveResumeGuard(code, attempt.guard);
         if (attempt.kind === "accepted") {
           setDobNote({ text: null, locked: false });
-          await begin(code, verify.session, verify.runtime, verify.answers);
+          if (verify.who.firstName) {
+            const confirm: Phase = { kind: "confirm", session: verify.session, runtime: verify.runtime, answers: verify.answers, firstName: verify.who.firstName, byStaff: false };
+            phaseRef.current = confirm;
+            setPhase(confirm);
+          } else {
+            await begin(code, verify.session, verify.runtime, verify.answers);
+          }
         } else if (attempt.kind === "locked") {
           setDobNote({ text: null, locked: true });
         } else {
           setDobNote({
-            text: `That date doesn't match. Please check it and try again (${attempt.triesLeft} ${attempt.triesLeft === 1 ? "try" : "tries"} left).`,
+            text: `${withInitials ? "That doesn't match. Please check your date of birth and initials" : "That date doesn't match. Please check it"} and try again (${attempt.triesLeft} ${attempt.triesLeft === 1 ? "try" : "tries"} left).`,
             locked: false,
           });
         }
@@ -856,9 +894,18 @@ export default function App({ initial, initialRuntime }: { initial: Startup; ini
           setCodeError("That sitting can't be carried on here any more. Ask the participant to type their code.");
           return;
         }
-        await appendEvent(found.session, "session.resumed_by_staff", undefined, undefined, found.session.currentIndex, tMono());
+        const answers = await loadAnswers(found.session.sessionId);
+        const who = whoOf(answers, nameKeys(found.runtime.flattened.units));
         setCode(row.participantCode);
-        await begin(row.participantCode, found.session, found.runtime, null);
+        if (who.firstName) {
+          // The participant says it is theirs before it opens (D-75); the log records the staff resume then.
+          const confirm: Phase = { kind: "confirm", session: found.session, runtime: found.runtime, answers, firstName: who.firstName, byStaff: true };
+          phaseRef.current = confirm;
+          setPhase(confirm);
+          return;
+        }
+        await appendEvent(found.session, "session.resumed_by_staff", undefined, undefined, found.session.currentIndex, tMono());
+        await begin(row.participantCode, found.session, found.runtime, answers);
       } finally {
         starting.current = false;
         setBusy(false);
@@ -866,6 +913,21 @@ export default function App({ initial, initialRuntime }: { initial: Startup; ini
     },
     [unfinishedHere, busy, runtime, resumeLookup, begin, closeStaffPanel],
   );
+
+  /** "Yes, that's me" (D-75): the sitting carries on where it stopped. */
+  const confirmItsThem = useCallback(async () => {
+    const confirm = phaseRef.current;
+    if (confirm.kind !== "confirm" || busy) return;
+    setBusy(true);
+    starting.current = true;
+    try {
+      if (confirm.byStaff) await appendEvent(confirm.session, "session.resumed_by_staff", undefined, undefined, confirm.session.currentIndex, tMono());
+      await begin(confirm.session.participantCode, confirm.session, confirm.runtime, confirm.answers);
+    } finally {
+      starting.current = false;
+      setBusy(false);
+    }
+  }, [busy, begin]);
 
   const start = useCallback(async () => {
     const trimmed = code.trim();
@@ -905,14 +967,14 @@ export default function App({ initial, initialRuntime }: { initial: Startup; ini
          */
         answers = await loadAnswers(existing.sessionId);
         const dob = dobUnit(rt.flattened.units);
-        const rule = resumeRule(answers, dob ? unitKey(dob) : undefined);
+        const rule = resumeRule(answers, dob ? unitKey(dob) : undefined, nameKeys(rt.flattened.units));
         if (rule.kind === "verify" && dob) {
           if ((await getResumeGuard(trimmed))?.lockedAt) {
             setCodeError(RESUME_LOCKED);
             return;
           }
           setDobNote({ text: null, locked: false });
-          const verify: Phase = { kind: "verify", session: existing, runtime: rt, answers, dob: rule.dob, item: dob.item };
+          const verify: Phase = { kind: "verify", session: existing, runtime: rt, answers, dob: rule.dob, item: dob.item, who: rule.who };
           phaseRef.current = verify;
           setPhase(verify);
           return;
@@ -1312,7 +1374,7 @@ export default function App({ initial, initialRuntime }: { initial: Startup; ini
   const pausedIdle = useMemo(() => (sittingStartedAt ? sittingIdle(PAUSED_IDLE, sittingStartedAt) : PAUSED_IDLE), [sittingStartedAt]);
   const idlePolicy: IdlePolicy | null = saveError
     ? null
-    : phase.kind === "finished" || phase.kind === "ended" || phase.kind === "review" || phase.kind === "verify" || (phase.kind === "running" && phase.fromReview)
+    : phase.kind === "finished" || phase.kind === "ended" || phase.kind === "review" || phase.kind === "verify" || phase.kind === "confirm" || (phase.kind === "running" && phase.fromReview)
       ? HAND_BACK_IDLE
       : phase.kind === "running" || phase.kind === "checkin" || phase.kind === "pace"
         ? surveyIdle
@@ -1415,6 +1477,7 @@ export default function App({ initial, initialRuntime }: { initial: Startup; ini
         closeStaffPanel();
         return;
       case "verify":
+      case "confirm":
       case "finished":
       case "ended":
         handover();
@@ -1590,7 +1653,13 @@ export default function App({ initial, initialRuntime }: { initial: Startup; ini
               syncNote={syncNote}
               handoverNote={handoverNote}
               lockedCodes={lockedCodes}
-              unfinished={unfinishedHere.map((u) => ({ sessionId: u.sessionId, code: u.participantCode, startedAt: u.startedAt, updatedAt: u.updatedAt }))}
+              unfinished={unfinishedHere.map((u) => ({
+                sessionId: u.sessionId,
+                code: u.participantCode,
+                initials: unfinishedInitials[u.sessionId] ?? null,
+                startedAt: u.startedAt,
+                updatedAt: u.updatedAt,
+              }))}
               onCarryOn={(sessionId) => void staffCarryOn(sessionId)}
               onAllowResume={(allowed) => {
                 void (async () => {
@@ -1609,11 +1678,24 @@ export default function App({ initial, initialRuntime }: { initial: Startup; ini
           // A new control for every check, so nothing typed for one code is left for the next.
           key={phase.session.sessionId}
           item={phase.item}
+          askInitials={asksInitials(phase.who)}
           note={dobNote.text}
           locked={dobNote.locked}
           busy={busy}
-          onCheck={(iso) => void confirmDob(iso)}
+          onCheck={(iso, initials) => void confirmDob(iso, initials)}
           onCancel={handover}
+        />
+      )}
+
+      {phase.kind === "confirm" && (
+        <IsThisYouScreen
+          firstName={phase.firstName}
+          busy={busy}
+          onYes={() => void confirmItsThem()}
+          onNo={() => {
+            handover();
+            setCodeError(NOT_THEIR_SITTING);
+          }}
         />
       )}
 

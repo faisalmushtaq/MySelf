@@ -235,13 +235,45 @@ async function walkPastDateOfBirth(page: Page, limit = 30): Promise<void> {
   throw new Error(`did not get past the date of birth within ${limit} screens`);
 }
 
+/** As `walkPastDateOfBirth`, giving a real name, so the sitting has initials to check (D-75). */
+async function walkPastDateOfBirthAs(page: Page, first: string, last: string, limit = 30): Promise<void> {
+  const onDob = async () => (await page.locator('.survey-body input[type="date"]:visible').count()) > 0;
+  let seen = false;
+  for (let screens = 0; screens < limit; screens += 1) {
+    seen ||= await onDob();
+    const body = (await page.locator(".survey-body").textContent()) ?? "";
+    const name = /first name/i.test(body) ? first : /last name/i.test(body) ? last : null;
+    if (name) {
+      const before = await position(page);
+      await page.locator(".survey-body input.text-input:visible").fill(name);
+      await advance(page);
+      await expect.poll(() => position(page)).not.toBe(before);
+    } else {
+      await step(page);
+    }
+    if (seen && !(await onDob())) return;
+  }
+  throw new Error(`did not get past the date of birth within ${limit} screens`);
+}
+
 /** The check a code that matches an unfinished sitting meets: its date of birth. */
 async function carryOnWith(page: Page, dob: string): Promise<void> {
   const check = page.locator(".screen.dob-check");
   await expect(check).toContainText("To carry on, enter your date of birth");
   await check.locator('input[type="date"]').fill(dob);
+  // The walk gives names with no letters in them ("1"), so no initials are asked.
+  await expect(check.locator("input.initials")).toHaveCount(0);
   await check.getByRole("button", { name: "Carry on" }).click();
   await expect(check).toHaveCount(0);
+  await saysItsThem(page);
+}
+
+/** "Welcome back, … — is this you?" (D-75): yes. */
+async function saysItsThem(page: Page): Promise<void> {
+  const confirm = page.locator(".screen.is-this-you");
+  await expect(confirm).toContainText("Is this you?");
+  await confirm.getByRole("button", { name: "Yes, that's me" }).click();
+  await expect(confirm).toHaveCount(0);
 }
 
 test.describe("a sitting on a device with no study configured", () => {
@@ -536,6 +568,55 @@ test.describe("a shared iPad", () => {
     await page.locator("button.next.big").click();
     await carryOnWith(page, DOB);
     await expect(page.locator(".survey")).toBeVisible();
+    expect(await position(page)).toBe(where);
+    expect(await countRows(page, "sessions")).toBe(1);
+  });
+
+  test("tells twins apart: the date of birth and the initials, then 'is this you?' (D-75)", async ({ page }) => {
+    await startSitting(page);
+    await walkPastDateOfBirthAs(page, "Sam", "Khan");
+    const where = await position(page);
+
+    // Her twin: the same code (swapped cards), the same birthday, her own initials. Refused, and nothing shown.
+    await page.reload();
+    await page.locator("input.code").fill(CODE);
+    await page.locator("button.next.big").click();
+    const check = page.locator(".screen.dob-check");
+    await expect(check).toContainText("enter your date of birth and your initials");
+    await check.locator('input[type="date"]').fill(DOB);
+    await check.locator("input.initials").fill("ak");
+    await check.getByRole("button", { name: "Carry on" }).click();
+    await expect(check.locator(".error")).toContainText("That doesn't match");
+    await expect(page.locator(".survey, .screen.is-this-you")).toHaveCount(0);
+
+    // Sam: her initials, then her name, then her sitting where it stopped.
+    await check.locator("input.initials").fill("sk");
+    await check.getByRole("button", { name: "Carry on" }).click();
+    const confirm = page.locator(".screen.is-this-you");
+    await expect(confirm).toContainText("Welcome back, Sam!");
+    await expect(page.locator(".survey")).toHaveCount(0);
+
+    // "No, that's not me" opens nothing, and says to check the code.
+    await confirm.getByRole("button", { name: "No, that's not me" }).click();
+    await expect(page.locator(".code-field .error")).toContainText("check your code");
+    await page.locator("input.code").fill(CODE);
+    await page.locator("button.next.big").click();
+    await check.locator('input[type="date"]').fill(DOB);
+    await check.locator("input.initials").fill("SK");
+    await check.getByRole("button", { name: "Carry on" }).click();
+    await saysItsThem(page);
+    await expect(page.locator(".survey")).toBeVisible();
+    expect(await position(page)).toBe(where);
+
+    // The staff list shows initials beside the code, and staff resumes ask "is this you?" too.
+    await page.reload();
+    await openStaffPanel(page);
+    const carryOn = page.locator(".handover").getByRole("button", { name: new RegExp(`Carry on ${CODE}`) });
+    await expect(carryOn).toContainText("S.K.");
+    await expect(carryOn).not.toContainText("Sam");
+    await carryOn.click();
+    await expect(page.locator(".screen.is-this-you")).toContainText("Welcome back, Sam!");
+    await saysItsThem(page);
     expect(await position(page)).toBe(where);
     expect(await countRows(page, "sessions")).toBe(1);
   });

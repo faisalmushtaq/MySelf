@@ -52,7 +52,7 @@ export interface HandoverPanelProps {
   lockedCodes: string[];
   onAllowResume: (code: string) => void;
   /** Unfinished sittings of this survey from today, which staff can carry on without a date of birth (D-73). */
-  unfinished: { sessionId: string; code: string; startedAt: string; updatedAt: string }[];
+  unfinished: { sessionId: string; code: string; initials: string | null; startedAt: string; updatedAt: string }[];
   onCarryOn: (sessionId: string) => void;
 }
 
@@ -130,12 +130,14 @@ export function HandoverPanel({
           <h3>Carry on an unfinished sitting</h3>
           <p className="hint">
             Sittings on this iPad that stopped part-way today — timed out while a headset went on, say. Carrying one on starts at the question
-            it stopped on, with no date of birth asked. Check who is holding the iPad first.
+            it stopped on, with no date of birth asked; the participant is shown their first name and asked "is this you?" first. Check the
+            initials against who is holding the iPad.
           </p>
           <div className="handover-actions">
             {unfinished.map((u) => (
               <button key={u.sessionId} type="button" className="secondary" onClick={() => onCarryOn(u.sessionId)}>
-                Carry on {u.code} (started {time(u.startedAt)}, last {time(u.updatedAt)})
+                Carry on {u.code}
+                {u.initials ? ` · ${u.initials}` : ""} (started {time(u.startedAt)}, last {time(u.updatedAt)})
               </button>
             ))}
           </div>
