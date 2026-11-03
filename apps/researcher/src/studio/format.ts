@@ -89,7 +89,11 @@ export const ROLE_DESCRIPTIONS: Record<StudioRole, string> = {
 
 /** Save a string as a file, the way the researcher view downloads exports. */
 export function downloadText(text: string, filename: string, type = "application/json"): void {
-  const blob = new Blob([text], { type });
+  downloadBlob(new Blob([text], { type }), filename);
+}
+
+/** Save a file the page made (a Word file, a PDF) under `filename`. */
+export function downloadBlob(blob: Blob, filename: string): void {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
