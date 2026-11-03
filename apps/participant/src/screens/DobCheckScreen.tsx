@@ -11,29 +11,29 @@ import { DateControl } from "../components/controls/DateControl.js";
  * survey uses, so the picker, its limits and the "that makes you 12" read-back
  * are the ones the child met the first time. Nothing from the sitting is on
  * this screen: not the name, not the date being checked against. A sitting
- * that holds a name asks for its initials as well (D-75): twins share a date.
+ * that holds a first name asks for it as well (D-75): twins share a date.
  */
 export interface DobCheckScreenProps {
   /** The release's date-of-birth question, for the control. */
   item: ItemDefinition;
-  /** Ask for initials too: the sitting holds a name (D-75). */
-  askInitials: boolean;
+  /** Ask for the first name too: the sitting holds one (D-75). */
+  askName: boolean;
   /** What the last try found, if it was wrong. */
   note: string | null;
   /** Three wrong dates: no more tries on this iPad until staff allow it. */
   locked: boolean;
   busy: boolean;
-  onCheck: (iso: string, initials: string) => void;
+  onCheck: (iso: string, firstName: string) => void;
   /** Back to the start screen, carrying on nothing. */
   onCancel: () => void;
 }
 
-export function DobCheckScreen({ item, askInitials, note, locked, busy, onCheck, onCancel }: DobCheckScreenProps) {
+export function DobCheckScreen({ item, askName, note, locked, busy, onCheck, onCancel }: DobCheckScreenProps) {
   const [value, setValue] = useState<AnswerValue | undefined>(undefined);
   const [ok, setOk] = useState(false);
-  const [initials, setInitials] = useState("");
+  const [name, setName] = useState("");
   const iso = value?.kind === "date" ? value.iso : "";
-  const ready = ok && Boolean(iso) && (!askInitials || initials.replace(/[^\p{L}]/gu, "").length >= 1);
+  const ready = ok && Boolean(iso) && (!askName || name.trim().length > 0);
 
   if (locked) {
     return (
@@ -52,7 +52,23 @@ export function DobCheckScreen({ item, askInitials, note, locked, busy, onCheck,
   return (
     <div className="screen checkin dob-check">
       <h1>Welcome back</h1>
-      <p>{askInitials ? "To carry on, enter your date of birth and your initials." : "To carry on, enter your date of birth."}</p>
+      <p>{askName ? "To carry on, enter your first name and your date of birth." : "To carry on, enter your date of birth."}</p>
+      {askName && (
+        <label className="name-field">
+          <span>Your first name</span>
+          <input
+            type="text"
+            className="text-input first-name"
+            value={name}
+            maxLength={100}
+            autoCapitalize="words"
+            autoComplete="off"
+            autoCorrect="off"
+            spellCheck={false}
+            onChange={(e) => setName(e.target.value)}
+          />
+        </label>
+      )}
       <DateControl
         item={item}
         value={value}
@@ -62,36 +78,17 @@ export function DobCheckScreen({ item, askInitials, note, locked, busy, onCheck,
         }}
         onValidity={(state) => setOk(state.ok && state.complete)}
         onSubmit={() => {
-          if (ready && !busy) onCheck(iso, initials);
+          if (ready && !busy) onCheck(iso, name);
         }}
       />
-      {askInitials && (
-        <label className="initials-field">
-          <span>Your initials (the first letter of your first name and your last name)</span>
-          <input
-            type="text"
-            className="text-input initials"
-            value={initials}
-            maxLength={4}
-            autoCapitalize="characters"
-            autoComplete="off"
-            autoCorrect="off"
-            spellCheck={false}
-            placeholder="e.g. SK"
-            onChange={(e) => setInitials(e.target.value.toUpperCase())}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && ready && !busy) onCheck(iso, initials);
-            }}
-          />
-        </label>
-      )}
+
       {note && (
         <p className="error" role="alert">
           {note}
         </p>
       )}
       <div className="checkin-actions">
-        <button type="button" className="next big" disabled={!ready || busy} onClick={() => onCheck(iso, initials)}>
+        <button type="button" className="next big" disabled={!ready || busy} onClick={() => onCheck(iso, name)}>
           Carry on
         </button>
         <button type="button" className="decline dob-cancel" onClick={() => onCancel()}>

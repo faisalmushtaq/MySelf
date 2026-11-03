@@ -908,27 +908,27 @@ finish and review screens keep their two minutes: the sitting is saved there, an
 they show the participant's name and answers. `lib/idle.ts` `sittingIdle`,
 `SITTING_WINDOW_MS`.
 
-### Twins: initials with the date of birth, then "is this you?" (2026-11-03, D-75)
+### Twins: the first name with the date of birth (2026-11-03, D-75)
 
 **Reported.** Resuming worked, but because it checks the date of birth, one
 student carried on her twin's sitting, and nothing said whose it was until the
-end. Asked: "include initials or the ability to choose their name".
+end. Asked: "include initials or the ability to choose their name"; then, of a
+first version that asked for initials, "first name would be better" (twins can
+share initials).
 
-**Changed.** A code that matches an unfinished sitting holding a name now asks
-for the date of birth **and the initials** (first letter of the first name and of
-the last name) on the same screen. Both must match, and a wrong try never says
-which part was wrong; it counts towards the same three tries. Matching ignores
-case, accents and dots, allows a middle initial, and takes any part of a surname
-in parts ("de Silva": D or S). A sitting with no name asks for the date alone, as
-before. Once the checks pass, the participant sees **"Welcome back, Sam! Is this
-you?"** before anything of the sitting: "No, that's not me" opens nothing and
-says to check the code with the research team. The staff "Carry on" list shows
-each code's initials ("NDC0042 · S.K."), never the name, and a staff resume also
-asks "is this you?" first; `session.resumed_by_staff` is logged on the yes.
-`lib/dob.ts` (`whoOf`, `initialsMatch`, `nameKeys`), `IsThisYouScreen`.
+**Changed.** A code that matches an unfinished sitting holding a first name now
+asks for the **first name and the date of birth** on one screen. Both must match
+the sitting, and a wrong try never says which part was wrong; it counts towards
+the same three tries. The name is matched whole, ignoring case, accents, spaces,
+hyphens and apostrophes ("Mary Jane" = "Mary-Jane"), but never a part of it
+("Mary" does not open Mary-Jane's or Mary-Kate's sitting). A sitting with no first
+name asks for the date alone, as before. The staff "Carry on" list shows each
+code's initials ("NDC0042 · S.K."), never the name; a staff resume shows the
+first name, **"Welcome back, Sam! Is this you?"**, before anything of the
+sitting, and "No, that's not me" opens nothing. `session.resumed_by_staff` is
+logged on the yes. `lib/dob.ts` (`whoOf`, `firstNameMatches`, `nameKeys`),
+`IsThisYouScreen`.
 
 **Not chosen.** A list of names to pick from: it would show the names of everyone
-with unfinished sittings to whoever typed a code. Showing the first name only
-after the date and initials match keeps the earlier rule that nothing about a
-sitting is shown to someone who has not shown it is theirs. Twins who share both
-initials are still told apart by "is this you?".
+with unfinished sittings to whoever typed a code. Typing the name shows nothing
+to someone who does not already know it.

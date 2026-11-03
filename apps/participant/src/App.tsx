@@ -24,7 +24,7 @@ import {
   type SessionRow,
   type StoredSessionCounts,
 } from "./lib/db.js";
-import { asksInitials, dobUnit, initialsLabel, nameKeys, resumeRule, tryDob, unitKey, whoOf, type Who } from "./lib/dob.js";
+import { asksFirstName, dobUnit, initialsLabel, nameKeys, resumeRule, tryDob, unitKey, whoOf, type Who } from "./lib/dob.js";
 import { HAND_BACK_IDLE, PAUSED_IDLE, SURVEY_IDLE, sittingIdle, useIdleTimer, type IdlePolicy } from "./lib/idle.js";
 import {
   applyAccessibilityPreferences,
@@ -125,8 +125,9 @@ type Phase =
       who: Who;
     }
   /**
-   * The checks passed, or staff chose the sitting from the panel: its first
-   * name is shown, "is this you?", before anything of it is (D-75).
+   * Staff chose the sitting from the panel: its first name is shown, "is this
+   * you?", before anything of it is (D-75). (A participant resuming with their
+   * code has just typed it.)
    */
   | {
       kind: "confirm";
@@ -841,30 +842,24 @@ export default function App({ initial, initialRuntime }: { initial: Startup; ini
    * iPad, and the third wrong one locks the code until staff allow it again.
    */
   const confirmDob = useCallback(
-    async (typed: string, typedInitials: string) => {
+    async (typed: string, typedName: string) => {
       const verify = phaseRef.current;
       if (verify.kind !== "verify" || busy) return;
       setBusy(true);
       starting.current = true;
       try {
         const code = verify.session.participantCode;
-        const withInitials = asksInitials(verify.who);
-        const attempt = tryDob(verify.dob, typed, await getResumeGuard(code), new Date(), withInitials ? { who: verify.who, typed: typedInitials } : undefined);
+        const withName = asksFirstName(verify.who);
+        const attempt = tryDob(verify.dob, typed, await getResumeGuard(code), new Date(), withName ? { who: verify.who, typed: typedName } : undefined);
         await saveResumeGuard(code, attempt.guard);
         if (attempt.kind === "accepted") {
           setDobNote({ text: null, locked: false });
-          if (verify.who.firstName) {
-            const confirm: Phase = { kind: "confirm", session: verify.session, runtime: verify.runtime, answers: verify.answers, firstName: verify.who.firstName, byStaff: false };
-            phaseRef.current = confirm;
-            setPhase(confirm);
-          } else {
-            await begin(code, verify.session, verify.runtime, verify.answers);
-          }
+          await begin(code, verify.session, verify.runtime, verify.answers);
         } else if (attempt.kind === "locked") {
           setDobNote({ text: null, locked: true });
         } else {
           setDobNote({
-            text: `${withInitials ? "That doesn't match. Please check your date of birth and initials" : "That date doesn't match. Please check it"} and try again (${attempt.triesLeft} ${attempt.triesLeft === 1 ? "try" : "tries"} left).`,
+            text: `${withName ? "That doesn't match. Please check your first name and date of birth" : "That date doesn't match. Please check it"} and try again (${attempt.triesLeft} ${attempt.triesLeft === 1 ? "try" : "tries"} left).`,
             locked: false,
           });
         }
@@ -1678,11 +1673,11 @@ export default function App({ initial, initialRuntime }: { initial: Startup; ini
           // A new control for every check, so nothing typed for one code is left for the next.
           key={phase.session.sessionId}
           item={phase.item}
-          askInitials={asksInitials(phase.who)}
+          askName={asksFirstName(phase.who)}
           note={dobNote.text}
           locked={dobNote.locked}
           busy={busy}
-          onCheck={(iso, initials) => void confirmDob(iso, initials)}
+          onCheck={(iso, name) => void confirmDob(iso, name)}
           onCancel={handover}
         />
       )}
