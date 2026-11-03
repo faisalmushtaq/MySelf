@@ -932,3 +932,20 @@ logged on the yes. `lib/dob.ts` (`whoOf`, `firstNameMatches`, `nameKeys`),
 **Not chosen.** A list of names to pick from: it would show the names of everyone
 with unfinished sittings to whoever typed a code. Typing the name shows nothing
 to someone who does not already know it.
+
+### Versions download as Word and PDF (2026-11-03, D-76)
+
+**Asked.** "In versions for the studio it should be possible to export as a Word
+file and a PDF."
+
+**Changed.** Each version's menu on the Studio's Versions page now has
+**Download questionnaire (Word)** and **Download questionnaire (PDF)**, beside
+the manifest. Both hold what the archive's questionnaire holds (D-60): every
+section, block and question in order, answer options with their codes, the
+variable each answer is stored under, required or not, and when it is shown,
+in words. `questionnaireDocument` (packages/studio) says what the document
+holds; the archive's HTML and the Studio's Word (`docx`) and PDF (`pdfmake`)
+files are all laid out from it, so they cannot disagree. The files are made in
+the browser from the release already loaded; nothing is sent anywhere, and the
+libraries load only when a file is asked for. The PDF's font has no emoji, so
+emoji are left out of the PDF; the Word file keeps them.

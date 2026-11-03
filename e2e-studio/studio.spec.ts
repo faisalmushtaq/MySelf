@@ -246,4 +246,17 @@ test("a researcher switches MyStory on, edits its protocol, publishes it, and do
   expect(nine).toContain(",off,,");
   // r8.0.0 was live from the set-up until 9.0.0 was published.
   expect(lines.find((l) => l.startsWith("8.0.0,"))).toMatch(/ to \d{4}-[^ ]+ \(set up from the live survey\),$/);
+
+  // ── The questionnaire as Word and PDF (D-76) ──────────────────────────────
+  for (const [item, ext, magic] of [
+    ["Download questionnaire (Word)", "docx", "PK"],
+    ["Download questionnaire (PDF)", "pdf", "%PDF-"],
+  ] as const) {
+    await page.getByRole("button", { name: /More actions for r10\.0\.0/ }).click();
+    const [file] = await Promise.all([page.waitForEvent("download", { timeout: 60_000 }), page.getByRole("menuitem", { name: item }).click()]);
+    expect(file.suggestedFilename()).toBe(`ybm_nd2026_standard_v10.0.0_questionnaire.${ext}`);
+    const bytes = await readFile((await file.path())!);
+    expect(bytes.subarray(0, magic.length).toString("latin1")).toBe(magic);
+    expect(bytes.length).toBeGreaterThan(10_000);
+  }
 });

@@ -21,4 +21,13 @@ export {
 export { checkChosenVersion, diffDrafts, minimumVersion, nextVersion, suggestBump, type VersionCheck } from "./diff.js";
 export { manifestIndex, publishedProtocols, publishedScaleCodes, reservedFrom, type ManifestIndex, type ReservedIds } from "./history.js";
 export * from "./library.js";
-export { questionnaireHtml, type QuestionnaireMeta } from "./questionnaire.js";
+export {
+  NO_CHANGES,
+  questionnaireDocument,
+  questionnaireFilename,
+  questionnaireHtml,
+  type QuestionnaireAnswer,
+  type QuestionnaireDocument,
+  type QuestionnaireMeta,
+  type QuestionnaireQuestion,
+} from "./questionnaire.js";

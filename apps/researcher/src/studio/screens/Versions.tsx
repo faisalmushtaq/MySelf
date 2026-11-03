@@ -1,5 +1,5 @@
 import { useId, useMemo, useState } from "react";
-import { atLeast, extractDraft, type StudioDraft } from "@myself/studio";
+import { atLeast, extractDraft, questionnaireDocument, questionnaireFilename, type StudioDraft } from "@myself/studio";
 import {
   loadAudit,
   studio,
@@ -17,8 +17,9 @@ import {
 import { diffDrafts } from "../data/model-adapter.js";
 import { provenanceCsv, provenanceDocument, provenanceFilename, provenanceRows } from "../data/provenance.js";
 import { loadRelease, useRelease } from "../data/releases.js";
+import { questionnaireDocx, questionnairePdf } from "../data/questionnaire-files.js";
 import { useStudy } from "../router.js";
-import { downloadText, formatDate, formatDateTime, toDate, versionLabel } from "../format.js";
+import { downloadBlob, downloadText, formatDate, formatDateTime, toDate, versionLabel } from "../format.js";
 import { navigate } from "../router.js";
 import { AuditList, ChangeList, LoadError, changeHeadline } from "../shell/common.js";
 import { PageHead } from "../shell/Shell.js";
@@ -283,6 +284,7 @@ function VersionRow({
   onCompare: () => void;
 }) {
   const session = useStudioSession();
+  const study = useStudy();
   const toast = useToast();
   const canPublish = atLeast(session.role, "publisher");
   const [dialog, setDialog] = useState<"restore" | "activate" | null>(null);
@@ -301,7 +303,44 @@ function VersionRow({
       .finally(() => setDownloading(false));
   };
 
+  // The readable questionnaire, as Word or PDF (D-76): the same content as the archive's copy.
+  const [making, setMaking] = useState<"docx" | "pdf" | null>(null);
+  const downloadQuestionnaire = (format: "docx" | "pdf") => {
+    setMaking(format);
+    loadRelease(v.hash)
+      .then(async (r) => {
+        const meta = {
+          study,
+          surveyId: v.surveyId,
+          version: v.version,
+          hash: v.hash,
+          publishedAt: toDate(v.publishedAt)?.toISOString() ?? v.manifestPublishedAt ?? "",
+          publishedBy: v.publishedByEmail ?? (v.source === "repository" ? "the repository" : null),
+          releaseNote: v.releaseNote?.trim() ? v.releaseNote : null,
+          changeSummary: v.changeSummary ?? null,
+          basedOnVersion: v.basedOnVersion ?? null,
+        };
+        const doc = questionnaireDocument(extractDraft(r.raw), meta);
+        const blob = format === "docx" ? await questionnaireDocx(doc) : await questionnairePdf(doc);
+        downloadBlob(blob, questionnaireFilename(meta, format));
+      })
+      .catch((e: unknown) => toast.error(`Couldn’t make the questionnaire for ${label}`, e instanceof Error ? e.message : undefined))
+      .finally(() => setMaking(null));
+  };
+
   const items: MenuItem[] = [
+    {
+      label: making === "docx" ? "Making the Word file…" : "Download questionnaire (Word)",
+      icon: "arrow-down",
+      onSelect: () => downloadQuestionnaire("docx"),
+      disabled: making !== null,
+    },
+    {
+      label: making === "pdf" ? "Making the PDF…" : "Download questionnaire (PDF)",
+      icon: "arrow-down",
+      onSelect: () => downloadQuestionnaire("pdf"),
+      disabled: making !== null,
+    },
     { label: downloading ? "Downloading…" : "Download manifest (JSON)", icon: "arrow-down", onSelect: download, disabled: downloading },
     {
       label: "Restore into draft",
