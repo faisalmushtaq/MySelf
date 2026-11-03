@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { PresentableUnit } from "@myself/engine";
 import type { RecordedAnswer } from "./lib/db.js";
-import { DOB_MAX_ATTEMPTS, dobMatches, dobUnit, resumeRule, tryDob, unitKey } from "./lib/dob.js";
+import { DOB_MAX_ATTEMPTS, dobMatches, dobUnit, initialsLabel, initialsMatch, nameKeys, resumeRule, tryDob, unitKey, whoOf } from "./lib/dob.js";
 import { BUILT_IN } from "./lib/releases.js";
 import { buildRuntime } from "./lib/runtime.js";
 
@@ -51,7 +51,7 @@ describe("which sittings a code may carry on", () => {
       ]),
       DOB,
     );
-    expect(rule).toEqual({ kind: "verify", dob: "2012-05-14" });
+    expect(rule).toMatchObject({ kind: "verify", dob: "2012-05-14" });
   });
 
   it("carries on, as before, a sitting with nothing answered on it", () => {
@@ -89,5 +89,57 @@ describe("wrong dates of birth", () => {
     const one = tryDob("2012-05-14", "2012-05-15", null, t0);
     const right = tryDob("2012-05-14", "2012-05-14", one.guard, t0);
     expect(right).toEqual({ kind: "accepted", guard: null });
+  });
+});
+
+/** Twins share a date of birth (D-75): the initials of the name tell them apart. */
+const NAMES = { first: "ybm_identity.first_name", last: "ybm_identity.last_name" };
+const named = (first: string | null, last: string | null) =>
+  answers([
+    ...(first !== null ? [[NAMES.first, { status: "answered", value: { kind: "text", value: first } }] as [string, RecordedAnswer]] : []),
+    ...(last !== null ? [[NAMES.last, { status: "answered", value: { kind: "text", value: last } }] as [string, RecordedAnswer]] : []),
+    [DOB, { status: "answered", value: { kind: "date", iso: "2012-05-14" } }],
+  ]);
+
+describe("telling twins apart", () => {
+  it("finds the name questions in the built-in release", () => {
+    const runtime = buildRuntime(BUILT_IN.manifest, "built-in");
+    expect(nameKeys(runtime.flattened.units)).toEqual(NAMES);
+  });
+
+  it("asks for the initials of the name the sitting holds", () => {
+    const rule = resumeRule(named("Sam", "Khan"), DOB, NAMES);
+    expect(rule).toEqual({ kind: "verify", dob: "2012-05-14", who: { firstName: "Sam", initials: { first: "S", last: ["K"] } } });
+  });
+
+  it("refuses the twin's initials, with the right date", () => {
+    const sam = whoOf(named("Sam", "Khan"), NAMES);
+    expect(tryDob("2012-05-14", "2012-05-14", null, t0, { who: sam, typed: "AK" }).kind).toBe("refused");
+    expect(tryDob("2012-05-14", "2012-05-14", null, t0, { who: sam, typed: "sk" }).kind).toBe("accepted");
+    // The right initials never make up for the wrong date.
+    expect(tryDob("2012-05-14", "2012-05-15", null, t0, { who: sam, typed: "SK" }).kind).toBe("refused");
+  });
+
+  it("matches initials forgivingly: case, accents, dots, a middle initial, a surname in parts", () => {
+    expect(initialsMatch(whoOf(named("Zoë", "Ali"), NAMES), "z.a.")).toBe(true);
+    expect(initialsMatch(whoOf(named("Émile", "Smith"), NAMES), "ES")).toBe(true);
+    expect(initialsMatch(whoOf(named("Sam", "Khan"), NAMES), "SJK")).toBe(true);
+    expect(initialsMatch(whoOf(named("Ana", "de Silva"), NAMES), "AS")).toBe(true);
+    expect(initialsMatch(whoOf(named("Ana", "de Silva"), NAMES), "AD")).toBe(true);
+    expect(initialsMatch(whoOf(named("Ana", "O'Neill"), NAMES), "AO")).toBe(true);
+    expect(initialsMatch(whoOf(named("Sam", "Khan"), NAMES), "S")).toBe(false);
+    expect(initialsMatch(whoOf(named("Sam", "Khan"), NAMES), "")).toBe(false);
+  });
+
+  it("asks for no initials when the sitting holds no name", () => {
+    const who = whoOf(named(null, null), NAMES);
+    expect(who).toEqual({ firstName: null, initials: null });
+    expect(initialsMatch(who, "")).toBe(true);
+    expect(initialsLabel(who)).toBeNull();
+  });
+
+  it("labels the staff list with initials, not names", () => {
+    expect(initialsLabel(whoOf(named("Sam", "Khan"), NAMES))).toBe("S.K.");
+    expect(initialsLabel(whoOf(named("Sam", null), NAMES))).toBe("S.");
   });
 });
