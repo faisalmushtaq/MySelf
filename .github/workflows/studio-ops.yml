@@ -9,6 +9,7 @@ name: "Studio: study space housekeeping"
 #   remove-blocks whole questionnaires out of a draft (archived, restorable)
 #   reorder       a section's questions in a given order
 #   add-option    an answer option on a question, with a new code
+#   archive       single questions out of a draft (restorable)
 #   restore       archived questions back where they were
 #   dob-ages      the ages a survey's date of birth accepts
 #   retitle       a survey's title; form-label  a questionnaire's form label
@@ -21,7 +22,7 @@ on:
       command:
         description: "What to do"
         type: choice
-        options: [list, questions, grant-owners, insert, remove-blocks, restore, reorder, add-option, dob-ages, retitle, form-label]
+        options: [list, questions, grant-owners, insert, remove-blocks, archive, restore, reorder, add-option, dob-ages, retitle, form-label]
         default: list
       study:
         description: "Study space id (from list)"
@@ -64,7 +65,7 @@ on:
         type: string
         default: ""
       items:
-        description: "Question IDs, comma-separated (restore)"
+        description: "Question IDs, comma-separated (archive, restore)"
         type: string
         default: ""
       item:
