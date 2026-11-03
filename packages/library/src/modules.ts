@@ -296,7 +296,7 @@ export const ybmIdentity: ModuleInput = {
           required: "soft",
           stem: { text: "What's your home address?" },
           lede: {
-            text: "The address you live at most of the time. If you live in more than one home, put the one you stay at most. Fill in what you know — it's fine to leave out anything you're not sure of.",
+            text: "The address you live at most of the time. If you split your time equally between two homes, just pick one. Don't know your postcode? Tap \u201cI don't know my postcode\u201d and find your street instead. Fill in what you know — it's fine to leave out anything you're not sure of.",
           },
           fields: [
             {
