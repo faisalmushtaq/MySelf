@@ -2155,19 +2155,13 @@ input[type="range"] {
   max-width: 22rem;
 }
 
-/* Initials with the date (D-75): twins share a birthday. */
-.screen.dob-check .initials-field {
+/* The first name with the date (D-75): twins share a birthday. */
+.screen.dob-check .name-field {
   display: flex;
   flex-direction: column;
   gap: 0.4rem;
-  margin-top: 1.25rem;
+  margin-bottom: 1.25rem;
   max-width: 22rem;
-}
-.screen.dob-check .initials-field input {
-  font-size: 1.5rem;
-  letter-spacing: 0.3em;
-  text-transform: uppercase;
-  max-width: 10rem;
 }
 
 /* The countdown before an untouched iPad goes back to the start (lib/idle.ts).

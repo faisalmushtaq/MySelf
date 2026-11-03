@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { PresentableUnit } from "@myself/engine";
 import type { RecordedAnswer } from "./lib/db.js";
-import { DOB_MAX_ATTEMPTS, dobMatches, dobUnit, initialsLabel, initialsMatch, nameKeys, resumeRule, tryDob, unitKey, whoOf } from "./lib/dob.js";
+import { DOB_MAX_ATTEMPTS, dobMatches, dobUnit, firstNameMatches, initialsLabel, nameKeys, resumeRule, tryDob, unitKey, whoOf } from "./lib/dob.js";
 import { BUILT_IN } from "./lib/releases.js";
 import { buildRuntime } from "./lib/runtime.js";
 
@@ -92,7 +92,7 @@ describe("wrong dates of birth", () => {
   });
 });
 
-/** Twins share a date of birth (D-75): the initials of the name tell them apart. */
+/** Twins share a date of birth (D-75): the first name tells them apart. */
 const NAMES = { first: "ybm_identity.first_name", last: "ybm_identity.last_name" };
 const named = (first: string | null, last: string | null) =>
   answers([
@@ -107,34 +107,32 @@ describe("telling twins apart", () => {
     expect(nameKeys(runtime.flattened.units)).toEqual(NAMES);
   });
 
-  it("asks for the initials of the name the sitting holds", () => {
+  it("asks for the first name the sitting holds", () => {
     const rule = resumeRule(named("Sam", "Khan"), DOB, NAMES);
-    expect(rule).toEqual({ kind: "verify", dob: "2012-05-14", who: { firstName: "Sam", initials: { first: "S", last: ["K"] } } });
+    expect(rule).toMatchObject({ kind: "verify", dob: "2012-05-14", who: { firstName: "Sam" } });
   });
 
-  it("refuses the twin's initials, with the right date", () => {
+  it("refuses the twin's name, with the right date, even when the initials are the same", () => {
     const sam = whoOf(named("Sam", "Khan"), NAMES);
-    expect(tryDob("2012-05-14", "2012-05-14", null, t0, { who: sam, typed: "AK" }).kind).toBe("refused");
-    expect(tryDob("2012-05-14", "2012-05-14", null, t0, { who: sam, typed: "sk" }).kind).toBe("accepted");
-    // The right initials never make up for the wrong date.
-    expect(tryDob("2012-05-14", "2012-05-15", null, t0, { who: sam, typed: "SK" }).kind).toBe("refused");
+    expect(tryDob("2012-05-14", "2012-05-14", null, t0, { who: sam, typed: "Sara" }).kind).toBe("refused");
+    expect(tryDob("2012-05-14", "2012-05-14", null, t0, { who: sam, typed: "sam" }).kind).toBe("accepted");
+    // The right name never makes up for the wrong date.
+    expect(tryDob("2012-05-14", "2012-05-15", null, t0, { who: sam, typed: "Sam" }).kind).toBe("refused");
   });
 
-  it("matches initials forgivingly: case, accents, dots, a middle initial, a surname in parts", () => {
-    expect(initialsMatch(whoOf(named("Zoë", "Ali"), NAMES), "z.a.")).toBe(true);
-    expect(initialsMatch(whoOf(named("Émile", "Smith"), NAMES), "ES")).toBe(true);
-    expect(initialsMatch(whoOf(named("Sam", "Khan"), NAMES), "SJK")).toBe(true);
-    expect(initialsMatch(whoOf(named("Ana", "de Silva"), NAMES), "AS")).toBe(true);
-    expect(initialsMatch(whoOf(named("Ana", "de Silva"), NAMES), "AD")).toBe(true);
-    expect(initialsMatch(whoOf(named("Ana", "O'Neill"), NAMES), "AO")).toBe(true);
-    expect(initialsMatch(whoOf(named("Sam", "Khan"), NAMES), "S")).toBe(false);
-    expect(initialsMatch(whoOf(named("Sam", "Khan"), NAMES), "")).toBe(false);
+  it("ignores case, accents, spaces, hyphens and apostrophes, but not part of a name", () => {
+    expect(firstNameMatches(whoOf(named("Zoë", "Ali"), NAMES), " zoe ")).toBe(true);
+    expect(firstNameMatches(whoOf(named("Mary-Jane", "Ali"), NAMES), "Mary Jane")).toBe(true);
+    expect(firstNameMatches(whoOf(named("D'Arcy", "Ali"), NAMES), "darcy")).toBe(true);
+    expect(firstNameMatches(whoOf(named("Mary-Jane", "Ali"), NAMES), "Mary")).toBe(false);
+    expect(firstNameMatches(whoOf(named("Mary-Jane", "Ali"), NAMES), "Mary-Kate")).toBe(false);
+    expect(firstNameMatches(whoOf(named("Sam", "Khan"), NAMES), "")).toBe(false);
   });
 
-  it("asks for no initials when the sitting holds no name", () => {
+  it("asks for no name when the sitting holds none", () => {
     const who = whoOf(named(null, null), NAMES);
     expect(who).toEqual({ firstName: null, initials: null });
-    expect(initialsMatch(who, "")).toBe(true);
+    expect(firstNameMatches(who, "")).toBe(true);
     expect(initialsLabel(who)).toBeNull();
   });
 

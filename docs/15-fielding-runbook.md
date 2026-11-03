@@ -150,10 +150,11 @@ behaves accordingly:
 
 - **Carrying on an unfinished sitting needs the date of birth.** A participant who
   types the code of a sitting that stopped part-way is asked *"To carry on, enter
-  your date of birth and your initials"*, and is put back where they stopped only
-  if both match that sitting, and they say yes to *"Welcome back, Sam! Is this
-  you?"* (D-75: twins share a birthday). If a child says *"No, that's not me"*,
-  they have the wrong code: check their card. Three wrong dates and that code cannot be carried on
+  your first name and your date of birth"*, and is put back where they stopped
+  only if both match that sitting (D-75: twins share a birthday). If a child's
+  own name and birthday are refused, they probably have the wrong code: check
+  their card. In the staff **Carry on** list, codes show initials; the child is
+  then asked *"Welcome back, Sam! Is this you?"*. Three wrong dates and that code cannot be carried on
   on this iPad: the child sees *"Please ask a member of the research team"*. Check
   who they are, then in the handover panel tap **Allow** *(the code)* **to carry on**, which
   gives three more tries. The sitting itself is never touched and still uploads.
