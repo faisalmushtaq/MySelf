@@ -18,6 +18,7 @@ import {
   restoreQuestion,
   serialiseDraft,
   suggestBump,
+  updateQuestion,
   validateDraft,
   validatedFragment,
 } from "@myself/studio";
@@ -341,6 +342,23 @@ if (command === "list") {
       return d;
     },
     `Archive ${items.length} question(s)`,
+  );
+} else if (command === "set-lede") {
+  // A question's instructions (the line under the question), as given in --text.
+  const study = studyArg();
+  const surveyId = surveyArg();
+  const itemKey = flag("item") ?? fail("Say which question with --item (its ID).");
+  const text = (flag("text") ?? "").trim();
+  if (!text) fail("Say the new instructions with --text.");
+  await editDraft(
+    study,
+    surveyId,
+    (draft) => {
+      const out = updateQuestion(draft, itemKey, { lede: { text } });
+      console.log(`  ${itemKey}: instructions now “${text}”`);
+      return out.draft;
+    },
+    `Instructions for ${itemKey}`,
   );
 } else if (command === "add-option") {
   // An answer option on a question (and every question sharing its list), with a new code; first on screen with --first.

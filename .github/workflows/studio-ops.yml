@@ -9,6 +9,7 @@ name: "Studio: study space housekeeping"
 #   remove-blocks whole questionnaires out of a draft (archived, restorable)
 #   reorder       a section's questions in a given order
 #   add-option    an answer option on a question, with a new code
+#   set-lede      a question's instructions (the line under it)
 #   archive       single questions out of a draft (restorable)
 #   restore       archived questions back where they were
 #   dob-ages      the ages a survey's date of birth accepts
@@ -22,7 +23,7 @@ on:
       command:
         description: "What to do"
         type: choice
-        options: [list, questions, grant-owners, insert, remove-blocks, archive, restore, reorder, add-option, dob-ages, retitle, form-label]
+        options: [list, questions, grant-owners, insert, remove-blocks, archive, restore, reorder, add-option, set-lede, dob-ages, retitle, form-label]
         default: list
       study:
         description: "Study space id (from list)"
@@ -62,6 +63,10 @@ on:
         default: ""
       match:
         description: "Only questions whose ID, variable or wording contains this (questions)"
+        type: string
+        default: ""
+      text:
+        description: "New text (set-lede)"
         type: string
         default: ""
       items:
@@ -145,6 +150,7 @@ jobs:
           TITLE: ${{ inputs.title }}
           ITEMS: ${{ inputs.items }}
           ITEM: ${{ inputs.item }}
+          TEXT: ${{ inputs.text }}
           FIRST: ${{ inputs.first && '--first' || '' }}
           INSTRUMENTS: ${{ inputs.instruments }}
           INSTRUMENT: ${{ inputs.instrument }}
@@ -154,7 +160,7 @@ jobs:
           node studio-ops.mjs "$COMMAND" --project myself-research \
             ${STUDY:+--study "$STUDY"} ${SURVEY:+--survey "$SURVEY"} ${SECTION:+--section "$SECTION"} \
             ${AFTER:+--after "$AFTER"} ${PIECES:+--pieces "$PIECES"} ${REPLACE:+--replace "$REPLACE"} ${MIN_AGE:+--min-age "$MIN_AGE"} ${MAX_AGE:+--max-age "$MAX_AGE"} \
-            ${ORDER:+--order "$ORDER"} ${MATCH:+--match "$MATCH"} ${TITLE:+--title "$TITLE"} ${ITEMS:+--items "$ITEMS"} ${ITEM:+--item "$ITEM"} $FIRST ${INSTRUMENTS:+--instruments "$INSTRUMENTS"} ${INSTRUMENT:+--instrument "$INSTRUMENT"} ${LABEL:+--label "$LABEL"} $APPLY
+            ${ORDER:+--order "$ORDER"} ${MATCH:+--match "$MATCH"} ${TITLE:+--title "$TITLE"} ${ITEMS:+--items "$ITEMS"} ${ITEM:+--item "$ITEM"} ${TEXT:+--text "$TEXT"} $FIRST ${INSTRUMENTS:+--instruments "$INSTRUMENTS"} ${INSTRUMENT:+--instrument "$INSTRUMENT"} ${LABEL:+--label "$LABEL"} $APPLY
 
       - name: Shred the credential
         if: always()

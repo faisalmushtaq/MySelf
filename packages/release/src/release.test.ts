@@ -45,13 +45,19 @@ const meta = {
   decisionRefs: ["D-53"],
 };
 
-/** The names r9.0.0 was frozen with, before "Notre Dame" was taken out of titles and labels (D-69). */
+/** The names r9.0.0 was frozen with, before "Notre Dame" was taken out of titles and labels (D-69), and its wording since changed. */
 function asNamedIn9(r: Registries): Registries {
   const out = structuredClone(r);
   const consent = out.modules.find((m) => m.instrument === "ybm_intro_consent")!;
   consent.forms[0]!.label = "YBM NotreDame 2026 introduction + consent";
   const kss = out.instruments.find((i) => i.instrument === "kss")!;
   kss.changelog = "1.0: encoded from YBM NotreDame2026 QSF; canonical labels restored per D-08.";
+  // The home address instructions as r9.0.0 had them, before two homes and an unknown postcode were spelled out.
+  const identity = out.modules.find((m) => m.forms.some((f) => f.items.some((i) => i.key === "home_address")))!;
+  const address = identity.forms[0]!.items.find((i) => i.key === "home_address")!;
+  address.lede = {
+    text: "The address you live at most of the time. If you live in more than one home, put the one you stay at most. Fill in what you know — it's fine to leave out anything you're not sure of.",
+  };
   return out;
 }
 
