@@ -94,8 +94,11 @@ describe("the live survey", () => {
 
   it("validates quickly enough to run on every keystroke", () => {
     validateDraft(live, fullContext); // warm up
+    // The fastest of ten: about 20ms on a quiet machine, so a real slowdown still
+    // fails, while CI running every package's tests at once (one run at 105ms
+    // with three tries) does not.
     const times: number[] = [];
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < 10; i++) {
       const start = performance.now();
       validateDraft(live, fullContext);
       times.push(performance.now() - start);
