@@ -342,6 +342,7 @@ export function PreviewRunner({ release, startAt, jump, accessibility, onAccessi
           scales={scales}
           store={storeRef.current}
           allowBack={allowBack}
+          glossary={composition.glossary}
           sectionTitles={flattened.sectionTitles}
           index={phase.index}
           sessionStart={sessionStart.current}

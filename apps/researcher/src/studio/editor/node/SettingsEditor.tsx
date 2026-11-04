@@ -1,7 +1,14 @@
-import { useCallback, useMemo } from "react";
+import { useCallback, useId, useMemo, useState } from "react";
 import { updateSettings } from "@myself/studio";
+import { Button } from "../../ui/kit.js";
 import { useEditor } from "../context.js";
-import { Facts, IssueMessages, Panel, SwitchRow, TextField } from "./controls.js";
+import {
+  Facts,
+  IssueMessages,
+  Panel,
+  SwitchRow,
+  TextField,
+} from "./controls.js";
 import { issuesAt, screenIssues } from "./issues.js";
 import { unlessUnchanged } from "./unchanged.js";
 
@@ -25,8 +32,14 @@ export function ageBandLabel(band: string): string {
 export function SettingsEditor() {
   const ctx = useEditor();
   const c = ctx.draft.composition;
-  const issues = useMemo(() => screenIssues(ctx.issues, "survey"), [ctx.issues]);
-  const validateTitle = useCallback((text: string) => (text.trim() ? null : "The survey needs a title."), []);
+  const issues = useMemo(
+    () => screenIssues(ctx.issues, "survey"),
+    [ctx.issues],
+  );
+  const validateTitle = useCallback(
+    (text: string) => (text.trim() ? null : "The survey needs a title."),
+    [],
+  );
   const readOnly = !ctx.canEdit;
   return (
     <div className="stn-node">
@@ -48,7 +61,13 @@ export function SettingsEditor() {
           issues={issuesAt(issues, "title")}
           onCommit={(title) =>
             // Stored trimmed: no undo step for a space at the end (unchanged.ts).
-            ctx.run("Rename the survey", (d) => unlessUnchanged(d, updateSettings(d, { title }).draft, (x) => x.composition.title))
+            ctx.run("Rename the survey", (d) =>
+              unlessUnchanged(
+                d,
+                updateSettings(d, { title }).draft,
+                (x) => x.composition.title,
+              ),
+            )
           }
         />
         <SwitchRow
@@ -57,8 +76,17 @@ export function SettingsEditor() {
           checked={c.allowBackNavigation !== false}
           disabled={readOnly}
           onChange={(allowBackNavigation) => {
-            if (ctx.run("Change whether participants can go back", (d) => updateSettings(d, { allowBackNavigation }).draft)) {
-              ctx.announce(allowBackNavigation ? "Participants can go back." : "Participants can't go back.");
+            if (
+              ctx.run(
+                "Change whether participants can go back",
+                (d) => updateSettings(d, { allowBackNavigation }).draft,
+              )
+            ) {
+              ctx.announce(
+                allowBackNavigation
+                  ? "Participants can go back."
+                  : "Participants can't go back.",
+              );
             }
           }}
           info="When off, there is no Back button: each answer is final once the participant moves on. They can still change answers from the review screen at the end, if the survey has one."
@@ -66,7 +94,7 @@ export function SettingsEditor() {
       </Panel>
       <Panel
         title="Pacing"
-        info="Help for participants who are taking a long time. Researchers can also end a sitting that has run out of time: five taps on the progress bar, then the staff PIN."
+        info="Help for participants who are taking a long time. Researchers can also end a sitting that has run out of time: five taps on the progress bar."
       >
         <SwitchRow
           label="Reassure someone stuck on a question"
@@ -74,8 +102,17 @@ export function SettingsEditor() {
           checked={c.effort?.stuckPrompt !== false}
           disabled={readOnly}
           onChange={(stuckPrompt) => {
-            if (ctx.run("Change whether stuck participants are reassured", (d) => updateSettings(d, { effort: { stuckPrompt } }).draft)) {
-              ctx.announce(stuckPrompt ? "Stuck participants are reassured." : "No reassurance for stuck participants.");
+            if (
+              ctx.run(
+                "Change whether stuck participants are reassured",
+                (d) => updateSettings(d, { effort: { stuckPrompt } }).draft,
+              )
+            ) {
+              ctx.announce(
+                stuckPrompt
+                  ? "Stuck participants are reassured."
+                  : "No reassurance for stuck participants.",
+              );
             }
           }}
           info="After someone has sat on an unanswered question, without touching the screen, for several times as long as it takes to read (20 to 90 seconds), a note says: “Take your time. If you're not sure, choose the answer that fits best.” Once per question; never on text, consent or information screens."
@@ -83,27 +120,176 @@ export function SettingsEditor() {
         <SwitchRow
           label="…and offer to skip it"
           field="effort.stuckPromptOffersSkip"
-          checked={c.effort?.stuckPrompt !== false && c.effort?.stuckPromptOffersSkip !== false}
+          checked={
+            c.effort?.stuckPrompt !== false &&
+            c.effort?.stuckPromptOffersSkip !== false
+          }
           disabled={readOnly || c.effort?.stuckPrompt === false}
           onChange={(stuckPromptOffersSkip) => {
-            if (ctx.run("Change whether stuck participants can skip", (d) => updateSettings(d, { effort: { stuckPromptOffersSkip } }).draft)) {
-              ctx.announce(stuckPromptOffersSkip ? "Stuck participants are offered a skip." : "Stuck participants are not offered a skip.");
+            if (
+              ctx.run(
+                "Change whether stuck participants can skip",
+                (d) =>
+                  updateSettings(d, { effort: { stuckPromptOffersSkip } })
+                    .draft,
+              )
+            ) {
+              ctx.announce(
+                stuckPromptOffersSkip
+                  ? "Stuck participants are offered a skip."
+                  : "Stuck participants are not offered a skip.",
+              );
             }
           }}
           info="Adds a “Skip this one” button to the note. Never on a question that must be answered."
         />
       </Panel>
-      <Panel title="About this survey" info="Set when the survey was created. Changing any of these would make it a different survey.">
+      <GlossaryPanel readOnly={readOnly} />
+      <Panel
+        title="About this survey"
+        info="Set when the survey was created. Changing any of these would make it a different survey."
+      >
         <Facts
           rows={[
             { label: "Survey ID", value: <code>{ctx.draft.surveyId}</code> },
             { label: "Study", value: <code>{c.study}</code> },
             { label: "Language", value: c.language },
-            { label: "Reading level", value: READING_LEVELS[c.readingLevel] ?? c.readingLevel },
+            {
+              label: "Reading level",
+              value: READING_LEVELS[c.readingLevel] ?? c.readingLevel,
+            },
             { label: "Age band", value: ageBandLabel(c.ageBand) },
           ]}
         />
       </Panel>
     </div>
+  );
+}
+
+/**
+ * Word explanations (D-79): words a participant can tap, wherever they appear
+ * in a question or the line under it, to see what they mean. Kept on the
+ * survey rather than the questions, so a licensed questionnaire's wording is
+ * explained without being changed.
+ */
+function GlossaryPanel({ readOnly }: { readOnly: boolean }) {
+  const ctx = useEditor();
+  const entries = ctx.draft.composition.glossary ?? [];
+  const [term, setTerm] = useState("");
+  const [explanation, setExplanation] = useState("");
+  const termId = useId();
+  const explanationId = useId();
+  const save = (label: string, next: { term: string; explanation: string }[]) =>
+    ctx.run(label, (d) => updateSettings(d, { glossary: next }).draft);
+  const add = () => {
+    if (!term.trim() || !explanation.trim()) return;
+    if (save(`Explain “${term.trim()}”`, [...entries, { term, explanation }])) {
+      ctx.announce(`“${term.trim()}” can now be tapped for its meaning.`);
+      setTerm("");
+      setExplanation("");
+    }
+  };
+  return (
+    <Panel
+      title="Word explanations"
+      info="Words a participant can tap, wherever they appear in a question or the line under it, to see what they mean — for example “optimistic” or “appetite”. The question's own wording is not changed, so this is how to explain a word in a licensed questionnaire. Whole words only, any capitalisation; each tap is recorded."
+    >
+      {entries.length === 0 ? (
+        <p className="stn-empty">No words are explained yet.</p>
+      ) : null}
+      {entries.map((g, i) => (
+        <div key={`${g.term}-${i}`} className="stn-gloss-row">
+          <TextField
+            label="Word or phrase"
+            field={`glossary.${i}.term`}
+            value={g.term}
+            readOnly={readOnly}
+            maxLength={60}
+            validate={(text) => (text.trim() ? null : "Say which word.")}
+            onCommit={(text) =>
+              save(
+                "Change an explained word",
+                entries.map((x, j) => (j === i ? { ...x, term: text } : x)),
+              )
+            }
+          />
+          <TextField
+            label="What it means"
+            field={`glossary.${i}.explanation`}
+            value={g.explanation}
+            readOnly={readOnly}
+            multiline
+            maxLength={300}
+            validate={(text) => (text.trim() ? null : "Say what it means.")}
+            onCommit={(text) =>
+              save(
+                `Change what “${g.term}” means`,
+                entries.map((x, j) =>
+                  j === i ? { ...x, explanation: text } : x,
+                ),
+              )
+            }
+          />
+          <Button
+            size="sm"
+            variant="ghost"
+            disabled={readOnly}
+            onClick={() => {
+              if (
+                save(
+                  `Stop explaining “${g.term}”`,
+                  entries.filter((_, j) => j !== i),
+                )
+              )
+                ctx.announce(`“${g.term}” is no longer explained.`);
+            }}
+          >
+            Remove
+          </Button>
+        </div>
+      ))}
+      {!readOnly ? (
+        <div className="stn-gloss-row stn-gloss-add">
+          <div className="stn-field">
+            <label htmlFor={termId} className="stn-label">
+              Word or phrase
+            </label>
+            <input
+              id={termId}
+              className="st-input"
+              value={term}
+              maxLength={60}
+              placeholder="optimistic"
+              onChange={(e) => setTerm(e.target.value)}
+            />
+          </div>
+          <div className="stn-field">
+            <label htmlFor={explanationId} className="stn-label">
+              What it means
+            </label>
+            <input
+              id={explanationId}
+              className="st-input"
+              value={explanation}
+              maxLength={300}
+              placeholder="Feeling hopeful that good things will happen."
+              onChange={(e) => setExplanation(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") add();
+              }}
+            />
+          </div>
+          <Button
+            size="sm"
+            variant="secondary"
+            icon="plus"
+            disabled={!term.trim() || !explanation.trim()}
+            onClick={add}
+          >
+            Explain this word
+          </Button>
+        </div>
+      ) : null}
+    </Panel>
   );
 }

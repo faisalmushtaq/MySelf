@@ -8,6 +8,8 @@ import {
   type PresentableUnit,
 } from "@myself/engine";
 import type { ItemDefinition, ResponseScale } from "@myself/schema";
+import type { GlossaryEntry } from "../lib/glossary.js";
+import { Glossed } from "./Glossed.js";
 import { resolveText } from "../lib/pipes.js";
 import { gridRowsFor } from "../lib/timegrid.js";
 import { dwellHintMs, wordCount, type DwellPolicy } from "../lib/timing.js";
@@ -123,6 +125,8 @@ export interface SurveyScreenProps {
    * Absent where there is no researcher to ask for (a preview).
    */
   onStaffGesture?: () => void;
+  /** The survey's word explanations (D-79): these words can be tapped wherever they appear. */
+  glossary?: readonly GlossaryEntry[] | undefined;
 }
 
 export function SurveyScreen(props: SurveyScreenProps) {
@@ -145,6 +149,8 @@ export function SurveyScreen(props: SurveyScreenProps) {
   const [dwelling, setDwelling] = useState(false);
   /** Reassurance shown to someone stuck on this question, until they answer or close it (D-70). */
   const [stuck, setStuck] = useState(false);
+  /** The explained word whose meaning is showing (D-79), if any. */
+  const [gloss, setGloss] = useState<GlossaryEntry | null>(null);
   const staffTaps = useRef<number[]>([]);
   const advanceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const headingRef = useRef<HTMLHeadingElement | null>(null);
@@ -157,6 +163,7 @@ export function SurveyScreen(props: SurveyScreenProps) {
     setInconsistency(null);
     setDwelling(false);
     setStuck(false);
+    setGloss(null);
     headingRef.current?.focus();
     return () => {
       if (advanceTimer.current) clearTimeout(advanceTimer.current);
@@ -227,6 +234,16 @@ export function SurveyScreen(props: SurveyScreenProps) {
   }, [index]);
 
   if (!unit) return null;
+
+  /** Tap an explained word: its meaning shows under the question, and the tap is logged (D-79). Tap again to close. */
+  const openGloss = (entry: GlossaryEntry) => {
+    if (gloss === entry) {
+      setGloss(null);
+      return;
+    }
+    setGloss(entry);
+    props.onEvent("glossary.opened", { term: entry.term });
+  };
 
   /**
    * A narrative position: hand over to the module rather than draw a question.
@@ -480,15 +497,25 @@ export function SurveyScreen(props: SurveyScreenProps) {
               : `stem${stemText.length > 110 ? " stem-long" : ""}`
           }
         >
-          {stemText}
+          <Glossed text={stemText} glossary={props.glossary} open={gloss} onOpen={openGloss} />
         </h1>
         {/* Framing that used to be its own click-through page. Keeping it with
             the control means the explanation is still on screen when the
             answer is given. */}
         {item.lede && (
           <p className={`lede${item.responseType === "info" ? " lede-body" : ""}`}>
-            {resolveText(item.lede.text, item.lede.pipes, answers, sessionStart)}
+            <Glossed text={resolveText(item.lede.text, item.lede.pipes, answers, sessionStart)} glossary={props.glossary} open={gloss} onOpen={openGloss} />
           </p>
+        )}
+        {gloss && (
+          <div id="gloss-note" className="gloss-note" role="status">
+            <p>
+              <strong>{gloss.term}</strong> — {gloss.explanation}
+            </p>
+            <button type="button" className="gloss-close" onClick={() => setGloss(null)}>
+              OK
+            </button>
+          </div>
         )}
         {/* Detail on request — data handling, mostly. Available from the screen
             it belongs to, never in the way of getting started. */}

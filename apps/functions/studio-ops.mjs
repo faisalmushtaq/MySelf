@@ -22,6 +22,7 @@ import {
   serialiseDraft,
   suggestBump,
   updateQuestion,
+  updateSettings,
   validateDraft,
   validatedFragment,
 } from "@myself/studio";
@@ -413,6 +414,26 @@ if (command === "list") {
       return d;
     },
     `Information screen “${title}”`,
+  );
+} else if (command === "glossary") {
+  // A word explanation (D-79): --label the word, --text what it means; no --text removes it.
+  const study = studyArg();
+  const surveyId = surveyArg();
+  const term = (flag("label") ?? "").trim() || fail("Say which word with --label.");
+  const text = (flag("text") ?? "").trim();
+  await editDraft(
+    study,
+    surveyId,
+    (draft) => {
+      const current = draft.composition.glossary ?? [];
+      const others = current.filter((g) => g.term.toLocaleLowerCase("en-GB") !== term.toLocaleLowerCase("en-GB"));
+      const next = text ? [...others, { term, explanation: text }] : others;
+      if (!text && others.length === current.length) fail(`“${term}” is not explained in this survey.`);
+      console.log(text ? `  “${term}” now explained as “${text}”` : `  “${term}” no longer explained`);
+      console.log(`  ${next.length} word(s) explained: ${next.map((g) => g.term).join(", ") || "none"}`);
+      return updateSettings(draft, { glossary: next }).draft;
+    },
+    `Word explanation for “${term}”`,
   );
 } else if (command === "add-option") {
   // An answer option on a question (and every question sharing its list), with a new code; first on screen with --first.

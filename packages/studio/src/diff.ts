@@ -363,6 +363,7 @@ const SETTINGS: Record<string, { name: string; bump: Bump }> = {
   readingLevel: { name: "the reading level", bump: "minor" },
   ageBand: { name: "the age group", bump: "minor" },
   offline: { name: "the offline settings", bump: "patch" },
+  glossary: { name: "the word explanations", bump: "minor" },
 };
 const HANDLED_COMPOSITION = new Set(["sections", "screens", "participantCode", "studyLabel", "contact"]);
 

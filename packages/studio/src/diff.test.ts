@@ -160,6 +160,16 @@ describe("diffDrafts", () => {
     expect(summary.bump).toBe("minor");
   });
 
+  it("word explanations, as a change participants notice (D-79)", () => {
+    const summary = diffDrafts(
+      baseline,
+      edit((d) => {
+        d.composition.glossary = [{ term: "optimistic", explanation: "Feeling hopeful." }];
+      }),
+    );
+    expect(summary.entries.map((e) => [e.kind, e.bump, e.message])).toEqual([["settings.changed", "minor", "Changed the word explanations."]]);
+  });
+
   it("section added, removed, reordered and made conditional", () => {
     const moved = diffDrafts(
       baseline,

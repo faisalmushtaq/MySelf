@@ -12,6 +12,7 @@ name: "Studio: study space housekeeping"
 #   set-lede      a question's instructions (the line under it)
 #   set-text      a question's wording (field stem) or instructions (field lede)
 #   add-info      an information screen (title, text), after a question or first
+#   glossary      a word participants can tap for its meaning (label = word, text = meaning)
 #   archive       single questions out of a draft (restorable)
 #   restore       archived questions back where they were
 #   dob-ages      the ages a survey's date of birth accepts
@@ -25,7 +26,7 @@ on:
       command:
         description: "What to do"
         type: choice
-        options: [list, questions, grant-owners, insert, remove-blocks, archive, restore, reorder, add-option, set-lede, set-text, add-info, dob-ages, retitle, form-label]
+        options: [list, questions, grant-owners, insert, remove-blocks, archive, restore, reorder, add-option, set-lede, set-text, add-info, glossary, dob-ages, retitle, form-label]
         default: list
       study:
         description: "Study space id (from list)"
@@ -72,7 +73,7 @@ on:
         type: string
         default: ""
       text:
-        description: "New text (set-lede, set-text, add-info)"
+        description: "New text (set-lede, set-text, add-info); the meaning (glossary)"
         type: string
         default: ""
       items:
@@ -100,7 +101,7 @@ on:
         type: string
         default: ""
       label:
-        description: "New form label (form-label)"
+        description: "New form label (form-label); the word (glossary); an option label (add-option)"
         type: string
         default: ""
       apply:

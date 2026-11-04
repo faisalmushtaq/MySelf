@@ -209,6 +209,23 @@ export const assessmentDraft = z.object({
     }),
   ),
   notes: z.string().optional(),
+  /**
+   * Word explanations (D-79): a word or phrase that, wherever it appears in a
+   * question or the line under it, can be tapped to show what it means —
+   * "optimistic", "appetite". Kept on the survey, not on the questions, so a
+   * licensed questionnaire's items stay word for word as validated. Optional,
+   * not defaulted: a release published before it existed reads back, and
+   * hashes, exactly as it was frozen.
+   */
+  glossary: z
+    .array(
+      z.object({
+        term: z.string().trim().min(1).max(60),
+        explanation: z.string().trim().min(1).max(300),
+      }),
+    )
+    .max(100)
+    .optional(),
 });
 
 /** Frozen, hashed release manifest. Content-complete: everything a participant
@@ -311,6 +328,8 @@ export const responseEvent = z.object({
     "session.unpaused",
     /** A researcher carried on an unfinished sitting from the staff panel, without its date of birth (D-73). */
     "session.resumed_by_staff",
+    /** A participant tapped an explained word to see what it means; `term` says which (D-79). */
+    "glossary.opened",
   ]),
   itemRef: z
     .object({ instrument: slug, item: slug, revision: z.number().int().positive() })
