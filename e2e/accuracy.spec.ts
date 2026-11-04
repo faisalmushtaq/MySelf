@@ -3,7 +3,7 @@ import { resolve } from "node:path";
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { openOnCandidate } from "./support/candidate.js";
 import { openStaffPanel } from "./support/staff.js";
-import { accepted, advance, installClock, position, settle } from "./support/walker.js";
+import { accepted, advance, chooseDate, DATE_DAY, installClock, position, settle } from "./support/walker.js";
 
 /**
  * What the child tapped, against what the study stored.
@@ -207,9 +207,8 @@ async function answerAndRecord(page: Page, ledger: Tapped[]): Promise<void> {
     return;
   }
 
-  const date = page.locator('.survey-body input[type="date"]:visible').first();
-  if ((await date.count()) > 0) {
-    await date.fill(dateOfBirth);
+  if ((await page.locator(`.survey-body ${DATE_DAY}`).count()) > 0) {
+    await chooseDate(page.locator(".survey-body"), dateOfBirth);
     return;
   }
 

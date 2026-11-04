@@ -1,4 +1,4 @@
-import type { Page } from "@playwright/test";
+import type { Locator, Page } from "@playwright/test";
 
 /**
  * The parts of a walk through the survey that every end-to-end suite shares.
@@ -193,4 +193,15 @@ export async function settle(
     () => new Promise<void>((done) => requestAnimationFrame(() => requestAnimationFrame(() => done()))),
   );
   return (await read(page)) !== before;
+}
+
+/** The date dropdowns a date question shows (D-77), visible ones only. */
+export const DATE_DAY = "select.date-day:visible";
+
+/** Choose a date (`YYYY-MM-DD`) in the day, month and year dropdowns inside `scope`. */
+export async function chooseDate(scope: Page | Locator, iso: string): Promise<void> {
+  const [y, m, d] = iso.split("-").map(Number) as [number, number, number];
+  await scope.locator("select.date-year:visible").first().selectOption(String(y));
+  await scope.locator("select.date-month:visible").first().selectOption(String(m));
+  await scope.locator("select.date-day:visible").first().selectOption(String(d));
 }

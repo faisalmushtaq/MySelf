@@ -3,7 +3,7 @@ import { resolve } from "node:path";
 import { expect, test, type Page } from "@playwright/test";
 import { CANDIDATE, openOnCandidate } from "./support/candidate.js";
 import { openStaffPanel } from "./support/staff.js";
-import { installClock, settle } from "./support/walker.js";
+import { chooseDate, installClock, settle } from "./support/walker.js";
 
 /**
  * Whole sittings through the real app, down different paths, handed over and read
@@ -70,7 +70,7 @@ const type = (text: string): Act => async (page) => {
 const common = (s: { first: string; last: string; dob: string }): [RegExp, Act][] => [
   [/^What.s your first name\?$/, type(s.first)],
   [/^What.s your last name/, type(s.last)],
-  [/date of birth/, async (page) => page.locator('.survey-body input[type="date"]').fill(s.dob)],
+  [/date of birth/, async (page) => chooseDate(page.locator(".survey-body"), s.dob)],
 ];
 
 const scenarios: Scenario[] = [

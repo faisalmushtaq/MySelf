@@ -949,3 +949,34 @@ files are all laid out from it, so they cannot disagree. The files are made in
 the browser from the release already loaded; nothing is sent anywhere, and the
 libraries load only when a file is asked for. The PDF's font has no emoji, so
 emoji are left out of the PDF; the Word file keeps them.
+
+### Field feedback, 4 November: dates, a shared code, timeouts and wording (2026-11-04, D-77)
+
+**Reported** by the YBM fieldwork team: birthdays are hard to pick; a new child
+meets *Welcome back* and cannot get past it; the survey times out too soon;
+younger children don't know "abstinence", "optimistic" or "appetite", or what
+"nothing is much fun anymore", "bad news" or "waking" mean; "which other
+language" should say apart from English; children ask whether YouTube and
+Pinterest count as social media; homes with a name and no street.
+
+**Changed in the app.**
+- A date is chosen from three dropdowns, day, month and year, instead of the
+  browser's date picker. The years offered are the ones the survey's ages
+  allow, newest first; a day the month does not have is refused; the age is
+  read back as before. `DateControl`.
+- *Welcome back* has **I'm new — start a new survey**: a code shared for the
+  day matched someone else's unfinished sitting. A new sitting starts under the
+  code; the other is left as it is and still uploads. Nothing of it is shown,
+  so this needs no check. A code locked after three wrong tries still lets
+  someone new start.
+- Nothing in a sitting times out for its first two hours (was 90 minutes);
+  after that, twenty quiet minutes (was ten). `lib/idle.ts`.
+
+**Changed in the surveys** (YBM and the break study drafts, via studio-ops
+`set-text` and `add-info`, for the team to publish): plainer wording for
+"abstaining", "apart from English", YouTube and Pinterest as examples of social
+media, the whole school day counted, "waking up", and a home with a name and no
+street. The words in licensed questionnaires (SWEMWBS's "optimistic", RCADS-25's
+"appetite" and "Nothing is much fun anymore", the doomscrolling items' "bad
+news") cannot be reworded without breaking their validation, so a short screen
+before each questionnaire explains them instead; the items are unchanged.

@@ -158,6 +158,10 @@ behaves accordingly:
   on this iPad: the child sees *"Please ask a member of the research team"*. Check
   who they are, then in the handover panel tap **Allow** *(the code)* **to carry on**, which
   gives three more tries. The sitting itself is never touched and still uploads.
+- **Someone new with a code another child left unfinished** (a code shared for
+  the day, D-77) taps **I'm new — start a new survey** on the *Welcome back*
+  screen. A new survey starts under the code; the unfinished one is left as it
+  is, still uploads, and nothing of it is shown.
 - **A sitting that stopped before the date of birth was given is not reopened.**
   If it stopped on the welcome or consent screens with nothing answered, the code
   carries on as before. If it holds answers but no date of birth (in YBM, stopped
@@ -166,8 +170,9 @@ behaves accordingly:
   occasional extra partial sitting in the dataset for that reason.
 - **Screens go back to the start by themselves.** The finish screen and *Go back
   to my answers* return to the start after two minutes untouched, with a
-  20-second countdown and an **I'm still here** button. A question in the middle of
-  a sitting asks *"Are you still there?"* after ten minutes untouched and returns to
+  20-second countdown and an **I'm still here** button. Nothing in a sitting times
+  out for its first **two hours** (D-74, D-77). After that, a question asks *"Are you
+  still there?"* after **twenty minutes** untouched and returns to
   the start 60 seconds later; the sitting is kept and can be carried on with the
   code and date of birth. An open handover panel closes after two minutes
   untouched, and always closes (forgetting the passphrase typed into it) when a
@@ -175,7 +180,7 @@ behaves accordingly:
   save-failed screen is up: that waits for a person.
 - **MyStory conversations:** the module runs in its own frame, and typing there is
   not seen by the app, so a long conversation can meet *"Are you still there?"*
-  after ten minutes; one tap carries on.
+  once the sitting's first two hours are up and twenty quiet minutes have passed; one tap carries on.
 - **The start screen never shows a real code**, so do not tell a participant
   "it's like the example" — give them their own.
 

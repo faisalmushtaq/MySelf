@@ -5,6 +5,9 @@ import { FieldValue, getFirestore } from "firebase-admin/firestore";
 import { paths } from "@myself/firebase";
 import {
   addOption,
+  addQuestion,
+  moveBlock,
+  reservedFrom,
   archiveQuestion,
   diffDrafts,
   extractDraft,
@@ -359,6 +362,57 @@ if (command === "list") {
       return out.draft;
     },
     `Instructions for ${itemKey}`,
+  );
+} else if (command === "set-text") {
+  // A question's wording (--field stem) or its instructions (--field lede, the default), as given in --text.
+  const study = studyArg();
+  const surveyId = surveyArg();
+  const itemKey = flag("item") ?? fail("Say which question with --item (its ID).");
+  const field = flag("field") ?? "lede";
+  if (field !== "stem" && field !== "lede") fail("--field is stem (the question) or lede (the line under it).");
+  const text = (flag("text") ?? "").trim();
+  if (!text) fail("Say the new text with --text.");
+  await editDraft(
+    study,
+    surveyId,
+    (draft) => {
+      const out = updateQuestion(draft, itemKey, { [field]: { text } });
+      console.log(`  ${itemKey}: ${field === "stem" ? "question" : "instructions"} now “${text}”`);
+      return out.draft;
+    },
+    `${field === "stem" ? "Wording" : "Instructions"} for ${itemKey}`,
+  );
+} else if (command === "add-info") {
+  // An information screen (nothing answered): --title, --text, after --after (a question ID), or --first in --section.
+  const study = studyArg();
+  const surveyId = surveyArg();
+  const sectionKey = flag("section") ?? fail("Say which section with --section (its key, from questions).");
+  const title = (flag("title") ?? "").trim() || fail("Say the screen's heading with --title.");
+  const text = (flag("text") ?? "").trim() || fail("Say the screen's text with --text.");
+  const after = flag("after");
+  const first = args.includes("--first");
+  if (first && after) fail("Use --after or --first, not both.");
+  const versions = await db.collection(paths.studioVersions(study, surveyId)).get();
+  const reserved = reservedFrom(versions.docs.map((v) => ({ itemKeys: v.get("itemKeys") ?? [], variables: v.get("variables") ?? [] })));
+  await editDraft(
+    study,
+    surveyId,
+    (draft) => {
+      const added = addQuestion(draft, { sectionKey, typeId: "info", text: title, ...(after ? { afterItemKey: after } : {}), reserved });
+      let d = updateQuestion(added.draft, added.itemKey, { lede: { text } }, { reserved }).draft;
+      if (first) {
+        const section = outline(d).sections.find((x) => x.key === sectionKey);
+        const block = section?.blocks.find((b) => b.questions.some((q) => q.itemKey === added.itemKey));
+        if (!block) fail("Could not find the new screen to move it.");
+        if (block.questions.length > 1) fail(`The new screen joined a block with other questions (${block.name}); add it with --after instead.`);
+        d = moveBlock(d, { sectionKey, componentIndex: block.componentIndex }, { sectionKey, index: 0 }).draft;
+      }
+      const keys = (outline(d).sections.find((x) => x.key === sectionKey)?.blocks ?? []).flatMap((b) => b.questions.map((q) => q.itemKey));
+      const at = keys.indexOf(added.itemKey);
+      console.log(`  ${added.itemKey}: information screen “${title}” in “${sectionKey}”, between ${keys[at - 1] ?? "(the start)"} and ${keys[at + 1] ?? "(the end)"}`);
+      return d;
+    },
+    `Information screen “${title}”`,
   );
 } else if (command === "add-option") {
   // An answer option on a question (and every question sharing its list), with a new code; first on screen with --first.

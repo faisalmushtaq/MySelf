@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { openStaffPanel } from "./support/staff.js";
-import { accepted, advance, installClock, position, settle } from "./support/walker.js";
+import { accepted, advance, chooseDate, DATE_DAY, installClock, position, settle } from "./support/walker.js";
 
 /**
  * A sitting, from the start screen to a file a researcher can read.
@@ -100,9 +100,8 @@ async function answerCurrentScreen(page: Page): Promise<boolean> {
   // A date, before the generic text branch: it is rendered as an `input[type=date]`
   // which reports as a textbox, and filling prose into one silently does nothing
   // while leaving Next disabled. A plausible participant year, not today's.
-  const date = await usable(page, '.survey-body input[type="date"]:visible');
-  if (date) {
-    await date.fill("2012-05-14");
+  if ((await page.locator(`.survey-body ${DATE_DAY}`).count()) > 0) {
+    await chooseDate(page.locator(".survey-body"), "2012-05-14");
     return true;
   }
 
@@ -223,7 +222,7 @@ const DOB = "2012-05-14";
 
 /** Walk until the date-of-birth screen has been answered and left. */
 async function walkPastDateOfBirth(page: Page, limit = 30): Promise<void> {
-  const onDob = async () => (await page.locator('.survey-body input[type="date"]:visible').count()) > 0;
+  const onDob = async () => (await page.locator(`.survey-body ${DATE_DAY}`).count()) > 0;
   let seen = false;
   for (let screens = 0; screens < limit; screens += 1) {
     // `step` counts the date being read back ("that makes you 14") as moving
@@ -237,7 +236,7 @@ async function walkPastDateOfBirth(page: Page, limit = 30): Promise<void> {
 
 /** As `walkPastDateOfBirth`, giving a real name, so the sitting has initials to check (D-75). */
 async function walkPastDateOfBirthAs(page: Page, first: string, last: string, limit = 30): Promise<void> {
-  const onDob = async () => (await page.locator('.survey-body input[type="date"]:visible').count()) > 0;
+  const onDob = async () => (await page.locator(`.survey-body ${DATE_DAY}`).count()) > 0;
   let seen = false;
   for (let screens = 0; screens < limit; screens += 1) {
     seen ||= await onDob();
@@ -260,7 +259,7 @@ async function walkPastDateOfBirthAs(page: Page, first: string, last: string, li
 async function carryOnWith(page: Page, dob: string, name = "1"): Promise<void> {
   const check = page.locator(".screen.dob-check");
   await expect(check).toContainText("To carry on, enter your first name and your date of birth");
-  await check.locator('input[type="date"]').fill(dob);
+  await chooseDate(check, dob);
   // The walk gives "1" for the first name, so that is what is typed back (D-75).
   await check.locator("input.first-name").fill(name);
   await check.getByRole("button", { name: "Carry on" }).click();
@@ -557,8 +556,8 @@ test.describe("a shared iPad", () => {
     await expect(check).toContainText("To carry on, enter your first name and your date of birth");
     await expect(page.locator(".survey")).toHaveCount(0);
 
-    // "That's not me" goes back to the start with nothing carried on.
-    await check.getByRole("button", { name: "That's not me" }).click();
+    // "Back" goes back to the start with nothing carried on.
+    await check.getByRole("button", { name: "Back", exact: true }).click();
     await expect(page.locator("h1.brand")).toBeVisible();
     await expect(page.locator("input.code")).toHaveValue("");
 
@@ -583,7 +582,7 @@ test.describe("a shared iPad", () => {
     const check = page.locator(".screen.dob-check");
     await expect(check).toContainText("enter your first name and your date of birth");
     await check.locator("input.first-name").fill("Sara");
-    await check.locator('input[type="date"]').fill(DOB);
+    await chooseDate(check, DOB);
     await check.getByRole("button", { name: "Carry on" }).click();
     await expect(check.locator(".error")).toContainText("That doesn't match");
     await expect(page.locator(".survey")).toHaveCount(0);
@@ -616,6 +615,23 @@ test.describe("a shared iPad", () => {
     expect(await countRows(page, "sessions")).toBe(1);
   });
 
+  test("lets someone new start their own survey with a code another child left unfinished (D-77)", async ({ page }) => {
+    await startSitting(page);
+    await walkPastDateOfBirth(page);
+
+    // The next child, with the same code for the day: "Welcome back" is not them.
+    await page.reload();
+    await page.locator("input.code").fill(CODE);
+    await page.locator("button.next.big").click();
+    const check = page.locator(".screen.dob-check");
+    await expect(check).toContainText("Welcome back");
+    await check.getByRole("button", { name: "I'm new — start a new survey" }).click();
+
+    // A new survey, and the unfinished one kept beside it.
+    await expect(page.locator(".survey")).toBeVisible();
+    expect(await countRows(page, "sessions")).toBe(2);
+  });
+
   test("refuses a wrong date of birth, and after three needs staff", async ({ page }) => {
     await startSitting(page);
     await walkPastDateOfBirth(page);
@@ -628,13 +644,13 @@ test.describe("a shared iPad", () => {
     // The right first name (the walk's "1"), the wrong dates.
     await check.locator("input.first-name").fill("1");
     for (const [wrong, left] of [["2011-01-01", 2], ["2012-05-15", 1]] as const) {
-      await check.locator('input[type="date"]').fill(wrong);
+      await chooseDate(check, wrong);
       await check.getByRole("button", { name: "Carry on" }).click();
       await expect(check.locator(".error")).toContainText(`That doesn't match`);
       await expect(check.locator(".error")).toContainText(`${left} ${left === 1 ? "try" : "tries"} left`);
       await expect(page.locator(".survey")).toHaveCount(0);
     }
-    await check.locator('input[type="date"]').fill("2010-02-02");
+    await chooseDate(check, "2010-02-02");
     await check.getByRole("button", { name: "Carry on" }).click();
     await expect(check).toContainText("can't be carried on with on this iPad");
     await check.getByRole("button", { name: "OK" }).click();
@@ -645,8 +661,8 @@ test.describe("a shared iPad", () => {
     await page.reload();
     await page.locator("input.code").fill(CODE);
     await page.locator("button.next.big").click();
-    await expect(page.locator(".code-field .error")).toContainText("can't be carried on with on this iPad");
-    await expect(check).toHaveCount(0);
+    await expect(check).toContainText("can't be carried on with on this iPad");
+    await check.getByRole("button", { name: "OK" }).click();
 
     // Staff allow it again; then the right date carries on.
     await openStaffPanel(page);
@@ -661,14 +677,14 @@ test.describe("a shared iPad", () => {
     expect(await countRows(page, "sessions")).toBe(1);
   });
 
-  test("never times out in a sitting's first 90 minutes, then goes back after ten idle ones, keeping the sitting (D-74)", async ({ page }) => {
+  test("never times out in a sitting's first two hours, then goes back after twenty idle minutes, keeping the sitting (D-74, D-77)", async ({ page }) => {
     await page.clock.install();
     await startSitting(page);
     await walkPastDateOfBirth(page);
     const where = await position(page);
 
-    // Left alone for most of the 90 minutes (a headset going on, say): still there, no warning.
-    await page.clock.fastForward("01:25:00");
+    // Left alone for most of the two hours (a headset going on, say): still there, no warning.
+    await page.clock.fastForward("01:55:00");
     await expect(page.locator(".idle-notice")).toHaveCount(0);
     await expect(page.locator(".survey")).toBeVisible();
     // Untouched through the end of the window: asked at once, with the full countdown.
@@ -682,7 +698,7 @@ test.describe("a shared iPad", () => {
     await expect(notice).toHaveCount(0);
     await expect(page.locator(".survey")).toBeVisible();
 
-    await page.clock.fastForward("10:00");
+    await page.clock.fastForward("20:00");
     await expect(notice).toBeVisible();
     await page.clock.fastForward("01:01");
     await expect(page.locator(".screen.start")).toBeVisible();
@@ -785,8 +801,8 @@ test.describe("a shared iPad", () => {
     for (let i = 0; i < 2; i += 1) await step(page);
     const where = await position(page);
 
-    // Past the 90 minutes a sitting is given, untouched: back to the start (D-74).
-    await page.clock.fastForward("01:31:05");
+    // Past the two hours a sitting is given, untouched: back to the start (D-74, D-77).
+    await page.clock.fastForward("02:01:05");
     await expect(page.locator(".screen.start")).toBeVisible();
     await openStaffPanel(page);
     await page.locator(".handover").getByRole("button", { name: new RegExp(`Carry on ${CODE}`) }).click();

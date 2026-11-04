@@ -2,7 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 import type { ChunkDoc, SessionDoc } from "@myself/firebase";
 import type { StudyServer } from "../e2e/support/study-server.js";
 import { openStaffPanel } from "../e2e/support/staff.js";
-import { accepted, position, settle } from "../e2e/support/walker.js";
+import { accepted, chooseDate, DATE_DAY, position, settle } from "../e2e/support/walker.js";
 
 /**
  * Loaded dynamically, because Playwright compiles these specs as CommonJS and every
@@ -73,10 +73,13 @@ async function answer(page: Page): Promise<void> {
     for (let i = 0; i < Math.min(3, await cards.count()); i += 1) await cards.nth(i).click({ timeout: 5_000 });
     return;
   }
+  if ((await page.locator(`.survey-body ${DATE_DAY}`).count()) > 0) {
+    await chooseDate(page.locator(".survey-body"), "2012-05-14");
+    return;
+  }
   for (const [selector, value] of [
     [".survey-body .ladder-svg:visible", null],
     ['.survey-body input[type="range"]:visible', "5"],
-    ['.survey-body input[type="date"]:visible', "2012-05-14"],
   ] as const) {
     const element = page.locator(selector).first();
     if ((await element.count()) === 0 || !(await element.isVisible())) continue;
@@ -256,6 +259,13 @@ async function answerSome(page: Page, count: number): Promise<void> {
   }
 }
 
+/** Past a check-in ("No rush", "Still with us?") the walk ended on, back to the questions. */
+async function backToQuestions(page: Page): Promise<void> {
+  const checkin = page.locator(".screen.checkin button.next.big");
+  if ((await checkin.count()) > 0) await checkin.first().click();
+  await expect(page.locator(".screen.survey")).toBeVisible();
+}
+
 test("a sitting still being answered is already in the database", async ({ page }) => {
   // The protection against a dropped iPad, a flat battery, a child who stops halfway.
   // Without it the only sittings the study ever holds are the ones that reached the
@@ -266,19 +276,27 @@ test("a sitting still being answered is already in the database", async ({ page 
   test.slow();
   await start(page);
   await answerSome(page, 12);
+  // The walk answers faster than any child, so it can end on the "No rush" check-in;
+  // checkpoints run while a question is on screen, so carry on to one.
+  await backToQuestions(page);
 
   const [id] = await waitForSittings(1);
+  // The first copy can be the one sent the moment the sitting began (two events);
+  // the next checkpoint brings what has been answered. Wait for that, not a race.
+  await expect
+    .poll(async () => (await stored(id!))?.session.events.length ?? 0, { timeout: 60_000, intervals: [500] })
+    .toBeGreaterThan(5);
   const early = await stored(id!);
 
   // Present, incomplete, and carrying what has been answered so far.
   expect(early!.session.complete).toBe(false);
-  expect(early!.session.events.length).toBeGreaterThan(5);
   expect(early!.session.studyCode).toBe(CODE);
   expect(early!.doc.deviceId).toMatch(/^ipad_/);
 
   // Then more answers, and the SAME sitting grows rather than becoming a second one.
   // A checkpoint turning into a duplicate would be a participant counted twice.
   await answerSome(page, 10);
+  await backToQuestions(page);
   await expect
     .poll(async () => (await stored(id!))!.session.events.length, { timeout: 60_000, intervals: [500] })
     .toBeGreaterThan(early!.session.events.length);

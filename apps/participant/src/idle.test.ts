@@ -12,11 +12,11 @@ describe("the idle lock", () => {
     expect(idleStage(120_000, HAND_BACK_IDLE)).toEqual({ kind: "expired" });
   });
 
-  it("asks mid-survey after ten minutes, then gives sixty seconds", () => {
-    expect(SURVEY_IDLE).toEqual({ quietMs: 10 * 60_000, countdownMs: 60_000 });
-    expect(idleStage(10 * 60_000 - 1, SURVEY_IDLE).kind).toBe("active");
-    expect(idleStage(10 * 60_000, SURVEY_IDLE)).toEqual({ kind: "warning", secondsLeft: 60 });
-    expect(idleStage(11 * 60_000, SURVEY_IDLE)).toEqual({ kind: "expired" });
+  it("asks mid-survey after twenty minutes, then gives sixty seconds (D-77)", () => {
+    expect(SURVEY_IDLE).toEqual({ quietMs: 20 * 60_000, countdownMs: 60_000 });
+    expect(idleStage(20 * 60_000 - 1, SURVEY_IDLE).kind).toBe("active");
+    expect(idleStage(20 * 60_000, SURVEY_IDLE)).toEqual({ kind: "warning", secondsLeft: 60 });
+    expect(idleStage(21 * 60_000, SURVEY_IDLE)).toEqual({ kind: "expired" });
   });
 
   it("goes straight back after an iPad was locked for longer than the whole period", () => {
@@ -24,15 +24,16 @@ describe("the idle lock", () => {
   });
 });
 
-describe("a sitting's first 90 minutes (D-74)", () => {
+describe("a sitting's first two hours (D-74, D-77)", () => {
   const started = "2026-11-02T09:00:00.000Z";
   const t0 = Date.parse(started);
   const policy = sittingIdle(SURVEY_IDLE, started);
 
   it("never count as idle, however long the screen is left", () => {
     expect(policy.notBeforeMs).toBe(t0 + SITTING_WINDOW_MS);
-    expect(idleSince(t0 + 89 * 60_000, t0, policy)).toBe(0);
-    expect(idleStage(idleSince(t0 + 89 * 60_000, t0, policy), policy)).toEqual({ kind: "active" });
+    expect(SITTING_WINDOW_MS).toBe(120 * 60_000);
+    expect(idleSince(t0 + 119 * 60_000, t0, policy)).toBe(0);
+    expect(idleStage(idleSince(t0 + 119 * 60_000, t0, policy), policy)).toEqual({ kind: "active" });
   });
 
   it("then ask straight away, with the whole countdown, if nobody touched it through the end", () => {
@@ -41,10 +42,10 @@ describe("a sitting's first 90 minutes (D-74)", () => {
     expect(idleStage(idleSince(at + 60_000, t0, policy), policy)).toEqual({ kind: "expired" });
   });
 
-  it("and after that count the usual ten quiet minutes from the last touch", () => {
+  it("and after that count the usual twenty quiet minutes from the last touch", () => {
     const touched = t0 + SITTING_WINDOW_MS + 5 * 60_000;
-    expect(idleStage(idleSince(touched + 9 * 60_000, touched, policy), policy)).toEqual({ kind: "active" });
-    expect(idleStage(idleSince(touched + 10 * 60_000, touched, policy), policy).kind).toBe("warning");
+    expect(idleStage(idleSince(touched + 19 * 60_000, touched, policy), policy)).toEqual({ kind: "active" });
+    expect(idleStage(idleSince(touched + 20 * 60_000, touched, policy), policy).kind).toBe("warning");
   });
 
   it("leave a policy without a window as it was", () => {
