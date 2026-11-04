@@ -980,3 +980,19 @@ street. The words in licensed questionnaires (SWEMWBS's "optimistic", RCADS-25's
 "appetite" and "Nothing is much fun anymore", the doomscrolling items' "bad
 news") cannot be reworded without breaking their validation, so a short screen
 before each questionnaire explains them instead; the items are unchanged.
+
+### The date picker back first, dropdowns as an option (2026-11-04, D-78)
+
+**Asked.** "I'm not so happy about the date picker change as the normal one is
+an iOS default and useful for most. Could we have both?"
+
+**Changed.** A date question shows the device's own date picker again (the iOS
+wheel), as before D-77. Under it, **Choose day, month and year separately**
+switches to the three dropdowns, and **Use the calendar instead** switches back;
+whichever is used, the answer and its checks are the same, and the date chosen
+in one shows in the other. `DateControl`.
+
+**Also from the same feedback.** The "words explained" screens D-77 put before
+the licensed questionnaires were taken out of both drafts again: the team does
+not want extra screens. Hard words are to be explained by tapping them instead
+(D-79).

@@ -1799,7 +1799,7 @@ input[type="range"] {
   gap: 0.35rem;
 }
 
-/* Day, month and year as three dropdowns (D-77). */
+/* Day, month and year as three dropdowns, the alternative to the picker (D-77, D-78). */
 .date-parts {
   display: flex;
   flex-wrap: wrap;
@@ -2042,6 +2042,23 @@ input[type="range"] {
 }
 
 .date-amend:hover {
+  color: var(--text);
+}
+
+/* The way to the other kind of date entry (D-78): quiet, like the amend link. */
+.date-switch {
+  align-self: flex-start;
+  min-height: 44px;
+  padding: 0 0.1rem;
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--hairline-strong);
+  font-family: var(--font-ui);
+  font-size: 0.95rem;
+  color: var(--muted);
+  cursor: pointer;
+}
+.date-switch:hover {
   color: var(--text);
 }
 

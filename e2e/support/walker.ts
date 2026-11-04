@@ -195,11 +195,16 @@ export async function settle(
   return (await read(page)) !== before;
 }
 
-/** The date dropdowns a date question shows (D-77), visible ones only. */
-export const DATE_DAY = "select.date-day:visible";
+/** A date question's entry, visible: the device's date picker, or the dropdowns (D-77, D-78). */
+export const DATE_DAY = ':is(input[type="date"], select.date-day):visible';
 
-/** Choose a date (`YYYY-MM-DD`) in the day, month and year dropdowns inside `scope`. */
+/** Enter a date (`YYYY-MM-DD`) inside `scope`, in whichever way it is showing. */
 export async function chooseDate(scope: Page | Locator, iso: string): Promise<void> {
+  const picker = scope.locator('input[type="date"]:visible').first();
+  if ((await picker.count()) > 0) {
+    await picker.fill(iso);
+    return;
+  }
   const [y, m, d] = iso.split("-").map(Number) as [number, number, number];
   await scope.locator("select.date-year:visible").first().selectOption(String(y));
   await scope.locator("select.date-month:visible").first().selectOption(String(m));

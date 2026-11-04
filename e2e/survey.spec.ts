@@ -615,6 +615,26 @@ test.describe("a shared iPad", () => {
     expect(await countRows(page, "sessions")).toBe(1);
   });
 
+  test("offers day, month and year dropdowns as well as the date picker (D-78)", async ({ page }) => {
+    await startSitting(page);
+    for (let i = 0; i < 30 && (await page.locator('.survey-body input[type="date"]:visible').count()) === 0; i += 1) await step(page);
+    const body = page.locator(".survey-body");
+    // The picker first; the dropdowns on request; and back.
+    await expect(body.locator('input[type="date"]')).toBeVisible();
+    await body.getByRole("button", { name: "Choose day, month and year separately" }).click();
+    await expect(body.locator('input[type="date"]')).toHaveCount(0);
+    // A day the month does not have is refused.
+    await body.locator("select.date-year").selectOption("2013");
+    await body.locator("select.date-month").selectOption("2");
+    await body.locator("select.date-day").selectOption("30");
+    await expect(body.locator(".error")).toContainText("has no day 30");
+    await body.locator("select.date-day").selectOption("14");
+    await expect(body.locator(".date-age")).toContainText("that makes you");
+    // Back to the picker, which shows the same date.
+    await body.getByRole("button", { name: "Use the calendar instead" }).click();
+    await expect(body.locator('input[type="date"]')).toHaveValue("2013-02-14");
+  });
+
   test("lets someone new start their own survey with a code another child left unfinished (D-77)", async ({ page }) => {
     await startSitting(page);
     await walkPastDateOfBirth(page);
