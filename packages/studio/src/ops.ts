@@ -1632,6 +1632,8 @@ export interface SettingsPatch {
   ageBand?: CompositionInput["ageBand"];
   effort?: Partial<Effort>;
   notes?: string | null;
+  /** Word explanations (D-79); an empty list or null removes them all. */
+  glossary?: { term: string; explanation: string }[] | null;
 }
 
 /**
@@ -1655,6 +1657,21 @@ export function updateSettings(draft: StudioDraft, patch: SettingsPatch): { draf
   if (patch.notes !== undefined) {
     if (patch.notes === null || !patch.notes.trim()) delete c.notes;
     else c.notes = patch.notes;
+  }
+  if (patch.glossary !== undefined) {
+    const entries = (patch.glossary ?? []).map((g) => ({ term: g.term.trim(), explanation: g.explanation.trim() }));
+    const seen = new Set<string>();
+    for (const g of entries) {
+      if (!g.term || !g.explanation) throw new StudioOpError("Each word needs both the word and what it means.", "invalid");
+      if (g.term.length > 60) throw new StudioOpError(`“${g.term.slice(0, 30)}…” is too long for a word to explain (60 characters at most).`, "invalid");
+      if (g.explanation.length > 300) throw new StudioOpError(`The explanation of “${g.term}” is too long (300 characters at most).`, "invalid");
+      const key = g.term.toLocaleLowerCase("en-GB");
+      if (seen.has(key)) throw new StudioOpError(`“${g.term}” is explained twice.`, "invalid");
+      seen.add(key);
+    }
+    if (entries.length > 100) throw new StudioOpError("A survey can explain at most 100 words.", "invalid");
+    if (entries.length === 0) delete c.glossary;
+    else c.glossary = entries;
   }
   return { draft: d };
 }

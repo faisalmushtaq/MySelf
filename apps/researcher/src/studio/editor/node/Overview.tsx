@@ -43,7 +43,7 @@ export function Overview() {
       selection: { kind: "mystory" },
     },
     { icon: "flag", label: "Completion screens", hint: "The thank-you and the review screen", selection: { kind: "completion" } },
-    { icon: "settings", label: "Survey settings", hint: "Title and going back", selection: { kind: "settings" } },
+    { icon: "settings", label: "Survey settings", hint: "Title, going back, word explanations", selection: { kind: "settings" } },
   ];
 
   const stats = [

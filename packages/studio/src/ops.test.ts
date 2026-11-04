@@ -643,6 +643,27 @@ describe("sections, blocks and screens", () => {
     expect(refusal(() => ops.updateSettings(live(), { title: " " })).code).toBe("invalid");
   });
 
+  it("explains words without touching the questions, and the release carries them (D-79)", () => {
+    const before = live();
+    const glossed = ops.updateSettings(before, {
+      glossary: [
+        { term: " optimistic ", explanation: "Feeling hopeful that good things will happen." },
+        { term: "appetite", explanation: "How much you feel like eating." },
+      ],
+    }).draft;
+    expect(glossed.composition.glossary).toEqual([
+      { term: "optimistic", explanation: "Feeling hopeful that good things will happen." },
+      { term: "appetite", explanation: "How much you feel like eating." },
+    ]);
+    // The questions are exactly as they were: a licensed questionnaire is explained, not reworded.
+    expect(glossed.instruments).toEqual(before.instruments);
+    expect(publishable(glossed).composition.glossary).toHaveLength(2);
+    // Twice, half-filled, or emptied.
+    expect(refusal(() => ops.updateSettings(before, { glossary: [{ term: "a", explanation: "x" }, { term: "A", explanation: "y" }] })).code).toBe("invalid");
+    expect(refusal(() => ops.updateSettings(before, { glossary: [{ term: "a", explanation: " " }] })).code).toBe("invalid");
+    expect("glossary" in ops.updateSettings(glossed, { glossary: [] }).draft.composition).toBe(false);
+  });
+
   it("keeps coding notes out of the release", () => {
     const noted = ops.setQuestionNotes(live(), "kss.q1", { codingNotes: "9 = extremely sleepy" }).draft;
     expect(noted.notes).toEqual({ "kss.q1": { codingNotes: "9 = extremely sleepy" } });

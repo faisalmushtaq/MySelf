@@ -1727,6 +1727,7 @@ export default function App({ initial, initialRuntime }: { initial: Startup; ini
           scales={scaleMap}
           store={storeRef.current}
           allowBack={manifest.composition.allowBackNavigation}
+          glossary={manifest.composition.glossary}
           sectionTitles={flattened.sectionTitles}
           index={phase.index}
           sessionStart={new Date(phase.session.startedAt)}

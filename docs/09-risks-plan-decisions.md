@@ -996,3 +996,31 @@ in one shows in the other. `DateControl`.
 the licensed questionnaires were taken out of both drafts again: the team does
 not want extra screens. Hard words are to be explained by tapping them instead
 (D-79).
+
+### Tap a word for its meaning (2026-11-04, D-79)
+
+**Asked.** Younger children don't know "optimistic", "appetite", what "Nothing
+is much fun anymore" or "bad news" mean. Not extra screens ("we can't add extra
+screens"); "they could highlight and click on a word or something for an
+explanation." Chosen over putting explanations in brackets in the items,
+because those items are in licensed, validated questionnaires (SWEMWBS,
+RCADS-25, the doomscrolling items) and must stay word for word.
+
+**Changed.**
+- A survey has **word explanations** (`composition.glossary`: a word or phrase
+  and what it means, up to 100). Kept on the survey, not the questions, so a
+  licensed questionnaire's items are unchanged and its licence and locks hold.
+  Optional, not defaulted: releases published before it read back and hash
+  exactly as they were.
+- On the iPad, an explained word in a question or the line under it has a
+  dotted underline; tapping it shows its meaning under the question, with OK
+  to close; tapping again closes it too. Whole words only, any capitalisation,
+  the longest phrase first, once per piece of text. Punctuation after the word
+  stays on its line. Each tap is logged as `glossary.opened` with the word, so
+  analysis can see who needed which explanation. `components/Glossed.tsx`,
+  `lib/glossary.ts`.
+- In the Studio, **Survey settings → Word explanations** adds, edits and
+  removes them; a change shows in what changed when publishing ("Changed the
+  word explanations", minor). studio-ops `glossary` does the same from the
+  repository.
+- The Studio's pacing note no longer mentions a staff PIN (removed in D-71).

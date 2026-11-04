@@ -1912,3 +1912,23 @@
 .stn-mystory .stn-panel > .stn-msgs[aria-live] {
   margin: -8px 0 12px;
 }
+
+/* Word explanations (D-79): a word, what it means, and Remove, on one row
+   where there is room; stacked on a narrow screen. */
+.stn-gloss-row {
+  display: grid;
+  grid-template-columns: minmax(8rem, 1fr) minmax(12rem, 2fr) auto;
+  gap: 0.75rem;
+  align-items: end;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--st-border);
+}
+.stn-gloss-add {
+  border-bottom: none;
+  padding-top: 0.75rem;
+}
+@media (max-width: 640px) {
+  .stn-gloss-row {
+    grid-template-columns: 1fr;
+  }
+}
