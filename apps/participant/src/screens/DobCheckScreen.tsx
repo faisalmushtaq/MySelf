@@ -26,9 +26,15 @@ export interface DobCheckScreenProps {
   onCheck: (iso: string, firstName: string) => void;
   /** Back to the start screen, carrying on nothing. */
   onCancel: () => void;
+  /**
+   * Someone new with the same code (a code shared for the day, D-77): a new
+   * survey starts under it. The unfinished one is left as it is and still
+   * uploads; nothing of it is shown.
+   */
+  onStartNew: () => void;
 }
 
-export function DobCheckScreen({ item, askName, note, locked, busy, onCheck, onCancel }: DobCheckScreenProps) {
+export function DobCheckScreen({ item, askName, note, locked, busy, onCheck, onCancel, onStartNew }: DobCheckScreenProps) {
   const [value, setValue] = useState<AnswerValue | undefined>(undefined);
   const [ok, setOk] = useState(false);
   const [name, setName] = useState("");
@@ -43,6 +49,9 @@ export function DobCheckScreen({ item, askName, note, locked, busy, onCheck, onC
         <div className="checkin-actions">
           <button type="button" className="next big" onClick={() => onCancel()}>
             OK
+          </button>
+          <button type="button" className="decline start-new" disabled={busy} onClick={() => onStartNew()}>
+            I&apos;m new — start a new survey
           </button>
         </div>
       </div>
@@ -91,8 +100,11 @@ export function DobCheckScreen({ item, askName, note, locked, busy, onCheck, onC
         <button type="button" className="next big" disabled={!ready || busy} onClick={() => onCheck(iso, name)}>
           Carry on
         </button>
+        <button type="button" className="decline start-new" disabled={busy} onClick={() => onStartNew()}>
+          I&apos;m new — start a new survey
+        </button>
         <button type="button" className="decline dob-cancel" onClick={() => onCancel()}>
-          That&apos;s not me
+          Back
         </button>
       </div>
     </div>

@@ -10,6 +10,8 @@ name: "Studio: study space housekeeping"
 #   reorder       a section's questions in a given order
 #   add-option    an answer option on a question, with a new code
 #   set-lede      a question's instructions (the line under it)
+#   set-text      a question's wording (field stem) or instructions (field lede)
+#   add-info      an information screen (title, text), after a question or first
 #   archive       single questions out of a draft (restorable)
 #   restore       archived questions back where they were
 #   dob-ages      the ages a survey's date of birth accepts
@@ -23,7 +25,7 @@ on:
       command:
         description: "What to do"
         type: choice
-        options: [list, questions, grant-owners, insert, remove-blocks, archive, restore, reorder, add-option, set-lede, dob-ages, retitle, form-label]
+        options: [list, questions, grant-owners, insert, remove-blocks, archive, restore, reorder, add-option, set-lede, set-text, add-info, dob-ages, retitle, form-label]
         default: list
       study:
         description: "Study space id (from list)"
@@ -65,8 +67,12 @@ on:
         description: "Only questions whose ID, variable or wording contains this (questions)"
         type: string
         default: ""
+      field:
+        description: "stem or lede (set-text)"
+        type: string
+        default: ""
       text:
-        description: "New text (set-lede)"
+        description: "New text (set-lede, set-text, add-info)"
         type: string
         default: ""
       items:
@@ -82,7 +88,7 @@ on:
         type: boolean
         default: false
       title:
-        description: "New survey title (retitle)"
+        description: "New survey title (retitle); screen heading (add-info)"
         type: string
         default: ""
       instruments:
@@ -151,6 +157,7 @@ jobs:
           ITEMS: ${{ inputs.items }}
           ITEM: ${{ inputs.item }}
           TEXT: ${{ inputs.text }}
+          FIELD: ${{ inputs.field }}
           FIRST: ${{ inputs.first && '--first' || '' }}
           INSTRUMENTS: ${{ inputs.instruments }}
           INSTRUMENT: ${{ inputs.instrument }}
@@ -160,7 +167,7 @@ jobs:
           node studio-ops.mjs "$COMMAND" --project myself-research \
             ${STUDY:+--study "$STUDY"} ${SURVEY:+--survey "$SURVEY"} ${SECTION:+--section "$SECTION"} \
             ${AFTER:+--after "$AFTER"} ${PIECES:+--pieces "$PIECES"} ${REPLACE:+--replace "$REPLACE"} ${MIN_AGE:+--min-age "$MIN_AGE"} ${MAX_AGE:+--max-age "$MAX_AGE"} \
-            ${ORDER:+--order "$ORDER"} ${MATCH:+--match "$MATCH"} ${TITLE:+--title "$TITLE"} ${ITEMS:+--items "$ITEMS"} ${ITEM:+--item "$ITEM"} ${TEXT:+--text "$TEXT"} $FIRST ${INSTRUMENTS:+--instruments "$INSTRUMENTS"} ${INSTRUMENT:+--instrument "$INSTRUMENT"} ${LABEL:+--label "$LABEL"} $APPLY
+            ${ORDER:+--order "$ORDER"} ${MATCH:+--match "$MATCH"} ${TITLE:+--title "$TITLE"} ${ITEMS:+--items "$ITEMS"} ${ITEM:+--item "$ITEM"} ${TEXT:+--text "$TEXT"} ${FIELD:+--field "$FIELD"} $FIRST ${INSTRUMENTS:+--instruments "$INSTRUMENTS"} ${INSTRUMENT:+--instrument "$INSTRUMENT"} ${LABEL:+--label "$LABEL"} $APPLY
 
       - name: Shred the credential
         if: always()

@@ -28,10 +28,10 @@ export interface IdlePolicy {
   notBeforeMs?: number;
 }
 
-/** How long a sitting runs before an idle screen can take the iPad back (D-74). */
-export const SITTING_WINDOW_MS = 90 * 60_000;
+/** How long a sitting runs before an idle screen can take the iPad back (D-74; two hours from D-77). */
+export const SITTING_WINDOW_MS = 120 * 60_000;
 
-/** The quiet period a sitting's screen has, opened `startedAt`: nothing before 90 minutes, then `base`. */
+/** The quiet period a sitting's screen has, opened `startedAt`: nothing before two hours, then `base`. */
 export function sittingIdle(base: IdlePolicy, startedAt: string): IdlePolicy {
   const started = Date.parse(startedAt);
   return Number.isFinite(started) ? { ...base, notBeforeMs: started + SITTING_WINDOW_MS } : base;
@@ -52,11 +52,11 @@ export function idleSince(now: number, lastActivity: number, policy: IdlePolicy)
 export const HAND_BACK_IDLE: IdlePolicy = { quietMs: 100_000, countdownMs: 20_000 };
 
 /**
- * A question in the middle of a sitting: ten minutes, because thinking is
+ * A question in the middle of a sitting: twenty minutes (ten until D-77), because thinking is
  * allowed, then "Are you still there?" for sixty seconds. The sitting stays
  * resumable — with the date-of-birth check (lib/resume-check.ts).
  */
-export const SURVEY_IDLE: IdlePolicy = { quietMs: 10 * 60_000, countdownMs: 60_000 };
+export const SURVEY_IDLE: IdlePolicy = { quietMs: 20 * 60_000, countdownMs: 60_000 };
 
 /**
  * A sitting a researcher has paused (D-73), for headsets going on: an hour,

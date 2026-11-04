@@ -141,8 +141,6 @@ type Phase =
 /** Said on the start screen after "No, that's not me" (D-75). */
 const NOT_THEIR_SITTING = "That sitting isn't yours, so it hasn't been opened. Please check your code with a member of the research team.";
 
-/** Said on the start screen to a code that has had three wrong dates of birth on this iPad. */
-const RESUME_LOCKED = "This code can't be carried on with on this iPad. Please ask a member of the research team.";
 
 /**
  * What main.tsx found before the first render (D-56): the survey this iPad is
@@ -909,6 +907,29 @@ export default function App({ initial, initialRuntime }: { initial: Startup; ini
     [unfinishedHere, busy, runtime, resumeLookup, begin, closeStaffPanel],
   );
 
+  /**
+   * "I'm new — start a new survey" (D-77): a code shared for the day matched
+   * someone else's unfinished sitting. A new sitting starts under the code, in
+   * the release new sittings use; the unfinished one is left alone.
+   */
+  const startNewInstead = useCallback(async () => {
+    const verify = phaseRef.current;
+    if (verify.kind !== "verify" || busy) return;
+    if (studyClosed) {
+      setDobNote({ text: CLOSED_TO_NEW, locked: false });
+      return;
+    }
+    setBusy(true);
+    starting.current = true;
+    try {
+      setDobNote({ text: null, locked: false });
+      await begin(verify.session.participantCode, undefined, activeRuntime.current ?? runtime, null);
+    } finally {
+      starting.current = false;
+      setBusy(false);
+    }
+  }, [busy, studyClosed, begin, runtime]);
+
   /** "Yes, that's me" (D-75): the sitting carries on where it stopped. */
   const confirmItsThem = useCallback(async () => {
     const confirm = phaseRef.current;
@@ -964,11 +985,8 @@ export default function App({ initial, initialRuntime }: { initial: Startup; ini
         const dob = dobUnit(rt.flattened.units);
         const rule = resumeRule(answers, dob ? unitKey(dob) : undefined, nameKeys(rt.flattened.units));
         if (rule.kind === "verify" && dob) {
-          if ((await getResumeGuard(trimmed))?.lockedAt) {
-            setCodeError(RESUME_LOCKED);
-            return;
-          }
-          setDobNote({ text: null, locked: false });
+          // A locked code still lets someone new start (D-77): only carrying on is refused.
+          setDobNote({ text: null, locked: Boolean((await getResumeGuard(trimmed))?.lockedAt) });
           const verify: Phase = { kind: "verify", session: existing, runtime: rt, answers, dob: rule.dob, item: dob.item, who: rule.who };
           phaseRef.current = verify;
           setPhase(verify);
@@ -1353,7 +1371,7 @@ export default function App({ initial, initialRuntime }: { initial: Startup; ini
    *
    * A finished sitting — the thank-you, the review list, an answer being
    * corrected from it — after two minutes, completed again first if it was
-   * being reviewed. A sitting in progress after ten minutes and the "Are you
+   * being reviewed. A sitting in progress after twenty minutes and the "Are you
    * still there?" countdown, recorded as suspended and left resumable, which
    * then needs the date of birth (lib/dob.ts). The date-of-birth check, and an
    * open staff panel, after two minutes. Never while a write has failed: that
@@ -1363,7 +1381,7 @@ export default function App({ initial, initialRuntime }: { initial: Startup; ini
    * Going back is `handover`, which empties the answer store, so nothing of
    * the sitting — above all the review list — can be shown after it.
    */
-  // A sitting does not time out in its first 90 minutes (D-74); one policy per sitting, so the timer is not restarted by every render.
+  // A sitting does not time out in its first two hours (D-74, D-77); one policy per sitting, so the timer is not restarted by every render.
   const sittingStartedAt = phase.kind === "running" || phase.kind === "checkin" || phase.kind === "pace" || phase.kind === "paused" ? phase.session.startedAt : null;
   const surveyIdle = useMemo(() => (sittingStartedAt ? sittingIdle(SURVEY_IDLE, sittingStartedAt) : SURVEY_IDLE), [sittingStartedAt]);
   const pausedIdle = useMemo(() => (sittingStartedAt ? sittingIdle(PAUSED_IDLE, sittingStartedAt) : PAUSED_IDLE), [sittingStartedAt]);
@@ -1679,6 +1697,7 @@ export default function App({ initial, initialRuntime }: { initial: Startup; ini
           busy={busy}
           onCheck={(iso, name) => void confirmDob(iso, name)}
           onCancel={handover}
+          onStartNew={() => void startNewInstead()}
         />
       )}
 
