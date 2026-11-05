@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>West Yorkshire Address Lookup</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&family=Source+Sans+3:wght@400;600&family=JetBrains+Mono:wght@400&display=swap">
+<style>
+/* Layout: single narrow column, the widget as the one framed object, the recorded answer beneath it */
+:root{
+  --bg:#f3f5f2;--card:#ffffff;--ink:#17201c;--muted:#56625c;--line:#d5dcd7;--accent:#1f5f4a;--chosen:#e4efe9;--err:#a3261d;
+  --display:"Fraunces",Georgia,serif;--body:"Source Sans 3",system-ui,sans-serif;--mono:"JetBrains Mono",ui-monospace,monospace;
+  --wyl-field:var(--card);--wyl-ink:var(--ink);--wyl-accent:var(--accent);--wyl-on-accent:#fff;--wyl-link:var(--accent);--wyl-error:var(--err);--wyl-chosen:var(--chosen);
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#111614;--card:#1a211e;--ink:#e6ece8;--muted:#9eaba4;--line:#2e3833;--accent:#6fc2a2;--chosen:#21352d;--err:#f08b80;--wyl-on-accent:#0d1512;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#111614;--card:#1a211e;--ink:#e6ece8;--muted:#9eaba4;--line:#2e3833;--accent:#6fc2a2;--chosen:#21352d;--err:#f08b80;--wyl-on-accent:#0d1512;color-scheme:dark}
+body{background:var(--bg);color:var(--ink);font:17px/1.55 var(--body)}
+main{max-width:38rem;margin:0 auto;padding-block:2.5rem 4rem;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:grid;gap:1.25rem}
+h1{font:600 clamp(1.6rem,5vw,2.1rem)/1.15 var(--display);margin:0;text-wrap:balance}
+.sub{color:var(--muted);margin:0}
+.eyebrow{font:400 .72rem var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:0 0 .4rem}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:1.25rem}
+.wyl input,.wyl select{border-color:var(--line)!important}
+.wyl button:focus-visible,.wyl input:focus-visible,.wyl select:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+pre{margin:0;font:.82rem/1.5 var(--mono);white-space:pre-wrap;word-break:break-word;color:var(--ink)}
+.out{border-top:1px dashed var(--line);padding-top:1rem}
+.foot{color:var(--muted);font-size:.9rem;margin:0}
+</style>
+</head>
+<body>
+<main>
+  <div>
+    <p class="eyebrow">Survey widget demo · Bradford · Calderdale · Kirklees · Leeds · Wakefield</p>
+    <h1>West Yorkshire address lookup</h1>
+  </div>
+  <p class="sub">Type an address as a respondent would. Try &ldquo;12 manor drive headingley&rdquo;, &ldquo;bridge st bradford&rdquo; or a postcode such as LS6 1DE.</p>
+  <div class="card">
+    <div id="lookup"></div>
+    <div class="out">
+      <p class="eyebrow">What the survey records</p>
+      <pre id="out">Nothing yet. Choose an address above.</pre>
+    </div>
+  </div>
+  <p class="foot" id="stats">Built from OS Code-Point Open, OS Open Names and HM Land Registry Price Paid Data.</p>
+</main>
+<script src="postcode-lookup.js"></script>
+<script>
+WYLookup.mount("#lookup", { dataUrl: "data", onChange: function (r) {
+  document.getElementById("out").textContent = r ? JSON.stringify(r, null, 2) : "Nothing yet. Choose an address above.";
+}});
+fetch("data/index.json").then(function (r) { return r.json(); }).then(function (d) {
+  var s = d.stats, f = function (n) { return n.toLocaleString("en-GB"); };
+  document.getElementById("stats").textContent = f(s.postcodes) + " postcodes and " + f(s.addresses) +
+    " addresses. Built from OS Code-Point Open, OS Open Names and HM Land Registry Price Paid Data. Contains OS data © Crown copyright and database right 2026. Contains HM Land Registry data © Crown copyright and database right 2021, licensed under the Open Government Licence v3.0. Address data processed against OS AddressBase Premium, which incorporates Royal Mail's PAF database.";
+}).catch(function () {});
+</script>
+</body>
+</html>
