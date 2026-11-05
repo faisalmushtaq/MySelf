@@ -11,6 +11,7 @@ import {
   archiveQuestion,
   diffDrafts,
   extractDraft,
+  findQuestion,
   insertFragment,
   moveOption,
   outline,
@@ -22,6 +23,7 @@ import {
   serialiseDraft,
   suggestBump,
   updateQuestion,
+  updateScreen,
   updateSettings,
   validateDraft,
   validatedFragment,
@@ -371,12 +373,16 @@ if (command === "list") {
   const itemKey = flag("item") ?? fail("Say which question with --item (its ID).");
   const field = flag("field") ?? "lede";
   if (field !== "stem" && field !== "lede") fail("--field is stem (the question) or lede (the line under it).");
-  const text = (flag("text") ?? "").trim();
-  if (!text) fail("Say the new text with --text.");
+  const given = (flag("text") ?? "").trim();
+  if (!given) fail("Say the new text with --text.");
+  // --append adds the text as a new paragraph after what is there.
+  const append = args.includes("--append");
   await editDraft(
     study,
     surveyId,
     (draft) => {
+      const current = findQuestion(draft, itemKey)?.item?.[field]?.text ?? "";
+      const text = append && current.trim() ? `${current.trimEnd()}\n\n${given}` : given;
       const out = updateQuestion(draft, itemKey, { [field]: { text } });
       console.log(`  ${itemKey}: ${field === "stem" ? "question" : "instructions"} now “${text}”`);
       return out.draft;
@@ -434,6 +440,26 @@ if (command === "list") {
       return updateSettings(draft, { glossary: next }).draft;
     },
     `Word explanation for “${term}”`,
+  );
+} else if (command === "set-screen") {
+  // The finish or review screen's text (--item finish|review), as --text; --append adds it as a new paragraph.
+  const study = studyArg();
+  const surveyId = surveyArg();
+  const which = flag("item") ?? "finish";
+  if (which !== "finish" && which !== "review") fail("--item is finish or review.");
+  const given = (flag("text") ?? "").trim();
+  if (!given) fail("Say the new text with --text.");
+  const append = args.includes("--append");
+  await editDraft(
+    study,
+    surveyId,
+    (draft) => {
+      const current = draft.composition.screens?.[which]?.body?.text ?? "";
+      const body = append && current.trim() ? `${current.trimEnd()}\n\n${given}` : given;
+      console.log(`  ${which} screen now reads:\n${body.split("\n").map((l) => `    ${l}`).join("\n")}`);
+      return updateScreen(draft, which, { body }).draft;
+    },
+    `The ${which} screen's text`,
   );
 } else if (command === "add-option") {
   // An answer option on a question (and every question sharing its list), with a new code; first on screen with --first.

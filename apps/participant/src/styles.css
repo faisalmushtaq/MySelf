@@ -2589,3 +2589,11 @@ input[type="range"] {
 .wrapup-card h3 {
   margin: 0 0 0.5rem;
 }
+
+/* Where to get support, on a sitting a researcher ended (D-80): the survey's own text, line breaks kept. */
+.ended-support {
+  white-space: pre-wrap;
+  max-width: 52ch;
+  text-align: left;
+  line-height: 1.6;
+}
