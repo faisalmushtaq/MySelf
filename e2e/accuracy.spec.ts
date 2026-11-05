@@ -387,7 +387,8 @@ test.describe("on the r9.0.0 candidate", () => {
 
     // A postcode the list doesn't know is questioned, with a way out for anyone unsure.
     await postcode.fill("LS99 9ZZ");
-    await expect(page.locator(".field-note").nth(1)).toHaveText("We can't find LS99 9ZZ in West Yorkshire. Check it's typed correctly.");
+    // The candidate checks against Yorkshire and the Humber (D-83).
+    await expect(page.locator(".field-note").nth(1)).toHaveText("We can't find LS99 9ZZ in Yorkshire. Check it's typed correctly.");
     await expect(next).toBeDisabled();
     await page.getByRole("button", { name: "I'm not sure of my postcode" }).click();
     await expect(postcode).toHaveValue("");
@@ -399,7 +400,7 @@ test.describe("on the r9.0.0 candidate", () => {
     await page.getByRole("button", { name: "Search for my street again" }).click();
     await expect(search).toBeFocused();
     await search.fill("7 Nowhere In Particular Lane");
-    await expect(page.locator(".field-note").first()).toContainText("We can't find that street in West Yorkshire");
+    await expect(page.locator(".field-note").first()).toContainText("We can't find that street in Yorkshire");
     await page.getByRole("button", { name: "My street isn't here" }).click();
     await expect(house).toHaveValue("7");
     await expect(street).toHaveValue("Nowhere In Particular Lane");

@@ -286,21 +286,21 @@ describe("the home address instead of a secret code (D-52)", () => {
   it("asks name, date of birth and address, and no secret code", () => {
     expect(items.map((i) => i.key)).toEqual(["first_name", "last_name", "dob", "home_address"]);
     const address = items.find((i) => i.key === "home_address")!;
-    expect(address).toMatchObject({ responseType: "form_fields", identifying: true, postcodeCheck: { asset: "postcodes_west_yorkshire" } });
+    expect(address).toMatchObject({ responseType: "form_fields", identifying: true, postcodeCheck: { asset: "postcodes_yorkshire_humber" } });
   });
 
   it("pins the postcode list it checks against, by hash", () => {
-    const pinned = manifest.assets["postcodes_west_yorkshire"]!;
+    const pinned = manifest.assets["postcodes_yorkshire_humber"]!;
     const file = readFileSync(fileURLToPath(new URL(`../../../${pinned.path}`, import.meta.url)));
     expect(pinned.bytes).toBe(file.length);
     expect(pinned.sha256).toBe(`sha256:${createHash("sha256").update(file).digest("hex")}`);
-    // and, from r9.0.0, the street list (D-53)
-    expect(Object.keys(manifest.assets).sort()).toEqual(["postcodes_west_yorkshire", "streets_west_yorkshire"]);
+    // and, from r9.0.0, the street list (D-53); across Yorkshire and the Humber since D-83
+    expect(Object.keys(manifest.assets).sort()).toEqual(["postcodes_yorkshire_humber", "streets_yorkshire_humber"]);
   });
 
   it("refuses to publish an address question whose postcode list it does not have", () => {
     expect(() => buildRelease(ybmComposition, { ...registries, assets: {} }, meta)).toThrow(
-      /home_address: postcode list 'postcodes_west_yorkshire' is not among the release's assets/,
+      /home_address: postcode list 'postcodes_yorkshire_humber' is not among the release's assets/,
     );
   });
 
@@ -343,17 +343,17 @@ describe("shorter consent, sleep quality and sanity checks (D-53)", () => {
   });
 
   it("pins the street list it searches, by hash", () => {
-    const pinned = manifest.assets["streets_west_yorkshire"]!;
+    const pinned = manifest.assets["streets_yorkshire_humber"]!;
     const file = readFileSync(fileURLToPath(new URL(`../../../${pinned.path}`, import.meta.url)));
-    expect(pinned.path).toMatch(/streets-west-yorkshire-\d{4}-\d{2}\.txt$/);
+    expect(pinned.path).toMatch(/streets-yorkshire-humber-\d{4}-\d{2}\.txt$/);
     expect(pinned.bytes).toBe(file.length);
     expect(pinned.sha256).toBe(`sha256:${createHash("sha256").update(file).digest("hex")}`);
   });
 
   it("refuses a street search whose list, field or postcode check is missing", () => {
     expect(() =>
-      buildRelease(ybmComposition, { ...registries, assets: { postcodes_west_yorkshire: registries.assets!["postcodes_west_yorkshire"]! } }, meta),
-    ).toThrow(/home_address: street list 'streets_west_yorkshire' is not among the release's assets/);
+      buildRelease(ybmComposition, { ...registries, assets: { postcodes_yorkshire_humber: registries.assets!["postcodes_yorkshire_humber"]! } }, meta),
+    ).toThrow(/home_address: street list 'streets_yorkshire_humber' is not among the release's assets/);
     const bad = structuredClone(registries);
     const address = bad.modules.find((m) => m.instrument === "ybm_identity")!.forms[0]!.items.find((i) => i.key === "home_address")!;
     if (address.responseType !== "form_fields") throw new Error("wrong type");

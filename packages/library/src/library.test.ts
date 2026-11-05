@@ -599,12 +599,13 @@ describe("D-53: shorter consent, sleep quality and sanity checks", () => {
     expect(ability.options.map((o) => o.label)).toEqual(["Very well", "Well", "Not very well", "Only a few words", "Not at all"]);
   });
 
-  it("the address question opens on the street search, with the postcode last and optional, and whole addresses online (D-53, D-80, D-81)", () => {
+  it("the address question opens on the street search, with the postcode last and optional, and whole addresses online, across Yorkshire and the Humber (D-53, D-80, D-81, D-83)", () => {
     const address = moduleItems("ybm_identity").find((i) => i.key === "home_address")!;
     if (address.responseType !== "form_fields") throw new Error("wrong type");
+    expect(address.postcodeCheck).toEqual({ field: "postcode", asset: "postcodes_yorkshire_humber", areaName: "Yorkshire" });
     expect(address.streetCheck).toEqual({
       field: "street",
-      asset: "streets_west_yorkshire",
+      asset: "streets_yorkshire_humber",
       areaKey: "area",
       districtKey: "postcode_district",
       searchFirst: true,

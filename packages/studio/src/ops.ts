@@ -1623,6 +1623,44 @@ export function updateScreen(
   return { draft: d };
 }
 
+/** A file a release pins (D-52): where it lives in the repository, its hash and its size. */
+export interface AssetPin {
+  path: string;
+  sha256: string;
+  bytes: number;
+}
+
+/**
+ * Point an address question at other postcode and street lists (D-83: from
+ * West Yorkshire's to Yorkshire and the Humber's), and pin those lists on the
+ * draft. The Studio does not edit lists, so the pins are given — from the
+ * repository, and the publish check accepts only pins a release there carries.
+ * Only on a question whose module may be changed: the home address is an
+ * identity question, so its module must be unlocked first.
+ */
+export function setAddressLists(
+  draft: StudioDraft,
+  itemKey: string,
+  lists: { postcode: { asset: string; areaName: string; pin: AssetPin }; street?: { asset: string; pin: AssetPin } },
+): { draft: StudioDraft } {
+  const d = clone(draft);
+  const q = live(d, itemKey);
+  const item = q.item as ItemDefinition & { postcodeCheck?: { asset: string; areaName: string }; streetCheck?: { asset: string } };
+  if (item.responseType !== "form_fields" || !item.postcodeCheck) {
+    throw new StudioOpError(`${quoted(q.item)} is not an address question with a postcode check.`, "invalid");
+  }
+  requireEditable(d, q.instrument, "change which area its address is checked against");
+  if (lists.street && !item.streetCheck) throw new StudioOpError(`${quoted(q.item)} has no street list to change.`, "invalid");
+  item.postcodeCheck = { ...item.postcodeCheck, asset: lists.postcode.asset, areaName: lists.postcode.areaName };
+  if (lists.street && item.streetCheck) item.streetCheck = { ...item.streetCheck, asset: lists.street.asset };
+  d.assets = {
+    ...(d.assets ?? {}),
+    [lists.postcode.asset]: lists.postcode.pin,
+    ...(lists.street ? { [lists.street.asset]: lists.street.pin } : {}),
+  };
+  return { draft: d };
+}
+
 export interface SettingsPatch {
   title?: string;
   allowBackNavigation?: boolean;

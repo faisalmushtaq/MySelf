@@ -133,7 +133,10 @@ const scenarios: Scenario[] = [
         /home address/,
         async (page) => {
           // Starts typing the street, chooses it, then adds the building's name (D-80).
+          // A street name in many places: the screen asks for the town, and the postcode district works too (D-83).
           await page.getByRole("textbox", { name: "Start typing your address" }).fill("woodhouse ln");
+          await expect(page.locator(".street-town")).toContainText("Lots of places have a woodhouse ln");
+          await page.getByRole("textbox", { name: "Start typing your address" }).fill("woodhouse ln ls2");
           await page.locator(".street-match", { hasText: "Woodhouse Lane" }).filter({ hasText: "LS2" }).click();
           await page.getByRole("textbox", { name: "House number or name" }).fill("University of Leeds");
         },

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { normalisePostcode, splitHouse, type StreetList, type StreetMatch } from "@myself/engine";
 import { addressFinderBuilt, pickAddress, suggestAddresses, type Suggestion } from "../../lib/addresses.js";
-import { postcodeList } from "../../lib/postcodes.js";
+import { loadPostcodeList, postcodeList } from "../../lib/postcodes.js";
 import { streetList as loadStreets } from "../../lib/streets.js";
 import { truncateText } from "../../lib/text.js";
 import type { ControlProps } from "./shared.js";
@@ -21,7 +21,16 @@ export function FormFieldsControl({ item, value, onAnswer, onValidity, onSubmit 
   // already saved was confirmed when it was given, so a return visit does not
   // ask again.
   const check = item.postcodeCheck;
-  const list = check ? postcodeList(check.asset) : null;
+  // Loaded on first use for a list kept out of the app's first download (D-83); until then, no check.
+  const [list, setList] = useState(() => (check ? postcodeList(check.asset) : null));
+  useEffect(() => {
+    if (!check || list) return;
+    let live = true;
+    void loadPostcodeList(check.asset).then((l) => live && setList(l));
+    return () => {
+      live = false;
+    };
+  }, [check?.asset]);
   const saved = check ? normalisePostcode(current[check.field] ?? "") : null;
   /** The postcode the participant said is typed correctly (step one). */
   const [typedRight, setTypedRight] = useState<string | null>(saved);
@@ -110,6 +119,20 @@ export function FormFieldsControl({ item, value, onAnswer, onValidity, onSubmit 
     () => (streetList && searching && typed.street.trim() ? streetList.search(typed.street, 6) : []),
     [streetList, searching, typed.street],
   );
+  /**
+   * A street name in more places than the list can show ("Church Lane" is in
+   * hundreds across the region, D-83): ask for the town too, rather than leave
+   * someone hunting for theirs among six from elsewhere.
+   */
+  const askTown = (query: string, shown: number) => {
+    if (!streetList || shown === 0 || streetList.sameName(query) <= shown) return null;
+    const street = query.trim().replace(/\s+/g, " ");
+    return (
+      <p className="street-town" role="status">
+        Lots of places have a {street}. Add your town or village after it, like “{street} Harrogate”.
+      </p>
+    );
+  };
 
   const report = (next: Record<string, string>, confirmedPostcode: string | null) => {
     if (item.responseType !== "form_fields") return;
@@ -340,6 +363,7 @@ export function FormFieldsControl({ item, value, onAnswer, onValidity, onSubmit 
               ))}
             </ul>
           )}
+          {!showFound && askTown(typed.street, addressMatches.length)}
           {!showFound && addressMatches.length > 0 && (
             <ul className="street-matches" aria-label="Streets that match">
               {addressMatches.map((m) => (
@@ -502,6 +526,7 @@ export function FormFieldsControl({ item, value, onAnswer, onValidity, onSubmit 
                 {dontKnowLabel}
               </button>
             )}
+            {isStreet && askTown(streetQuery, matches.length)}
             {isStreet && matches.length > 0 && (
               <ul className="street-matches" aria-label="Streets that match">
                 {matches.map((m) => (

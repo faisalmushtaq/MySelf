@@ -1106,3 +1106,44 @@ after, where to turn.
 
 **For the team.** Check the wording against the ethics approval's
 safeguarding section: it promises privacy from teachers and family.
+
+### Addresses across Yorkshire and the Humber (2026-11-05, D-83)
+
+**Reported.** Pupils at GSAL (a Leeds school) who live in Harrogate couldn't
+put their address in: the postcode list and street list held only West
+Yorkshire's five councils, so an HG postcode was met with "We can't find it in
+West Yorkshire" and two confirmations, and street search found nothing. The
+PI chose Yorkshire and the Humber, the ONS region (which Connected Yorkshire's
+linkage area matches), over the Yorkshire counties alone.
+
+**Changed.**
+- Two new lists, built by the same scripts with a new region,
+  `yorkshire-humber`: every council in the region — West Yorkshire's five,
+  Barnsley, Doncaster, Rotherham, Sheffield, North Yorkshire, York, East Riding
+  of Yorkshire, Hull, North Lincolnshire and North East Lincolnshire.
+  - `postcodes-yorkshire-humber-2026-09-07.txt`: 153,297 postcodes in use, in
+    411 wards (ONSPD via doogal.co.uk; Barnsley and Sheffield under their 2023
+    codes, E08000038 and E08000039).
+  - `streets-yorkshire-humber-2026-10.txt`: 91,790 named roads (OS Open Names,
+    October 2026; unitary councils read from COUNTY_UNITARY).
+  West Yorkshire's lists stay, unchanged, for the releases that pin them; the
+  script rebuilds West Yorkshire's postcode list byte for byte.
+- The address question checks against them, and says "Yorkshire" where it said
+  "West Yorkshire" ("Is your home outside Yorkshire?"). A postcode outside the
+  region is still questioned once, then kept.
+- The address finder (D-81) suggests from the region's 240 postcode districts
+  (generated: `apps/functions/src/address-outwards.ts`), or its core postcode
+  areas if Ideal Postcodes refuses the list, biased towards York.
+- On the iPad the region's postcode list (681 KB) is a separate chunk, loaded
+  when an address question first needs it and precached for offline use; West
+  Yorkshire's stays in the app as before.
+- Street names repeat across a region ("Church Lane" is in 241 places, "Main
+  Street" in 242), more than the six matches the screen shows. So the search
+  now takes the town, village or postcode district typed after the street
+  ("church lane harrogate", "woodhouse ln ls2"), and when a name is in more
+  places than are shown the screen says "Lots of places have a Church Lane. Add
+  your town or village after it". `StreetList.sameName`.
+- The r9.0.0 candidate is re-cut with the new lists and D-83 (its hash
+  changes). Studio-published surveys switch with studio-ops `address-area`
+  (Studio op `setAddressLists`: only on an unlocked identity module, and it
+  pins the lists from the repository, which the publish check accepts).

@@ -26,13 +26,36 @@
 import { readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
-const DISTRICTS = new Set(["Bradford", "Calderdale", "Kirklees", "Leeds", "Wakefield"]);
-
-const [dir, edition] = process.argv.slice(2);
-if (!dir || !/^\d{4}-\d{2}$/.test(edition ?? "")) {
-  console.error("Usage: node scripts/build-streets.mjs <OS Open Names dir> <edition YYYY-MM>");
+const WEST_YORKSHIRE = ["Bradford", "Calderdale", "Kirklees", "Leeds", "Wakefield"];
+const REGIONS = {
+  // The 100 km grid squares to read: those the region lies in, and neighbours where a boundary comes close.
+  "west-yorkshire": { name: "West Yorkshire", districts: WEST_YORKSHIRE, squares: ["SD", "SE", "SK"] },
+  // Every council in Yorkshire and the Humber (D-83).
+  "yorkshire-humber": {
+    name: "Yorkshire and the Humber",
+    districts: [
+      ...WEST_YORKSHIRE,
+      "Barnsley",
+      "Doncaster",
+      "Rotherham",
+      "Sheffield",
+      "North Yorkshire",
+      "York",
+      "East Riding of Yorkshire",
+      "City of Kingston upon Hull",
+      "North Lincolnshire",
+      "North East Lincolnshire",
+    ],
+    squares: ["NY", "NZ", "SD", "SE", "SK", "TA", "TF"],
+  },
+};
+const [dir, edition, regionKey = "west-yorkshire"] = process.argv.slice(2);
+const region = REGIONS[regionKey];
+if (!dir || !/^\d{4}-\d{2}$/.test(edition ?? "") || !region) {
+  console.error(`Usage: node scripts/build-streets.mjs <OS Open Names dir> <edition YYYY-MM> [${Object.keys(REGIONS).join("|")}]`);
   process.exit(1);
 }
+const DISTRICTS = new Set(region.districts);
 
 /** Minimal RFC 4180 reader: names such as "Leeds Road, The" are quoted. */
 function parseCsv(text) {
@@ -77,18 +100,22 @@ const NAME1 = col("NAME1");
 const LOCAL_TYPE = col("LOCAL_TYPE");
 const PLACE = col("POPULATED_PLACE");
 const BOROUGH = col("DISTRICT_BOROUGH");
+// Unitary councils (North Yorkshire, York, Hull, …) have no district: their name is in COUNTY_UNITARY.
+const UNITARY = col("COUNTY_UNITARY");
 const OUTWARD = col("POSTCODE_DISTRICT");
 
 /** area|district|outward -> street names */
 const blocks = new Map();
 let kept = 0;
-const files = readdirSync(join(dir, "Data")).filter((f) => /^(SD|SE|SK)\d\d\.csv$/.test(f));
+const squares = new RegExp(`^(${region.squares.join("|")})\\d\\d\\.csv$`);
+const files = readdirSync(join(dir, "Data")).filter((f) => squares.test(f));
 for (const file of files) {
   for (const r of parseCsv(readFileSync(join(dir, "Data", file), "utf8"))) {
-    if (r[LOCAL_TYPE] !== "Named Road" || !DISTRICTS.has(r[BOROUGH])) continue;
+    const council = r[BOROUGH] || r[UNITARY];
+    if (r[LOCAL_TYPE] !== "Named Road" || !DISTRICTS.has(council)) continue;
     const name = (r[NAME1] ?? "").trim();
     if (!name || name.includes("|") || name.startsWith("@")) continue;
-    const key = [r[PLACE] ?? "", r[BOROUGH], (r[OUTWARD] ?? "").replace(/\s/g, "")].join("|");
+    const key = [r[PLACE] ?? "", council, (r[OUTWARD] ?? "").replace(/\s/g, "")].join("|");
     const set = blocks.get(key) ?? new Set();
     if (!set.has(name)) kept += 1;
     set.add(name);
@@ -97,12 +124,16 @@ for (const file of files) {
 }
 
 const lines = [
-  `# West Yorkshire named roads, OS Open Names ${edition}. Contains OS data © Crown copyright and database rights ${edition.slice(0, 4)}. Open Government Licence v3.0.`,
+  `# ${region.name} named roads, OS Open Names ${edition}. Contains OS data © Crown copyright and database rights ${edition.slice(0, 4)}. Open Government Licence v3.0.`,
 ];
 for (const key of [...blocks.keys()].sort()) {
   lines.push(`@${key}`);
   for (const name of [...blocks.get(key)].sort()) lines.push(name);
 }
-const out = join("releases", "assets", `streets-west-yorkshire-${edition}.txt`);
+// Every council must have streets: a name that does not match OS's spelling would leave one out silently.
+const boroughs = new Set([...blocks.keys()].map((k) => k.split("|")[1]));
+const missing = region.districts.filter((d) => !boroughs.has(d));
+if (missing.length) throw new Error(`no streets found for ${missing.join(", ")}: check the DISTRICT_BOROUGH spelling in OS Open Names`);
+const out = join("releases", "assets", `streets-${regionKey}-${edition}.txt`);
 writeFileSync(out, `${lines.join("\n")}\n`);
 console.log(`${out}: ${kept} streets in ${blocks.size} area/postcode-district blocks, from ${files.length} grid files`);

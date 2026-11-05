@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  WEST_YORKSHIRE_OUTWARDS,
+  ADDRESS_OUTWARDS,
   addressFrom,
   addressRequest,
   outcomeOf,
@@ -22,16 +22,16 @@ describe("the address finder (D-81)", () => {
     expect(searchText(" .. ")).toBeNull();
   });
 
-  it("asks only for West Yorkshire, by district, then by postcode area", () => {
-    expect(WEST_YORKSHIRE_OUTWARDS).toContain("LS6");
-    expect(WEST_YORKSHIRE_OUTWARDS).toContain("OL14");
-    expect(WEST_YORKSHIRE_OUTWARDS).not.toContain("YO1");
+  it("asks only for Yorkshire and the Humber, by district, then by postcode area (D-83)", () => {
+    for (const district of ["LS6", "OL14", "HG1", "YO1", "HU1", "S1", "DN15", "DN31"]) expect(ADDRESS_OUTWARDS).toContain(district);
+    expect(ADDRESS_OUTWARDS).not.toContain("M1");
+    expect(ADDRESS_OUTWARDS).not.toContain("NE1");
     const first = suggestParams("12 hyde park", "districts");
     expect(first).toMatchObject({ query: "12 hyde park", context: "GBR", limit: "6" });
-    expect(first["postcode_outward"]!.split(",")).toHaveLength(WEST_YORKSHIRE_OUTWARDS.length);
+    expect(first["postcode_outward"]!.split(",")).toHaveLength(ADDRESS_OUTWARDS.length);
     expect(first["bias_lonlat"]).toMatch(/^-1\.\d+,53\.\d+,\d+$/);
     const second = suggestParams("12 hyde park", "areas");
-    expect(second["postcode_area"]).toBe("BD,HD,HX,LS,WF");
+    expect(second["postcode_area"]).toBe("BD,DN,HD,HG,HU,HX,LS,S,WF,YO");
     expect(second["postcode_outward"]).toBeUndefined();
   });
 
