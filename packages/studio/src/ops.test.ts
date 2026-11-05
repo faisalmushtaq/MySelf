@@ -664,6 +664,29 @@ describe("sections, blocks and screens", () => {
     expect("glossary" in ops.updateSettings(glossed, { glossary: [] }).draft.composition).toBe(false);
   });
 
+  it("points the address at Yorkshire and the Humber's lists, only once unlocked (D-83)", async () => {
+    const { releaseAssets } = await import("@myself/release");
+    const pins = releaseAssets();
+    const r800 = JSON.parse(readFileSync(resolve(__dirname, "../../../releases/ybm_nd2026_standard_r8.0.0.manifest.json"), "utf8"));
+    const before = extractDraft(r800);
+    const lists = {
+      postcode: { asset: "postcodes_yorkshire_humber", areaName: "Yorkshire", pin: pins["postcodes_yorkshire_humber"]! },
+      street: { asset: "streets_yorkshire_humber", pin: pins["streets_yorkshire_humber"]! },
+    };
+    // The home address is an identity question: its module has to be unlocked, with a reason.
+    expect(refusal(() => ops.setAddressLists(before, "ybm_identity.home_address", lists)).code).toBe("protected");
+    const unlocked = ops.unlockModule(before, "ybm_identity", { ...actor, reason: "Pupils at Leeds schools live across Yorkshire (D-83)" }).draft;
+    // r8.0.0 has no street list yet (that came with D-53): asking to change one is refused, not ignored.
+    expect(refusal(() => ops.setAddressLists(unlocked, "ybm_identity.home_address", lists)).message).toMatch(/no street list/);
+    const after = ops.setAddressLists(unlocked, "ybm_identity.home_address", { postcode: lists.postcode }).draft;
+    const item = findQuestion(after, "ybm_identity.home_address")!.item as { postcodeCheck: { asset: string; areaName: string } };
+    expect(item.postcodeCheck).toMatchObject({ asset: "postcodes_yorkshire_humber", areaName: "Yorkshire" });
+    expect(after.assets?.["postcodes_yorkshire_humber"]).toEqual(pins["postcodes_yorkshire_humber"]);
+    // It still makes a release, and the release pins the new lists.
+    expect(Object.keys(publishable(after).assets)).toContain("postcodes_yorkshire_humber");
+    expect(refusal(() => ops.setAddressLists(unlocked, "ybm_identity.first_name", lists)).code).toBe("invalid");
+  });
+
   it("keeps coding notes out of the release", () => {
     const noted = ops.setQuestionNotes(live(), "kss.q1", { codingNotes: "9 = extremely sleepy" }).draft;
     expect(noted.notes).toEqual({ "kss.q1": { codingNotes: "9 = extremely sleepy" } });

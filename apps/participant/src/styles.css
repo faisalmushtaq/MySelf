@@ -1302,6 +1302,14 @@ input[type="range"] {
   color: var(--text);
 }
 
+/* A street name in many places (D-83): a nudge to add the town, under the box, above the matches. */
+.street-town {
+  margin: 0.5rem 0 0;
+  font-family: var(--font-body);
+  font-size: 0.95rem;
+  color: var(--text);
+}
+
 .confirm-row {
   display: flex;
   flex-wrap: wrap;

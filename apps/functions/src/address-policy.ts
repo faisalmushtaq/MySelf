@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { REGION_AREAS, REGION_OUTWARDS } from "./address-outwards.js";
 
 /**
  * The address finder's rules (D-81): what the iPad may ask, what is asked of
@@ -9,28 +10,26 @@ import { z } from "zod";
  */
 
 /**
- * The postcode districts with West Yorkshire addresses (OS Code-Point Open,
- * July 2026: every live postcode in Bradford, Calderdale, Kirklees, Leeds and
- * Wakefield). Suggestions are limited to these, so a child only ever sees
- * Yorkshire addresses. A few districts cross the county edge (LS24 or OL14,
- * say), so an address just outside can appear; the postcode check on the iPad
- * then says so, as for any postcode outside the list.
+ * The postcode districts with addresses in Yorkshire and the Humber (D-83;
+ * West Yorkshire only until then): every live postcode in the region's fifteen
+ * councils, from the ONS Postcode Directory (generated, address-outwards.ts).
+ * Suggestions are limited to these, so a child only ever sees addresses in the
+ * region. A few districts cross its edge (BB18 or S40, say), so an address just
+ * outside can appear; the postcode check on the iPad then says so, as for any
+ * postcode outside the list.
  */
-export const WEST_YORKSHIRE_OUTWARDS = [
-  "BD1", "BD2", "BD3", "BD4", "BD5", "BD6", "BD7", "BD8", "BD9", "BD10", "BD11", "BD12", "BD13", "BD14", "BD15",
-  "BD16", "BD17", "BD18", "BD19", "BD20", "BD21", "BD22", "DN6", "HD1", "HD2", "HD3", "HD4", "HD5", "HD6", "HD7",
-  "HD8", "HD9", "HX1", "HX2", "HX3", "HX4", "HX5", "HX6", "HX7", "LS1", "LS2", "LS3", "LS4", "LS5", "LS6", "LS7",
-  "LS8", "LS9", "LS10", "LS11", "LS12", "LS13", "LS14", "LS15", "LS16", "LS17", "LS18", "LS19", "LS20", "LS21",
-  "LS22", "LS23", "LS24", "LS25", "LS26", "LS27", "LS28", "LS29", "OL14", "OL15", "S71", "S72", "S75", "WF1",
-  "WF2", "WF3", "WF4", "WF5", "WF6", "WF7", "WF8", "WF9", "WF10", "WF11", "WF12", "WF13", "WF14", "WF15", "WF16",
-  "WF17",
-] as const;
+export const ADDRESS_OUTWARDS: readonly string[] = REGION_OUTWARDS;
 
-/** The postcode areas most of West Yorkshire lies in, if Ideal Postcodes refuses the district list. */
-export const WEST_YORKSHIRE_AREAS = "BD,HD,HX,LS,WF";
+/**
+ * The postcode areas most of the region lies in, if Ideal Postcodes refuses the
+ * district list: the areas of the region's districts, without those it only
+ * touches at its edge (Lancashire's BB and LA, Teesside's TS, County Durham's
+ * DL, Lincoln's LN, Oldham's OL).
+ */
+export const ADDRESS_AREAS = REGION_AREAS.filter((a) => !["BB", "DL", "LA", "LN", "OL", "TS"].includes(a)).join(",");
 
-/** Middle of West Yorkshire (near Dewsbury), and far enough to cover it: nearer addresses first. */
-export const WEST_YORKSHIRE_BIAS = "-1.63,53.73,40000";
+/** Middle of Yorkshire and the Humber (near York), and far enough to cover it: nearer addresses first. */
+export const ADDRESS_BIAS = "-1.25,53.95,110000";
 
 export const SUGGESTIONS = 6;
 const SUGGESTION_ID = /^[A-Za-z0-9_|.:-]{1,80}$/;
@@ -48,14 +47,14 @@ export function searchText(input: string): string | null {
   return text.length >= 3 && text.length <= 100 && /[A-Za-z0-9]/.test(text) ? text : null;
 }
 
-/** The query for suggestions: limited to West Yorkshire's districts, or its postcode areas as the second try. */
+/** The query for suggestions: limited to the region's districts, or its postcode areas as the second try. */
 export function suggestParams(query: string, narrow: "districts" | "areas"): Record<string, string> {
   return {
     query,
     limit: String(SUGGESTIONS),
     context: "GBR",
-    ...(narrow === "districts" ? { postcode_outward: WEST_YORKSHIRE_OUTWARDS.join(",") } : { postcode_area: WEST_YORKSHIRE_AREAS }),
-    bias_lonlat: WEST_YORKSHIRE_BIAS,
+    ...(narrow === "districts" ? { postcode_outward: ADDRESS_OUTWARDS.join(",") } : { postcode_area: ADDRESS_AREAS }),
+    bias_lonlat: ADDRESS_BIAS,
   };
 }
 

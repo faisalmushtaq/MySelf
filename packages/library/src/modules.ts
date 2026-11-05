@@ -311,22 +311,24 @@ export const ybmIdentity: ModuleInput = {
               patternHint: "A postcode looks like LS6 2AA",
             },
           ],
-          postcodeCheck: { field: "postcode", asset: "postcodes_west_yorkshire", areaName: "West Yorkshire" },
+          // All of Yorkshire and the Humber (D-83): pupils at a Leeds school can live in Harrogate, York or Hull.
+          postcodeCheck: { field: "postcode", asset: "postcodes_yorkshire_humber", areaName: "Yorkshire" },
           // The street search leads (D-80), so nobody needs their postcode first (D-53).
           streetCheck: {
             field: "street",
-            asset: "streets_west_yorkshire",
+            asset: "streets_yorkshire_humber",
             areaKey: "area",
             districtKey: "postcode_district",
             searchFirst: true,
-            // Online, whole West Yorkshire addresses from the study's address finder, with their UPRN (D-81).
+            // Online, whole addresses in the region from the study's address finder, with their UPRN (D-81, D-83).
             addressFinder: { uprnKey: "uprn" },
           },
           researcherNote:
             "Direct identifier — identity-schema routed (D-09, D-52). Stored as given, as {postcode, house, street}. The postcode is checked on the device against the release's West Yorkshire list; one not in the list is questioned once and then kept. The participant ID is derived from name and date of birth, not from the address. " +
             "From r9.0.0 (D-53) the street typed is matched against West Yorkshire's named roads, and a match chosen adds {area, postcode_district}. " +
             "Revision 2 (D-80): the screen opens on one search box ('Start typing your address'); a house number typed before the street is stored as house, the street chosen as street, and the postcode, now last and optional, only when the participant knows it. Same keys as revision 1. " +
-            "D-81: when the iPad is online the search also offers whole addresses from the study's address finder (Ideal Postcodes, West Yorkshire only); choosing one fills in every field and adds {uprn}. Offline, or if the finder is unavailable, the street search answers as above.",
+            "D-81: when the iPad is online the search also offers whole addresses from the study's address finder (Ideal Postcodes, West Yorkshire only); choosing one fills in every field and adds {uprn}. Offline, or if the finder is unavailable, the street search answers as above. " +
+            "D-83: the postcode check, street list and address finder cover Yorkshire and the Humber (fifteen councils), not only West Yorkshire; a postcode outside the region is still questioned once, then kept.",
         },
       ],
     },

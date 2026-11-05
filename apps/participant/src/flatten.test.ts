@@ -470,16 +470,22 @@ describe("the home address (D-52)", () => {
 
   it("checks postcodes against exactly the list the release pins", async () => {
     const { createHash } = await import("node:crypto");
-    const { POSTCODE_LISTS, postcodeList } = await import("./lib/postcodes.js");
+    const { POSTCODE_LISTS, loadPostcodeList, postcodeList } = await import("./lib/postcodes.js");
     for (const [asset, pinned] of Object.entries(current.assets).filter(([k]) => k.startsWith("postcodes_"))) {
-      const text = POSTCODE_LISTS[asset];
-      expect(text, asset).toBeDefined();
-      expect(`sha256:${createHash("sha256").update(text!, "utf8").digest("hex")}`, asset).toBe(pinned.sha256);
+      expect(POSTCODE_LISTS[asset], asset).toBeDefined();
+      const text = await POSTCODE_LISTS[asset]!();
+      expect(`sha256:${createHash("sha256").update(text, "utf8").digest("hex")}`, asset).toBe(pinned.sha256);
     }
     const list = postcodeList("postcodes_west_yorkshire")!;
     expect(list.lookup("ls2 9jt")).toEqual({ ward: "Little London & Woodhouse", district: "Leeds" });
     expect(list.lookup("HG1 1AA")).toBeNull();
     expect(postcodeList("no_such_list")).toBeNull();
+    expect(await loadPostcodeList("no_such_list")).toBeNull();
+    // Yorkshire and the Humber (D-83): Harrogate, York and Hull are in it; somewhere in Manchester is not.
+    const region = (await loadPostcodeList("postcodes_yorkshire_humber"))!;
+    expect(region.lookup("HG1 1AA")).toEqual({ ward: "Valley Gardens & Central Harrogate", district: "North Yorkshire" });
+    expect(region.lookup("ls2 9jt")).toEqual({ ward: "Little London & Woodhouse", district: "Leeds" });
+    expect(region.lookup("M1 1AE")).toBeNull();
   });
 });
 
@@ -491,11 +497,16 @@ describe("shorter consent, sleep quality and sanity checks (D-53, in the r9.0.0 
   it("searches streets against exactly the list the release pins", async () => {
     const { createHash } = await import("node:crypto");
     const { STREET_LISTS, streetList } = await import("./lib/streets.js");
-    const pinned = current.assets["streets_west_yorkshire"]!;
-    const text = await STREET_LISTS["streets_west_yorkshire"]!();
+    // The candidate pins Yorkshire and the Humber's list (D-83); every list the build carries matches its pin.
+    const pinned = current.assets["streets_yorkshire_humber"]!;
+    const text = await STREET_LISTS["streets_yorkshire_humber"]!();
     expect(`sha256:${createHash("sha256").update(text, "utf8").digest("hex")}`).toBe(pinned.sha256);
-    const list = (await streetList("streets_west_yorkshire"))!;
+    const list = (await streetList("streets_yorkshire_humber"))!;
     expect(list.search("hyde park rd")[0]?.street).toBe("Hyde Park Road");
+    // Harrogate's streets are in it now.
+    expect(list.search("ainsty road").some((m) => m.area.includes("Harrogate"))).toBe(true);
+    // West Yorkshire's list is still carried, for the releases that pin it.
+    expect((await streetList("streets_west_yorkshire"))!.search("hyde park rd")[0]?.street).toBe("Hyde Park Road");
     expect(await streetList("no_such_list")).toBeNull();
   });
 

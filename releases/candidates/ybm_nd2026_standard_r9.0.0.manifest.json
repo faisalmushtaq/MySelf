@@ -16,7 +16,8 @@
       "D-62",
       "D-63",
       "D-80",
-      "D-81"
+      "D-81",
+      "D-83"
     ]
   },
   "composition": {
@@ -661,7 +662,7 @@
               "required": "soft",
               "allowDecline": false,
               "identifying": true,
-              "researcherNote": "Direct identifier — identity-schema routed (D-09, D-52). Stored as given, as {postcode, house, street}. The postcode is checked on the device against the release's West Yorkshire list; one not in the list is questioned once and then kept. The participant ID is derived from name and date of birth, not from the address. From r9.0.0 (D-53) the street typed is matched against West Yorkshire's named roads, and a match chosen adds {area, postcode_district}. Revision 2 (D-80): the screen opens on one search box ('Start typing your address'); a house number typed before the street is stored as house, the street chosen as street, and the postcode, now last and optional, only when the participant knows it. Same keys as revision 1. D-81: when the iPad is online the search also offers whole addresses from the study's address finder (Ideal Postcodes, West Yorkshire only); choosing one fills in every field and adds {uprn}. Offline, or if the finder is unavailable, the street search answers as above.",
+              "researcherNote": "Direct identifier — identity-schema routed (D-09, D-52). Stored as given, as {postcode, house, street}. The postcode is checked on the device against the release's West Yorkshire list; one not in the list is questioned once and then kept. The participant ID is derived from name and date of birth, not from the address. From r9.0.0 (D-53) the street typed is matched against West Yorkshire's named roads, and a match chosen adds {area, postcode_district}. Revision 2 (D-80): the screen opens on one search box ('Start typing your address'); a house number typed before the street is stored as house, the street chosen as street, and the postcode, now last and optional, only when the participant knows it. Same keys as revision 1. D-81: when the iPad is online the search also offers whole addresses from the study's address finder (Ideal Postcodes, West Yorkshire only); choosing one fills in every field and adds {uprn}. Offline, or if the finder is unavailable, the street search answers as above. D-83: the postcode check, street list and address finder cover Yorkshire and the Humber (fifteen councils), not only West Yorkshire; a postcode outside the region is still questioned once, then kept.",
               "responseType": "form_fields",
               "fields": [
                 {
@@ -690,12 +691,12 @@
               ],
               "postcodeCheck": {
                 "field": "postcode",
-                "asset": "postcodes_west_yorkshire",
-                "areaName": "West Yorkshire"
+                "asset": "postcodes_yorkshire_humber",
+                "areaName": "Yorkshire"
               },
               "streetCheck": {
                 "field": "street",
-                "asset": "streets_west_yorkshire",
+                "asset": "streets_yorkshire_humber",
                 "areaKey": "area",
                 "districtKey": "postcode_district",
                 "searchFirst": true,
@@ -9070,16 +9071,16 @@
   "prompts": {},
   "modelConfigs": {},
   "assets": {
-    "postcodes_west_yorkshire": {
-      "path": "releases/assets/postcodes-west-yorkshire-2026-09-07.txt",
-      "sha256": "sha256:f9807eaff81524c5e8db7f948f5d2483fbb06e20bcddd72156d5a8ecf00a5e7e",
-      "bytes": 277351
+    "postcodes_yorkshire_humber": {
+      "path": "releases/assets/postcodes-yorkshire-humber-2026-09-07.txt",
+      "sha256": "sha256:fb07bc111d3ca1df026b36442fbef1fa73617779c2abcc7f4b09ebf016efb990",
+      "bytes": 681173
     },
-    "streets_west_yorkshire": {
-      "path": "releases/assets/streets-west-yorkshire-2026-07.txt",
-      "sha256": "sha256:821a92ee625d8f453b999774a1d1ae523a17c88ceae87360b5186069b7cbeda1",
-      "bytes": 589147
+    "streets_yorkshire_humber": {
+      "path": "releases/assets/streets-yorkshire-humber-2026-10.txt",
+      "sha256": "sha256:59bc9518b10b858f62755287e073399297f1c9ebc158db39d386ec189375763b",
+      "bytes": 1366828
     }
   },
-  "hash": "sha256:de2366e8d0dd313bfd456ce30b55b001078472f185d9664a29855df916a33bfe"
+  "hash": "sha256:01867dd0550e3a5a8c4bf34264b02affdd262e3beed55d7eb39564f5b06aa3eb"
 }

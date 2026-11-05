@@ -3,6 +3,7 @@ import { initializeApp, applicationDefault, cert } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 import { FieldValue, getFirestore } from "firebase-admin/firestore";
 import { paths } from "@myself/firebase";
+import { releaseAssets } from "@myself/release";
 import {
   addOption,
   addQuestion,
@@ -21,6 +22,7 @@ import {
   repositoryModuleFragment,
   restoreQuestion,
   serialiseDraft,
+  setAddressLists,
   suggestBump,
   updateQuestion,
   updateScreen,
@@ -460,6 +462,28 @@ if (command === "list") {
       return updateScreen(draft, which, { body }).draft;
     },
     `The ${which} screen's text`,
+  );
+} else if (command === "address-area") {
+  // The home address checked against Yorkshire and the Humber's postcodes and streets, not only West Yorkshire's (D-83).
+  const study = studyArg();
+  const surveyId = surveyArg();
+  const itemKey = flag("item") ?? "ybm_identity.home_address";
+  const pins = releaseAssets();
+  for (const key of ["postcodes_yorkshire_humber", "streets_yorkshire_humber"]) if (!pins[key]) fail(`The repository has no ${key} list.`);
+  await editDraft(
+    study,
+    surveyId,
+    (draft) => {
+      const item = findQuestion(draft, itemKey)?.item;
+      if (!item?.postcodeCheck) fail(`${itemKey} is not an address question with a postcode check in this draft.`);
+      const out = setAddressLists(draft, itemKey, {
+        postcode: { asset: "postcodes_yorkshire_humber", areaName: "Yorkshire", pin: pins["postcodes_yorkshire_humber"] },
+        ...(item.streetCheck ? { street: { asset: "streets_yorkshire_humber", pin: pins["streets_yorkshire_humber"] } } : {}),
+      });
+      console.log(`  ${itemKey}: postcodes ${item.postcodeCheck.asset} -> postcodes_yorkshire_humber (“Yorkshire”)${item.streetCheck ? `; streets ${item.streetCheck.asset} -> streets_yorkshire_humber` : ""}`);
+      return out.draft;
+    },
+    `The address checked against Yorkshire and the Humber`,
   );
 } else if (command === "add-option") {
   // An answer option on a question (and every question sharing its list), with a new code; first on screen with --first.

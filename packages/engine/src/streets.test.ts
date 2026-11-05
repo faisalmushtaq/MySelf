@@ -66,6 +66,34 @@ describe("streets (D-53)", () => {
   });
 });
 
+describe("streets across Yorkshire and the Humber (D-83)", () => {
+  const region = parseStreetList(readFileSync(`${dir}${readdirSync(dir).filter((f) => f.startsWith("streets-yorkshire-humber-")).sort().at(-1)!}`, "utf8"));
+
+  it("carries every named road in the region, Harrogate's included", () => {
+    expect(region.size).toBeGreaterThan(85_000);
+    expect(region.search("Ainsty Road Harrogate")[0]).toMatchObject({ street: "Ainsty Road", outward: "HG1" });
+  });
+
+  it("finds a street by its town or its postcode district typed after it", () => {
+    expect(region.search("woodhouse ln ls2")[0]).toMatchObject({ street: "Woodhouse Lane", outward: "LS2" });
+    expect(region.search("woodhouse lane leeds ls2")[0]).toMatchObject({ street: "Woodhouse Lane", outward: "LS2" });
+    expect(region.search("church lane harrogate")[0]?.area).toMatch(/Harrogate/);
+  });
+
+  it("says how many places share a street's name, so the screen can ask for the town", () => {
+    expect(region.sameName("Church Lane")).toBeGreaterThan(100);
+    expect(region.sameName("church ln")).toBe(region.sameName("Church Lane"));
+    expect(region.sameName("Ainsty Road")).toBeLessThan(6);
+    expect(region.sameName("qzxqzx")).toBe(0);
+  });
+
+  it("is still quick enough to run as someone types", () => {
+    const start = performance.now();
+    for (const q of ["Hyde Prak Road", "Manningham Lane", "Woodhouse Lane", "Wakefield Rd"]) region.search(q);
+    expect((performance.now() - start) / 4).toBeLessThan(250);
+  });
+});
+
 describe("the address search's house part (D-80)", () => {
   it("takes a house number, flat or range off the front, as typed", () => {
     expect(splitHouse("12 Manor Drive")).toEqual({ house: "12", street: "Manor Drive" });

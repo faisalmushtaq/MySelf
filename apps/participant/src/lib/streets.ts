@@ -12,6 +12,9 @@ import { parseStreetList, type StreetList } from "@myself/engine";
 export const STREET_LISTS: Record<string, () => Promise<string>> = {
   streets_west_yorkshire: () =>
     import("../../../../releases/assets/streets-west-yorkshire-2026-07.txt?raw").then((m) => m.default),
+  // Yorkshire and the Humber (D-83).
+  streets_yorkshire_humber: () =>
+    import("../../../../releases/assets/streets-yorkshire-humber-2026-10.txt?raw").then((m) => m.default),
 };
 
 const loaded = new Map<string, Promise<StreetList | null>>();

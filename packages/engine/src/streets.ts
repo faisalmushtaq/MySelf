@@ -27,6 +27,12 @@ export interface StreetList {
   readonly size: number;
   /** The closest entries to what was typed, best first; empty for under three letters. */
   search(query: string, limit?: number): StreetMatch[];
+  /**
+   * How many places have a street of exactly this name (D-83): across a whole
+   * region "Church Lane" is in hundreds, more than a list can show, so the
+   * screen asks for the town as well.
+   */
+  sameName(query: string): number;
 }
 
 /** Common abbreviations, to the form the list's names are compared in. */
@@ -135,11 +141,18 @@ interface Entry extends StreetMatch {
   key: string;
   /** Name, place and district as compared, for a query that names the area too. */
   full: string;
+  /** The place, district and postcode district, word by word, for "church lane harrogate" or "woodhouse ln ls2". */
+  where: ReadonlySet<string>;
 }
 
 /** How close a typed street is to one entry, from 0 (nothing alike) to 1 (the same). */
 function closeness(q: string, qCounts: Int16Array, e: Entry): number {
   if (e.key === q) return 1;
+  // The street, then where it is, in any order: "woodhouse lane ls2", "church lane harrogate" (D-83).
+  if (q.startsWith(`${e.key} `)) {
+    const rest = q.slice(e.key.length + 1).split(" ").filter(Boolean);
+    if (rest.length > 0 && rest.every((w) => e.where.has(w))) return 0.99;
+  }
   if (e.key.startsWith(q)) return 0.9 + 0.08 * (q.length / e.key.length);
   if (e.full.startsWith(q)) return 0.88;
   if (e.key.includes(` ${q}`)) return 0.8;
@@ -182,10 +195,16 @@ export function parseStreetList(text: string): StreetList {
     }
     if (area === null) throw new Error(`street list: '${line}' comes before any area`);
     const key = normaliseStreet(line);
-    entries.push({ street: line, area, outward, key, full: `${key} ${areaKey}` });
+    entries.push({ street: line, area, outward, key, full: `${key} ${areaKey}`, where: new Set([...areaKey.split(" ").filter(Boolean), outward.toLowerCase()]) });
   }
   return {
     size: entries.length,
+    sameName(query: string) {
+      const q = normaliseStreet(query);
+      let n = 0;
+      for (const e of entries) if (e.key === q) n += 1;
+      return n;
+    },
     search(query: string, limit = 5) {
       const q = normaliseStreet(query);
       if (q.replace(/[^a-z]/g, "").length < 3) return [];

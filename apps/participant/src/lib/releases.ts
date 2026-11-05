@@ -96,7 +96,7 @@ const assetHashes = new Map<string, Promise<string>>();
 
 /** The files this build carries, by the key a release pins them under (D-52, D-53). */
 const CARRIED_ASSETS: Record<string, () => Promise<string>> = {
-  ...Object.fromEntries(Object.entries(POSTCODE_LISTS).map(([key, text]) => [key, () => Promise.resolve(text)])),
+  ...POSTCODE_LISTS,
   ...STREET_LISTS,
 };
 
