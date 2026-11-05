@@ -12,6 +12,7 @@ name: "Studio: study space housekeeping"
 #   set-lede      a question's instructions (the line under it)
 #   set-text      a question's wording (field stem) or instructions (field lede)
 #   add-info      an information screen (title, text), after a question or first
+#   set-screen    the finish (or review) screen's text (item = finish)
 #   glossary      a word participants can tap for its meaning (label = word, text = meaning)
 #   archive       single questions out of a draft (restorable)
 #   restore       archived questions back where they were
@@ -26,7 +27,7 @@ on:
       command:
         description: "What to do"
         type: choice
-        options: [list, questions, grant-owners, insert, remove-blocks, archive, restore, reorder, add-option, set-lede, set-text, add-info, glossary, dob-ages, retitle, form-label]
+        options: [list, questions, grant-owners, insert, remove-blocks, archive, restore, reorder, add-option, set-lede, set-text, add-info, glossary, set-screen, dob-ages, retitle, form-label]
         default: list
       study:
         description: "Study space id (from list)"
@@ -84,6 +85,10 @@ on:
         description: "Question ID (add-option)"
         type: string
         default: ""
+      append:
+        description: "Add the text as a new paragraph after what is there (set-text, set-screen)"
+        type: boolean
+        default: false
       first:
         description: "Show the new option first (add-option)"
         type: boolean
@@ -160,6 +165,7 @@ jobs:
           TEXT: ${{ inputs.text }}
           FIELD: ${{ inputs.field }}
           FIRST: ${{ inputs.first && '--first' || '' }}
+          APPEND: ${{ inputs.append && '--append' || '' }}
           INSTRUMENTS: ${{ inputs.instruments }}
           INSTRUMENT: ${{ inputs.instrument }}
           LABEL: ${{ inputs.label }}
@@ -168,7 +174,7 @@ jobs:
           node studio-ops.mjs "$COMMAND" --project myself-research \
             ${STUDY:+--study "$STUDY"} ${SURVEY:+--survey "$SURVEY"} ${SECTION:+--section "$SECTION"} \
             ${AFTER:+--after "$AFTER"} ${PIECES:+--pieces "$PIECES"} ${REPLACE:+--replace "$REPLACE"} ${MIN_AGE:+--min-age "$MIN_AGE"} ${MAX_AGE:+--max-age "$MAX_AGE"} \
-            ${ORDER:+--order "$ORDER"} ${MATCH:+--match "$MATCH"} ${TITLE:+--title "$TITLE"} ${ITEMS:+--items "$ITEMS"} ${ITEM:+--item "$ITEM"} ${TEXT:+--text "$TEXT"} ${FIELD:+--field "$FIELD"} $FIRST ${INSTRUMENTS:+--instruments "$INSTRUMENTS"} ${INSTRUMENT:+--instrument "$INSTRUMENT"} ${LABEL:+--label "$LABEL"} $APPLY
+            ${ORDER:+--order "$ORDER"} ${MATCH:+--match "$MATCH"} ${TITLE:+--title "$TITLE"} ${ITEMS:+--items "$ITEMS"} ${ITEM:+--item "$ITEM"} ${TEXT:+--text "$TEXT"} ${FIELD:+--field "$FIELD"} $FIRST $APPEND ${INSTRUMENTS:+--instruments "$INSTRUMENTS"} ${INSTRUMENT:+--instrument "$INSTRUMENT"} ${LABEL:+--label "$LABEL"} $APPLY
 
       - name: Shred the credential
         if: always()

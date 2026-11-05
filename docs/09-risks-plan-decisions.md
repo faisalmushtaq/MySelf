@@ -1024,3 +1024,30 @@ RCADS-25, the doomscrolling items) and must stay word for word.
   word explanations", minor). studio-ops `glossary` does the same from the
   repository.
 - The Studio's pacing note no longer mentions a staff PIN (removed in D-71).
+
+### Signposting support around the questions about feelings (2026-11-05, D-80)
+
+**Asked.** The fieldwork team, of RCADS-25's "I think about death": what is our
+safeguarding protocol, and do we have to report answers to teachers? The PI:
+"No — we can't identify individuals. We should flag to respondents that they
+can reach out."
+
+**Decided.** Answers are not reported to schools: researchers work with codes,
+not names, and the survey says so. Instead participants are told, before and
+after, where to turn.
+
+**Changed.**
+- *Why your answers matter* (both surveys) gains a paragraph: some questions
+  are about difficult feelings; answers are private and teachers and family
+  won't see them; any question can be skipped; they can talk to the research
+  team at any time; support is listed at the end.
+- The break study's finish screen gains the support list YBM's already has
+  (the research team, a teacher or someone trusted; Childline, Shout,
+  Samaritans, Papyrus, NHS 111; 999 in danger).
+- A sitting a researcher ends early (D-70) never reached the finish screen, so
+  it missed that list. *That's all for today* now shows the finish screen's
+  text after its thanks. `EndedScreen`, `supportFrom`.
+- studio-ops: `set-text --append`, and `set-screen` for the finish screen.
+
+**For the team.** Check the wording against the ethics approval's
+safeguarding section: it promises privacy from teachers and family.

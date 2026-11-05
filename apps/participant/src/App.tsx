@@ -65,7 +65,7 @@ import { DobCheckScreen } from "./screens/DobCheckScreen.js";
 import { IsThisYouScreen } from "./screens/IsThisYouScreen.js";
 import { IdleNotice } from "./screens/IdleNotice.js";
 import { FinishScreen } from "./screens/FinishScreen.js";
-import { EndedScreen } from "./screens/EndedScreen.js";
+import { EndedScreen, supportFrom } from "./screens/EndedScreen.js";
 import { PausedScreen } from "./screens/PausedScreen.js";
 import { WrapUpPanel, type WrapUpReason } from "./screens/WrapUpPanel.js";
 import { HandoverPanel } from "./screens/HandoverPanel.js";
@@ -1842,7 +1842,10 @@ export default function App({ initial, initialRuntime }: { initial: Startup; ini
         />
       )}
 
-      {phase.kind === "ended" && <EndedScreen onDone={handover} />}
+      {phase.kind === "ended" && (
+        // The survey's own finish text, which says where to get support; its first paragraph (the thanks) is said above.
+        <EndedScreen onDone={handover} support={supportFrom(manifest.composition.screens["finish"]?.body.text)} />
+      )}
       {phase.kind === "paused" && <PausedScreen onCarryOn={carryOnFromPause} />}
 
       {idle.stage.kind === "warning" && (
