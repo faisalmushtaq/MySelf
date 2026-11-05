@@ -3,7 +3,7 @@ import { resolve } from "node:path";
 import { validateDraft } from "./validate.js";
 import { describe, expect, it } from "vitest";
 import { refKeyOf } from "@myself/release/gate";
-import type { ReleaseManifest } from "@myself/schema";
+import type { ItemDefinition, ReleaseManifest } from "@myself/schema";
 import { QUESTION_TYPES, type QuestionTypeId } from "./catalogue.js";
 import type { StudioDraft } from "./contract.js";
 import { emptyDraft, extractDraft, previewRelease } from "./draft.js";
@@ -691,7 +691,8 @@ describe("sections, blocks and screens", () => {
     const { releaseAssets } = await import("@myself/release");
     const { allModules } = await import("@myself/library");
     const pins = releaseAssets();
-    const libraryItem = allModules.find((m) => m.instrument === "ybm_identity")!.forms[0]!.items.find((i) => i.key === "home_address")!;
+    // The library's input form: as the Studio holds it once parsed (revision defaulted).
+    const libraryItem = allModules.find((m) => m.instrument === "ybm_identity")!.forms[0]!.items.find((i) => i.key === "home_address")! as unknown as ItemDefinition;
     const r800 = JSON.parse(readFileSync(resolve(__dirname, "../../../releases/ybm_nd2026_standard_r8.0.0.manifest.json"), "utf8"));
     const before = extractDraft(r800);
     expect(refusal(() => ops.adoptLibraryItem(before, "ybm_identity.home_address", libraryItem)).code).toBe("protected");
