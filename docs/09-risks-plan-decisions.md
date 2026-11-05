@@ -1147,3 +1147,18 @@ linkage area matches), over the Yorkshire counties alone.
   changes). Studio-published surveys switch with studio-ops `address-area`
   (Studio op `setAddressLists`: only on an unlocked identity module, and it
   pins the lists from the repository, which the publish check accepts).
+
+### The surveys take the new address screen (2026-11-05, D-84)
+
+**Asked.** With the Ideal Postcodes key stored, the PI asked for both drafts
+(YBM and the break study) to use the new address screen (D-80, D-81).
+
+**Changed.** The drafts' address question was the library's revision 1
+(postcode first, West Yorkshire's lists until D-83). The Studio can update a
+module saved in its own library, but not take a newer revision of a
+repository module's question, so: Studio op `adoptLibraryItem` replaces one
+question with the library's version of the same question — same ID, variable
+and kind of answer, so answers stay joined up (they are looked up by module
+and ID, not revision) — only on an unlocked module. studio-ops
+`address-screen` applies it to the home address, pins the lists it names, and
+keeps the drafts' "a home with a name and no street" sentence (D-77).

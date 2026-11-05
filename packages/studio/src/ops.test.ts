@@ -687,6 +687,29 @@ describe("sections, blocks and screens", () => {
     expect(refusal(() => ops.setAddressLists(unlocked, "ybm_identity.first_name", lists)).code).toBe("invalid");
   });
 
+  it("takes the library's newer address question, keeping its ID and variable (D-84)", async () => {
+    const { releaseAssets } = await import("@myself/release");
+    const { allModules } = await import("@myself/library");
+    const pins = releaseAssets();
+    const libraryItem = allModules.find((m) => m.instrument === "ybm_identity")!.forms[0]!.items.find((i) => i.key === "home_address")!;
+    const r800 = JSON.parse(readFileSync(resolve(__dirname, "../../../releases/ybm_nd2026_standard_r8.0.0.manifest.json"), "utf8"));
+    const before = extractDraft(r800);
+    expect(refusal(() => ops.adoptLibraryItem(before, "ybm_identity.home_address", libraryItem)).code).toBe("protected");
+    const unlocked = ops.unlockModule(before, "ybm_identity", { ...actor, reason: "The address screen starts with the street (D-80, D-84)" }).draft;
+    const adopted = ops.adoptLibraryItem(unlocked, "ybm_identity.home_address", libraryItem).draft;
+    const item = findQuestion(adopted, "ybm_identity.home_address")!.item as typeof libraryItem & { streetCheck?: { searchFirst?: boolean } };
+    expect(item).toEqual(libraryItem);
+    expect(item.streetCheck?.searchFirst).toBe(true);
+    // With the lists it names pinned, it makes a release.
+    const pinned = ops.setAddressLists(adopted, "ybm_identity.home_address", {
+      postcode: { asset: "postcodes_yorkshire_humber", areaName: "Yorkshire", pin: pins["postcodes_yorkshire_humber"]! },
+      street: { asset: "streets_yorkshire_humber", pin: pins["streets_yorkshire_humber"]! },
+    }).draft;
+    expect(Object.keys(publishable(pinned).assets).sort()).toEqual(["postcodes_yorkshire_humber", "streets_yorkshire_humber"]);
+    // Not a different question under the same ID.
+    expect(refusal(() => ops.adoptLibraryItem(unlocked, "ybm_identity.home_address", { ...libraryItem, variable: "elsewhere" })).code).toBe("invalid");
+  });
+
   it("keeps coding notes out of the release", () => {
     const noted = ops.setQuestionNotes(live(), "kss.q1", { codingNotes: "9 = extremely sleepy" }).draft;
     expect(noted.notes).toEqual({ "kss.q1": { codingNotes: "9 = extremely sleepy" } });
