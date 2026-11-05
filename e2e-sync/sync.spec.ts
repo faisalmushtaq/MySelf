@@ -353,6 +353,8 @@ test("two devices with the same sitting id cannot overwrite each other, over HTT
     await walk(one);
     await waitForSittings(1);
     const [id] = await sessionIds();
+    // The first copy can be a checkpoint from the middle of the walk; wait for the finished one.
+    await expect.poll(async () => (await stored(id!))?.session.complete ?? false, { timeout: 60_000, intervals: [500] }).toBe(true);
     const original = await stored(id!);
 
     // Force the collision: the second device files a sitting under the first's id.

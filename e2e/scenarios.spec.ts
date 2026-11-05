@@ -84,9 +84,11 @@ const scenarios: Scenario[] = [
       [
         /home address/,
         async (page) => {
-          await page.getByRole("textbox", { name: "Postcode" }).fill("LS2 9JT");
+          // Knows it all, and types it in the boxes rather than searching (D-80).
+          await page.getByRole("button", { name: "Type my address in the boxes instead" }).click();
           await page.getByRole("textbox", { name: "House number or name" }).fill("University of Leeds");
           await page.getByRole("textbox", { name: "Street" }).fill("Woodhouse Lane");
+          await page.getByRole("textbox", { name: "Postcode, if you know it" }).fill("LS2 9JT");
         },
       ],
       [/ethnic origin/, choose("Pakistani")],
@@ -130,11 +132,10 @@ const scenarios: Scenario[] = [
       [
         /home address/,
         async (page) => {
-          await page.getByRole("textbox", { name: "Postcode" }).fill("LS99 9ZZ");
-          await page.getByRole("button", { name: "I don't know my postcode" }).click();
-          await page.getByRole("textbox", { name: "House number or name" }).fill("University of Leeds");
-          await page.getByRole("textbox", { name: "Street" }).fill("woodhouse ln");
+          // Starts typing the street, chooses it, then adds the building's name (D-80).
+          await page.getByRole("textbox", { name: "Start typing your address" }).fill("woodhouse ln");
           await page.locator(".street-match", { hasText: "Woodhouse Lane" }).filter({ hasText: "LS2" }).click();
+          await page.getByRole("textbox", { name: "House number or name" }).fill("University of Leeds");
         },
       ],
       [/ethnic origin/, choose("English, Welsh, Scottish, Northern Irish or British")],

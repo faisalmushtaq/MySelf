@@ -2590,7 +2590,7 @@ input[type="range"] {
   margin: 0 0 0.5rem;
 }
 
-/* Where to get support, on a sitting a researcher ended (D-80): the survey's own text, line breaks kept. */
+/* Where to get support, on a sitting a researcher ended (D-82): the survey's own text, line breaks kept. */
 .ended-support {
   white-space: pre-wrap;
   max-width: 52ch;

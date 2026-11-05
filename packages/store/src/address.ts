@@ -17,9 +17,11 @@ export interface HomeAddress {
   area?: string;
   /** "LS18" — the postcode district of a street chosen from the list (D-53). */
   postcode_district?: string;
+  /** The property's UPRN, when the address was chosen from the address finder (D-81). */
+  uprn?: string;
 }
 
-const PARTS = ["postcode", "house", "street", "area", "postcode_district"] as const;
+const PARTS = ["postcode", "house", "street", "area", "postcode_district", "uprn"] as const;
 
 /** The address in an identity row's value, or null when it holds nothing usable. Kept as given, trimmed. */
 export function parseHomeAddress(raw: string | null | undefined): HomeAddress | null {

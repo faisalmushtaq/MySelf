@@ -3,6 +3,8 @@ import { createRoot } from "react-dom/client";
 import { Workbox } from "workbox-window";
 import { readParticipantLink } from "@myself/schema";
 import App, { type Startup } from "./App.js";
+import { provideAddressCredential } from "./lib/addresses.js";
+import { syncTarget } from "./lib/device.js";
 import { BUILT_IN, type LoadedRelease } from "./lib/releases.js";
 import { buildRuntime, type Runtime } from "./lib/runtime.js";
 import { DEFAULT_CHOICE, serviceFor, storedChoice } from "./lib/selection.js";
@@ -52,6 +54,8 @@ function registerServiceWorker(): void {
 }
 
 registerServiceWorker();
+// The address finder asks the study as this iPad, on the credential it files sittings with (D-81).
+provideAddressCredential(async () => (await syncTarget())?.credential ?? null);
 navigator.serviceWorker?.addEventListener("controllerchange", () => updates.tookOver());
 
 /**

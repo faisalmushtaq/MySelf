@@ -200,3 +200,17 @@ export function parseStreetList(text: string): StreetList {
     },
   };
 }
+
+/**
+ * What someone typed into the address search (D-80), split into the house part
+ * at the front and the street after it: "12a Manor Dr" is "12a" and "Manor Dr",
+ * "Flat 3, 24 Headingley Mount" is "Flat 3, 24" and "Headingley Mount". Without
+ * a number at the front, all of it is the street. The house part is kept as
+ * typed, since it is stored as the participant gave it.
+ */
+export function splitHouse(input: string): { house: string; street: string } {
+  const text = input.replace(/\s+/g, " ").trim();
+  const m = /^((?:(?:flat|apartment|apt|unit|room)\s+[0-9a-z]+[,\s]+)?\d+[a-z]?(?:\s*[-/]\s*\d+[a-z]?)?)(?=[,\s]|$)[,\s]*(.*)$/i.exec(text);
+  if (!m) return { house: "", street: text };
+  return { house: m[1]!.trim(), street: m[2]!.trim() };
+}

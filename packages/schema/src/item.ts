@@ -316,6 +316,26 @@ export const itemDefinition = z.discriminatedUnion("responseType", [
          */
         areaKey: slug,
         districtKey: slug,
+        /**
+         * Lead with the street search (D-80): the screen opens on one box,
+         * "Start typing your address", whose suggestions are the list's streets
+         * with their area, so nobody needs to know their postcode first. A house
+         * number typed before the street goes into the field keyed "house"; the fields
+         * then appear filled in, the postcode among them for anyone who knows
+         * it. Without it, the search is offered only once someone says they
+         * don't know their postcode (D-53).
+         */
+        searchFirst: z.boolean().optional(),
+        /**
+         * Whole addresses when the iPad is online (D-81): the search box also
+         * asks the study's address finder (Ideal Postcodes, through the
+         * `findAddress` function), limited to West Yorkshire, and choosing one
+         * fills in every field, the postcode included. Its UPRN is recorded
+         * under `uprnKey`, beside the fields like the area. Offline, or when the
+         * finder is unavailable, the street search answers as before. Only with
+         * `searchFirst`.
+         */
+        addressFinder: z.object({ uprnKey: slug }).optional(),
       })
       .optional(),
   }),
