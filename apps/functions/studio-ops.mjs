@@ -4,8 +4,10 @@ import { getAuth } from "firebase-admin/auth";
 import { FieldValue, getFirestore } from "firebase-admin/firestore";
 import { paths } from "@myself/firebase";
 import { releaseAssets } from "@myself/release";
+import { allModules } from "@myself/library";
 import {
   addOption,
+  adoptLibraryItem,
   addQuestion,
   moveBlock,
   reservedFrom,
@@ -484,6 +486,44 @@ if (command === "list") {
       return out.draft;
     },
     `The address checked against Yorkshire and the Humber`,
+  );
+} else if (command === "address-screen") {
+  // The home address as the library has it now (D-80, D-81, D-83, D-84): "Start typing your address", whole addresses
+  // when online, checked across Yorkshire and the Humber. Same ID and variable, so answers stay joined up.
+  const study = studyArg();
+  const surveyId = surveyArg();
+  const itemKey = "ybm_identity.home_address";
+  const libraryItem = allModules.find((m) => m.instrument === "ybm_identity")?.forms[0]?.items.find((i) => i.key === "home_address");
+  if (!libraryItem) fail("The library has no ybm_identity.home_address.");
+  const pins = releaseAssets();
+  const postcodeAsset = libraryItem.postcodeCheck.asset;
+  const streetAsset = libraryItem.streetCheck.asset;
+  for (const key of [postcodeAsset, streetAsset]) if (!pins[key]) fail(`The repository has no ${key} list.`);
+  // Kept from the draft's own instructions (D-77): a home with a name and no street.
+  const houseName = "If your home has a name but no street, just put the name.";
+  await editDraft(
+    study,
+    surveyId,
+    (draft) => {
+      const before = findQuestion(draft, itemKey)?.item;
+      if (!before) fail(`${itemKey} is not in this draft.`);
+      let d = adoptLibraryItem(draft, itemKey, libraryItem).draft;
+      d = setAddressLists(d, itemKey, {
+        postcode: { asset: postcodeAsset, areaName: libraryItem.postcodeCheck.areaName, pin: pins[postcodeAsset] },
+        street: { asset: streetAsset, pin: pins[streetAsset] },
+      }).draft;
+      const lede = libraryItem.lede?.text ?? "";
+      if (lede && !lede.includes(houseName)) {
+        const text = lede.includes("Fill in what you know") ? lede.replace("Fill in what you know", `${houseName} Fill in what you know`) : `${lede} ${houseName}`;
+        d = updateQuestion(d, itemKey, { lede: { text } }).draft;
+      }
+      const after = findQuestion(d, itemKey).item;
+      console.log(`  ${itemKey}: revision ${before.revision} -> ${after.revision}; fields ${before.fields.map((f) => f.key).join(", ")} -> ${after.fields.map((f) => f.key).join(", ")}`);
+      console.log(`  opens on the search: ${after.streetCheck?.searchFirst === true}; whole addresses online: ${Boolean(after.streetCheck?.addressFinder)}; area: ${after.postcodeCheck.areaName}`);
+      console.log(`  instructions: “${after.lede?.text ?? ""}”`);
+      return d;
+    },
+    "The address screen as the library has it (search first, whole addresses online)",
   );
 } else if (command === "add-option") {
   // An answer option on a question (and every question sharing its list), with a new code; first on screen with --first.

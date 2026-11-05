@@ -1623,6 +1623,32 @@ export function updateScreen(
   return { draft: d };
 }
 
+/**
+ * Replace a question with the library's newer revision of it (D-84): the same
+ * question, ID, variable and kind of answer, so its answers stay joined up
+ * across versions — answers are looked up by module and ID, not revision — but
+ * the library's current wording, fields and checks. For a change the library
+ * made that the Studio cannot make field by field (the address screen's search
+ * and finder, D-80, D-81). Only on a module that may be changed.
+ */
+export function adoptLibraryItem(draft: StudioDraft, itemKey: string, libraryItem: ItemDefinition): { draft: StudioDraft } {
+  const d = clone(draft);
+  const q = live(d, itemKey);
+  requireEditable(d, q.instrument, "replace it with the library's version");
+  const from = q.item as ItemDefinition & { variable?: string };
+  const to = libraryItem as ItemDefinition & { variable?: string };
+  if (to.key !== from.key || to.variable !== from.variable || to.responseType !== from.responseType) {
+    throw new StudioOpError(
+      `The library's question is not the same question as ${quoted(q.item)}: its ID, variable or kind of answer differs.`,
+      "invalid",
+    );
+  }
+  const items = q.item as unknown as Record<string, unknown>;
+  for (const k of Object.keys(items)) delete items[k];
+  Object.assign(items, structuredClone(libraryItem));
+  return { draft: d };
+}
+
 /** A file a release pins (D-52): where it lives in the repository, its hash and its size. */
 export interface AssetPin {
   path: string;

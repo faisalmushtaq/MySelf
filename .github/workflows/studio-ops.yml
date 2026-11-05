@@ -14,6 +14,7 @@ name: "Studio: study space housekeeping"
 #   add-info      an information screen (title, text), after a question or first
 #   set-screen    the finish (or review) screen's text (item = finish)
 #   address-area  the home address checked against Yorkshire and the Humber (D-83)
+#   address-screen the home address as the library has it: search first, whole addresses online (D-84)
 #   glossary      a word participants can tap for its meaning (label = word, text = meaning)
 #   archive       single questions out of a draft (restorable)
 #   restore       archived questions back where they were
@@ -28,7 +29,7 @@ on:
       command:
         description: "What to do"
         type: choice
-        options: [list, questions, grant-owners, insert, remove-blocks, archive, restore, reorder, add-option, set-lede, set-text, add-info, glossary, set-screen, address-area, dob-ages, retitle, form-label]
+        options: [list, questions, grant-owners, insert, remove-blocks, archive, restore, reorder, add-option, set-lede, set-text, add-info, glossary, set-screen, address-area, address-screen, dob-ages, retitle, form-label]
         default: list
       study:
         description: "Study space id (from list)"
