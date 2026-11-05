@@ -236,6 +236,47 @@ Every import is from a narrow subpath (`firebase-functions/logger`,
 provider including Realtime Database, which drags in `@firebase/database-compat`
 and fails on a missing `@firebase/app` — a package nothing here uses.
 
+### 5.1.1 The address finder, and the Ideal Postcodes key (D-81)
+
+The address screen opens on "Start typing your address" (D-80). When the iPad
+is online it also asks the `findAddress` function, which asks Ideal Postcodes,
+so a child can choose their whole address, postcode included, from West
+Yorkshire's addresses only; its UPRN is kept with the answer. Offline, before a
+key is stored, or whenever Ideal Postcodes fails, the screen uses the street
+list on the iPad instead and nobody sees an error.
+
+**Turning it on.**
+
+1. In the Ideal Postcodes dashboard, make a key for MySelf (not the one the
+   MyPhone/MyBrain site uses). Leave **Allowed URLs empty**: the requests come
+   from the function, not from a browser, so a web-address restriction would
+   refuse them all. Set a **daily limit** (1,500 is plenty), set the usage
+   history's redaction period to **0 days** so what was typed is not kept in
+   its log, and ask for a low-balance email.
+2. In Cloud Shell: `bash infra/firebase/set-address-key.sh myself-research`.
+   It asks for the key without showing it and stores it in Secret Manager as
+   `ideal-postcodes-key`. Never put the key in the code, GitHub, an email or a
+   chat.
+3. The finder uses it within about ten minutes. Nothing needs deploying for
+   that, because the key is read when it is first needed rather than declared
+   as a deploy-time secret; the function itself goes out with the next deploy
+   of the functions (§5.2.1).
+4. Check: on an iPad that is online, start a sitting on a release with the
+   finder (r9.0.0 on), type your own address and choose it. The dashboard
+   should show one lookup.
+
+**Limits.** Each iPad may choose 40 addresses a day and ask for 25 times as
+many suggestions; the study 1,500 and 15,000. Repository variables
+`MYSELF_ADDRESS_DEVICE_DAILY_LIMIT` and `MYSELF_ADDRESS_DAILY_LIMIT` change
+them. A refused request answers "unavailable", so the iPad falls back to the
+street list. Suggestions cost nothing; each address chosen costs one lookup.
+
+**What leaves the iPad.** What the child has typed so far, and the id of the
+address they choose, go to the function and from it to Ideal Postcodes, with
+nothing about who is asking. Nothing typed is logged. Ideal Postcodes is a
+data processor, like Firebase: name it in the DPIA and the record of
+processing.
+
 ### 5.2 Two homes for the lab, and why (D-46)
 
 ```bash

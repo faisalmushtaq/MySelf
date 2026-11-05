@@ -3,9 +3,10 @@ import { parseStreetList, type StreetList } from "@myself/engine";
 /**
  * The street lists this build carries, by the asset key a release names (D-53).
  *
- * Loaded only when someone says they don't know their postcode: the list is
- * twice the size of the postcode list and most people never need it. It is a
- * separate chunk of the app, so the service worker still precaches it and the
+ * Loaded when the address screen opens on the street search (D-80), or, where
+ * it does not, when someone says they don't know their postcode. The list is
+ * twice the size of the postcode list, so it is a separate chunk of the app,
+ * kept out of the main bundle; the service worker still precaches it and the
  * search works offline. A test holds each to the hash the release pins.
  */
 export const STREET_LISTS: Record<string, () => Promise<string>> = {

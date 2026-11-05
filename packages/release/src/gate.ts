@@ -659,7 +659,10 @@ export function freezeRelease(
           // Offered to someone who says they don't know their postcode, so it
           // only makes sense beside a postcode check (D-53).
           if (!item.postcodeCheck) failures.push(`${ref.instrument}/${item.key}: a street check needs a postcode check beside it`);
-          for (const k of [check.areaKey, check.districtKey]) {
+          if (check.addressFinder && !check.searchFirst) {
+            failures.push(`${ref.instrument}/${item.key}: the address finder is only offered from the search, so it needs searchFirst`);
+          }
+          for (const k of [check.areaKey, check.districtKey, ...(check.addressFinder ? [check.addressFinder.uprnKey] : [])]) {
             if (item.fields.some((f) => f.key === k)) {
               failures.push(`${ref.instrument}/${item.key}: street check records '${k}', which is already a field`);
             }

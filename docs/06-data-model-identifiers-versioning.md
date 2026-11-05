@@ -477,6 +477,34 @@ and is pinned by hash like the postcode list. The app loads it only when someone
 says they don't know their postcode, as a separate part of the app that is still
 stored for offline use.
 
+**Starting with the street (D-80).** Children in the field mostly did not know
+their postcode, so the address screen now opens on that search instead of the
+postcode: one box, "Start typing your address". As they type ("12 hyde park rd")
+the matching West Yorkshire streets appear with their area and postcode district,
+the house number shown in front ("12 Hyde Park Road — Leeds · LS6"). Choosing one
+fills in the fields: the number as the house (`splitHouse` in `packages/engine`
+takes a number, range or flat off the front), the street as the list spells it,
+and its area and district as before. The postcode comes last, labelled "Postcode,
+if you know it", and is checked as before; "I'm not sure of my postcode" clears
+one the list does not know. "My street isn't here" and "Type my address in the
+boxes instead" go straight to the fields, and what was typed in the search is
+kept as the house and street whatever happens, so moving on without choosing
+loses nothing. The stored keys are unchanged (`house`, `street`, `postcode`,
+`area`, `postcode_district`), so nothing downstream changes. Schema:
+`streetCheck.searchFirst`; the item is revision 2. Everything stays on the
+device. An app without it shows the fields as before.
+
+**Whole addresses online (D-81).** When the iPad is online the same box also
+offers whole addresses from the study's address finder (Ideal Postcodes,
+through the `findAddress` function), limited to West Yorkshire's postcode
+districts: "12 Hyde Park Road, Headingley, Leeds, LS6 1AB". Choosing one fills
+in every field, the postcode included, with the area and district as above, and
+adds the property's UPRN under `uprn` (`streetCheck.addressFinder.uprnKey`).
+Changing any field afterwards drops the UPRN, so a stored UPRN always belongs
+to the stored address. Offline, or whenever the finder is unavailable, the
+street search answers instead, and nothing on screen says which did. Set up in
+docs/13 §5.1.1.
+
 **Welcome screen.** Pending: the team will mark what to remove, and the
 screen will be titled "Taking part".
 

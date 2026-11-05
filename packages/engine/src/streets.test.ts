@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { normaliseStreet, parseStreetList } from "./streets.js";
+import { normaliseStreet, parseStreetList, splitHouse } from "./streets.js";
 
 const dir = fileURLToPath(new URL("../../../releases/assets/", import.meta.url));
 const file = readdirSync(dir).filter((f) => f.startsWith("streets-west-yorkshire-")).sort().at(-1)!;
@@ -63,5 +63,25 @@ describe("streets (D-53)", () => {
   it("refuses a malformed list rather than half-reading it", () => {
     expect(() => parseStreetList("Hyde Park Road\n")).toThrow(/before any area/);
     expect(() => parseStreetList("@only-one-part\n")).toThrow(/unreadable/);
+  });
+});
+
+describe("the address search's house part (D-80)", () => {
+  it("takes a house number, flat or range off the front, as typed", () => {
+    expect(splitHouse("12 Manor Drive")).toEqual({ house: "12", street: "Manor Drive" });
+    expect(splitHouse("  12a  manor dr ")).toEqual({ house: "12a", street: "manor dr" });
+    expect(splitHouse("Flat 3, 24 Headingley Mount")).toEqual({ house: "Flat 3, 24", street: "Headingley Mount" });
+    expect(splitHouse("1-3 Bridge St")).toEqual({ house: "1-3", street: "Bridge St" });
+    expect(splitHouse("12, Hyde Park Road")).toEqual({ house: "12", street: "Hyde Park Road" });
+  });
+  it("leaves a street with no number at the front whole", () => {
+    expect(splitHouse("Manor Drive")).toEqual({ house: "", street: "Manor Drive" });
+    expect(splitHouse("1st Avenue")).toEqual({ house: "", street: "1st Avenue" });
+    expect(splitHouse("12")).toEqual({ house: "12", street: "" });
+    expect(splitHouse("")).toEqual({ house: "", street: "" });
+  });
+  it("finds the street with the number typed in front of it", () => {
+    const { street } = splitHouse("12 hyde prak rd");
+    expect(list.search(street).some((m) => m.street === "Hyde Park Road" && m.outward === "LS6")).toBe(true);
   });
 });

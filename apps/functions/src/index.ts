@@ -21,6 +21,7 @@ export { llmRelay } from "./relay.js";
 export { transcribe } from "./transcribe.js";
 export { saveNarrative } from "./narratives.js";
 export { saveSitting } from "./sittings.js";
+export { findAddress } from "./address.js";
 export {
   studioSession,
   studioImportLive,

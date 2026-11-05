@@ -3,7 +3,7 @@
  * thanks, and nothing that suggests they ran out of time or did anything
  * wrong. The researcher, holding the iPad, then readies it for the next person.
  *
- * And where to get support (D-80): a sitting ended early never reaches the
+ * And where to get support (D-82): a sitting ended early never reaches the
  * finish screen, which is where the survey says who to talk to after
  * questions about difficult feelings. So the finish screen's text is shown
  * here too, as the survey wrote it.

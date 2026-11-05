@@ -623,8 +623,8 @@ export function validateAnswer(
       const known = new Set(fields.map((f) => f.key));
       // A street chosen from the survey's list is recorded beside the fields,
       // under the keys the item's street check names (r9.0.0 on, D-53).
-      const street = c["streetCheck"] as { areaKey?: unknown; districtKey?: unknown } | undefined;
-      for (const k of [street?.areaKey, street?.districtKey]) if (typeof k === "string") known.add(k);
+      const street = c["streetCheck"] as { areaKey?: unknown; districtKey?: unknown; addressFinder?: { uprnKey?: unknown } } | undefined;
+      for (const k of [street?.areaKey, street?.districtKey, street?.addressFinder?.uprnKey]) if (typeof k === "string") known.add(k);
       const stray = Object.keys(values).filter((k) => known.size > 0 && !known.has(k));
       if (stray.length > 0) return bad(`unknown field(s) ${stray.join(", ")}`);
       return ok(Object.values(values).every((x) => typeof x !== "string" || x.trim().length === 0));

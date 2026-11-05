@@ -285,41 +285,48 @@ export const ybmIdentity: ModuleInput = {
         },
         // The home address replaces the secret code (D-52): one screen instead of
         // five, and the research team derives the ID rather than asking a child
-        // to construct one. Postcode first, so the area it lies in can be shown
-        // back before anything else is typed.
+        // to construct one. From D-80 it opens on a single search box: children
+        // in the field mostly did not know their postcode, so they start typing
+        // their address and choose their street from West Yorkshire's list, and
+        // the postcode is asked for after, only from those who know it.
         {
           responseType: "form_fields",
           key: "home_address",
           identifying: true,
-          revision: 1,
+          revision: 2,
           variable: "home_address",
           required: "soft",
           stem: { text: "What's your home address?" },
           lede: {
-            text: "The address you live at most of the time. If you split your time equally between two homes, just pick one. Don't know your postcode? Tap \u201cI don't know my postcode\u201d and find your street instead. Fill in what you know — it's fine to leave out anything you're not sure of.",
+            text: "The address you live at most of the time. If you split your time equally between two homes, just pick one. Start typing your house number and street, then choose your street from the list. Fill in what you know — it's fine to leave out anything you're not sure of.",
           },
           fields: [
+            { key: "house", label: "House number or name", maxChars: 60 },
+            { key: "street", label: "Street", maxChars: 100 },
             {
               key: "postcode",
-              label: "Postcode",
+              label: "Postcode, if you know it",
               maxChars: 10,
               pattern: "^[A-Za-z]{1,2}[0-9][A-Za-z0-9]?\\s*[0-9][A-Za-z]{2}$",
               patternHint: "A postcode looks like LS6 2AA",
             },
-            { key: "house", label: "House number or name", maxChars: 60 },
-            { key: "street", label: "Street", maxChars: 100 },
           ],
           postcodeCheck: { field: "postcode", asset: "postcodes_west_yorkshire", areaName: "West Yorkshire" },
-          // For someone who doesn't know their postcode (D-53).
+          // The street search leads (D-80), so nobody needs their postcode first (D-53).
           streetCheck: {
             field: "street",
             asset: "streets_west_yorkshire",
             areaKey: "area",
             districtKey: "postcode_district",
+            searchFirst: true,
+            // Online, whole West Yorkshire addresses from the study's address finder, with their UPRN (D-81).
+            addressFinder: { uprnKey: "uprn" },
           },
           researcherNote:
             "Direct identifier — identity-schema routed (D-09, D-52). Stored as given, as {postcode, house, street}. The postcode is checked on the device against the release's West Yorkshire list; one not in the list is questioned once and then kept. The participant ID is derived from name and date of birth, not from the address. " +
-            "From r9.0.0 (D-53) someone who doesn't know their postcode can say so; the street they type is matched against West Yorkshire's named roads, and a match they choose adds {area, postcode_district}.",
+            "From r9.0.0 (D-53) the street typed is matched against West Yorkshire's named roads, and a match chosen adds {area, postcode_district}. " +
+            "Revision 2 (D-80): the screen opens on one search box ('Start typing your address'); a house number typed before the street is stored as house, the street chosen as street, and the postcode, now last and optional, only when the participant knows it. Same keys as revision 1. " +
+            "D-81: when the iPad is online the search also offers whole addresses from the study's address finder (Ideal Postcodes, West Yorkshire only); choosing one fills in every field and adds {uprn}. Offline, or if the finder is unavailable, the street search answers as above.",
         },
       ],
     },
@@ -335,7 +342,9 @@ export const ybmIdentity: ModuleInput = {
     " D-52: the secret code (its introduction and four components) is replaced by the home address, one form_fields " +
     "screen with the postcode checked against the release's West Yorkshire list; the participant ID is derived from " +
     "first name, last name and date of birth at ingest. " +
-    "D-53: someone who doesn't know their postcode can say so and find their street in a list of West Yorkshire's named roads.",
+    "D-53: someone who doesn't know their postcode can say so and find their street in a list of West Yorkshire's named roads. " +
+    "D-80: the address screen opens on one search box instead, so children start typing their address and choose their street; the postcode comes last and is optional. " +
+    "D-81: online, whole West Yorkshire addresses are offered too, from the study's address finder, with their UPRN.",
   researcherNotes:
     "Legacy crosswalk (r1.0.0–r7.3.0): ps_id = initials + house digit + zero-padded month number + postcode letters (e.g. JA101CD); " +
     "val_id = the participant code captured at the opening screen. Both are derived, never re-asked. From r8.0.0 (D-52) " +

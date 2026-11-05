@@ -1025,7 +1025,62 @@ RCADS-25, the doomscrolling items) and must stay word for word.
   repository.
 - The Studio's pacing note no longer mentions a staff PIN (removed in D-71).
 
-### Signposting support around the questions about feelings (2026-11-05, D-80)
+### The address screen starts with the street (2026-11-05, D-80)
+
+**Asked.** Children are struggling to give their postcode. "One where they just
+start typing their address and then options are restricted to only Yorkshire
+possibilities is really useful."
+
+**Changed.** The home address screen opens on a single box, **Start typing your
+address**. The suggestions are West Yorkshire's named roads only (the release's
+street list, D-53), each with its area and postcode district, so a child picks
+the street they recognise. Choosing one fills in the house number they typed,
+the street and its area; the postcode is asked for last, only from those who
+know it. Nothing a child types leaves the iPad: the search runs on the list the
+release carries, as before. `streetCheck.searchFirst`,
+`FormFieldsControl`, `splitHouse`.
+
+**Considered.** Full addresses, house by house, as an address finder such as
+Ideal Postcodes gives. Not taken here: it needs a network the schools do not
+reliably have, it would send what children type to a third party, and the open
+alternative (HM Land Registry's addresses) is licensed for non-commercial use
+only and would have to ship publicly with the app. The street and its area are
+enough for the team to complete the address, and its postcode, at linkage.
+
+**Release.** The r9.0.0 candidate was re-cut with the change (item revision 2,
+the fields reordered house, street, postcode, the postcode's label "Postcode, if
+you know it"), and nothing else; its hash changed. r8.0.0, as fielded, is
+untouched.
+
+### Whole addresses from Ideal Postcodes when online (2026-11-05, D-81)
+
+**Asked.** The team has an Ideal Postcodes account and wants it used: children
+typing their address should be offered whole addresses, still only in
+Yorkshire. "There is no issue with privacy: we send data to Firebase too."
+
+**Changed.** When the iPad is online, "Start typing your address" (D-80) also
+asks a new function, `findAddress`, which asks Ideal Postcodes with the key
+held in Secret Manager. Suggestions are limited to West Yorkshire's postcode
+districts, nearer addresses first. Choosing one fills in the house, street and
+postcode and records the UPRN. The street list stays as the fallback: offline,
+before the key is stored, past a limit, or when Ideal Postcodes fails, the
+screen behaves exactly as D-80, and the iPad stops asking for the rest of the
+sitting once the finder has failed. The iPad sends its own credential, as for
+MyStory (D-55), and is capped per day, as is the study.
+`apps/functions/src/address.ts`, `address-policy.ts`;
+`apps/participant/src/lib/addresses.ts`; `streetCheck.addressFinder`;
+`infra/firebase/set-address-key.sh`; docs/13 §5.1.1.
+
+**What this changes from D-52.** D-52 kept every postcode on the device. With
+the finder on, what a child types into the address box while online goes, via
+the study's function, to Ideal Postcodes. It is another processor beside
+Firebase and needs naming in the DPIA; its usage log should be set to redact
+after 0 days.
+
+**Release.** The r9.0.0 candidate was re-cut again with
+`addressFinder: { uprnKey: "uprn" }` on the address item; its hash changed.
+
+### Signposting support around the questions about feelings (2026-11-05, D-82)
 
 **Asked.** The fieldwork team, of RCADS-25's "I think about death": what is our
 safeguarding protocol, and do we have to report answers to teachers? The PI:

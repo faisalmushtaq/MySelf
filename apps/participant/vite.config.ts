@@ -42,6 +42,18 @@ function deriveSittingsUrl(): string {
 }
 
 /**
+ * Where the address finder answers (D-81): beside `saveSitting`, so derived
+ * from it. `MYSELF_ADDRESS_URL` overrides it; empty means this build has no
+ * finder, and the address search uses the street list alone, as offline.
+ */
+function deriveAddressUrl(): string {
+  const explicit = process.env["MYSELF_ADDRESS_URL"];
+  if (explicit !== undefined) return explicit;
+  const sittings = deriveSittingsUrl();
+  return sittings.endsWith("/saveSitting") ? sittings.replace(/\/saveSitting$/, "/findAddress") : "";
+}
+
+/**
  * Where the survey itself is read from (docs/16 §5.3).
  *
  * The study's public, get-only documents — the `published/{surveyId}` pointer
@@ -113,6 +125,7 @@ export default defineConfig({
      */
     __MYSTORY_URL__: JSON.stringify(process.env["MYSELF_MYSTORY_URL"] ?? ""),
     __SITTINGS_URL__: JSON.stringify(deriveSittingsUrl()),
+    __ADDRESS_URL__: JSON.stringify(deriveAddressUrl()),
     /**
      * How often a sitting still being answered is copied to the study.
      *
