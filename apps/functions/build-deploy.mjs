@@ -113,7 +113,14 @@ writeFileSync(
  * An empty value is left out rather than written, because an unset repository
  * variable arrives as an empty string and must mean "the default", not "0".
  */
-const SETTINGS = ["MYSELF_RELAY_DAILY_LIMIT", "MYSELF_RELAY_DEVICE_DAILY_LIMIT", "MYSELF_RELAY_DEVICES_DAILY_LIMIT"];
+const SETTINGS = [
+  "MYSELF_RELAY_DAILY_LIMIT",
+  "MYSELF_RELAY_DEVICE_DAILY_LIMIT",
+  "MYSELF_RELAY_DEVICES_DAILY_LIMIT",
+  // The address finder's day, per iPad and for the study (D-81).
+  "MYSELF_ADDRESS_DEVICE_DAILY_LIMIT",
+  "MYSELF_ADDRESS_DAILY_LIMIT",
+];
 const settings = SETTINGS.filter((name) => (process.env[name] ?? "").trim() !== "").map(
   (name) => `${name}=${process.env[name].trim()}`,
 );

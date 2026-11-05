@@ -326,6 +326,16 @@ export const itemDefinition = z.discriminatedUnion("responseType", [
          * don't know their postcode (D-53).
          */
         searchFirst: z.boolean().optional(),
+        /**
+         * Whole addresses when the iPad is online (D-81): the search box also
+         * asks the study's address finder (Ideal Postcodes, through the
+         * `findAddress` function), limited to West Yorkshire, and choosing one
+         * fills in every field, the postcode included. Its UPRN is recorded
+         * under `uprnKey`, beside the fields like the area. Offline, or when the
+         * finder is unavailable, the street search answers as before. Only with
+         * `searchFirst`.
+         */
+        addressFinder: z.object({ uprnKey: slug }).optional(),
       })
       .optional(),
   }),

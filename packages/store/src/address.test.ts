@@ -26,6 +26,12 @@ describe("the home address as the identity partition carries it (D-52)", () => {
     expect(formatHomeAddress({ street: "Hyde Park Road", postcode: "LS6 2AA", postcode_district: "LS6" })).toBe("Hyde Park Road, LS6 2AA");
   });
 
+  it("keeps the UPRN of an address chosen from the address finder (D-81)", () => {
+    const found = parseHomeAddress('{"postcode":"LS6 1AB","house":"12","street":"Hyde Park Road","area":"Headingley, Leeds","postcode_district":"LS6","uprn":"72012345678"}');
+    expect(found).toMatchObject({ postcode: "LS6 1AB", uprn: "72012345678" });
+    expect(formatHomeAddress(found)).toBe("12 Hyde Park Road, Headingley, Leeds, LS6 1AB");
+  });
+
   it("reads as one line", () => {
     expect(formatHomeAddress({ postcode: "XX1 1XX", house: "1", street: "Example Street" })).toBe(
       "1 Example Street, XX1 1XX",

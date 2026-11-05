@@ -1052,3 +1052,31 @@ the fields reordered house, street, postcode, the postcode's label "Postcode, if
 you know it"), and nothing else; its hash changed. r8.0.0, as fielded, is
 untouched.
 
+### Whole addresses from Ideal Postcodes when online (2026-11-05, D-81)
+
+**Asked.** The team has an Ideal Postcodes account and wants it used: children
+typing their address should be offered whole addresses, still only in
+Yorkshire. "There is no issue with privacy: we send data to Firebase too."
+
+**Changed.** When the iPad is online, "Start typing your address" (D-80) also
+asks a new function, `findAddress`, which asks Ideal Postcodes with the key
+held in Secret Manager. Suggestions are limited to West Yorkshire's postcode
+districts, nearer addresses first. Choosing one fills in the house, street and
+postcode and records the UPRN. The street list stays as the fallback: offline,
+before the key is stored, past a limit, or when Ideal Postcodes fails, the
+screen behaves exactly as D-80, and the iPad stops asking for the rest of the
+sitting once the finder has failed. The iPad sends its own credential, as for
+MyStory (D-55), and is capped per day, as is the study.
+`apps/functions/src/address.ts`, `address-policy.ts`;
+`apps/participant/src/lib/addresses.ts`; `streetCheck.addressFinder`;
+`infra/firebase/set-address-key.sh`; docs/13 §5.1.1.
+
+**What this changes from D-52.** D-52 kept every postcode on the device. With
+the finder on, what a child types into the address box while online goes, via
+the study's function, to Ideal Postcodes. It is another processor beside
+Firebase and needs naming in the DPIA; its usage log should be set to redact
+after 0 days.
+
+**Release.** The r9.0.0 candidate was re-cut again with
+`addressFinder: { uprnKey: "uprn" }` on the address item; its hash changed.
+

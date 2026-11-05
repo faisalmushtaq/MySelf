@@ -225,6 +225,8 @@ jobs:
           MYSELF_RELAY_DAILY_LIMIT: ${{ vars.MYSELF_RELAY_DAILY_LIMIT }}
           MYSELF_RELAY_DEVICE_DAILY_LIMIT: ${{ vars.MYSELF_RELAY_DEVICE_DAILY_LIMIT }}
           MYSELF_RELAY_DEVICES_DAILY_LIMIT: ${{ vars.MYSELF_RELAY_DEVICES_DAILY_LIMIT }}
+          MYSELF_ADDRESS_DEVICE_DAILY_LIMIT: ${{ vars.MYSELF_ADDRESS_DEVICE_DAILY_LIMIT }}
+          MYSELF_ADDRESS_DAILY_LIMIT: ${{ vars.MYSELF_ADDRESS_DAILY_LIMIT }}
         run: firebase deploy --only functions --project myself-research --non-interactive --force
 
       # The credential is a key to the whole project and has no business

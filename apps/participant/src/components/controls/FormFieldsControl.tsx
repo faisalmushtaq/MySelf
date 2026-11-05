@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { normalisePostcode, splitHouse, type StreetList, type StreetMatch } from "@myself/engine";
+import { addressFinderBuilt, pickAddress, suggestAddresses, type Suggestion } from "../../lib/addresses.js";
 import { postcodeList } from "../../lib/postcodes.js";
 import { streetList as loadStreets } from "../../lib/streets.js";
 import { truncateText } from "../../lib/text.js";
@@ -91,6 +92,20 @@ export function FormFieldsControl({ item, value, onAnswer, onValidity, onSubmit 
   );
   /** What is typed in the search box, as a house part and a street to look for. */
   const typed = useMemo(() => splitHouse(addressQuery), [addressQuery]);
+  // Whole addresses from the study's address finder when online (D-81); null
+  // when it cannot answer, and the street list answers instead.
+  const finder = streets?.addressFinder;
+  const [found, setFound] = useState<Suggestion[] | null>(null);
+  const [picking, setPicking] = useState(false);
+  useEffect(() => {
+    if (!searching || !finder || !addressFinderBuilt) return;
+    let live = true;
+    void suggestAddresses(addressQuery).then((hits) => live && setFound(hits));
+    return () => {
+      live = false;
+    };
+  }, [searching, finder, addressQuery]);
+  const showFound = found !== null && found.length > 0;
   const addressMatches = useMemo(
     () => (streetList && searching && typed.street.trim() ? streetList.search(typed.street, 6) : []),
     [streetList, searching, typed.street],
@@ -134,6 +149,13 @@ export function FormFieldsControl({ item, value, onAnswer, onValidity, onSubmit 
   const withoutMatch = (vals: Record<string, string>) => {
     if (!streets) return vals;
     const { [streets.areaKey]: _area, [streets.districtKey]: _district, ...rest } = vals;
+    return withoutUprn(rest);
+  };
+
+  /** The values without a UPRN: an address changed by hand is no longer the one it identifies (D-81). */
+  const withoutUprn = (vals: Record<string, string>) => {
+    if (!finder) return vals;
+    const { [finder.uprnKey]: _uprn, ...rest } = vals;
     return rest;
   };
 
@@ -150,6 +172,7 @@ export function FormFieldsControl({ item, value, onAnswer, onValidity, onSubmit 
     // except where the search leads (D-80): there the postcode is an addition
     // to the street chosen, not instead of it.
     if (streets && (key === streets.field || (!searchFirst && key === check?.field && v.trim()))) next = withoutMatch(next);
+    next = withoutUprn(next);
     if (streets && key === check?.field && v.trim() && noPostcode) setNoPostcode(false);
     const bad = field?.pattern && v.trim().length > 0 && !new RegExp(field.pattern).test(v.trim());
     const nextErrors = { ...errors };
@@ -206,6 +229,34 @@ export function FormFieldsControl({ item, value, onAnswer, onValidity, onSubmit 
     setTimeout(() => (house ? postcodeInput.current : houseInput.current)?.focus(), 0);
   };
 
+  /** A whole address chosen from the finder (D-81): every field filled in, its UPRN kept beside them. */
+  const chooseFound = (s: Suggestion) => {
+    if (!streets || !check || !finder) return;
+    setPicking(true);
+    void pickAddress(s.id).then((a) => {
+      setPicking(false);
+      if (!a) {
+        // Could not be fetched: the street list takes over, with what is typed.
+        setFound(null);
+        return;
+      }
+      const next: Record<string, string> = {
+        ...values,
+        [streets.field]: fit(streets.field, a.street),
+        [check.field]: fit(check.field, a.postcode),
+        [streets.areaKey]: a.area,
+        [streets.districtKey]: a.postcodeDistrict,
+      };
+      if (item.fields.some((f) => f.key === "house")) next["house"] = fit("house", a.house);
+      if (a.uprn) next[finder.uprnKey] = a.uprn;
+      else delete next[finder.uprnKey];
+      const nextErrors = { ...errors };
+      delete nextErrors[check.field];
+      apply(next, nextErrors);
+      setSearching(false);
+    });
+  };
+
   /** The search did not find the street: the fields appear with what was typed (already kept), to finish by hand. */
   const typeInstead = () => {
     const house = splitHouse(addressText).house;
@@ -237,7 +288,11 @@ export function FormFieldsControl({ item, value, onAnswer, onValidity, onSubmit 
     const letters = typed.street.replace(/[^A-Za-z]/g, "").length;
     const note = !addressText.trim()
       ? "Start with your house number and street, like 12 Manor Drive."
-      : streetList === null
+      : picking
+        ? "Getting your address…"
+        : showFound
+          ? "Is it one of these? Tap your address."
+          : streetList === null
         ? "Looking for your street…"
         : addressMatches.length > 0
           ? "Is it one of these? Tap your street."
@@ -265,14 +320,27 @@ export function FormFieldsControl({ item, value, onAnswer, onValidity, onSubmit 
                 if (e.key !== "Enter") return;
                 e.preventDefault();
                 // Enter takes the only match there is; otherwise nothing is guessed.
-                if (addressMatches.length === 1) chooseAddress(addressMatches[0]!);
+                if (showFound) {
+                  if (found!.length === 1) chooseFound(found![0]!);
+                } else if (addressMatches.length === 1) chooseAddress(addressMatches[0]!);
               }}
             />
           </label>
           <p id={`${item.key}-search-note`} className="field-note" aria-live="polite">
             {note}
           </p>
-          {addressMatches.length > 0 && (
+          {showFound && (
+            <ul className="street-matches" aria-label="Addresses that match">
+              {found!.map((s) => (
+                <li key={s.id}>
+                  <button type="button" className="street-match" disabled={picking} onClick={() => chooseFound(s)}>
+                    <span className="street-name">{s.label}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+          {!showFound && addressMatches.length > 0 && (
             <ul className="street-matches" aria-label="Streets that match">
               {addressMatches.map((m) => (
                 <li key={`${m.street}|${m.area}|${m.outward}`}>
@@ -288,7 +356,7 @@ export function FormFieldsControl({ item, value, onAnswer, onValidity, onSubmit 
             </ul>
           )}
           <button type="button" className="dont-know" onClick={typeInstead}>
-            {letters >= 3 ? "My street isn't here" : "Type my address in the boxes instead"}
+            {letters >= 3 ? (showFound ? "My address isn't here" : "My street isn't here") : "Type my address in the boxes instead"}
           </button>
         </div>
       </div>

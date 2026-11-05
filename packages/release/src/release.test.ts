@@ -33,7 +33,8 @@ const registries: Registries = {
  * ethnic origins in West Yorkshire order, the Sleep Quality Scale, new
  * handedness pictures, checks on social-media answers, and a street search
  * for someone who doesn't know their postcode, which from D-80 opens the address
- * screen. MAJOR: all participant-visible.
+ * screen, with whole addresses from the address finder online (D-81). MAJOR: all
+ * participant-visible.
  *
  * r7.3.0 (D-50) froze the published RCADS-25 key; r7.2.0 (D-49) named the
  * SWEMWBS and STAI-5 items by their real keys.

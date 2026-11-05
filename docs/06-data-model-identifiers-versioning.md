@@ -494,6 +494,17 @@ loses nothing. The stored keys are unchanged (`house`, `street`, `postcode`,
 `streetCheck.searchFirst`; the item is revision 2. Everything stays on the
 device. An app without it shows the fields as before.
 
+**Whole addresses online (D-81).** When the iPad is online the same box also
+offers whole addresses from the study's address finder (Ideal Postcodes,
+through the `findAddress` function), limited to West Yorkshire's postcode
+districts: "12 Hyde Park Road, Headingley, Leeds, LS6 1AB". Choosing one fills
+in every field, the postcode included, with the area and district as above, and
+adds the property's UPRN under `uprn` (`streetCheck.addressFinder.uprnKey`).
+Changing any field afterwards drops the UPRN, so a stored UPRN always belongs
+to the stored address. Offline, or whenever the finder is unavailable, the
+street search answers instead, and nothing on screen says which did. Set up in
+docs/13 §5.1.1.
+
 **Welcome screen.** Pending: the team will mark what to remove, and the
 screen will be titled "Taking part".
 

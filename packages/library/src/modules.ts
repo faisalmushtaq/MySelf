@@ -319,11 +319,14 @@ export const ybmIdentity: ModuleInput = {
             areaKey: "area",
             districtKey: "postcode_district",
             searchFirst: true,
+            // Online, whole West Yorkshire addresses from the study's address finder, with their UPRN (D-81).
+            addressFinder: { uprnKey: "uprn" },
           },
           researcherNote:
             "Direct identifier — identity-schema routed (D-09, D-52). Stored as given, as {postcode, house, street}. The postcode is checked on the device against the release's West Yorkshire list; one not in the list is questioned once and then kept. The participant ID is derived from name and date of birth, not from the address. " +
             "From r9.0.0 (D-53) the street typed is matched against West Yorkshire's named roads, and a match chosen adds {area, postcode_district}. " +
-            "Revision 2 (D-80): the screen opens on one search box ('Start typing your address'); a house number typed before the street is stored as house, the street chosen as street, and the postcode, now last and optional, only when the participant knows it. Same keys as revision 1.",
+            "Revision 2 (D-80): the screen opens on one search box ('Start typing your address'); a house number typed before the street is stored as house, the street chosen as street, and the postcode, now last and optional, only when the participant knows it. Same keys as revision 1. " +
+            "D-81: when the iPad is online the search also offers whole addresses from the study's address finder (Ideal Postcodes, West Yorkshire only); choosing one fills in every field and adds {uprn}. Offline, or if the finder is unavailable, the street search answers as above.",
         },
       ],
     },
@@ -340,7 +343,8 @@ export const ybmIdentity: ModuleInput = {
     "screen with the postcode checked against the release's West Yorkshire list; the participant ID is derived from " +
     "first name, last name and date of birth at ingest. " +
     "D-53: someone who doesn't know their postcode can say so and find their street in a list of West Yorkshire's named roads. " +
-    "D-80: the address screen opens on one search box instead, so children start typing their address and choose their street; the postcode comes last and is optional.",
+    "D-80: the address screen opens on one search box instead, so children start typing their address and choose their street; the postcode comes last and is optional. " +
+    "D-81: online, whole West Yorkshire addresses are offered too, from the study's address finder, with their UPRN.",
   researcherNotes:
     "Legacy crosswalk (r1.0.0–r7.3.0): ps_id = initials + house digit + zero-padded month number + postcode letters (e.g. JA101CD); " +
     "val_id = the participant code captured at the opening screen. Both are derived, never re-asked. From r8.0.0 (D-52) " +
