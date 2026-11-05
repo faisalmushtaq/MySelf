@@ -599,7 +599,7 @@ describe("D-53: shorter consent, sleep quality and sanity checks", () => {
     expect(ability.options.map((o) => o.label)).toEqual(["Very well", "Well", "Not very well", "Only a few words", "Not at all"]);
   });
 
-  it("the address question can find a street for someone who doesn't know their postcode", () => {
+  it("the address question opens on the street search, with the postcode last and optional (D-53, D-80)", () => {
     const address = moduleItems("ybm_identity").find((i) => i.key === "home_address")!;
     if (address.responseType !== "form_fields") throw new Error("wrong type");
     expect(address.streetCheck).toEqual({
@@ -607,7 +607,10 @@ describe("D-53: shorter consent, sleep quality and sanity checks", () => {
       asset: "streets_west_yorkshire",
       areaKey: "area",
       districtKey: "postcode_district",
+      searchFirst: true,
     });
-    expect(address.fields.map((f) => f.key)).toEqual(["postcode", "house", "street"]);
+    expect(address.revision).toBe(2);
+    expect(address.fields.map((f) => f.key)).toEqual(["house", "street", "postcode"]);
+    expect(address.fields.every((f) => !f.required)).toBe(true);
   });
 });

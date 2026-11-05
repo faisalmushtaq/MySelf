@@ -357,45 +357,62 @@ test.describe("on the r9.0.0 candidate", () => {
     await expect(statements).toHaveCount(total);
   });
 
-  test("someone who doesn't know their postcode finds their street instead (D-53)", async ({ page }) => {
+  test("the address screen opens on a search: start typing, choose the street, the postcode optional (D-53, D-80)", async ({ page }) => {
     test.slow();
     dateOfBirth = "2012-05-14";
-    const postcode = page.getByRole("textbox", { name: "Postcode" });
-    await walk(page, [], async () => (await postcode.count()) > 0, { candidate: true });
+    const search = page.getByRole("textbox", { name: "Start typing your address" });
+    await walk(page, [], async () => (await search.count()) > 0, { candidate: true });
 
     const next = page.locator("button.next:not(.big)").first();
-    // Offered from the start, for someone who knows straight away.
-    await expect(page.getByRole("button", { name: "I don't know my postcode" })).toBeVisible();
+    // Nothing but the search to begin with: no postcode asked for first.
+    await expect(search).toBeVisible();
+    await expect(page.getByRole("textbox", { name: /Postcode/ })).toHaveCount(0);
+    await expect(page.locator(".field-note").first()).toHaveText("Start with your house number and street, like 12 Manor Drive.");
 
-    // A postcode the list doesn't know: warned, then allowed to say they don't know it.
-    await postcode.fill("LS99 9ZZ");
-    await expect(page.locator(".field-note").first()).toHaveText("We can't find LS99 9ZZ in West Yorkshire. Check it's typed correctly.");
-    await expect(next).toBeDisabled();
-    await page.getByRole("button", { name: "I don't know my postcode" }).click();
-    await expect(postcode).toHaveValue("");
-    await expect(page.locator(".field-note").first()).toHaveText("That's fine — type your street below and choose it from the list.");
-    await expect(next).toBeEnabled();
-
-    // A typo and an abbreviation still find it; the choice records the area and district.
-    const street = page.getByRole("textbox", { name: "Street" });
-    await expect(street).toBeFocused();
-    await street.fill("hyde prak rd");
-    const match = page.locator(".street-match", { hasText: "Hyde Park Road" }).filter({ hasText: "LS6" });
+    // A house number, a typo and an abbreviation still find the street.
+    await search.fill("12 hyde prak rd");
+    const match = page.locator(".street-match", { hasText: "12 Hyde Park Road" }).filter({ hasText: "LS6" });
     await expect(match).toBeVisible();
     await match.click();
+
+    // The fields appear filled in: the number as the house, the street as chosen.
+    const house = page.getByRole("textbox", { name: "House number or name" });
+    const street = page.getByRole("textbox", { name: "Street" });
+    const postcode = page.getByRole("textbox", { name: "Postcode, if you know it" });
+    await expect(house).toHaveValue("12");
     await expect(street).toHaveValue("Hyde Park Road");
-    await expect(page.locator(".field-note").nth(1)).toHaveText("✓ Hyde Park Road, Leeds (LS6)");
-    await expect(page.locator(".street-match")).toHaveCount(0);
+    await expect(page.locator(".field-note").first()).toHaveText("✓ Hyde Park Road, Leeds (LS6)");
+    await expect(postcode).toBeFocused();
+    await expect(next).toBeEnabled();
+
+    // A postcode the list doesn't know is questioned, with a way out for anyone unsure.
+    await postcode.fill("LS99 9ZZ");
+    await expect(page.locator(".field-note").nth(1)).toHaveText("We can't find LS99 9ZZ in West Yorkshire. Check it's typed correctly.");
+    await expect(next).toBeDisabled();
+    await page.getByRole("button", { name: "I'm not sure of my postcode" }).click();
+    await expect(postcode).toHaveValue("");
+    await expect(page.locator(".field-note").nth(1)).toHaveText("That's fine — you can leave it blank.");
+    await expect(page.locator(".field-note").first()).toHaveText("✓ Hyde Park Road, Leeds (LS6)");
+    await expect(next).toBeEnabled();
 
     // A street the list doesn't know is kept as typed, never refused.
-    await street.fill("Nowhere In Particular Lane");
-    await expect(page.locator(".field-note").nth(1)).toContainText("We can't find that street in West Yorkshire");
+    await page.getByRole("button", { name: "Search for my street again" }).click();
+    await expect(search).toBeFocused();
+    await search.fill("7 Nowhere In Particular Lane");
+    await expect(page.locator(".field-note").first()).toContainText("We can't find that street in West Yorkshire");
+    await page.getByRole("button", { name: "My street isn't here" }).click();
+    await expect(house).toHaveValue("7");
+    await expect(street).toHaveValue("Nowhere In Particular Lane");
     await expect(next).toBeEnabled();
-    await street.fill("hyde park rd");
-    await page.locator(".street-match", { hasText: "Hyde Park Road" }).filter({ hasText: "LS6" }).click();
-    await page.getByRole("textbox", { name: "House number or name" }).fill("12");
+
+    // And moving on straight from the search keeps what was typed.
+    await page.getByRole("button", { name: "Search for my street again" }).click();
+    await search.fill("3 Somewhere Unlisted Road");
     await next.click();
-    await expect(postcode).toHaveCount(0);
+    await expect(search).toHaveCount(0);
+    await page.locator("button.back").click();
+    await expect(page.getByRole("textbox", { name: "House number or name" })).toHaveValue("3");
+    await expect(page.getByRole("textbox", { name: "Street" })).toHaveValue("Somewhere Unlisted Road");
   });
 
   test("sleep quality is one numbered row, a long time without social media is checked, and family control asks how (D-53)", async ({ page }) => {

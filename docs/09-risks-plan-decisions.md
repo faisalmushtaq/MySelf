@@ -1024,3 +1024,31 @@ RCADS-25, the doomscrolling items) and must stay word for word.
   word explanations", minor). studio-ops `glossary` does the same from the
   repository.
 - The Studio's pacing note no longer mentions a staff PIN (removed in D-71).
+
+### The address screen starts with the street (2026-11-05, D-80)
+
+**Asked.** Children are struggling to give their postcode. "One where they just
+start typing their address and then options are restricted to only Yorkshire
+possibilities is really useful."
+
+**Changed.** The home address screen opens on a single box, **Start typing your
+address**. The suggestions are West Yorkshire's named roads only (the release's
+street list, D-53), each with its area and postcode district, so a child picks
+the street they recognise. Choosing one fills in the house number they typed,
+the street and its area; the postcode is asked for last, only from those who
+know it. Nothing a child types leaves the iPad: the search runs on the list the
+release carries, as before. `streetCheck.searchFirst`,
+`FormFieldsControl`, `splitHouse`.
+
+**Considered.** Full addresses, house by house, as an address finder such as
+Ideal Postcodes gives. Not taken here: it needs a network the schools do not
+reliably have, it would send what children type to a third party, and the open
+alternative (HM Land Registry's addresses) is licensed for non-commercial use
+only and would have to ship publicly with the app. The street and its area are
+enough for the team to complete the address, and its postcode, at linkage.
+
+**Release.** The r9.0.0 candidate was re-cut with the change (item revision 2,
+the fields reordered house, street, postcode, the postcode's label "Postcode, if
+you know it"), and nothing else; its hash changed. r8.0.0, as fielded, is
+untouched.
+

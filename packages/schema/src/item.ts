@@ -316,6 +316,16 @@ export const itemDefinition = z.discriminatedUnion("responseType", [
          */
         areaKey: slug,
         districtKey: slug,
+        /**
+         * Lead with the street search (D-80): the screen opens on one box,
+         * "Start typing your address", whose suggestions are the list's streets
+         * with their area, so nobody needs to know their postcode first. A house
+         * number typed before the street goes into the field keyed "house"; the fields
+         * then appear filled in, the postcode among them for anyone who knows
+         * it. Without it, the search is offered only once someone says they
+         * don't know their postcode (D-53).
+         */
+        searchFirst: z.boolean().optional(),
       })
       .optional(),
   }),
