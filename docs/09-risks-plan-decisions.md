@@ -1162,3 +1162,19 @@ and kind of answer, so answers stay joined up (they are looked up by module
 and ID, not revision) — only on an unlocked module. studio-ops
 `address-screen` applies it to the home address, pins the lists it names, and
 keeps the drafts' "a home with a name and no street" sentence (D-77).
+
+### When a disclosure means telling the school (2026-11-06, D-85)
+
+**Asked.** The PI: the opening screens should say that a disclosure needing
+safeguarding means alerting the school, and that other responses stay private.
+A pupil had disclosed something to a researcher during a session.
+
+**Changed.** *Why your answers matter* (both surveys) replaces D-82's
+paragraph, which promised that teachers and family would not see answers, with
+one that keeps that promise and states its one limit: if a participant tells
+the team something that makes them worried that someone could be harmed, the
+team must tell the school's safeguarding lead, and will talk to the participant
+first whenever it can. "Private", not "anonymous": names are kept, apart, for
+linkage. "If you tell us", not "if you write": nobody reads answers during a
+session and researchers see codes, so the survey does not promise to act on a
+written answer it cannot see. studio-ops `set-text --replace` swaps one passage.

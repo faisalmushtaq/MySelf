@@ -386,7 +386,11 @@ if (command === "list") {
     surveyId,
     (draft) => {
       const current = findQuestion(draft, itemKey)?.item?.[field]?.text ?? "";
-      const text = append && current.trim() ? `${current.trimEnd()}\n\n${given}` : given;
+      // --replace swaps that exact passage for --text, leaving the rest as it is.
+      const replace = flag("replace");
+      if (replace !== undefined && !current.includes(replace)) fail(`${itemKey}'s ${field} has no passage “${replace.slice(0, 80)}…” to replace.`);
+      const text =
+        replace !== undefined ? current.replace(replace, given) : append && current.trim() ? `${current.trimEnd()}\n\n${given}` : given;
       const out = updateQuestion(draft, itemKey, { [field]: { text } });
       console.log(`  ${itemKey}: ${field === "stem" ? "question" : "instructions"} now “${text}”`);
       return out.draft;
