@@ -529,6 +529,32 @@ if (command === "list") {
     },
     "The address screen as the library has it (search first, whole addresses online)",
   );
+} else if (command === "add-statement") {
+  // A statement to tick on a consent screen (checkbox_set): --item, --label its key, --text, after --after (a statement key).
+  const study = studyArg();
+  const surveyId = surveyArg();
+  const itemKey = flag("item") ?? fail("Say which consent question with --item.");
+  const key = (flag("label") ?? "").trim();
+  if (!/^[a-z][a-z0-9_]{1,39}$/.test(key)) fail("Give the statement a key with --label: lower case letters, digits and underscores.");
+  const text = (flag("text") ?? "").trim() || fail("Say the statement with --text.");
+  const after = flag("after");
+  await editDraft(
+    study,
+    surveyId,
+    (draft) => {
+      const item = findQuestion(draft, itemKey)?.item;
+      if (item?.responseType !== "checkbox_set") fail(`${itemKey} is not a set of statements to tick.`);
+      const statements = item.statements.filter((st) => st.key !== key);
+      const at = after ? statements.findIndex((st) => st.key === after) + 1 : statements.length;
+      if (after && at === 0) fail(`${itemKey} has no statement “${after}”.`);
+      const replaced = statements.length !== item.statements.length;
+      statements.splice(at, 0, { key, text: { text }, required: true });
+      console.log(`  ${itemKey}: ${replaced ? "replaced" : "added"} “${key}”${after ? ` after “${after}”` : " at the end"}: “${text}”`);
+      console.log(`  statements now: ${statements.map((st) => st.key).join(", ")}`);
+      return updateQuestion(draft, itemKey, { statements }).draft;
+    },
+    `Consent statement “${key}”`,
+  );
 } else if (command === "add-option") {
   // An answer option on a question (and every question sharing its list), with a new code; first on screen with --first.
   const study = studyArg();

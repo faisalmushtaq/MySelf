@@ -14,6 +14,7 @@ name: "Studio: study space housekeeping"
 #   add-info      an information screen (title, text), after a question or first
 #   set-screen    the finish (or review) screen's text (item = finish)
 #   address-area  the home address checked against Yorkshire and the Humber (D-83)
+#   add-statement a statement to tick on a consent screen (item, label = key, text, after)
 #   address-screen the home address as the library has it: search first, whole addresses online (D-84)
 #   glossary      a word participants can tap for its meaning (label = word, text = meaning)
 #   archive       single questions out of a draft (restorable)
@@ -29,7 +30,7 @@ on:
       command:
         description: "What to do"
         type: choice
-        options: [list, questions, grant-owners, insert, remove-blocks, archive, restore, reorder, add-option, set-lede, set-text, add-info, glossary, set-screen, address-area, address-screen, dob-ages, retitle, form-label]
+        options: [list, questions, grant-owners, insert, remove-blocks, archive, restore, reorder, add-option, set-lede, set-text, add-info, glossary, set-screen, address-area, address-screen, add-statement, dob-ages, retitle, form-label]
         default: list
       study:
         description: "Study space id (from list)"
@@ -44,7 +45,7 @@ on:
         type: string
         default: ""
       after:
-        description: "Question ID to insert after (insert; blank = end of the section)"
+        description: "Question ID to insert after (insert; blank = end of the section); statement key to add after (add-statement)"
         type: string
         default: ""
       pieces:
