@@ -53,7 +53,7 @@ on:
         type: string
         default: ""
       replace:
-        description: "Questionnaire to replace, by key, e.g. macarthur_ssy (insert); the exact passage to replace with the text (set-text)"
+        description: "Questionnaire to replace, by key, e.g. macarthur_ssy (insert); the exact passage to replace with the text (set-text, set-screen)"
         type: string
         default: ""
       min_age:
