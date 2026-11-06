@@ -544,11 +544,17 @@ if (command === "list") {
     (draft) => {
       const item = findQuestion(draft, itemKey)?.item;
       if (item?.responseType !== "checkbox_set") fail(`${itemKey} is not a set of statements to tick.`);
+      // Rewording one that is there keeps its place and its pipes ({withdrawal_date}), unless --after moves it.
+      const existingAt = item.statements.findIndex((st) => st.key === key);
+      const existing = existingAt >= 0 ? item.statements[existingAt] : null;
       const statements = item.statements.filter((st) => st.key !== key);
-      const at = after ? statements.findIndex((st) => st.key === after) + 1 : statements.length;
+      const at = after ? statements.findIndex((st) => st.key === after) + 1 : existing ? existingAt : statements.length;
       if (after && at === 0) fail(`${itemKey} has no statement “${after}”.`);
-      const replaced = statements.length !== item.statements.length;
-      statements.splice(at, 0, { key, text: { text }, required: true });
+      const replaced = existing !== null;
+      const pipes = existing?.text?.pipes;
+      const unknown = [...text.matchAll(/\{(\w+)\}/g)].map((m) => m[1]).filter((name) => !pipes?.[name]);
+      if (unknown.length) fail(`The statement uses {${unknown.join("}, {")}}, which ${existing ? "this statement does not fill in" : "a new statement cannot fill in"}.`);
+      statements.splice(at, 0, { ...(existing ?? {}), key, text: { ...(pipes ? { pipes } : {}), text }, required: existing?.required ?? true });
       console.log(`  ${itemKey}: ${replaced ? "replaced" : "added"} “${key}”${after ? ` after “${after}”` : " at the end"}: “${text}”`);
       console.log(`  statements now: ${statements.map((st) => st.key).join(", ")}`);
       return updateQuestion(draft, itemKey, { statements }).draft;
