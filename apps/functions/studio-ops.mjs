@@ -463,7 +463,11 @@ if (command === "list") {
     surveyId,
     (draft) => {
       const current = draft.composition.screens?.[which]?.body?.text ?? "";
-      const body = append && current.trim() ? `${current.trimEnd()}\n\n${given}` : given;
+      // --replace swaps that exact passage for --text, leaving the rest as it is.
+      const replace = flag("replace");
+      if (replace !== undefined && !current.includes(replace)) fail(`The ${which} screen has no passage “${replace.slice(0, 80)}…” to replace.`);
+      const body =
+        replace !== undefined ? current.replace(replace, given) : append && current.trim() ? `${current.trimEnd()}\n\n${given}` : given;
       console.log(`  ${which} screen now reads:\n${body.split("\n").map((l) => `    ${l}`).join("\n")}`);
       return updateScreen(draft, which, { body }).draft;
     },
