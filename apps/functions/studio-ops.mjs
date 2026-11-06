@@ -533,6 +533,48 @@ if (command === "list") {
     },
     "The address screen as the library has it (search first, whole addresses online)",
   );
+} else if (command === "wording" || command === "replace-text") {
+  // wording (read-only): every text a participant sees on one question (--item), in full.
+  // replace-text: that exact passage (--replace) swapped for --text wherever it appears on the question:
+  // its wording, instructions, "more information" panel and statements to tick.
+  const study = studyArg();
+  const surveyId = surveyArg();
+  const itemKey = flag("item") ?? fail("Say which question with --item (its ID).");
+  const textsOf = (item) => [
+    ["question", item.stem?.text],
+    ["instructions", item.lede?.text],
+    ["more information", item.moreInfo?.body?.text],
+    ...(item.statements ?? []).map((st) => [`statement ${st.key}`, st.text?.text]),
+  ].filter(([, text]) => typeof text === "string");
+  if (command === "wording") {
+    const snap = await db.doc(paths.studioDraft(study, surveyId)).get();
+    if (!snap.exists) fail(`There is no survey “${surveyId}” in the study space “${study}”.`);
+    const item = findQuestion(parseDraft(snap.get("content")), itemKey)?.item ?? fail(`There is no question “${itemKey}” in the draft.`);
+    for (const [where, text] of textsOf(item)) console.log(`\n[${where}]\n${text}`);
+  } else {
+    const replace = flag("replace") ?? "";
+    if (!replace) fail("Say the exact passage to replace with --replace.");
+    const given = flag("text") ?? "";
+    if (!given.trim()) fail("Say the new text with --text.");
+    await editDraft(
+      study,
+      surveyId,
+      (draft) => {
+        const item = findQuestion(draft, itemKey)?.item ?? fail(`There is no question “${itemKey}” in the draft.`);
+        const swap = (text) => text.split(replace).join(given);
+        for (const [where, text] of textsOf(item)) if (text.includes(replace)) console.log(`  ${itemKey} ${where} now: “${swap(text)}”`);
+        if (!textsOf(item).some(([, text]) => text.includes(replace))) fail(`${itemKey} has no passage “${replace.slice(0, 80)}” to replace.`);
+        const patch = {};
+        if (item.stem?.text?.includes(replace)) patch.stem = { ...item.stem, text: swap(item.stem.text) };
+        if (item.lede?.text?.includes(replace)) patch.lede = { ...item.lede, text: swap(item.lede.text) };
+        if (item.moreInfo?.body?.text?.includes(replace)) patch.moreInfo = { ...item.moreInfo, body: { ...item.moreInfo.body, text: swap(item.moreInfo.body.text) } };
+        if ((item.statements ?? []).some((st) => st.text?.text?.includes(replace)))
+          patch.statements = item.statements.map((st) => (st.text?.text?.includes(replace) ? { ...st, text: { ...st.text, text: swap(st.text.text) } } : st));
+        return updateQuestion(draft, itemKey, patch).draft;
+      },
+      `Wording on ${itemKey}`,
+    );
+  }
 } else if (command === "add-statement") {
   // A statement to tick on a consent screen (checkbox_set): --item, --label its key, --text, after --after (a statement key).
   const study = studyArg();

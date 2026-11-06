@@ -14,6 +14,8 @@ name: "Studio: study space housekeeping"
 #   add-info      an information screen (title, text), after a question or first
 #   set-screen    the finish (or review) screen's text (item = finish)
 #   address-area  the home address checked against Yorkshire and the Humber (D-83)
+#   wording       every text a participant sees on one question (item), in full, read-only
+#   replace-text  an exact passage (replace) swapped for text everywhere on one question (item)
 #   add-statement a statement to tick on a consent screen (item, label = key, text, after)
 #   address-screen the home address as the library has it: search first, whole addresses online (D-84)
 #   glossary      a word participants can tap for its meaning (label = word, text = meaning)
@@ -30,7 +32,7 @@ on:
       command:
         description: "What to do"
         type: choice
-        options: [list, questions, grant-owners, insert, remove-blocks, archive, restore, reorder, add-option, set-lede, set-text, add-info, glossary, set-screen, address-area, address-screen, add-statement, dob-ages, retitle, form-label]
+        options: [list, questions, grant-owners, insert, remove-blocks, archive, restore, reorder, add-option, set-lede, set-text, add-info, glossary, set-screen, address-area, address-screen, add-statement, wording, replace-text, dob-ages, retitle, form-label]
         default: list
       study:
         description: "Study space id (from list)"
@@ -53,7 +55,7 @@ on:
         type: string
         default: ""
       replace:
-        description: "Questionnaire to replace, by key, e.g. macarthur_ssy (insert); the exact passage to replace with the text (set-text, set-screen)"
+        description: "Questionnaire to replace, by key, e.g. macarthur_ssy (insert); the exact passage to replace with the text (set-text, set-screen, replace-text)"
         type: string
         default: ""
       min_age:
@@ -85,7 +87,7 @@ on:
         type: string
         default: ""
       item:
-        description: "Question ID (add-option)"
+        description: "Question ID (add-option, wording, replace-text)"
         type: string
         default: ""
       append:
