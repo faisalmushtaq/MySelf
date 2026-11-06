@@ -1178,3 +1178,13 @@ first whenever it can. "Private", not "anonymous": names are kept, apart, for
 linkage. "If you tell us", not "if you write": nobody reads answers during a
 session and researchers see codes, so the survey does not promise to act on a
 written answer it cannot see. studio-ops `set-text --replace` swaps one passage.
+
+**Also (same day).** The PI asked for the same limit as a consent statement, so
+it is agreed to, not only read: YBM's consent gains `safeguarding`, after
+`no_identification` — "I understand that my answers are private and that my
+teachers and family will not see them. The only exception is safety: if I tell
+the research team something that makes them worried that I, or someone else,
+could be harmed, they will need to tell my school's safeguarding lead so that
+I can get support." studio-ops `add-statement`. Not the break study's: its
+participants are adults (its consent asks them to confirm they are 18 or
+over), for whom teachers, family and a school safeguarding lead do not apply.
