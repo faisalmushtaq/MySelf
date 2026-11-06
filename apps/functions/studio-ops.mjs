@@ -607,6 +607,27 @@ if (command === "list") {
     },
     `Consent statement “${key}”`,
   );
+} else if (command === "remove-statement") {
+  // A statement to tick off a consent screen (checkbox_set): --item, --label its key.
+  const study = studyArg();
+  const surveyId = surveyArg();
+  const itemKey = flag("item") ?? fail("Say which consent question with --item.");
+  const key = (flag("label") ?? "").trim() || fail("Say which statement with --label (its key).");
+  await editDraft(
+    study,
+    surveyId,
+    (draft) => {
+      const item = findQuestion(draft, itemKey)?.item;
+      if (item?.responseType !== "checkbox_set") fail(`${itemKey} is not a set of statements to tick.`);
+      const gone = item.statements.find((st) => st.key === key) ?? fail(`${itemKey} has no statement “${key}”.`);
+      const statements = item.statements.filter((st) => st.key !== key);
+      if (statements.length === 0) fail("A consent screen needs at least one statement.");
+      console.log(`  ${itemKey}: removed “${key}”: “${gone.text?.text ?? ""}”`);
+      console.log(`  statements now: ${statements.map((st) => st.key).join(", ")}`);
+      return updateQuestion(draft, itemKey, { statements }).draft;
+    },
+    `Remove consent statement “${key}”`,
+  );
 } else if (command === "add-option") {
   // An answer option on a question (and every question sharing its list), with a new code; first on screen with --first.
   const study = studyArg();
