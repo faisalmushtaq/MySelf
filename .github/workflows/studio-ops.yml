@@ -9,6 +9,7 @@ name: "Studio: study space housekeeping"
 #   remove-blocks whole questionnaires out of a draft (archived, restorable)
 #   reorder       a section's questions in a given order
 #   add-option    an answer option on a question, with a new code
+#   remove-option an answer option off a question, by its label (its value is retired)
 #   set-lede      a question's instructions (the line under it)
 #   set-text      a question's wording (field stem) or instructions (field lede)
 #   add-info      an information screen (title, text), after a question or first
@@ -33,7 +34,7 @@ on:
       command:
         description: "What to do"
         type: choice
-        options: [list, questions, grant-owners, insert, remove-blocks, archive, restore, reorder, add-option, set-lede, set-text, add-info, glossary, set-screen, address-area, address-screen, add-statement, remove-statement, wording, replace-text, dob-ages, retitle, form-label]
+        options: [list, questions, grant-owners, insert, remove-blocks, archive, restore, reorder, add-option, remove-option, set-lede, set-text, add-info, glossary, set-screen, address-area, address-screen, add-statement, remove-statement, wording, replace-text, dob-ages, retitle, form-label]
         default: list
       study:
         description: "Study space id (from list)"
@@ -88,7 +89,7 @@ on:
         type: string
         default: ""
       item:
-        description: "Question ID (add-option, wording, replace-text)"
+        description: "Question ID (add-option, remove-option, wording, replace-text)"
         type: string
         default: ""
       append:
@@ -112,7 +113,7 @@ on:
         type: string
         default: ""
       label:
-        description: "New form label (form-label); the word (glossary); an option label (add-option)"
+        description: "New form label (form-label); the word (glossary); an option label (add-option, remove-option)"
         type: string
         default: ""
       apply:
