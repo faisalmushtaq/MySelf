@@ -140,6 +140,8 @@ export function SurveyScreen(props: SurveyScreenProps) {
   /** How many times leaving this question blank has been asked about (0: not yet). */
   const [skipAsked, setSkipAsked] = useState(0);
   const confirmingSkip = skipAsked > 0;
+  /** Taking back an answer already given, to leave the question blank: asked once, in the same strip. */
+  const [clearing, setClearing] = useState(false);
   // Draft validity reported by the control on screen (formats, required parts).
   const [draft, setDraft] = useState<{ ok: boolean; complete: boolean } | null>(null);
   const [helpOpen, setHelpOpen] = useState(false);
@@ -157,6 +159,7 @@ export function SurveyScreen(props: SurveyScreenProps) {
 
   useEffect(() => {
     setSkipAsked(0);
+    setClearing(false);
     setDraft(null);
     setHelpOpen(false);
     setMoreOpen(false);
@@ -448,6 +451,19 @@ export function SurveyScreen(props: SurveyScreenProps) {
       props.onStaffGesture();
     }
   };
+  /**
+   * An answer given can be taken back, leaving the question blank, as if it had
+   * been skipped (recorded as a skip, so the data matches what was left). A
+   * choice cannot be unticked, so without this a participant who changes their
+   * mind about answering at all could not. Not for a required question, a
+   * consent screen, typed answers (emptying the box already does it) or the
+   * home address (its own skip asks three times, D-71).
+   */
+  const canClear =
+    answered &&
+    item.required !== "hard" &&
+    !isAddress &&
+    !["info", "checkbox_set", "text_short", "text_long", "form_fields"].includes(item.responseType);
   const stuckSkip = stuck && !answered && effort.stuckPromptOffersSkip !== false && item.required !== "hard";
 
   return (
@@ -630,7 +646,26 @@ export function SurveyScreen(props: SurveyScreenProps) {
       <footer className="survey-footer">
         {/* Skip confirmation lives in a reserved strip: asking never reflows
             the question above it. */}
-        {confirmingSkip ? (
+        {clearing ? (
+          <div className="skip-confirm" role="alertdialog" aria-label="Take back your answer?">
+            <p className="skip-question">Take back your answer and leave this one blank?</p>
+            <div className="skip-actions">
+              <button
+                type="button"
+                className="skip-go"
+                onClick={() => {
+                  setClearing(false);
+                  props.onAdvance(index, "skip");
+                }}
+              >
+                Leave it blank
+              </button>
+              <button type="button" className="skip-back" onClick={() => setClearing(false)}>
+                Keep my answer
+              </button>
+            </div>
+          </div>
+        ) : confirmingSkip ? (
           <div className="skip-confirm" role="alertdialog" aria-label="Skip this question?">
             {isAddress ? (
               <div className="skip-question">
@@ -665,6 +700,11 @@ export function SurveyScreen(props: SurveyScreenProps) {
           </div>
         ) : (
           <>
+            {canClear && (
+              <button type="button" className="decline clear-answer" onClick={() => setClearing(true)}>
+                Leave this blank instead
+              </button>
+            )}
             {item.allowDecline && !answered && (
               <button type="button" className="decline" onClick={() => props.onAdvance(index, "decline")}>
                 Prefer not to say

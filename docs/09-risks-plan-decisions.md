@@ -1188,3 +1188,31 @@ could be harmed, they will need to tell my school's safeguarding lead so that
 I can get support." studio-ops `add-statement`. Not the break study's: its
 participants are adults (its consent asks them to confirm they are 18 or
 over), for whom teachers, family and a school safeguarding lead do not apply.
+
+### Taking an answer back, longer social media days, and "jittery" (2026-11-07, D-86)
+
+**Asked.** After a pass through the school survey: from the summary, a pupil
+could change an answer but not remove it (a choice cannot be unticked);
+"7 hours or more" was the top band for a day's social media, when many pupils
+likely spend ten or more on a weekend; pupils asked what "jittery" means, and
+researchers explained it differently.
+
+**Changed.** An answered question that may be skipped now offers *Leave this
+blank instead*, asked once ("Take back your answer and leave this one
+blank?"), and recorded as a skip after the answer — the way the data already
+treats a skip that follows an answer, so the dataset shows it blank and the
+raw log keeps both. Not offered on required questions, consent screens, typed
+answers (emptying the box already does it) or the home address, whose skip
+asks three times (D-71).
+
+The daily-time list (`scale.sm_daily_time_9pt`, school and non-school days)
+loses "7 hours or more" and gains "7 hours to just under 8 hours", "8 hours to
+just under 10 hours", "10 hours to just under 12 hours" and "12 hours or
+more". The old value is retired, never reused: in sittings before this change
+it still means 7 hours or more, so analysis across versions combines the new
+top bands back into it. studio-ops `remove-option` (by label) and
+`add-option`.
+
+"Jittery" (STAI-5, a validated questionnaire that cannot be reworded) gets a
+tap-a-word explanation (D-79) rather than new wording, so every pupil gets the
+same meaning.

@@ -524,6 +524,48 @@ test.describe("a sitting on a device with no study configured", () => {
     await expect(page.locator(".screen.finish")).toBeVisible();
     await expect(page.getByRole("button", { name: /hand back to the researcher/i })).toBeVisible();
   });
+
+  /**
+   * Taking an answer back. A choice cannot be unticked, so a participant who
+   * answered and then decided to leave a question blank had no way to: the
+   * summary let them change the answer, never remove it. Now an answered
+   * question that may be skipped offers "Leave this blank instead", asks once,
+   * and records a skip, so the summary shows it as blank.
+   */
+  test("takes an answer back from the summary, leaving the question blank", async ({ page }) => {
+    await installClock(page);
+    await startSitting(page);
+    await walkToEnd(page);
+    await page.getByRole("button", { name: /go back to my answers/i }).click();
+    const review = page.locator(".screen.review");
+    const survey = page.locator(".screen.survey");
+    await expect(review).toBeVisible();
+
+    const rows = review.locator("button.review-row");
+    const count = await rows.count();
+    let cleared = -1;
+    for (let i = 0; i < Math.min(count, 60) && cleared < 0; i++) {
+      if (/left blank/i.test((await rows.nth(i).textContent()) ?? "")) continue;
+      await rows.nth(i).click();
+      await expect(survey).toBeVisible();
+      const take = survey.getByRole("button", { name: /leave this blank instead/i });
+      if (await take.isVisible()) {
+        await take.click();
+        // Asked once, with keeping the answer as the other choice.
+        await expect(survey.getByText(/take back your answer and leave this one blank/i)).toBeVisible();
+        await survey.getByRole("button", { name: /keep my answer/i }).click();
+        await expect(take).toBeVisible();
+        await take.click();
+        await survey.getByRole("button", { name: /^leave it blank$/i }).click();
+        cleared = i;
+      } else {
+        await survey.getByRole("button", { name: /back to summary/i }).click();
+      }
+      await expect(review).toBeVisible();
+    }
+    expect(cleared).toBeGreaterThanOrEqual(0);
+    await expect(rows.nth(cleared)).toContainText(/left blank/i);
+  });
 });
 
 /**

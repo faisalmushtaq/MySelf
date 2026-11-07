@@ -20,6 +20,7 @@ import {
   outline,
   parseDraft,
   removeBlock,
+  removeOption,
   reorderSection,
   repositoryModuleFragment,
   restoreQuestion,
@@ -645,6 +646,28 @@ if (command === "list") {
       return first ? moveOption(added.draft, itemKey, added.code, 0).draft : added.draft;
     },
     `Option “${label}” on ${itemKey}`,
+  );
+} else if (command === "remove-option") {
+  // An answer option off a question (and every question sharing its list), found by its label (--label).
+  // Its value is retired, never reused: answers already given with it keep their meaning.
+  const study = studyArg();
+  const surveyId = surveyArg();
+  const itemKey = flag("item") ?? fail("Say which question with --item (its ID).");
+  const label = (flag("label") ?? "").trim() || fail("Say which option with --label (its words, exactly).");
+  await editDraft(
+    study,
+    surveyId,
+    (draft) => {
+      const item = findQuestion(draft, itemKey)?.item ?? fail(`There is no question “${itemKey}” in the draft.`);
+      const scale = item.scale ? draft.scales[item.scale] : undefined;
+      if (!scale) fail(`${itemKey} has no options.`);
+      const option = scale.options.find((o) => o.label === label) ?? fail(`${itemKey} has no option “${label}”. Its options: ${scale.options.map((o) => `“${o.label}”`).join(", ")}`);
+      const out = removeOption(draft, itemKey, option.code, { published: true, at: new Date().toISOString() });
+      console.log(`  ${itemKey}: removed “${label}” (value ${option.code}, retired: answers already given with it keep their meaning)`);
+      console.log(`  options now: ${out.draft.scales[item.scale].options.map((o) => `${o.code} “${o.label}”`).join(", ")}`);
+      return out.draft;
+    },
+    `Remove option “${label}” from ${itemKey}`,
   );
 } else if (command === "reorder") {
   // A section's questions in the order given (every one, by ID); locked questionnaires move whole.
