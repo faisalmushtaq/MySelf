@@ -538,7 +538,7 @@ if (command === "list") {
 } else if (command === "wording" || command === "replace-text") {
   // wording (read-only): every text a participant sees on one question (--item), in full.
   // replace-text: that exact passage (--replace) swapped for --text wherever it appears on the question:
-  // its wording, instructions, "more information" panel and statements to tick.
+  // its wording, instructions, "more information" panel, statements to tick and the groups to sort into.
   const study = studyArg();
   const surveyId = surveyArg();
   const itemKey = flag("item") ?? fail("Say which question with --item (its ID).");
@@ -547,6 +547,7 @@ if (command === "list") {
     ["instructions", item.lede?.text],
     ["more information", item.moreInfo?.body?.text],
     ...(item.statements ?? []).map((st) => [`statement ${st.key}`, st.text?.text]),
+    ...(item.groups ?? []).map((g) => [`group ${g.key}`, g.label]),
   ].filter(([, text]) => typeof text === "string");
   if (command === "wording") {
     const snap = await db.doc(paths.studioDraft(study, surveyId)).get();
@@ -572,6 +573,8 @@ if (command === "list") {
         if (item.moreInfo?.body?.text?.includes(replace)) patch.moreInfo = { ...item.moreInfo, body: { ...item.moreInfo.body, text: swap(item.moreInfo.body.text) } };
         if ((item.statements ?? []).some((st) => st.text?.text?.includes(replace)))
           patch.statements = item.statements.map((st) => (st.text?.text?.includes(replace) ? { ...st, text: { ...st.text, text: swap(st.text.text) } } : st));
+        if ((item.groups ?? []).some((g) => g.label.includes(replace)))
+          patch.groups = item.groups.map((g) => (g.label.includes(replace) ? { ...g, label: swap(g.label) } : g));
         return updateQuestion(draft, itemKey, patch).draft;
       },
       `Wording on ${itemKey}`,

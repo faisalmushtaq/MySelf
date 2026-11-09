@@ -1216,3 +1216,22 @@ top bands back into it. studio-ops `remove-option` (by label) and
 "Jittery" (STAI-5, a validated questionnaire that cannot be reworded) gets a
 tap-a-word explanation (D-79) rather than new wording, so every pupil gets the
 same meaning.
+
+### One definition of social media, and phones (2026-11-09, D-87)
+
+**Asked.** The PI: the survey must define social media one way, and focus on
+phone use. It said three things: "Do you use social media?" named apps and
+websites like YouTube, TikTok, Instagram, Snapchat and Pinterest; the
+"just to check" screen said messaging apps count too; "How long could you go
+without social media?" said they don't. The app question asked which apps
+pupils *use*, but sorted them into "I have these apps on my phone".
+
+**Decided.** Messaging apps (WhatsApp, iMessage) are not social media, as the
+app list already assumed; Snapchat and Discord stay. The phone focus goes into
+the definition and the app question only: the app question asks which apps
+pupils use on their phone, and its groups say so. The daily-time and other
+social media questions keep their wording, so they measure what earlier
+sittings measured. Pinterest and BeReal, named on the "just to check" screen,
+join the app list with the same "in one go" follow-up as the others
+(studio-ops `copy-question`). studio-ops `replace-text` now reaches a sorting
+question's group labels.
