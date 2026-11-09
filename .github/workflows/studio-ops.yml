@@ -9,6 +9,7 @@ name: "Studio: study space housekeeping"
 #   remove-blocks whole questionnaires out of a draft (archived, restorable)
 #   reorder       a section's questions in a given order
 #   add-option    an answer option on a question, with a new code
+#   copy-question a question copied after itself: new ID (label), wording passage (replace -> text), shown for option value (code)
 #   remove-option an answer option off a question, by its label (its value is retired)
 #   set-lede      a question's instructions (the line under it)
 #   set-text      a question's wording (field stem) or instructions (field lede)
@@ -34,7 +35,7 @@ on:
       command:
         description: "What to do"
         type: choice
-        options: [list, questions, grant-owners, insert, remove-blocks, archive, restore, reorder, add-option, remove-option, set-lede, set-text, add-info, glossary, set-screen, address-area, address-screen, add-statement, remove-statement, wording, replace-text, dob-ages, retitle, form-label]
+        options: [list, questions, grant-owners, insert, remove-blocks, archive, restore, reorder, add-option, remove-option, copy-question, set-lede, set-text, add-info, glossary, set-screen, address-area, address-screen, add-statement, remove-statement, wording, replace-text, dob-ages, retitle, form-label]
         default: list
       study:
         description: "Study space id (from list)"
@@ -89,7 +90,7 @@ on:
         type: string
         default: ""
       item:
-        description: "Question ID (add-option, remove-option, wording, replace-text)"
+        description: "Question ID (add-option, remove-option, copy-question, wording, replace-text)"
         type: string
         default: ""
       append:
@@ -114,6 +115,10 @@ on:
         default: ""
       label:
         description: "New form label (form-label); the word (glossary); an option label (add-option, remove-option)"
+        type: string
+        default: ""
+      code:
+        description: "Option value the copy's display condition checks (copy-question)"
         type: string
         default: ""
       apply:
@@ -176,12 +181,13 @@ jobs:
           INSTRUMENTS: ${{ inputs.instruments }}
           INSTRUMENT: ${{ inputs.instrument }}
           LABEL: ${{ inputs.label }}
+          CODE: ${{ inputs.code }}
           APPLY: ${{ inputs.apply && '--apply' || '' }}
         run: |
           node studio-ops.mjs "$COMMAND" --project myself-research \
             ${STUDY:+--study "$STUDY"} ${SURVEY:+--survey "$SURVEY"} ${SECTION:+--section "$SECTION"} \
             ${AFTER:+--after "$AFTER"} ${PIECES:+--pieces "$PIECES"} ${REPLACE:+--replace "$REPLACE"} ${MIN_AGE:+--min-age "$MIN_AGE"} ${MAX_AGE:+--max-age "$MAX_AGE"} \
-            ${ORDER:+--order "$ORDER"} ${MATCH:+--match "$MATCH"} ${TITLE:+--title "$TITLE"} ${ITEMS:+--items "$ITEMS"} ${ITEM:+--item "$ITEM"} ${TEXT:+--text "$TEXT"} ${FIELD:+--field "$FIELD"} $FIRST $APPEND ${INSTRUMENTS:+--instruments "$INSTRUMENTS"} ${INSTRUMENT:+--instrument "$INSTRUMENT"} ${LABEL:+--label "$LABEL"} $APPLY
+            ${ORDER:+--order "$ORDER"} ${MATCH:+--match "$MATCH"} ${TITLE:+--title "$TITLE"} ${ITEMS:+--items "$ITEMS"} ${ITEM:+--item "$ITEM"} ${TEXT:+--text "$TEXT"} ${FIELD:+--field "$FIELD"} $FIRST $APPEND ${INSTRUMENTS:+--instruments "$INSTRUMENTS"} ${INSTRUMENT:+--instrument "$INSTRUMENT"} ${LABEL:+--label "$LABEL"} ${CODE:+--code "$CODE"} $APPLY
 
       - name: Shred the credential
         if: always()

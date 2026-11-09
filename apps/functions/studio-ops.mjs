@@ -13,6 +13,7 @@ import {
   reservedFrom,
   archiveQuestion,
   diffDrafts,
+  duplicateQuestion,
   extractDraft,
   findQuestion,
   insertFragment,
@@ -646,6 +647,53 @@ if (command === "list") {
       return first ? moveOption(added.draft, itemKey, added.code, 0).draft : added.draft;
     },
     `Option “${label}” on ${itemKey}`,
+  );
+} else if (command === "copy-question") {
+  // A copy of a question (--item), straight after it, with its own ID (--label), its wording's
+  // passage --replace swapped for --text, and its display condition pointed at option value --code:
+  // e.g. the "how long in one go" follow-up for one more app.
+  const study = studyArg();
+  const surveyId = surveyArg();
+  const source = flag("item") ?? fail("Say which question to copy with --item.");
+  const newKey = (flag("label") ?? "").trim();
+  if (!/^[a-z][a-z0-9_]{1,63}$/.test(newKey)) fail("Give the copy an ID with --label: lower case letters, digits and underscores.");
+  const replace = flag("replace") ?? "";
+  const given = (flag("text") ?? "").trim();
+  if (!replace || !given) fail("Say the passage to change with --replace and what it becomes with --text.");
+  const codeFlag = flag("code");
+  const code = codeFlag === undefined ? undefined : Number(codeFlag);
+  if (code !== undefined && !Number.isInteger(code)) fail("--code is an option's value (a whole number).");
+  const versions = await db.collection(paths.studioVersions(study, surveyId)).get();
+  const reserved = reservedFrom(versions.docs.map((v) => ({ itemKeys: v.get("itemKeys") ?? [], variables: v.get("variables") ?? [] })));
+  await editDraft(
+    study,
+    surveyId,
+    (draft) => {
+      const original = findQuestion(draft, source)?.item ?? fail(`There is no question “${source}” in the draft.`);
+      if (!original.stem.text.includes(replace)) fail(`${source}'s wording has no passage “${replace}”.`);
+      const oldKey = source.slice(source.indexOf(".") + 1);
+      const variable = original.variable.includes(oldKey) ? original.variable.replace(oldKey, newKey) : newKey;
+      let displayIf = original.displayIf;
+      if (code !== undefined) {
+        if (!displayIf) fail(`${source} has no display condition to point at value ${code}.`);
+        const codes = JSON.stringify(displayIf).match(/"code":/g)?.length ?? 0;
+        if (codes !== 1) fail(`${source}'s display condition checks ${codes} option values; copy-question changes exactly one.`);
+        displayIf = JSON.parse(JSON.stringify(displayIf).replace(/"code":-?\d+/, `"code":${code}`));
+      }
+      const copied = duplicateQuestion(draft, source, { reserved });
+      const out = updateQuestion(
+        copied.draft,
+        copied.itemKey,
+        { key: newKey, variable, stem: { ...original.stem, text: original.stem.text.split(replace).join(given) }, ...(displayIf ? { displayIf } : {}) },
+        { reserved },
+      );
+      const itemKey = `${source.slice(0, source.indexOf("."))}.${newKey}`;
+      const item = findQuestion(out.draft, itemKey)?.item;
+      console.log(`  ${itemKey} (variable ${item?.variable}) added after ${source}: “${item?.stem.text}”`);
+      if (item?.displayIf) console.log(`  shown when: ${JSON.stringify(item.displayIf)}`);
+      return out.draft;
+    },
+    `Copy ${source} as ${newKey}`,
   );
 } else if (command === "remove-option") {
   // An answer option off a question (and every question sharing its list), found by its label (--label).
