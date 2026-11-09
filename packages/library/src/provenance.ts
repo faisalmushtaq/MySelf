@@ -18,6 +18,13 @@ const QSF_UNKNOWN =
   "The survey file does not record who first wrote these questions, or whether any were taken from elsewhere. To confirm with the team that wrote the 2026 survey.";
 const TEAM = "YBM research team";
 
+const PEW_SURVEY =
+  "Pew Research Center, 2025 Teens Survey (Teens & Technology): US teens aged 13-17, n = 1,458, online, 25 September to 9 October 2025.";
+const PEW_TOPLINE_FEB =
+  "'How Teens Use and View AI', 24 February 2026, https://www.pewresearch.org/wp-content/uploads/sites/20/2026/02/PI_2026.02.24_Teens-and-AI_TOPLINE.pdf";
+const PEW_TOPLINE_DEC =
+  "'Teens, Social Media and AI Chatbots 2025', 9 December 2025, https://www.pewresearch.org/wp-content/uploads/sites/20/2025/12/PI_2025.12.09_Teens-Social-Media-AI_TOPLINE.pdf";
+
 export const LIBRARY_PROVENANCE: Record<string, ProvenanceInput> = {
   // --- Validated instruments --------------------------------------------------
   kss: {
@@ -171,6 +178,26 @@ export const LIBRARY_PROVENANCE: Record<string, ProvenanceInput> = {
     evidence: "None yet; study-written, like ybm_ai_use (D-59).",
     decisions: ["D-72"],
   },
+  ybm_ai_chatbots: {
+    kind: "existing_items",
+    basedOn: `${PEW_SURVEY} Teen questions TCHATAWARE, TCHATUSE, TCHATFREQ, TCHATSPEC, TCHATWHY, TCHATFREQ2, TCHATHELPFUL, TCHATSCH1 and TCHATSCH2, as published in the toplines: ${PEW_TOPLINE_FEB} and ${PEW_TOPLINE_DEC}.`,
+    adaptations:
+      "Wording and answer options are Pew's, word for word, apart from: each grid (TCHATSPEC, TCHATWHY, TCHATSCH1) is one screen per row, asked as a question ('Do you ever use ChatGPT?', 'Have you ever used AI chatbots to …?') with Pew's answer labels, in a fixed order where Pew randomises; Pew rotates some answer orders, here always shown in Pew's listed order; British spelling ('summarise', 'maths'). Added: Snapchat's My AI as a seventh chatbot, and two study-written questions (ai_felt_friend, ai_why_not_person). Each question's own record gives its Pew ID, Pew's wording and Pew's result.",
+    developedBy: TEAM,
+    evidence:
+      "Not a validated scale: single survey items from a national online survey of US teens. Benchmark: Pew's published results for US teens aged 13-17; compare this study's 13-17 year olds only, and allow for country, school setting (in class, on an iPad) and date.",
+    decisions: ["D-88"],
+    notes: "Chosen over study-written items so that answers can be compared with a published, regularly repeated source (PI's request, November 2026). UK figures to set alongside (no shared wording): Ofcom, Children and Parents: Media Use and Attitudes 2026 (56% of 8-17s have used AI); National Literacy Trust Annual Literacy Survey 2025 (66.5% of 13-18s use generative AI); Internet Matters, Me, Myself and AI, 2025 (64% of 9-17s use AI chatbots).",
+  },
+  ybm_ai_outlook: {
+    kind: "existing_items",
+    basedOn: `${PEW_SURVEY} Teen questions TAIIMP and TAIIMPSELF, with TAIHEARD's definition of AI, as published in ${PEW_TOPLINE_FEB}.`,
+    adaptations:
+      "Two of the five questions are Pew's, word for word, apart from British spelling ('recognising') and a fixed answer order where Pew rotates 1-5 or 5-1. The other three (worries, spotting AI-made content, adult guidance) are study-written; their own records say so.",
+    developedBy: TEAM,
+    evidence: "Not a validated scale. Benchmark for the two impact questions: Pew's published results for US teens aged 13-17.",
+    decisions: ["D-88"],
+  },
   ybm_screen_attitudes: { kind: "researcher_developed", developedBy: TEAM, basedOn: QSF, notes: QSF_UNKNOWN, decisions: ["D-07"] },
   ybm_gaming: { kind: "researcher_developed", developedBy: TEAM, basedOn: QSF, notes: QSF_UNKNOWN, decisions: ["D-03"] },
   ybm_future_self: { kind: "researcher_developed", developedBy: TEAM, basedOn: QSF, notes: QSF_UNKNOWN, decisions: ["D-15"] },
@@ -212,7 +239,103 @@ const added = (decisions: string[], notes?: string): ProvenanceInput => ({
   ...(notes ? { notes } : {}),
 });
 
+/**
+ * One Pew Research Center teen question (D-88): its ID, Pew's exact wording,
+ * what this survey changed, and Pew's published result for US teens.
+ */
+const pew = (id: string, wording: string, changes: string, result: string, topline: "feb" | "dec" = "feb"): ProvenanceInput => ({
+  kind: "existing_items",
+  basedOn: `${PEW_SURVEY} Question ${id}: “${wording}” Topline: ${topline === "feb" ? PEW_TOPLINE_FEB : PEW_TOPLINE_DEC}.`,
+  adaptations: changes,
+  developedBy: TEAM,
+  evidence: `Pew result (US teens 13-17, ${topline === "feb" ? "topline of 24 February 2026" : "topline of 9 December 2025"}): ${result}`,
+  decisions: ["D-88"],
+});
+const SAME = "None: Pew's wording and answer options, word for word.";
+const ROW = (row: string) =>
+  `Pew asks this as row '${row}' of a grid, in random order; here it is its own screen, asked as a question with Pew's answer labels, in a fixed order.`;
+const WHY = "Have you ever used artificial intelligence (AI) chatbots for the following?";
+const SPEC = "Which of the following artificial intelligence (AI) chatbots do you ever use?";
+const SCH1 = "Have you ever used artificial intelligence (AI) chatbots to help with any of the following for school?";
+const ofUsers = (n: number) => `${n}% of teens who use AI chatbots said yes.`;
+const ofSchool = (n: number) => `${n}% of teens who use AI chatbots for schoolwork said yes.`;
+
 export const QUESTION_PROVENANCE: Record<string, Record<string, ProvenanceInput>> = {
+  ybm_ai_chatbots: {
+    heard: pew("TCHATAWARE", "How much have you heard about artificial intelligence (AI) chatbots like ChatGPT, Copilot or Character.ai?", SAME, "a lot 56%, a little 39%, nothing at all 5%."),
+    use: pew("TCHATUSE", "Do you ever use an artificial intelligence (AI) chatbot like ChatGPT, Copilot or Character.ai?", `${SAME} Asked, as by Pew, only of those who have heard a lot or a little.`, "67% of those who had heard of chatbots said yes; 64% of all teens."),
+    frequency: pew(
+      "TCHATFREQ",
+      "About how often do you use an artificial intelligence (AI) chatbot like ChatGPT, Copilot or Character.ai?",
+      `${SAME} Asked of users, as by Pew.`,
+      "of users: almost constantly 6%, several times a day 19%, about once a day 19%, several times a week 27%, less often 28%. Of all teens, 28% use one daily or more.",
+      "dec",
+    ),
+    tool_chatgpt: pew("TCHATSPEC (a)", SPEC, ROW("ChatGPT"), ofUsers(92), "dec"),
+    tool_claude: pew("TCHATSPEC (b)", SPEC, ROW("Claude"), ofUsers(5), "dec"),
+    tool_gemini: pew("TCHATSPEC (c)", SPEC, ROW("Gemini"), ofUsers(36), "dec"),
+    tool_copilot: pew("TCHATSPEC (d)", SPEC, ROW("Copilot"), ofUsers(23), "dec"),
+    tool_meta_ai: pew("TCHATSPEC (e)", SPEC, ROW("Meta AI"), ofUsers(31), "dec"),
+    tool_character_ai: pew("TCHATSPEC (f)", SPEC, ROW("Character.ai"), ofUsers(14), "dec"),
+    tool_my_ai: {
+      kind: "researcher_developed",
+      developedBy: TEAM,
+      basedOn: `Pew's TCHATSPEC format (${PEW_SURVEY}), with a chatbot Pew did not list.`,
+      evidence: "No benchmark: Pew did not ask about Snapchat's My AI. Added because it is widely used by UK under-16s and many do not count it as AI.",
+      decisions: ["D-88"],
+    },
+    for_info: pew("TCHATWHY (a)", WHY, ROW("Search for information"), ofUsers(89)),
+    for_news: pew("TCHATWHY (b)", WHY, ROW("Get news"), ofUsers(30)),
+    for_school: pew("TCHATWHY (c)", WHY, ROW("Get help with schoolwork"), `${ofUsers(85)} 54% of all teens.`),
+    for_fun: pew("TCHATWHY (d)", WHY, ROW("For fun or entertainment"), ofUsers(74)),
+    for_images: pew("TCHATWHY (e)", WHY, ROW("Create or edit images or videos"), ofUsers(59)),
+    for_support: pew("TCHATWHY (f)", WHY, ROW("Get emotional support or advice"), `${ofUsers(18)} 12% of all teens.`),
+    for_summary: pew("TCHATWHY (g)", WHY, `${ROW("Summarize an article, book, or video")} British spelling ('summarise').`, ofUsers(65)),
+    for_chat: pew("TCHATWHY (h)", WHY, ROW("Casual conversation"), `${ofUsers(25)} 16% of all teens.`),
+    felt_friend: {
+      kind: "researcher_developed",
+      developedBy: TEAM,
+      basedOn: "Worded to match the category Ofcom reports for children's AI use, 'as a friend or someone to talk to' (Children and Parents: Media Use and Attitudes 2026: 11% of 8-17 AI users). Ofcom's own question wording was not available.",
+      evidence: "No direct benchmark: the wording is the team's. In place of the PI's draft 'a friend, companion, or romantic interest'; 'romantic' was left out for a sample that starts at 11.",
+      decisions: ["D-88"],
+    },
+    why_not_person: added(["D-88"], "Options from the PI's draft list (November 2026), with 'None of these'. No benchmark."),
+    school_share: pew("TCHATFREQ2", "How much of your schoolwork would you say you do with the help of artificial intelligence (AI) chatbots?", `${SAME} Asked, as by Pew, of those who use chatbots for schoolwork.`, "all or almost all 5%, most 14%, some 39%, a little 42% (of teens who use them for schoolwork)."),
+    school_helpful: pew("TCHATHELPFUL", "Overall, how helpful have artificial intelligence (AI) chatbots been for completing your schoolwork?", `${SAME} Pew rotates the answer order; here always extremely to not at all.`, "extremely 14%, very 33%, somewhat 46%, not too 6%, not at all under 0.5% (of teens who use them for schoolwork)."),
+    school_maths: pew("TCHATSCH1 (a)", SCH1, `${ROW("Solving a math problem")} 'math' as 'maths'.`, ofSchool(79)),
+    school_editing: pew("TCHATSCH1 (b)", SCH1, ROW("Editing something you wrote"), ofSchool(64)),
+    school_research: pew("TCHATSCH1 (c)", SCH1, ROW("Researching a topic"), ofSchool(89)),
+    cheating: pew(
+      "TCHATSCH2",
+      "As far as you know, how often do students at your school use artificial intelligence (AI) chatbots to cheat on their schoolwork?",
+      `${SAME} Pew rotates the order 1-5 or 5-1, anchoring 'Not sure'; here always extremely often to never. Pew asks those who have heard of chatbots and are not home-schooled; here, those who have heard of them.`,
+      "extremely often 15%, very often 24%, somewhat often 28%, rarely 12%, never 4%, not sure 17%.",
+    ),
+  },
+  ybm_ai_outlook: {
+    impact_society: pew(
+      "TAIIMP",
+      "Do you think that the impact of artificial intelligence (AI) on society over the next 20 years will be…",
+      "Pew's wording. The line under it is Pew's TAIHEARD definition of AI ('Artificial intelligence (AI) is designed to learn tasks that humans typically do, for instance recognizing or generating text or pictures.'), with British spelling. Pew rotates the answer order; here always very positive to very negative, then not sure.",
+      "very positive 11%, somewhat positive 20%, equally positive and negative 34%, somewhat negative 18%, very negative 8%, not sure 8%.",
+    ),
+    impact_self: pew(
+      "TAIIMPSELF",
+      "And, do you think that the impact of artificial intelligence (AI) on you, personally over the next 20 years will be…",
+      `${SAME} Straight after TAIIMP, as in Pew. Pew rotates the answer order in the same way as TAIIMP; here fixed.`,
+      "very positive 11%, somewhat positive 25%, equally positive and negative 32%, somewhat negative 12%, very negative 3%, not sure 17%.",
+    ),
+    worries: added(
+      ["D-88"],
+      "Study-written, from the PI's draft list (November 2026). Options 1-6 follow the codes Pew gave US teens' open answers on why AI will have a negative impact (TIMPOE_N: overreliance 34%, job loss 25%, misinformation 13%, misuse or threat 13%, loss of human factor 6%, environment 6%), so they can be compared in kind but not as a benchmark: Pew's question was open-ended and asked only of those expecting a negative impact.",
+    ),
+    spot_confidence: added(
+      ["D-88"],
+      "Study-written. Ofcom asks children about their confidence in identifying AI-generated content and tests it with an image (Children and Parents: Media Use and Attitudes 2026); its wording was not available, so this is not a benchmark.",
+    ),
+    talked: added(["D-88"], "Study-written, from the PI's draft list (November 2026). Pew asked parents, not teens, whether they talk with their teen about chatbots, so there is no teen benchmark."),
+  },
+
   ybm_intro_consent: { why_it_matters: added(["D-62"], "Wording by the research team, October 2026.") },
   ybm_identity: { home_address: added(["D-52"]) },
   ybm_social_media: { family_control_how: added(["D-53"]), family_control_other: added(["D-53"]) },

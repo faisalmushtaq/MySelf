@@ -1235,3 +1235,51 @@ sittings measured. Pinterest and BeReal, named on the "just to check" screen,
 join the app list with the same "in one go" follow-up as the others
 (studio-ops `copy-question`). studio-ops `replace-text` now reaches a sorting
 question's group labels.
+
+### AI chatbots, benchmarked against Pew (2026-11-09, D-88)
+
+**Asked.** The PI: the survey under-explores AI use; a draft list covered
+awareness and frequency, tools, purposes, schoolwork and cheating, emotional
+support and companionship, and safety, trust and adult guidance — preferably
+from "a more reliable and consistent source" to benchmark answers against.
+
+**Decided.** Pew Research Center's 2025 teen survey (US 13-17s, n = 1,458,
+25 Sept-9 Oct 2025) publishes its exact questions, answer options and results,
+and covers most of the list. Its questions are used word for word as two
+library modules:
+
+- `ybm_ai_chatbots`: heard of chatbots (TCHATAWARE), use (TCHATUSE), how often
+  (TCHATFREQ), which chatbots (TCHATSPEC, plus Snapchat's My AI, which Pew did
+  not list), what for (TCHATWHY: information, news, schoolwork, fun, images,
+  emotional support or advice, summaries, casual conversation), and, for
+  schoolwork users, how much and how helpful (TCHATFREQ2, TCHATHELPFUL) and
+  for what (TCHATSCH1); how often students at their school cheat with
+  chatbots (TCHATSCH2). Two study-written questions follow the purposes: has
+  a chatbot felt like a friend or someone to talk to (Ofcom's category; the
+  draft's "romantic interest" left out for 11-year-olds), and why talk to one
+  about feelings rather than a person.
+- `ybm_ai_outlook`, asked of everyone: AI's impact on society and on them over
+  20 years (TAIIMP, TAIIMPSELF, with Pew's definition of AI), then three
+  study-written questions: what worries them (options following Pew's coded
+  reasons), confidence spotting AI-made content, and whether parents, carers
+  or teachers have talked to them about using AI.
+
+Pew's conditions are kept: use only of those who have heard of chatbots;
+frequency, tools and purposes only of users; the schoolwork questions only of
+those who use chatbots for schoolwork. The changes from Pew are recorded per
+question: grids become one screen per row, in a fixed order; rotated answer
+orders are fixed; British spelling ("maths", "summarise").
+
+**Provenance.** Every question carries its own record: Pew's question ID and
+exact wording, both toplines, what changed and Pew's result, or, for the
+study's own questions, that they are the team's and why there is no
+benchmark. Compare only this study's 13-17 year olds with Pew's figures, and
+allow for country, setting (in class, on an iPad) and date. UK figures to set
+alongside, without shared wording: Ofcom 2026 (56% of 8-17s have used AI),
+National Literacy Trust 2025 (66.5% of 13-18s), Internet Matters 2025 (64% of
+9-17s).
+
+**Replaces.** `ybm_ai_use` frequency and purposes (D-59) are archived; their
+answers stay readable. "How do you feel after using AI chatbots" (D-59) and
+`ybm_ai_views` (D-72) stay, the first now shown when the Pew use question is
+yes (studio-ops `show-if`). New questions: part of the ethics amendment.

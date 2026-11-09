@@ -9,6 +9,7 @@ name: "Studio: study space housekeeping"
 #   remove-blocks whole questionnaires out of a draft (archived, restorable)
 #   reorder       a section's questions in a given order
 #   add-option    an answer option on a question, with a new code
+#   show-if       a question shown only when another (label) has option value (code) chosen
 #   copy-question a question copied after itself: new ID (label), wording passage (replace -> text), shown for option value (code)
 #   remove-option an answer option off a question, by its label (its value is retired)
 #   set-lede      a question's instructions (the line under it)
@@ -35,7 +36,7 @@ on:
       command:
         description: "What to do"
         type: choice
-        options: [list, questions, grant-owners, insert, remove-blocks, archive, restore, reorder, add-option, remove-option, copy-question, set-lede, set-text, add-info, glossary, set-screen, address-area, address-screen, add-statement, remove-statement, wording, replace-text, dob-ages, retitle, form-label]
+        options: [list, questions, grant-owners, insert, remove-blocks, archive, restore, reorder, add-option, remove-option, copy-question, show-if, set-lede, set-text, add-info, glossary, set-screen, address-area, address-screen, add-statement, remove-statement, wording, replace-text, dob-ages, retitle, form-label]
         default: list
       study:
         description: "Study space id (from list)"
@@ -90,7 +91,7 @@ on:
         type: string
         default: ""
       item:
-        description: "Question ID (add-option, remove-option, copy-question, wording, replace-text)"
+        description: "Question ID (add-option, remove-option, copy-question, show-if, wording, replace-text)"
         type: string
         default: ""
       append:
@@ -118,7 +119,7 @@ on:
         type: string
         default: ""
       code:
-        description: "Option value the copy's display condition checks (copy-question)"
+        description: "Option value the copy's display condition checks (copy-question); the value that shows it (show-if)"
         type: string
         default: ""
       apply:

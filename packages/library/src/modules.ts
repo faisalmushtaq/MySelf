@@ -959,6 +959,150 @@ export const ybmAiViews: ModuleInput = {
 
 // ---------------------------------------------------------------------------
 
+/**
+ * AI chatbots, benchmarked (D-88). Pew Research Center's 2025 teen survey
+ * questions, word for word wherever they can be, so this study's 13-17 year
+ * olds can be set beside Pew's published results for US teens. Pew's grids
+ * become one screen per row; every question's provenance record gives its Pew
+ * ID, the exact Pew wording, what changed here and Pew's result. Two
+ * study-written questions sit with them (whether a chatbot has felt like a
+ * friend, and why someone would talk to one about feelings rather than a
+ * person); their records say so.
+ */
+const chatRef = (item: string) => ({ instrument: "ybm_ai_chatbots", item, revision: 1 });
+const sel = (item: string, code: number) => ({ op: "selected", target: { item: chatRef(item) }, code }) as const;
+/** Pew asks the rest only of those who have heard a lot or a little about chatbots. */
+const heardOfChatbots = { op: "not_selected", target: { item: chatRef("heard") }, code: 3 } as const;
+const usesChatbots = sel("use", 1);
+const usesForSchool = sel("for_school", 1);
+const yesNoRow = (key: string, text: string, scale: string, displayIf: unknown, note: string) =>
+  single(key, `ai_${key}`, "", text, scale, { displayIf, autoAdvance: true, researcherNote: note } as Partial<ItemInput>);
+
+export const ybmAiChatbots: ModuleInput = {
+  ...moduleBase,
+  instrument: "ybm_ai_chatbots",
+  name: "YBM AI chatbots (Pew Research Center 2025 teen items)",
+  construct: "Awareness, frequency, tools and purposes of AI chatbot use, including for schoolwork and emotional support",
+  forms: [
+    {
+      language: "en-GB",
+      label: "AI chatbots (Pew Research Center 2025 teen survey items, D-88)",
+      items: [
+        single("heard", "ai_heard", "", "How much have you heard about artificial intelligence (AI) chatbots like ChatGPT, Copilot or Character.ai?", "scale.pew_heard", {
+          researcherNote: "Pew TCHATAWARE, verbatim (D-88). Asked of everyone.",
+        }),
+        single("use", "ai_use", "", "Do you ever use an artificial intelligence (AI) chatbot like ChatGPT, Copilot or Character.ai?", "scale.pew_yes_i_do", {
+          displayIf: heardOfChatbots,
+          researcherNote: "Pew TCHATUSE, verbatim (D-88). Asked if ai_heard = a lot or a little, as Pew does.",
+        }),
+        single("frequency", "ai_freq", "", "About how often do you use an artificial intelligence (AI) chatbot like ChatGPT, Copilot or Character.ai?", "scale.pew_chat_frequency", {
+          displayIf: usesChatbots,
+          researcherNote: "Pew TCHATFREQ, verbatim (D-88). Asked if ai_use = yes.",
+        }),
+        yesNoRow("tool_chatgpt", "Do you ever use ChatGPT?", "scale.pew_use_this", usesChatbots, "Pew TCHATSPEC row a (D-88). Asked if ai_use = yes."),
+        yesNoRow("tool_claude", "Do you ever use Claude?", "scale.pew_use_this", usesChatbots, "Pew TCHATSPEC row b (D-88). Asked if ai_use = yes."),
+        yesNoRow("tool_gemini", "Do you ever use Gemini?", "scale.pew_use_this", usesChatbots, "Pew TCHATSPEC row c (D-88). Asked if ai_use = yes."),
+        yesNoRow("tool_copilot", "Do you ever use Copilot?", "scale.pew_use_this", usesChatbots, "Pew TCHATSPEC row d (D-88). Asked if ai_use = yes."),
+        yesNoRow("tool_meta_ai", "Do you ever use Meta AI?", "scale.pew_use_this", usesChatbots, "Pew TCHATSPEC row e (D-88). Asked if ai_use = yes."),
+        yesNoRow("tool_character_ai", "Do you ever use Character.ai?", "scale.pew_use_this", usesChatbots, "Pew TCHATSPEC row f (D-88). Asked if ai_use = yes."),
+        yesNoRow("tool_my_ai", "Do you ever use Snapchat's My AI?", "scale.pew_use_this", usesChatbots, "Study addition to Pew's TCHATSPEC list (D-88): no Pew benchmark. Asked if ai_use = yes."),
+        yesNoRow("for_info", "Have you ever used AI chatbots to search for information?", "scale.pew_yes_i_have", usesChatbots, "Pew TCHATWHY row a (D-88). Asked if ai_use = yes."),
+        yesNoRow("for_news", "Have you ever used AI chatbots to get news?", "scale.pew_yes_i_have", usesChatbots, "Pew TCHATWHY row b (D-88). Asked if ai_use = yes."),
+        yesNoRow("for_school", "Have you ever used AI chatbots to get help with schoolwork?", "scale.pew_yes_i_have", usesChatbots, "Pew TCHATWHY row c (D-88). Asked if ai_use = yes; yes opens the schoolwork questions."),
+        yesNoRow("for_fun", "Have you ever used AI chatbots for fun or entertainment?", "scale.pew_yes_i_have", usesChatbots, "Pew TCHATWHY row d (D-88). Asked if ai_use = yes."),
+        yesNoRow("for_images", "Have you ever used AI chatbots to create or edit images or videos?", "scale.pew_yes_i_have", usesChatbots, "Pew TCHATWHY row e (D-88). Asked if ai_use = yes."),
+        yesNoRow("for_support", "Have you ever used AI chatbots to get emotional support or advice?", "scale.pew_yes_i_have", usesChatbots, "Pew TCHATWHY row f (D-88). Asked if ai_use = yes. Not a risk flag: nobody reads answers during a session."),
+        yesNoRow("for_summary", "Have you ever used AI chatbots to summarise an article, book or video?", "scale.pew_yes_i_have", usesChatbots, "Pew TCHATWHY row g (D-88), British spelling. Asked if ai_use = yes."),
+        yesNoRow("for_chat", "Have you ever used AI chatbots for casual conversation?", "scale.pew_yes_i_have", usesChatbots, "Pew TCHATWHY row h (D-88). Asked if ai_use = yes."),
+        single("felt_friend", "ai_felt_friend", "", "Has an AI chatbot ever felt like a friend or someone to talk to?", "scale.yes_no", {
+          displayIf: usesChatbots,
+          autoAdvance: true,
+          researcherNote: "Study-written (D-88), worded to match Ofcom's reported category ('as a friend or someone to talk to'). Asked if ai_use = yes. Not a risk flag.",
+        }),
+        {
+          responseType: "multi_choice",
+          key: "why_not_person",
+          revision: 1,
+          variable: "ai_why_not_person",
+          displayIf: { op: "any", args: [sel("for_support", 1), { op: "selected", target: { item: chatRef("felt_friend") }, code: 1 }] },
+          stem: { text: "Why might you talk to an AI chatbot about how you feel, rather than a person like a parent, teacher or friend?" },
+          lede: { text: "Choose all that apply." },
+          scale: "scale.ai_why_not_person",
+          scaleVersion: "1.0.0",
+          minSelections: 1,
+          researcherNote: "Study-written (D-88). Asked if ai_for_support = yes or ai_felt_friend = yes. 5 = none of these.",
+        },
+        single("school_share", "ai_school_share", "", "How much of your schoolwork would you say you do with the help of artificial intelligence (AI) chatbots?", "scale.pew_schoolwork_share", {
+          displayIf: usesForSchool,
+          researcherNote: "Pew TCHATFREQ2, verbatim (D-88). Asked if ai_for_school = yes, as Pew does.",
+        }),
+        single("school_helpful", "ai_school_helpful", "", "Overall, how helpful have artificial intelligence (AI) chatbots been for completing your schoolwork?", "scale.pew_helpful", {
+          displayIf: usesForSchool,
+          researcherNote: "Pew TCHATHELPFUL, verbatim (D-88). Asked if ai_for_school = yes.",
+        }),
+        yesNoRow("school_maths", "Have you ever used AI chatbots to help with solving a maths problem for school?", "scale.pew_yes_i_have", usesForSchool, "Pew TCHATSCH1 row a (D-88), 'math' as 'maths'. Asked if ai_for_school = yes."),
+        yesNoRow("school_editing", "Have you ever used AI chatbots to help with editing something you wrote for school?", "scale.pew_yes_i_have", usesForSchool, "Pew TCHATSCH1 row b (D-88). Asked if ai_for_school = yes."),
+        yesNoRow("school_research", "Have you ever used AI chatbots to help with researching a topic for school?", "scale.pew_yes_i_have", usesForSchool, "Pew TCHATSCH1 row c (D-88). Asked if ai_for_school = yes."),
+        single("cheating", "ai_cheating", "", "As far as you know, how often do students at your school use artificial intelligence (AI) chatbots to cheat on their schoolwork?", "scale.pew_cheat_often", {
+          displayIf: heardOfChatbots,
+          researcherNote: "Pew TCHATSCH2, verbatim (D-88). Asked if ai_heard = a lot or a little (Pew also excludes home-schooled teens; none here).",
+        }),
+      ],
+    },
+  ],
+  timeEstimates: est(150, 120),
+  changelog: "1.0 (D-88): Pew Research Center's 2025 teen AI chatbot questions, with Snapchat's My AI and two study-written questions on chatbots as a friend.",
+};
+
+/**
+ * Views on AI (D-88), asked of everyone: Pew's two impact questions word for
+ * word, then three study-written questions (worries, spotting AI-made
+ * content, and whether adults have talked to them about using AI).
+ */
+export const ybmAiOutlook: ModuleInput = {
+  ...moduleBase,
+  instrument: "ybm_ai_outlook",
+  name: "YBM views on AI (Pew Research Center 2025 impact items and study questions)",
+  construct: "Expected impact of AI on society and on oneself; worries; confidence spotting AI-made content; adult guidance",
+  forms: [
+    {
+      language: "en-GB",
+      label: "Views on AI (Pew impact items and study-written questions, D-88)",
+      items: [
+        single("impact_society", "ai_impact_society", "", "Do you think that the impact of artificial intelligence (AI) on society over the next 20 years will be…", "scale.pew_impact", {
+          lede: { text: "Artificial intelligence (AI) is designed to learn tasks that humans typically do, for instance recognising or generating text or pictures." },
+          researcherNote: "Pew TAIIMP, verbatim, with Pew's TAIHEARD definition of AI as the line under it (D-88). Asked of everyone. 6 = not sure.",
+        }),
+        single("impact_self", "ai_impact_self", "", "And, do you think that the impact of artificial intelligence (AI) on you, personally over the next 20 years will be…", "scale.pew_impact", {
+          researcherNote: "Pew TAIIMPSELF, verbatim (D-88), straight after TAIIMP as in Pew. Asked of everyone. 6 = not sure.",
+        }),
+        {
+          responseType: "multi_choice",
+          key: "worries",
+          revision: 1,
+          variable: "ai_worries",
+          stem: { text: "What worries you about AI, if anything?" },
+          lede: { text: "Choose all that apply." },
+          scale: "scale.ai_worries",
+          scaleVersion: "1.0.0",
+          minSelections: 1,
+          researcherNote: "Study-written (D-88). Options 1-6 follow the coded reasons US teens gave Pew for AI's negative impact (TIMPOE_N); 7-8 are the team's. 10 = nothing worries me.",
+        },
+        single("spot_confidence", "ai_spot_confidence", "", "How confident are you that you could tell if a picture, video or piece of writing was made by AI?", "scale.ai_spot_confidence", {
+          researcherNote: "Study-written (D-88). Ofcom asks children a similar question with an image test; its wording was not available, so this is not a benchmark.",
+        }),
+        single("talked", "ai_talked", "", "Have your parents or carers, or your teachers, talked to you about using AI safely and responsibly?", "scale.ai_talked_with", {
+          researcherNote: "Study-written (D-88). Asked of everyone.",
+        }),
+      ],
+    },
+  ],
+  timeEstimates: est(75, 60),
+  changelog: "1.0 (D-88): Pew Research Center's two AI impact questions, and three study-written questions on worries, spotting AI-made content and adult guidance.",
+};
+
+// ---------------------------------------------------------------------------
+
 export const ybmScreenAttitudes: ModuleInput = {
   ...moduleBase,
   instrument: "ybm_screen_attitudes",
@@ -1278,4 +1422,6 @@ export const allModules: ModuleInput[] = attachProvenance([
   ybmSmPatterns,
   ybmPhonePickups,
   ybmAiViews,
+  ybmAiChatbots,
+  ybmAiOutlook,
 ]);
