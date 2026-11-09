@@ -947,6 +947,186 @@ export const neverAlways4: ResponseScale = {
   options: opts(["Never", "Sometimes", "Often", "Always"]),
 };
 
+// --- AI chatbots, benchmarked (D-88) ------------------------------------------
+// Pew Research Center 2025 teen survey answer options, word for word, coded in
+// Pew's order (Teens & Technology, Sept 25-Oct 9 2025; topline published
+// 24 February 2026). The study-written lists that sit with them follow.
+
+/** Pew TCHATAWARE / TAIHEARD: 1 = a lot … 3 = nothing at all. */
+export const pewHeard: ResponseScale = {
+  key: "scale.pew_heard",
+  version: "1.0.0",
+  name: "How much heard (Pew: A lot / A little / Nothing at all)",
+  direction: "descending",
+  options: [opt(1, "A lot"), opt(2, "A little"), opt(3, "Nothing at all")],
+  scoringNote: "Pew Research Center wording and order. 1 = a lot … 3 = nothing at all.",
+};
+
+/** Pew TCHATUSE: 1 = yes, 2 = no. */
+export const pewYesIDo: ResponseScale = {
+  key: "scale.pew_yes_i_do",
+  version: "1.0.0",
+  name: "Yes, I do / No, I do not (Pew)",
+  direction: "unordered",
+  options: [opt(1, "Yes, I do"), opt(2, "No, I do not")],
+};
+
+/** Pew TCHATFREQ: 1 = almost constantly … 5 = less often. */
+export const pewChatFrequency: ResponseScale = {
+  key: "scale.pew_chat_frequency",
+  version: "1.0.0",
+  name: "How often an AI chatbot is used (Pew: almost constantly to less often)",
+  direction: "descending",
+  options: [
+    opt(1, "Almost constantly"),
+    opt(2, "Several times a day"),
+    opt(3, "About once a day"),
+    opt(4, "Several times a week"),
+    opt(5, "Less often"),
+  ],
+  scoringNote: "Pew Research Center wording and order. 1 = almost constantly … 5 = less often. Daily or more = 1-3.",
+};
+
+/** Pew TCHATSPEC rows: 1 = yes, 2 = no. */
+export const pewUseThis: ResponseScale = {
+  key: "scale.pew_use_this",
+  version: "1.0.0",
+  name: "Yes, I use this / No, I do not use this (Pew)",
+  direction: "unordered",
+  options: [opt(1, "Yes, I use this"), opt(2, "No, I do not use this")],
+};
+
+/** Pew TCHATWHY and TCHATSCH1 rows: 1 = yes, 2 = no. */
+export const pewYesIHave: ResponseScale = {
+  key: "scale.pew_yes_i_have",
+  version: "1.0.0",
+  name: "Yes, I have / No, I have not (Pew)",
+  direction: "unordered",
+  options: [opt(1, "Yes, I have"), opt(2, "No, I have not")],
+};
+
+/** Pew TCHATFREQ2: 1 = all or almost all … 4 = a little. */
+export const pewSchoolworkShare: ResponseScale = {
+  key: "scale.pew_schoolwork_share",
+  version: "1.0.0",
+  name: "How much schoolwork is done with AI chatbots' help (Pew)",
+  direction: "descending",
+  options: [opt(1, "All or almost all"), opt(2, "Most"), opt(3, "Some"), opt(4, "A little")],
+  scoringNote: "Pew Research Center wording and order. 1 = all or almost all … 4 = a little.",
+};
+
+/** Pew TCHATHELPFUL: 1 = extremely … 5 = not at all helpful. */
+export const pewHelpful: ResponseScale = {
+  key: "scale.pew_helpful",
+  version: "1.0.0",
+  name: "How helpful AI chatbots have been for schoolwork (Pew)",
+  direction: "descending",
+  options: [
+    opt(1, "Extremely helpful"),
+    opt(2, "Very helpful"),
+    opt(3, "Somewhat helpful"),
+    opt(4, "Not too helpful"),
+    opt(5, "Not at all helpful"),
+  ],
+  scoringNote: "Pew Research Center wording. Pew rotates the order 1-5 or 5-1; here it is always shown 1-5.",
+};
+
+/** Pew TCHATSCH2: 1 = extremely often … 5 = never; 6 = not sure. */
+export const pewCheatOften: ResponseScale = {
+  key: "scale.pew_cheat_often",
+  version: "1.0.0",
+  name: "How often students at school use AI chatbots to cheat (Pew)",
+  direction: "descending",
+  options: [
+    opt(1, "Extremely often"),
+    opt(2, "Very often"),
+    opt(3, "Somewhat often"),
+    opt(4, "Rarely"),
+    opt(5, "Never"),
+    opt(6, "Not sure", undefined, "dont_know"),
+  ],
+  scoringNote: "Pew Research Center wording. 6 = not sure (missing for analysis). Pew rotates 1-5 or 5-1, anchoring 6; here always 1-5.",
+};
+
+/** Pew TAIIMP / TAIIMPSELF: 1 = very positive … 5 = very negative; 6 = not sure. */
+export const pewImpact: ResponseScale = {
+  key: "scale.pew_impact",
+  version: "1.0.0",
+  name: "Impact of AI over the next 20 years (Pew)",
+  direction: "descending",
+  options: [
+    opt(1, "Very positive"),
+    opt(2, "Somewhat positive"),
+    opt(3, "Equally positive and negative"),
+    opt(4, "Somewhat negative"),
+    opt(5, "Very negative"),
+    opt(6, "Not sure", undefined, "dont_know"),
+  ],
+  scoringNote: "Pew Research Center wording. 6 = not sure (missing for analysis). Pew rotates 1-5 or 5-1, anchoring 6; here always 1-5.",
+};
+
+/** Why talk to a chatbot about feelings rather than a person (study-written, D-88; select all). */
+export const aiWhyNotPerson: ResponseScale = {
+  key: "scale.ai_why_not_person",
+  version: "1.0.0",
+  name: "Why talk to an AI chatbot about feelings rather than a person (select all)",
+  direction: "unordered",
+  options: [
+    opt(1, "It's there any time, day or night"),
+    opt(2, "It doesn't judge me"),
+    opt(3, "It keeps things private and won't tell anyone"),
+    opt(4, "It's quicker or easier than talking to a person"),
+    opt(5, "None of these", undefined, "not_applicable"),
+  ],
+};
+
+/**
+ * What worries young people about AI (study-written, D-88; select all). The
+ * first seven follow the reasons US teens gave Pew for AI's negative impact
+ * (TIMPOE_N, coded open answers), so the two can be set side by side.
+ */
+export const aiWorries: ResponseScale = {
+  key: "scale.ai_worries",
+  version: "1.0.0",
+  name: "What worries young people about AI (select all)",
+  direction: "unordered",
+  options: [
+    opt(1, "People relying on it too much and not thinking for themselves"),
+    opt(2, "People losing their jobs"),
+    opt(3, "False information, or not being able to tell what's real"),
+    opt(4, "It being misused, or being dangerous"),
+    opt(5, "Less contact with real people"),
+    opt(6, "Its effect on the environment"),
+    opt(7, "Cheating at school"),
+    opt(8, "Privacy, or what happens to my information"),
+    opt(9, "Something else"),
+    opt(10, "Nothing worries me about AI", undefined, "not_applicable"),
+  ],
+};
+
+/** Confidence telling AI-made content from real (study-written, D-88): 1 = very … 4 = not at all. */
+export const aiSpotConfidence: ResponseScale = {
+  key: "scale.ai_spot_confidence",
+  version: "1.0.0",
+  name: "Confidence telling whether something was made by AI",
+  direction: "descending",
+  options: [opt(1, "Very confident"), opt(2, "Fairly confident"), opt(3, "Not very confident"), opt(4, "Not at all confident")],
+};
+
+/** Whether adults have talked to them about using AI (study-written, D-88). */
+export const aiTalkedWith: ResponseScale = {
+  key: "scale.ai_talked_with",
+  version: "1.0.0",
+  name: "Whether parents or carers and teachers have talked about using AI safely",
+  direction: "unordered",
+  options: [
+    opt(1, "Yes, both my parents or carers and my teachers"),
+    opt(2, "Yes, only my teachers"),
+    opt(3, "Yes, only my parents or carers"),
+    opt(4, "No, not really"),
+  ],
+};
+
 export const allScales: ResponseScale[] = [
   yesNo,
   yesNoUnsure,
@@ -999,4 +1179,17 @@ export const allScales: ResponseScale[] = [
   neverAlways4,
   aiGoodBad,
   aiTrust,
+  pewHeard,
+  pewYesIDo,
+  pewChatFrequency,
+  pewUseThis,
+  pewYesIHave,
+  pewSchoolworkShare,
+  pewHelpful,
+  pewCheatOften,
+  pewImpact,
+  aiWhyNotPerson,
+  aiWorries,
+  aiSpotConfidence,
+  aiTalkedWith,
 ];

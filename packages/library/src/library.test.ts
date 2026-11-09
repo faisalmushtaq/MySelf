@@ -17,8 +17,8 @@ const everything = [...parsedInstruments, ...parsedModules];
 const scaleKeys = new Set(parsedScales.map((s) => s.key));
 
 describe("scales", () => {
-  it("all 51 scales parse", () => {
-    expect(parsedScales).toHaveLength(51);
+  it("all 64 scales parse", () => {
+    expect(parsedScales).toHaveLength(64);
   });
 
   it("scale keys are unique", () => {
@@ -288,6 +288,21 @@ describe("provenance (D-68)", () => {
     }
   });
 
+  it("every AI chatbot question records where it came from, and Pew's questions are Pew's words (D-88)", () => {
+    for (const instrument of ["ybm_ai_chatbots", "ybm_ai_outlook"]) {
+      const def = parsedModules.find((m) => m.instrument === instrument)!;
+      for (const item of def.forms[0]!.items) {
+        const p = item.provenance;
+        expect(p, `${instrument}.${item.key}`).toBeDefined();
+        expect(p!.decisions, `${instrument}.${item.key}`).toContain("D-88");
+        // A question asked in Pew's own wording carries that wording in its record, word for word.
+        if (p!.kind === "existing_items" && !/grid/.test(p!.adaptations ?? "")) {
+          expect(p!.basedOn, `${instrument}.${item.key}`).toContain(item.stem.text);
+        }
+      }
+    }
+  });
+
   it("questions the research team added to a borrowed module are marked as theirs", () => {
     const demographics = parsedModules.find((m) => m.instrument === "ybm_demographics")!;
     const byKey = new Map(demographics.forms[0]!.items.map((i) => [i.key, i]));
@@ -297,9 +312,9 @@ describe("provenance (D-68)", () => {
 });
 
 describe("instruments and modules", () => {
-  it("13 instruments and 15 modules parse", () => {
+  it("13 instruments and 17 modules parse", () => {
     expect(parsedInstruments).toHaveLength(13);
-    expect(parsedModules).toHaveLength(15);
+    expect(parsedModules).toHaveLength(17);
   });
 
   it("every scale reference resolves", () => {

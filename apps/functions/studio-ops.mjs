@@ -698,6 +698,29 @@ if (command === "list") {
     },
     `Copy ${source} as ${newKey}`,
   );
+} else if (command === "show-if") {
+  // When a question (--item) is shown: only when another question (--label, its ID) has option value --code chosen.
+  const study = studyArg();
+  const surveyId = surveyArg();
+  const itemKey = flag("item") ?? fail("Say which question with --item (its ID).");
+  const sourceKey = (flag("label") ?? "").trim() || fail("Say which question it depends on with --label (its ID).");
+  const code = Number(flag("code"));
+  if (!Number.isInteger(code)) fail("Say which option value with --code (a whole number).");
+  await editDraft(
+    study,
+    surveyId,
+    (draft) => {
+      findQuestion(draft, itemKey) ?? fail(`There is no question “${itemKey}” in the draft.`);
+      const source = findQuestion(draft, sourceKey)?.item ?? fail(`There is no question “${sourceKey}” in the draft.`);
+      const scale = source.scale ? draft.scales[source.scale] : undefined;
+      const option = scale?.options.find((o) => o.code === code) ?? fail(`${sourceKey} has no option with value ${code}.`);
+      const [instrument, item] = [sourceKey.slice(0, sourceKey.indexOf(".")), sourceKey.slice(sourceKey.indexOf(".") + 1)];
+      const displayIf = { op: "selected", target: { item: { instrument, item, revision: source.revision } }, code };
+      console.log(`  ${itemKey}: now shown only when ${sourceKey} is “${option.label}” (${code})`);
+      return updateQuestion(draft, itemKey, { displayIf }).draft;
+    },
+    `When ${itemKey} is shown`,
+  );
 } else if (command === "remove-option") {
   // An answer option off a question (and every question sharing its list), found by its label (--label).
   // Its value is retired, never reused: answers already given with it keep their meaning.
