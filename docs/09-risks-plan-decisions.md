@@ -1310,3 +1310,29 @@ the full list had not been published.
 the team's copy (what it was copied from and what changed), rather than
 inheriting the source module's record; `set-provenance` gave Pinterest's and
 BeReal's follow-ups (D-87) the same record.
+
+### Publishing the school survey after the Chair's clearance (2026-11-10, D-90)
+
+**Cleared.** The PI cleared with the Chair of the School of Psychology Research
+Ethics Committee (SoPREC) that she can issue approval for these changes as
+minor, so the school survey draft (revision 110) may be published before the
+full amendment (SoPREC - 2026 4202-7027) is decided. It carries, since live
+20.0.0: the safeguarding consent statement and wording (D-85); withdrawal
+within one month, Dr Sarmad Ali as contact, Connected West Yorkshire and the
+SoPREC reference; the camera and microphone statement removed; the opening
+screen without the peer-recording sentence; RCADS-25 removed; "jittery"
+explained (D-79, D-86); the longer daily-time bands (D-86); one definition of
+social media and the phone focus (D-87); Pinterest, BeReal, YouTube Kids,
+Vinted and eBay with their follow-ups (D-87, D-89); the Pew-benchmarked AI
+questions (D-88); and the shopping and under-16 plans questions (D-89). The
+same changes are described in the amendment's cover letter and Appendix D, so
+the committee's record and the fielded survey agree.
+
+**The publish dialog's three "breaking" changes**, checked before publishing
+(Hannah Meek asked): (1) and (2) the school-day and non-school-day social media
+time questions, whose "7 hours or more" (value 9) was retired for four longer
+bands (D-86): retired, never reused, so answers given before keep their
+meaning and analysis across versions combines the new values 11-14 back into
+9; (3) the consent screen, whose number of statements changed from seven to
+eight with `safeguarding` (D-85): each statement is stored by its key, so
+consent records already collected are unaffected. None needs changing.
