@@ -1283,3 +1283,30 @@ National Literacy Trust 2025 (66.5% of 13-18s), Internet Matters 2025 (64% of
 answers stay readable. "How do you feel after using AI chatbots" (D-59) and
 `ybm_ai_views` (D-72) stay, the first now shown when the Pew use question is
 yes (studio-ops `show-if`). New questions: part of the ethics amendment.
+
+### Shopping apps, YouTube Kids, and the under-16 plans (2026-11-10, D-89)
+
+**Asked.** The PI: the government may extend its planned under-16 ban to
+selling and shopping apps such as Vinted and eBay, so the app list should
+include them, with YouTube Kids beside YouTube. The app list is about what
+pupils use on their phone, which is wider than the survey's definition of
+social media (D-87). Also: a question on online shopping habits, and one
+question on the planned ban, with a sentence of context and a rating scale.
+
+**Decided.** "Which of these apps do you use on your phone?" gains YouTube
+Kids, Vinted and eBay, each with the same "in one go" follow-up as the other
+apps (studio-ops `copy-question`). A new study-written module,
+`ybm_online_life`, at the end of the social media section: how often pupils
+use shopping apps or websites, to look, buy or sell (examples Vinted, eBay,
+Depop, Amazon); what they do there (asked unless never); and how much they
+agree that stopping under-16s from using apps like Snapchat, TikTok, YouTube,
+Instagram, Facebook and X is a good idea, with the context as the line under
+it (messaging apps like WhatsApp would still be allowed). The ban question
+uses the survey's agree-first scale with "Don't know", asked of every pupil.
+No start date is given on screen: reports differ (spring or March 2027) and
+the full list had not been published.
+
+**Provenance.** A question made with `copy-question` now records itself as
+the team's copy (what it was copied from and what changed), rather than
+inheriting the source module's record; `set-provenance` gave Pinterest's and
+BeReal's follow-ups (D-87) the same record.

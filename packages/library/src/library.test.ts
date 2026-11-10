@@ -17,8 +17,8 @@ const everything = [...parsedInstruments, ...parsedModules];
 const scaleKeys = new Set(parsedScales.map((s) => s.key));
 
 describe("scales", () => {
-  it("all 64 scales parse", () => {
-    expect(parsedScales).toHaveLength(64);
+  it("all 66 scales parse", () => {
+    expect(parsedScales).toHaveLength(66);
   });
 
   it("scale keys are unique", () => {
@@ -288,13 +288,14 @@ describe("provenance (D-68)", () => {
     }
   });
 
-  it("every AI chatbot question records where it came from, and Pew's questions are Pew's words (D-88)", () => {
-    for (const instrument of ["ybm_ai_chatbots", "ybm_ai_outlook"]) {
+  it("every new question records where it came from, and Pew's questions are Pew's words (D-88, D-89)", () => {
+    const decision: Record<string, string> = { ybm_ai_chatbots: "D-88", ybm_ai_outlook: "D-88", ybm_online_life: "D-89" };
+    for (const instrument of Object.keys(decision)) {
       const def = parsedModules.find((m) => m.instrument === instrument)!;
       for (const item of def.forms[0]!.items) {
         const p = item.provenance;
         expect(p, `${instrument}.${item.key}`).toBeDefined();
-        expect(p!.decisions, `${instrument}.${item.key}`).toContain("D-88");
+        expect(p!.decisions, `${instrument}.${item.key}`).toContain(decision[instrument]);
         // A question asked in Pew's own wording carries that wording in its record, word for word.
         if (p!.kind === "existing_items" && !/grid/.test(p!.adaptations ?? "")) {
           expect(p!.basedOn, `${instrument}.${item.key}`).toContain(item.stem.text);
@@ -312,9 +313,9 @@ describe("provenance (D-68)", () => {
 });
 
 describe("instruments and modules", () => {
-  it("13 instruments and 17 modules parse", () => {
+  it("13 instruments and 18 modules parse", () => {
     expect(parsedInstruments).toHaveLength(13);
-    expect(parsedModules).toHaveLength(17);
+    expect(parsedModules).toHaveLength(18);
   });
 
   it("every scale reference resolves", () => {

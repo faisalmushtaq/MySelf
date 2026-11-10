@@ -1103,6 +1103,63 @@ export const ybmAiOutlook: ModuleInput = {
 
 // ---------------------------------------------------------------------------
 
+/**
+ * Online shopping and the under-16 social media plans (D-89). Study-written.
+ * The government plans to stop under-16s using some social media apps, and is
+ * considering adding selling and shopping apps such as Vinted and eBay, so the
+ * survey asks how young people use shopping apps, and what they think of the
+ * plan, as one agree-disagree question.
+ */
+const lifeRef = (item: string) => ({ instrument: "ybm_online_life", item, revision: 1 });
+
+export const ybmOnlineLife: ModuleInput = {
+  ...moduleBase,
+  instrument: "ybm_online_life",
+  name: "YBM online shopping and the under-16 social media plans",
+  construct: "Use of shopping and selling apps; views on stopping under-16s using social media",
+  forms: [
+    {
+      language: "en-GB",
+      label: "Online shopping and the under-16 plans (study-written, D-89)",
+      items: [
+        single("shopping_frequency", "shopping_freq", "", "How often do you use shopping apps or websites, to look at, buy or sell things?", "scale.shopping_frequency", {
+          lede: { text: "For example Vinted, eBay, Depop or Amazon. Count anything you do yourself, even on someone else's account." },
+          researcherNote: "Study-written (D-89). Asked of everyone. 1 = never; the follow-up is asked of 2-6.",
+        }),
+        {
+          responseType: "multi_choice",
+          key: "shopping_activity",
+          revision: 1,
+          variable: "shopping_activity",
+          displayIf: { op: "not_selected", target: { item: lifeRef("shopping_frequency") }, code: 1 },
+          stem: { text: "What do you do on shopping apps or websites?" },
+          lede: { text: "Choose all that apply." },
+          scale: "scale.shopping_activity",
+          scaleVersion: "1.0.0",
+          minSelections: 1,
+          researcherNote: "Study-written (D-89). Asked unless shopping_freq = never.",
+        },
+        single(
+          "under16_ban",
+          "under16_ban_view",
+          "",
+          "How much do you agree that stopping under-16s from using apps like Snapchat, TikTok, YouTube, Instagram, Facebook and X is a good idea?",
+          "scale.agree_5pt_dk",
+          {
+            lede: { text: "The government is planning to stop under-16s from using some social media apps. Messaging apps like WhatsApp would still be allowed." },
+            researcherNote:
+              "Study-written (D-89). Asked of everyone, whatever their age. Agree-first, as the survey's other agreement questions; 6 = don't know. The apps named are those reported as covered by the UK government's plan (November 2026); the full list had not been published.",
+          },
+        ),
+      ],
+    },
+  ],
+  timeEstimates: est(40, 30),
+  changelog: "1.0 (D-89): how often shopping apps or websites are used and what for, and a view on the under-16 social media plans.",
+};
+
+// ---------------------------------------------------------------------------
+
 export const ybmScreenAttitudes: ModuleInput = {
   ...moduleBase,
   instrument: "ybm_screen_attitudes",
@@ -1424,4 +1481,5 @@ export const allModules: ModuleInput[] = attachProvenance([
   ybmAiViews,
   ybmAiChatbots,
   ybmAiOutlook,
+  ybmOnlineLife,
 ]);

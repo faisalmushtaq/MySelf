@@ -83,6 +83,12 @@ const app = initializeApp({ credential: keyFile ? cert(JSON.parse(readFileSync(k
 const db = getFirestore();
 const { registeredStudies } = await import("./dist/studies.js");
 
+/** --field as decision numbers ("D-89,D-87"), for provenance records. */
+const decisionsFlag = () => {
+  const list = (flag("field") ?? "").split(",").map((x) => x.trim()).filter(Boolean);
+  for (const d of list) if (!/^D-\d+$/.test(d)) fail(`“${d}” is not a decision number like D-89.`);
+  return list;
+};
 const studyArg = () => flag("study") ?? fail("Say which study space with --study.");
 const surveyArg = () => flag("survey") ?? fail("Say which survey with --survey.");
 
@@ -665,6 +671,7 @@ if (command === "list") {
   if (!replace || !given) fail("Say the passage to change with --replace and what it becomes with --text.");
   const codeFlag = flag("code");
   const code = codeFlag === undefined ? undefined : Number(codeFlag);
+  const decisions = decisionsFlag();
   if (code !== undefined && !Number.isInteger(code)) fail("--code is an option's value (a whole number).");
   const versions = await db.collection(paths.studioVersions(study, surveyId)).get();
   const reserved = reservedFrom(versions.docs.map((v) => ({ itemKeys: v.get("itemKeys") ?? [], variables: v.get("variables") ?? [] })));
@@ -687,7 +694,20 @@ if (command === "list") {
       const out = updateQuestion(
         copied.draft,
         copied.itemKey,
-        { key: newKey, variable, stem: { ...original.stem, text: original.stem.text.split(replace).join(given) }, ...(displayIf ? { displayIf } : {}) },
+        {
+          key: newKey,
+          variable,
+          stem: { ...original.stem, text: original.stem.text.split(replace).join(given) },
+          ...(displayIf ? { displayIf } : {}),
+          // The copy is the team's, not the source's: its record says what it was copied from.
+          provenance: {
+            kind: "researcher_developed",
+            developedBy: "YBM research team",
+            basedOn: `A copy of ${source} (“${original.stem.text}”), with “${replace}” changed to “${given}”, so that it is asked the same way.`,
+            ...(decisions.length ? { decisions } : {}),
+            confirmed: false,
+          },
+        },
         { reserved },
       );
       const itemKey = `${source.slice(0, source.indexOf("."))}.${newKey}`;
@@ -697,6 +717,27 @@ if (command === "list") {
       return out.draft;
     },
     `Copy ${source} as ${newKey}`,
+  );
+} else if (command === "set-provenance") {
+  // Where one question came from (D-68): --label its kind, --text what it is based on, --field the decisions (D-89,D-87).
+  const study = studyArg();
+  const surveyId = surveyArg();
+  const itemKey = flag("item") ?? fail("Say which question with --item (its ID).");
+  const kind = (flag("label") ?? "").trim();
+  const kinds = ["validated", "validated_adapted", "existing_items", "researcher_developed", "co_produced", "unknown"];
+  if (!kinds.includes(kind)) fail(`--label is the kind: ${kinds.join(", ")}.`);
+  const basedOn = (flag("text") ?? "").trim() || fail("Say what it is based on with --text.");
+  const decisions = decisionsFlag();
+  await editDraft(
+    study,
+    surveyId,
+    (draft) => {
+      findQuestion(draft, itemKey) ?? fail(`There is no question “${itemKey}” in the draft.`);
+      const provenance = { kind, developedBy: "YBM research team", basedOn, ...(decisions.length ? { decisions } : {}), confirmed: false };
+      console.log(`  ${itemKey}: provenance now ${kind}: “${basedOn}”${decisions.length ? ` (${decisions.join(", ")})` : ""}`);
+      return updateQuestion(draft, itemKey, { provenance }).draft;
+    },
+    `Provenance of ${itemKey}`,
   );
 } else if (command === "show-if") {
   // When a question (--item) is shown: only when another question (--label, its ID) has option value --code chosen.
