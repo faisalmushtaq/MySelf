@@ -1155,6 +1155,35 @@ export const shoppingActivity: ResponseScale = {
   options: [opt(1, "Look at things without buying"), opt(2, "Buy things"), opt(3, "Sell things")],
 };
 
+// --- Hearing (D-91) ----------------------------------------------------------------
+
+/** Self-rated hearing (NHANES AUQ054 form): 1 = excellent … 6 = deaf. */
+export const hearingCondition: ResponseScale = {
+  key: "scale.hearing_condition",
+  version: "1.0.0",
+  name: "Self-rated hearing without aids (excellent to deaf)",
+  direction: "descending",
+  options: [
+    opt(1, "Excellent"),
+    opt(2, "Good"),
+    opt(3, "A little trouble"),
+    opt(4, "Moderate trouble"),
+    opt(5, "A lot of trouble"),
+    opt(6, "Deaf"),
+  ],
+  scoringNote: "1 = excellent … 6 = deaf, in NHANES AUQ054's order (NHANES labels 4 'Moderate hearing trouble').",
+};
+
+/** Difficulty following conversation in background noise: 1-2 yes, 3 no, 4 do not know. */
+export const hearingNoise: ResponseScale = {
+  key: "scale.hearing_noise",
+  version: "1.0.0",
+  name: "Difficulty following conversation in background noise",
+  direction: "descending",
+  options: [opt(1, "Yes, all or most of the time"), opt(2, "Yes, sometimes"), opt(3, "No"), opt(4, "Do not know", undefined, "dont_know")],
+  scoringNote: "1-2 = yes (UK Biobank 2257's 'Yes', split by how often), 3 = no, 4 = do not know (missing for analysis).",
+};
+
 export const allScales: ResponseScale[] = [
   yesNo,
   yesNoUnsure,
@@ -1222,4 +1251,6 @@ export const allScales: ResponseScale[] = [
   aiTalkedWith,
   shoppingFrequency,
   shoppingActivity,
+  hearingCondition,
+  hearingNoise,
 ];

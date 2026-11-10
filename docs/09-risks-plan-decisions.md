@@ -1336,3 +1336,23 @@ meaning and analysis across versions combines the new values 11-14 back into
 9; (3) the consent screen, whose number of statements changed from seven to
 eight with `safeguarding` (D-85): each statement is stored by its key, so
 consent records already collected are unaffected. None needs changing.
+
+### Hearing (2026-11-10, D-91)
+
+**Asked.** The PI: add two hearing questions to the school survey, "at an
+appropriate place".
+
+**Decided.** A module, `ybm_hearing`, in "About you" after the mental health
+medication question and before the EEG hair question: self-rated hearing
+without aids (Excellent / Good / A little trouble / Moderate trouble / A lot
+of trouble / Deaf) and difficulty following a conversation in background noise
+(Yes, all or most of the time / Yes, sometimes / No / Do not know), both asked
+of everyone, in the PI's wording.
+
+**Provenance.** The first is NHANES's AUQ054 ("General condition of hearing"),
+with its options read out in the question as an interviewer would, and
+"Moderate trouble" for NHANES's "Moderate hearing trouble"; NHANES uses a
+proxy under 16, here pupils answer themselves. The second is UK Biobank
+data-field 2257 word for word, with Biobank's "Yes" split by how often and its
+"Prefer not to answer" left out; where the split comes from is not recorded,
+to confirm with the PI. Each question's record says so.

@@ -206,6 +206,18 @@ export const LIBRARY_PROVENANCE: Record<string, ProvenanceInput> = {
       "None yet; study-written. Context: the UK government announced in June 2026 that it intends to stop under-16s using social media, and in November 2026 said it was considering adding selling and shopping apps such as Vinted and eBay.",
     decisions: ["D-89"],
   },
+  ybm_hearing: {
+    kind: "existing_items",
+    basedOn:
+      "Two established self-report questions: NHANES (US National Health and Nutrition Examination Survey) audiometry questionnaire item AUQ054, 'General condition of hearing' (e.g. 2015-2016 cycle, https://wwwn.cdc.gov/Nchs/Data/Nhanes/Public/2015/DataFiles/AUQ_I.htm), and UK Biobank touchscreen data-field 2257, 'Hearing difficulty with background noise'.",
+    adaptations:
+      "Wording as given by the PI (November 2026). AUQ054: NHANES is interviewer-administered, with a proxy answering for under-16s; here pupils read and answer it themselves, and option 4 reads 'Moderate trouble' for NHANES's 'Moderate hearing trouble'. Field 2257: UK Biobank's answers are Yes / No / Do not know / Prefer not to answer; here 'Yes' is split into 'Yes, all or most of the time' and 'Yes, sometimes', and 'Prefer not to answer' is left out (any question can be skipped).",
+    developedBy: TEAM,
+    evidence:
+      "Single self-report items, widely used in adults (UK Biobank) and across ages (NHANES, by proxy under 16); not, as far as the record shows, validated as self-report in 11-18 year olds. Benchmarks: NHANES published distributions by age; UK Biobank (adults aged 40-69).",
+    decisions: ["D-91"],
+    notes: "Where the split of 'Yes' by frequency comes from is not recorded: to confirm with the PI.",
+  },
   ybm_screen_attitudes: { kind: "researcher_developed", developedBy: TEAM, basedOn: QSF, notes: QSF_UNKNOWN, decisions: ["D-07"] },
   ybm_gaming: { kind: "researcher_developed", developedBy: TEAM, basedOn: QSF, notes: QSF_UNKNOWN, decisions: ["D-03"] },
   ybm_future_self: { kind: "researcher_developed", developedBy: TEAM, basedOn: QSF, notes: QSF_UNKNOWN, decisions: ["D-15"] },
@@ -269,6 +281,28 @@ const ofUsers = (n: number) => `${n}% of teens who use AI chatbots said yes.`;
 const ofSchool = (n: number) => `${n}% of teens who use AI chatbots for schoolwork said yes.`;
 
 export const QUESTION_PROVENANCE: Record<string, Record<string, ProvenanceInput>> = {
+  ybm_hearing: {
+    hearing: {
+      kind: "existing_items",
+      basedOn:
+        "NHANES item AUQ054, 'General condition of hearing': “Which statement best describes your hearing (without a hearing aid or other listening devices)?” Answers Excellent / Good / A little trouble / Moderate hearing trouble / A lot of trouble / Deaf. https://wwwn.cdc.gov/Nchs/Data/Nhanes/Public/2015/DataFiles/AUQ_I.htm",
+      adaptations:
+        "The read-out of the options is part of the question, as the PI gave it; option 4 'Moderate trouble' for 'Moderate hearing trouble'; self-completed on an iPad rather than asked by an interviewer (NHANES uses a proxy under 16). The 2021-2023 NHANES cycle adds 'personal sound amplifier' to the bracket; this follows the earlier wording.",
+      developedBy: TEAM,
+      evidence: "Benchmark: NHANES published distributions by age (proxy-reported under 16).",
+      decisions: ["D-91"],
+    },
+    background_noise: {
+      kind: "existing_items",
+      basedOn:
+        "UK Biobank touchscreen data-field 2257, 'Hearing difficulty with background noise': “Do you find it difficult to follow a conversation if there is background noise (such as TV, radio, children playing)?” Answers Yes / No / Do not know / Prefer not to answer.",
+      adaptations:
+        "Wording unchanged. 'Yes' split into 'Yes, all or most of the time' and 'Yes, sometimes' (combine 1 and 2 to compare with UK Biobank's 'Yes'); 'Prefer not to answer' left out, since any question can be skipped. Where the split comes from is not recorded.",
+      developedBy: TEAM,
+      evidence: "Benchmark: UK Biobank, adults aged 40-69, so a comparison in kind only.",
+      decisions: ["D-91"],
+    },
+  },
   ybm_online_life: {
     shopping_frequency: added(["D-89"], "Study-written, November 2026. Examples (Vinted, eBay, Depop, Amazon) chosen because selling and shopping apps were reported as being considered for the under-16 ban. No benchmark."),
     shopping_activity: added(["D-89"], "Study-written, November 2026. Asked unless shopping_freq = never. No benchmark."),

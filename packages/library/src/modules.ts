@@ -1160,6 +1160,46 @@ export const ybmOnlineLife: ModuleInput = {
 
 // ---------------------------------------------------------------------------
 
+/**
+ * Hearing (D-91): two established self-report questions, asked of everyone in
+ * "About you". Self-rated hearing is NHANES's AUQ054; difficulty in background
+ * noise is UK Biobank's field 2257, with its "Yes" split by how often.
+ */
+export const ybmHearing: ModuleInput = {
+  ...moduleBase,
+  instrument: "ybm_hearing",
+  name: "YBM hearing (NHANES AUQ054, UK Biobank 2257)",
+  construct: "Self-rated hearing and difficulty hearing speech in background noise",
+  forms: [
+    {
+      language: "en-GB",
+      label: "Hearing (NHANES and UK Biobank items, D-91)",
+      items: [
+        single(
+          "hearing",
+          "hearing_self",
+          "",
+          "Which statement best describes your hearing (without a hearing aid or other listening devices)? Would you say your hearing is excellent, good, that you have a little trouble, moderate trouble, a lot of trouble or are you deaf?",
+          "scale.hearing_condition",
+          { researcherNote: "NHANES AUQ054 (D-91). Asked of everyone. 1 = excellent … 6 = deaf." },
+        ),
+        single(
+          "background_noise",
+          "hearing_noise",
+          "",
+          "Do you find it difficult to follow a conversation if there is background noise (such as TV, radio, children playing)?",
+          "scale.hearing_noise",
+          { researcherNote: "UK Biobank field 2257 wording (D-91), with 'Yes' split into 'all or most of the time' and 'sometimes'. Asked of everyone. 4 = do not know." },
+        ),
+      ],
+    },
+  ],
+  timeEstimates: est(25, 20),
+  changelog: "1.0 (D-91): self-rated hearing (NHANES AUQ054) and difficulty in background noise (UK Biobank 2257).",
+};
+
+// ---------------------------------------------------------------------------
+
 export const ybmScreenAttitudes: ModuleInput = {
   ...moduleBase,
   instrument: "ybm_screen_attitudes",
@@ -1482,4 +1522,5 @@ export const allModules: ModuleInput[] = attachProvenance([
   ybmAiChatbots,
   ybmAiOutlook,
   ybmOnlineLife,
+  ybmHearing,
 ]);
