@@ -1127,6 +1127,34 @@ export const aiTalkedWith: ResponseScale = {
   ],
 };
 
+// --- Online shopping (D-89, study-written) --------------------------------------
+
+/** How often shopping apps or websites are used, 1 = never … 6 = every day. */
+export const shoppingFrequency: ResponseScale = {
+  key: "scale.shopping_frequency",
+  version: "1.0.0",
+  name: "How often shopping apps or websites are used (never to every day)",
+  direction: "ascending",
+  options: [
+    opt(1, "Never"),
+    opt(2, "Less than once a month"),
+    opt(3, "About once a month"),
+    opt(4, "About once a week"),
+    opt(5, "Several times a week"),
+    opt(6, "Every day"),
+  ],
+  scoringNote: "1 = never … 6 = every day.",
+};
+
+/** What is done on shopping apps or websites (select all). */
+export const shoppingActivity: ResponseScale = {
+  key: "scale.shopping_activity",
+  version: "1.0.0",
+  name: "What is done on shopping apps or websites (select all)",
+  direction: "unordered",
+  options: [opt(1, "Look at things without buying"), opt(2, "Buy things"), opt(3, "Sell things")],
+};
+
 export const allScales: ResponseScale[] = [
   yesNo,
   yesNoUnsure,
@@ -1192,4 +1220,6 @@ export const allScales: ResponseScale[] = [
   aiWorries,
   aiSpotConfidence,
   aiTalkedWith,
+  shoppingFrequency,
+  shoppingActivity,
 ];

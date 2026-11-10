@@ -198,6 +198,14 @@ export const LIBRARY_PROVENANCE: Record<string, ProvenanceInput> = {
     evidence: "Not a validated scale. Benchmark for the two impact questions: Pew's published results for US teens aged 13-17.",
     decisions: ["D-88"],
   },
+  ybm_online_life: {
+    kind: "researcher_developed",
+    developedBy: TEAM,
+    involvement: [{ group: "YBM research team", role: "asked for questions on shopping apps and the planned under-16 ban", when: "2026-11" }],
+    evidence:
+      "None yet; study-written. Context: the UK government announced in June 2026 that it intends to stop under-16s using social media, and in November 2026 said it was considering adding selling and shopping apps such as Vinted and eBay.",
+    decisions: ["D-89"],
+  },
   ybm_screen_attitudes: { kind: "researcher_developed", developedBy: TEAM, basedOn: QSF, notes: QSF_UNKNOWN, decisions: ["D-07"] },
   ybm_gaming: { kind: "researcher_developed", developedBy: TEAM, basedOn: QSF, notes: QSF_UNKNOWN, decisions: ["D-03"] },
   ybm_future_self: { kind: "researcher_developed", developedBy: TEAM, basedOn: QSF, notes: QSF_UNKNOWN, decisions: ["D-15"] },
@@ -261,6 +269,14 @@ const ofUsers = (n: number) => `${n}% of teens who use AI chatbots said yes.`;
 const ofSchool = (n: number) => `${n}% of teens who use AI chatbots for schoolwork said yes.`;
 
 export const QUESTION_PROVENANCE: Record<string, Record<string, ProvenanceInput>> = {
+  ybm_online_life: {
+    shopping_frequency: added(["D-89"], "Study-written, November 2026. Examples (Vinted, eBay, Depop, Amazon) chosen because selling and shopping apps were reported as being considered for the under-16 ban. No benchmark."),
+    shopping_activity: added(["D-89"], "Study-written, November 2026. Asked unless shopping_freq = never. No benchmark."),
+    under16_ban: added(
+      ["D-89"],
+      "Study-written, November 2026, at the PI's request: one sentence of context, then the survey's agree-first scale with Don't know. The apps named are those the PI gave from news coverage of the UK government's plan (Snapchat, TikTok, YouTube, Instagram, Facebook, X; messaging apps such as WhatsApp not included); the full list had not been published. No benchmark.",
+    ),
+  },
   ybm_ai_chatbots: {
     heard: pew("TCHATAWARE", "How much have you heard about artificial intelligence (AI) chatbots like ChatGPT, Copilot or Character.ai?", SAME, "a lot 56%, a little 39%, nothing at all 5%."),
     use: pew("TCHATUSE", "Do you ever use an artificial intelligence (AI) chatbot like ChatGPT, Copilot or Character.ai?", `${SAME} Asked, as by Pew, only of those who have heard a lot or a little.`, "67% of those who had heard of chatbots said yes; 64% of all teens."),
