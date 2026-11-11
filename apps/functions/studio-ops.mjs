@@ -28,6 +28,7 @@ import {
   serialiseDraft,
   setAddressLists,
   suggestBump,
+  updateOption,
   updateQuestion,
   updateScreen,
   updateSettings,
@@ -741,26 +742,52 @@ if (command === "list") {
   );
 } else if (command === "show-if") {
   // When a question (--item) is shown: only when another question (--label, its ID) has option value --code chosen.
+  // Several, any of which shows it: --label "a.question:3;b.question:1" (no --code).
   const study = studyArg();
   const surveyId = surveyArg();
   const itemKey = flag("item") ?? fail("Say which question with --item (its ID).");
-  const sourceKey = (flag("label") ?? "").trim() || fail("Say which question it depends on with --label (its ID).");
-  const code = Number(flag("code"));
-  if (!Number.isInteger(code)) fail("Say which option value with --code (a whole number).");
+  const labelFlag = (flag("label") ?? "").trim() || fail("Say which question it depends on with --label (its ID).");
+  const pairs = labelFlag.includes(":")
+    ? labelFlag.split(";").map((p) => p.trim()).filter(Boolean).map((p) => [p.slice(0, p.lastIndexOf(":")), Number(p.slice(p.lastIndexOf(":") + 1))])
+    : [[labelFlag, Number(flag("code"))]];
+  for (const [, code] of pairs) if (!Number.isInteger(code)) fail("Say which option value with --code, or as question:value in --label (whole numbers).");
   await editDraft(
     study,
     surveyId,
     (draft) => {
       findQuestion(draft, itemKey) ?? fail(`There is no question “${itemKey}” in the draft.`);
-      const source = findQuestion(draft, sourceKey)?.item ?? fail(`There is no question “${sourceKey}” in the draft.`);
-      const scale = source.scale ? draft.scales[source.scale] : undefined;
-      const option = scale?.options.find((o) => o.code === code) ?? fail(`${sourceKey} has no option with value ${code}.`);
-      const [instrument, item] = [sourceKey.slice(0, sourceKey.indexOf(".")), sourceKey.slice(sourceKey.indexOf(".") + 1)];
-      const displayIf = { op: "selected", target: { item: { instrument, item, revision: source.revision } }, code };
-      console.log(`  ${itemKey}: now shown only when ${sourceKey} is “${option.label}” (${code})`);
+      const conditions = pairs.map(([sourceKey, code]) => {
+        const source = findQuestion(draft, sourceKey)?.item ?? fail(`There is no question “${sourceKey}” in the draft.`);
+        const scale = source.scale ? draft.scales[source.scale] : undefined;
+        const option = scale?.options.find((o) => o.code === code) ?? fail(`${sourceKey} has no option with value ${code}.`);
+        const [instrument, item] = [sourceKey.slice(0, sourceKey.indexOf(".")), sourceKey.slice(sourceKey.indexOf(".") + 1)];
+        console.log(`  ${itemKey}: shown when ${sourceKey} is “${option.label}” (${code})${pairs.length > 1 ? ", or" : ""}`);
+        return { op: "selected", target: { item: { instrument, item, revision: source.revision } }, code };
+      });
+      const displayIf = conditions.length === 1 ? conditions[0] : { op: "any", args: conditions };
       return updateQuestion(draft, itemKey, { displayIf }).draft;
     },
     `When ${itemKey} is shown`,
+  );
+} else if (command === "relabel-option") {
+  // An answer option's words (--replace the current label, --text the new one) on a question and every question sharing its list.
+  // Its value stays the same, so only reword it if it still means the same thing.
+  const study = studyArg();
+  const surveyId = surveyArg();
+  const itemKey = flag("item") ?? fail("Say which question with --item (its ID).");
+  const from = (flag("replace") ?? "").trim() || fail("Say the option's current words with --replace.");
+  const to = (flag("text") ?? "").trim() || fail("Say the new words with --text.");
+  await editDraft(
+    study,
+    surveyId,
+    (draft) => {
+      const item = findQuestion(draft, itemKey)?.item ?? fail(`There is no question “${itemKey}” in the draft.`);
+      const scale = item.scale ? draft.scales[item.scale] : undefined;
+      const option = scale?.options.find((o) => o.label === from) ?? fail(`${itemKey} has no option “${from}”.`);
+      console.log(`  ${itemKey}: option ${option.code} “${from}” now reads “${to}” (same value)`);
+      return updateOption(draft, itemKey, option.code, { label: to }).draft;
+    },
+    `Option ${itemKey}: “${to}”`,
   );
 } else if (command === "remove-option") {
   // An answer option off a question (and every question sharing its list), found by its label (--label).

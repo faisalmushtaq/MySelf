@@ -974,7 +974,8 @@ const sel = (item: string, code: number) => ({ op: "selected", target: { item: c
 /** Pew asks the rest only of those who have heard a lot or a little about chatbots. */
 const heardOfChatbots = { op: "not_selected", target: { item: chatRef("heard") }, code: 3 } as const;
 const usesChatbots = sel("use", 1);
-const usesForSchool = sel("for_school", 1);
+const usesRef = { instrument: "ybm_ai_uses", item: "purposes", revision: 1 };
+const usesForSchool = { op: "selected", target: { item: usesRef }, code: 3 } as const;
 const yesNoRow = (key: string, text: string, scale: string, displayIf: unknown, note: string) =>
   single(key, `ai_${key}`, "", text, scale, { displayIf, autoAdvance: true, researcherNote: note } as Partial<ItemInput>);
 
@@ -999,14 +1000,6 @@ export const ybmAiChatbots: ModuleInput = {
           displayIf: usesChatbots,
           researcherNote: "Pew TCHATFREQ, verbatim (D-88). Asked if ai_use = yes.",
         }),
-        yesNoRow("for_info", "Have you ever used AI chatbots to search for information?", "scale.pew_yes_i_have", usesChatbots, "Pew TCHATWHY row a (D-88). Asked if ai_use = yes."),
-        yesNoRow("for_news", "Have you ever used AI chatbots to get news?", "scale.pew_yes_i_have", usesChatbots, "Pew TCHATWHY row b (D-88). Asked if ai_use = yes."),
-        yesNoRow("for_school", "Have you ever used AI chatbots to get help with schoolwork?", "scale.pew_yes_i_have", usesChatbots, "Pew TCHATWHY row c (D-88). Asked if ai_use = yes; yes opens the schoolwork questions."),
-        yesNoRow("for_fun", "Have you ever used AI chatbots for fun or entertainment?", "scale.pew_yes_i_have", usesChatbots, "Pew TCHATWHY row d (D-88). Asked if ai_use = yes."),
-        yesNoRow("for_images", "Have you ever used AI chatbots to create or edit images or videos?", "scale.pew_yes_i_have", usesChatbots, "Pew TCHATWHY row e (D-88). Asked if ai_use = yes."),
-        yesNoRow("for_support", "Have you ever used AI chatbots to get emotional support or advice?", "scale.pew_yes_i_have", usesChatbots, "Pew TCHATWHY row f (D-88). Asked if ai_use = yes. Not a risk flag: nobody reads answers during a session."),
-        yesNoRow("for_summary", "Have you ever used AI chatbots to summarise an article, book or video?", "scale.pew_yes_i_have", usesChatbots, "Pew TCHATWHY row g (D-88), British spelling. Asked if ai_use = yes."),
-        yesNoRow("for_chat", "Have you ever used AI chatbots for casual conversation?", "scale.pew_yes_i_have", usesChatbots, "Pew TCHATWHY row h (D-88). Asked if ai_use = yes."),
         single("felt_friend", "ai_felt_friend", "", "Has an AI chatbot ever felt like a friend or someone to talk to?", "scale.yes_no", {
           displayIf: usesChatbots,
           autoAdvance: true,
@@ -1017,25 +1010,25 @@ export const ybmAiChatbots: ModuleInput = {
           key: "why_not_person",
           revision: 1,
           variable: "ai_why_not_person",
-          displayIf: { op: "any", args: [sel("for_support", 1), { op: "selected", target: { item: chatRef("felt_friend") }, code: 1 }] },
+          displayIf: { op: "any", args: [{ op: "selected", target: { item: usesRef }, code: 6 }, { op: "selected", target: { item: chatRef("felt_friend") }, code: 1 }] },
           stem: { text: "Why might you talk to an AI chatbot about how you feel, rather than a person like a parent, teacher or friend?" },
           lede: { text: "Choose all that apply." },
           scale: "scale.ai_why_not_person",
           scaleVersion: "1.0.0",
           minSelections: 1,
-          researcherNote: "Study-written (D-88). Asked if ai_for_support = yes or ai_felt_friend = yes. 5 = none of these.",
+          researcherNote: "Study-written (D-88). Asked if ai_uses includes emotional support or advice (6), or ai_felt_friend = yes (D-94). 5 = none of these.",
         },
         single("school_share", "ai_school_share", "", "How much of your schoolwork would you say you do with the help of artificial intelligence (AI) chatbots?", "scale.pew_schoolwork_share", {
           displayIf: usesForSchool,
-          researcherNote: "Pew TCHATFREQ2, verbatim (D-88). Asked if ai_for_school = yes, as Pew does.",
+          researcherNote: "Pew TCHATFREQ2, verbatim (D-88). Asked if ai_uses includes schoolwork (3), as Pew asks those who use chatbots for schoolwork (D-94).",
         }),
         single("school_helpful", "ai_school_helpful", "", "Overall, how helpful have artificial intelligence (AI) chatbots been for completing your schoolwork?", "scale.pew_helpful", {
           displayIf: usesForSchool,
-          researcherNote: "Pew TCHATHELPFUL, verbatim (D-88). Asked if ai_for_school = yes.",
+          researcherNote: "Pew TCHATHELPFUL, verbatim (D-88). Asked if ai_uses includes schoolwork (3) (D-94).",
         }),
-        yesNoRow("school_maths", "Have you ever used AI chatbots to help with solving a maths problem for school?", "scale.pew_yes_i_have", usesForSchool, "Pew TCHATSCH1 row a (D-88), 'math' as 'maths'. Asked if ai_for_school = yes."),
-        yesNoRow("school_editing", "Have you ever used AI chatbots to help with editing something you wrote for school?", "scale.pew_yes_i_have", usesForSchool, "Pew TCHATSCH1 row b (D-88). Asked if ai_for_school = yes."),
-        yesNoRow("school_research", "Have you ever used AI chatbots to help with researching a topic for school?", "scale.pew_yes_i_have", usesForSchool, "Pew TCHATSCH1 row c (D-88). Asked if ai_for_school = yes."),
+        yesNoRow("school_maths", "Have you ever used AI chatbots to help with solving a maths problem for school?", "scale.pew_yes_i_have", usesForSchool, "Pew TCHATSCH1 row a (D-88), 'math' as 'maths'. Asked if ai_uses includes schoolwork (3) (D-94)."),
+        yesNoRow("school_editing", "Have you ever used AI chatbots to help with editing something you wrote for school?", "scale.pew_yes_i_have", usesForSchool, "Pew TCHATSCH1 row b (D-88). Asked if ai_uses includes schoolwork (3) (D-94)."),
+        yesNoRow("school_research", "Have you ever used AI chatbots to help with researching a topic for school?", "scale.pew_yes_i_have", usesForSchool, "Pew TCHATSCH1 row c (D-88). Asked if ai_uses includes schoolwork (3) (D-94)."),
         single("cheating", "ai_cheating", "", "As far as you know, how often do students at your school use artificial intelligence (AI) chatbots to cheat on their schoolwork?", "scale.pew_cheat_often", {
           displayIf: heardOfChatbots,
           researcherNote: "Pew TCHATSCH2, verbatim (D-88). Asked if ai_heard = a lot or a little (Pew also excludes home-schooled teens; none here).",
@@ -1045,7 +1038,7 @@ export const ybmAiChatbots: ModuleInput = {
   ],
   timeEstimates: est(150, 120),
   changelog:
-    "1.0 (D-88): Pew Research Center's 2025 teen AI chatbot questions, with Snapchat's My AI and two study-written questions on chatbots as a friend. As kept here (D-93): which chatbots moves to ybm_ai_tools as one select-all list; the tool_* questions stay in the releases that asked them.",
+    "1.0 (D-88): Pew Research Center's 2025 teen AI chatbot questions, with Snapchat's My AI and two study-written questions on chatbots as a friend. As kept here (D-93, D-94): which chatbots and what for move to ybm_ai_tools and ybm_ai_uses as select-all lists; the tool_* and for_* questions stay in the releases that asked them.",
 };
 
 /**
@@ -1093,6 +1086,53 @@ export const ybmAiTools: ModuleInput = {
   ],
   timeEstimates: est(20, 15),
   changelog: "1.0 (D-93): which AI chatbots, as one select-all list with 'Something else'.",
+};
+
+/**
+ * What AI chatbots are used for (D-94): Pew's TCHATWHY rows asked as one
+ * select-all question, with "Something else" described in a box. Asked of
+ * users, after which chatbots; schoolwork (3) opens the schoolwork questions,
+ * and emotional support or advice (6) the question on why rather than a person.
+ */
+export const ybmAiUses: ModuleInput = {
+  ...moduleBase,
+  instrument: "ybm_ai_uses",
+  name: "YBM what AI chatbots are used for (Pew TCHATWHY as a select-all list)",
+  construct: "Purposes of AI chatbot use",
+  forms: [
+    {
+      language: "en-GB",
+      label: "What AI chatbots are used for (select all, D-94)",
+      items: [
+        {
+          responseType: "multi_choice",
+          key: "purposes",
+          revision: 1,
+          variable: "ai_uses",
+          displayIf: usesChatbots,
+          stem: { text: "Have you ever used artificial intelligence (AI) chatbots for the following?" },
+          lede: { text: "Choose all that apply." },
+          scale: "scale.ai_chatbot_uses",
+          scaleVersion: "1.0.0",
+          minSelections: 1,
+          researcherNote:
+            "Pew TCHATWHY, asked as one select-all list (D-94). Asked if ybm_ai_chatbots.use = yes. 3 (schoolwork) opens the schoolwork questions; 6 (emotional support) opens ai_why_not_person. 9 = something else, described in ai_uses_other.",
+        },
+        {
+          responseType: "text_short",
+          key: "purposes_other",
+          revision: 1,
+          variable: "ai_uses_other",
+          displayIf: { op: "selected", target: { item: { instrument: "ybm_ai_uses", item: "purposes", revision: 1 } }, code: 9 },
+          stem: { text: "What else have you used AI chatbots for?" },
+          maxChars: 200,
+          researcherNote: "Free text, asked only when 'Something else' is chosen in ai_uses (D-94).",
+        },
+      ],
+    },
+  ],
+  timeEstimates: est(25, 20),
+  changelog: "1.0 (D-94): what AI chatbots are used for, as one select-all list with 'Something else'.",
 };
 
 /**
@@ -1582,6 +1622,7 @@ export const allModules: ModuleInput[] = attachProvenance([
   ybmAiViews,
   ybmAiChatbots,
   ybmAiTools,
+  ybmAiUses,
   ybmAiOutlook,
   ybmOnlineLife,
   ybmHearing,

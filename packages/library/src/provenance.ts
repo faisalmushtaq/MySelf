@@ -199,6 +199,16 @@ export const LIBRARY_PROVENANCE: Record<string, ProvenanceInput> = {
       "Benchmark with care: select-all lists tend to give lower percentages than a Yes/No question per item, so this study's figures may run below Pew's for the same population. Pew (US teens 13-17 who use AI chatbots): ChatGPT 92%, Gemini 36%, Meta AI 31%, Copilot 23%, Character.ai 14%, Claude 5%.",
     decisions: ["D-88", "D-93"],
   },
+  ybm_ai_uses: {
+    kind: "existing_items",
+    basedOn: `${PEW_SURVEY} Teen question TCHATWHY, as published in ${PEW_TOPLINE_FEB}.`,
+    adaptations:
+      "Pew's question and its eight rows, in Pew's order, asked as one select-all list instead of a Yes/No row per use (the PI's request, November 2026), with 'Something else' (described in a box) added; British spelling ('Summarise').",
+    developedBy: TEAM,
+    evidence:
+      "Benchmark with care: select-all lists tend to give lower percentages than a Yes/No question per item. Pew (US teens 13-17 who use AI chatbots): search for information 89%, help with schoolwork 85%, fun or entertainment 74%, summarise 65%, images or videos 59%, news 30%, casual conversation 25%, emotional support or advice 18%.",
+    decisions: ["D-88", "D-94"],
+  },
   ybm_ai_outlook: {
     kind: "existing_items",
     basedOn: `${PEW_SURVEY} Teen questions TAIIMP and TAIIMPSELF, with TAIHEARD's definition of AI, as published in ${PEW_TOPLINE_FEB}.`,
@@ -345,14 +355,6 @@ export const QUESTION_PROVENANCE: Record<string, Record<string, ProvenanceInput>
       "of users: almost constantly 6%, several times a day 19%, about once a day 19%, several times a week 27%, less often 28%. Of all teens, 28% use one daily or more.",
       "dec",
     ),
-    for_info: pew("TCHATWHY (a)", WHY, ROW("Search for information"), ofUsers(89)),
-    for_news: pew("TCHATWHY (b)", WHY, ROW("Get news"), ofUsers(30)),
-    for_school: pew("TCHATWHY (c)", WHY, ROW("Get help with schoolwork"), `${ofUsers(85)} 54% of all teens.`),
-    for_fun: pew("TCHATWHY (d)", WHY, ROW("For fun or entertainment"), ofUsers(74)),
-    for_images: pew("TCHATWHY (e)", WHY, ROW("Create or edit images or videos"), ofUsers(59)),
-    for_support: pew("TCHATWHY (f)", WHY, ROW("Get emotional support or advice"), `${ofUsers(18)} 12% of all teens.`),
-    for_summary: pew("TCHATWHY (g)", WHY, `${ROW("Summarize an article, book, or video")} British spelling ('summarise').`, ofUsers(65)),
-    for_chat: pew("TCHATWHY (h)", WHY, ROW("Casual conversation"), `${ofUsers(25)} 16% of all teens.`),
     felt_friend: {
       kind: "researcher_developed",
       developedBy: TEAM,
@@ -386,6 +388,19 @@ export const QUESTION_PROVENANCE: Record<string, Record<string, ProvenanceInput>
     },
     chatbots_other: added(["D-93"], "Study-written follow-up for 'Something else'. No benchmark."),
   },
+  ybm_ai_uses: {
+    purposes: {
+      kind: "existing_items",
+      basedOn: `${PEW_SURVEY} Question TCHATWHY: “${WHY}” Rows: Search for information; Get news; Get help with schoolwork; For fun or entertainment; Create or edit images or videos; Get emotional support or advice; Summarize an article, book, or video; Casual conversation. Topline: ${PEW_TOPLINE_FEB}.`,
+      adaptations:
+        "Asked as one select-all list (Pew asks Yes/No for each use, in random order), with Pew’s question wording and “Choose all that apply.” under it; 'Something else' added; British spelling. Replaces the eight Yes/No questions of D-88 (ybm_ai_chatbots.for_*), whose answers stay in the releases that asked them.",
+      developedBy: TEAM,
+      evidence:
+        "Pew result (US teens 13-17 who use AI chatbots, topline of 24 February 2026): search for information 89%, schoolwork 85%, fun 74%, summarise 65%, images or videos 59%, news 30%, casual conversation 25%, emotional support or advice 18%. A select-all list may give lower figures than Pew's Yes/No format.",
+      decisions: ["D-88", "D-94"],
+    },
+    purposes_other: added(["D-94"], "Study-written follow-up for 'Something else'. No benchmark."),
+  },
   ybm_ai_outlook: {
     impact_society: pew(
       "TAIIMP",
@@ -407,7 +422,7 @@ export const QUESTION_PROVENANCE: Record<string, Record<string, ProvenanceInput>
       ["D-88"],
       "Study-written. Ofcom asks children about their confidence in identifying AI-generated content and tests it with an image (Children and Parents: Media Use and Attitudes 2026); its wording was not available, so this is not a benchmark.",
     ),
-    talked: added(["D-88"], "Study-written, from the PI's draft list (November 2026). Pew asked parents, not teens, whether they talk with their teen about chatbots, so there is no teen benchmark."),
+    talked: added(["D-88"], "Study-written, from the PI's draft list (November 2026). Pew asked parents, not teens, whether they talk with their teen about chatbots, so there is no teen benchmark. The last answer reads 'No' (D-94; it read 'No, not really' until 23.0.0, same value)."),
   },
 
   ybm_intro_consent: { why_it_matters: added(["D-62"], "Wording by the research team, October 2026.") },

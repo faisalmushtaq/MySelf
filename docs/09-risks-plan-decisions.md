@@ -1395,3 +1395,23 @@ box; asked of users, straight after how often they use them. The seven
 than Pew's Yes/No per chatbot, so comparisons with Pew's chatbot figures are
 made with care; the provenance record says so. The other Pew grids (what
 chatbots are used for, school tasks) stay one screen per row, as Pew asks them.
+
+### What AI chatbots are used for, as one list; "No" (2026-11-11, D-94)
+
+**Asked.** The PI: the eight Yes/No screens on what chatbots are used for
+should be one list to tick, with an option for something else, like D-93's
+chatbots; and "No, not really" is a poor answer on whether adults have talked
+to them about AI: "No" is better.
+
+**Decided.** A module, `ybm_ai_uses`: Pew's TCHATWHY question in Pew's words
+("Have you ever used artificial intelligence (AI) chatbots for the
+following?"), its eight uses in Pew's order as one select-all list, and
+"Something else", described in a box; asked of users, after which chatbots.
+The schoolwork questions now follow "Get help with schoolwork" in that list,
+and "why talk to a chatbot rather than a person" follows "Get emotional support
+or advice" in it or a chatbot having felt like a friend (studio-ops `show-if`,
+now able to take any of several answers). The eight `ybm_ai_chatbots.for_*`
+questions are archived; their answers stay in 21.0.0-23.0.0's data. As with
+D-93, select-all figures may run below Pew's Yes/No ones. The adults question's
+last answer reads "No" (studio-ops `relabel-option`): same value, so answers
+before and after combine.
