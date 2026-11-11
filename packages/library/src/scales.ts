@@ -1220,6 +1220,27 @@ export const banEffect5: ResponseScale = {
   scoringNote: "1 = very bad … 3 = no real effect … 5 = very good; 6 = I don't know (missing for analysis).",
 };
 
+/**
+ * Which AI chatbots are used (D-93; select all): Pew's TCHATSPEC list in
+ * Pew's order, then Snapchat's My AI and "Something else".
+ */
+export const aiChatbotsUsed: ResponseScale = {
+  key: "scale.ai_chatbots_used",
+  version: "1.0.0",
+  name: "AI chatbots used (select all)",
+  direction: "unordered",
+  options: [
+    opt(1, "ChatGPT"),
+    opt(2, "Claude"),
+    opt(3, "Gemini"),
+    opt(4, "Copilot"),
+    opt(5, "Meta AI"),
+    opt(6, "Character.ai"),
+    opt(7, "Snapchat's My AI"),
+    opt(8, "Something else", undefined, "other_specify"),
+  ],
+};
+
 export const allScales: ResponseScale[] = [
   yesNo,
   yesNoUnsure,
@@ -1291,4 +1312,5 @@ export const allScales: ResponseScale[] = [
   hearingNoise,
   supportOppose5,
   banEffect5,
+  aiChatbotsUsed,
 ];

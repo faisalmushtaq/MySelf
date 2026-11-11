@@ -189,6 +189,16 @@ export const LIBRARY_PROVENANCE: Record<string, ProvenanceInput> = {
     decisions: ["D-88"],
     notes: "Chosen over study-written items so that answers can be compared with a published, regularly repeated source (PI's request, November 2026). UK figures to set alongside (no shared wording): Ofcom, Children and Parents: Media Use and Attitudes 2026 (56% of 8-17s have used AI); National Literacy Trust Annual Literacy Survey 2025 (66.5% of 13-18s use generative AI); Internet Matters, Me, Myself and AI, 2025 (64% of 9-17s use AI chatbots).",
   },
+  ybm_ai_tools: {
+    kind: "existing_items",
+    basedOn: `${PEW_SURVEY} Teen question TCHATSPEC, as published in ${PEW_TOPLINE_DEC}.`,
+    adaptations:
+      "Pew's question wording and list of chatbots, in Pew's order, asked as one select-all list instead of a Yes/No row per chatbot (the PI's request, November 2026, to shorten it), with Snapchat's My AI and 'Something else' (named in a box) added.",
+    developedBy: TEAM,
+    evidence:
+      "Benchmark with care: select-all lists tend to give lower percentages than a Yes/No question per item, so this study's figures may run below Pew's for the same population. Pew (US teens 13-17 who use AI chatbots): ChatGPT 92%, Gemini 36%, Meta AI 31%, Copilot 23%, Character.ai 14%, Claude 5%.",
+    decisions: ["D-88", "D-93"],
+  },
   ybm_ai_outlook: {
     kind: "existing_items",
     basedOn: `${PEW_SURVEY} Teen questions TAIIMP and TAIIMPSELF, with TAIHEARD's definition of AI, as published in ${PEW_TOPLINE_FEB}.`,
@@ -335,19 +345,6 @@ export const QUESTION_PROVENANCE: Record<string, Record<string, ProvenanceInput>
       "of users: almost constantly 6%, several times a day 19%, about once a day 19%, several times a week 27%, less often 28%. Of all teens, 28% use one daily or more.",
       "dec",
     ),
-    tool_chatgpt: pew("TCHATSPEC (a)", SPEC, ROW("ChatGPT"), ofUsers(92), "dec"),
-    tool_claude: pew("TCHATSPEC (b)", SPEC, ROW("Claude"), ofUsers(5), "dec"),
-    tool_gemini: pew("TCHATSPEC (c)", SPEC, ROW("Gemini"), ofUsers(36), "dec"),
-    tool_copilot: pew("TCHATSPEC (d)", SPEC, ROW("Copilot"), ofUsers(23), "dec"),
-    tool_meta_ai: pew("TCHATSPEC (e)", SPEC, ROW("Meta AI"), ofUsers(31), "dec"),
-    tool_character_ai: pew("TCHATSPEC (f)", SPEC, ROW("Character.ai"), ofUsers(14), "dec"),
-    tool_my_ai: {
-      kind: "researcher_developed",
-      developedBy: TEAM,
-      basedOn: `Pew's TCHATSPEC format (${PEW_SURVEY}), with a chatbot Pew did not list.`,
-      evidence: "No benchmark: Pew did not ask about Snapchat's My AI. Added because it is widely used by UK under-16s and many do not count it as AI.",
-      decisions: ["D-88"],
-    },
     for_info: pew("TCHATWHY (a)", WHY, ROW("Search for information"), ofUsers(89)),
     for_news: pew("TCHATWHY (b)", WHY, ROW("Get news"), ofUsers(30)),
     for_school: pew("TCHATWHY (c)", WHY, ROW("Get help with schoolwork"), `${ofUsers(85)} 54% of all teens.`),
@@ -375,6 +372,19 @@ export const QUESTION_PROVENANCE: Record<string, Record<string, ProvenanceInput>
       `${SAME} Pew rotates the order 1-5 or 5-1, anchoring 'Not sure'; here always extremely often to never. Pew asks those who have heard of chatbots and are not home-schooled; here, those who have heard of them.`,
       "extremely often 15%, very often 24%, somewhat often 28%, rarely 12%, never 4%, not sure 17%.",
     ),
+  },
+  ybm_ai_tools: {
+    chatbots: {
+      kind: "existing_items",
+      basedOn: `${PEW_SURVEY} Question TCHATSPEC: “${SPEC}” Rows: ChatGPT, Claude, Gemini, Copilot, Meta AI, Character.ai. Topline: ${PEW_TOPLINE_DEC}.`,
+      adaptations:
+        "Asked as one select-all list (Pew asks Yes/No for each chatbot, in random order); 'Snapchat's My AI' and 'Something else' added. Replaces the seven Yes/No questions of D-88 (ybm_ai_chatbots.tool_*), whose answers stay in the releases that asked them.",
+      developedBy: TEAM,
+      evidence:
+        "Pew result (US teens 13-17 who use AI chatbots, topline of 9 December 2025): ChatGPT 92%, Gemini 36%, Meta AI 31%, Copilot 23%, Character.ai 14%, Claude 5%. A select-all list may give lower figures than Pew's Yes/No format.",
+      decisions: ["D-88", "D-93"],
+    },
+    chatbots_other: added(["D-93"], "Study-written follow-up for 'Something else'. No benchmark."),
   },
   ybm_ai_outlook: {
     impact_society: pew(

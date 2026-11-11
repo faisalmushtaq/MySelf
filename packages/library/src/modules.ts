@@ -999,13 +999,6 @@ export const ybmAiChatbots: ModuleInput = {
           displayIf: usesChatbots,
           researcherNote: "Pew TCHATFREQ, verbatim (D-88). Asked if ai_use = yes.",
         }),
-        yesNoRow("tool_chatgpt", "Do you ever use ChatGPT?", "scale.pew_use_this", usesChatbots, "Pew TCHATSPEC row a (D-88). Asked if ai_use = yes."),
-        yesNoRow("tool_claude", "Do you ever use Claude?", "scale.pew_use_this", usesChatbots, "Pew TCHATSPEC row b (D-88). Asked if ai_use = yes."),
-        yesNoRow("tool_gemini", "Do you ever use Gemini?", "scale.pew_use_this", usesChatbots, "Pew TCHATSPEC row c (D-88). Asked if ai_use = yes."),
-        yesNoRow("tool_copilot", "Do you ever use Copilot?", "scale.pew_use_this", usesChatbots, "Pew TCHATSPEC row d (D-88). Asked if ai_use = yes."),
-        yesNoRow("tool_meta_ai", "Do you ever use Meta AI?", "scale.pew_use_this", usesChatbots, "Pew TCHATSPEC row e (D-88). Asked if ai_use = yes."),
-        yesNoRow("tool_character_ai", "Do you ever use Character.ai?", "scale.pew_use_this", usesChatbots, "Pew TCHATSPEC row f (D-88). Asked if ai_use = yes."),
-        yesNoRow("tool_my_ai", "Do you ever use Snapchat's My AI?", "scale.pew_use_this", usesChatbots, "Study addition to Pew's TCHATSPEC list (D-88): no Pew benchmark. Asked if ai_use = yes."),
         yesNoRow("for_info", "Have you ever used AI chatbots to search for information?", "scale.pew_yes_i_have", usesChatbots, "Pew TCHATWHY row a (D-88). Asked if ai_use = yes."),
         yesNoRow("for_news", "Have you ever used AI chatbots to get news?", "scale.pew_yes_i_have", usesChatbots, "Pew TCHATWHY row b (D-88). Asked if ai_use = yes."),
         yesNoRow("for_school", "Have you ever used AI chatbots to get help with schoolwork?", "scale.pew_yes_i_have", usesChatbots, "Pew TCHATWHY row c (D-88). Asked if ai_use = yes; yes opens the schoolwork questions."),
@@ -1051,7 +1044,55 @@ export const ybmAiChatbots: ModuleInput = {
     },
   ],
   timeEstimates: est(150, 120),
-  changelog: "1.0 (D-88): Pew Research Center's 2025 teen AI chatbot questions, with Snapchat's My AI and two study-written questions on chatbots as a friend.",
+  changelog:
+    "1.0 (D-88): Pew Research Center's 2025 teen AI chatbot questions, with Snapchat's My AI and two study-written questions on chatbots as a friend. As kept here (D-93): which chatbots moves to ybm_ai_tools as one select-all list; the tool_* questions stay in the releases that asked them.",
+};
+
+/**
+ * Which AI chatbots (D-93): Pew's TCHATSPEC list asked as one select-all
+ * question rather than one Yes/No screen per chatbot, with Snapchat's My AI and
+ * "Something else", described in a box. Asked of users, straight after how
+ * often they use them.
+ */
+export const ybmAiTools: ModuleInput = {
+  ...moduleBase,
+  instrument: "ybm_ai_tools",
+  name: "YBM which AI chatbots (Pew TCHATSPEC as a select-all list)",
+  construct: "Which AI chatbots are used",
+  forms: [
+    {
+      language: "en-GB",
+      label: "Which AI chatbots (select all, D-93)",
+      items: [
+        {
+          responseType: "multi_choice",
+          key: "chatbots",
+          revision: 1,
+          variable: "ai_tools",
+          displayIf: usesChatbots,
+          stem: { text: "Which of the following artificial intelligence (AI) chatbots do you ever use?" },
+          lede: { text: "Choose all that apply." },
+          scale: "scale.ai_chatbots_used",
+          scaleVersion: "1.0.0",
+          minSelections: 1,
+          researcherNote:
+            "Pew TCHATSPEC wording, asked as one select-all list (D-93). Asked if ybm_ai_chatbots.use = yes. 7 = Snapchat's My AI (study addition); 8 = something else, named in ai_tools_other.",
+        },
+        {
+          responseType: "text_short",
+          key: "chatbots_other",
+          revision: 1,
+          variable: "ai_tools_other",
+          displayIf: { op: "selected", target: { item: { instrument: "ybm_ai_tools", item: "chatbots", revision: 1 } }, code: 8 },
+          stem: { text: "Which other AI chatbot do you use?" },
+          maxChars: 200,
+          researcherNote: "Free text, asked only when 'Something else' is chosen in ai_tools (D-93).",
+        },
+      ],
+    },
+  ],
+  timeEstimates: est(20, 15),
+  changelog: "1.0 (D-93): which AI chatbots, as one select-all list with 'Something else'.",
 };
 
 /**
@@ -1540,6 +1581,7 @@ export const allModules: ModuleInput[] = attachProvenance([
   ybmPhonePickups,
   ybmAiViews,
   ybmAiChatbots,
+  ybmAiTools,
   ybmAiOutlook,
   ybmOnlineLife,
   ybmHearing,
