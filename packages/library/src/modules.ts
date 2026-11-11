@@ -1139,26 +1139,46 @@ export const ybmOnlineLife: ModuleInput = {
           minSelections: 1,
           researcherNote: "Study-written (D-89). Asked unless shopping_freq = never.",
         },
-        single(
-          "under16_ban",
-          "under16_ban_view",
-          "",
-          "How much do you agree that stopping under-16s from using apps like Snapchat, TikTok, YouTube, Instagram, Facebook and X is a good idea?",
-          "scale.agree_5pt_dk",
-          {
-            lede: { text: "The government is planning to stop under-16s from using some social media apps. Messaging apps like WhatsApp would still be allowed." },
-            researcherNote:
-              "Study-written (D-89). Asked of everyone, whatever their age. Agree-first, as the survey's other agreement questions; 6 = don't know. The apps named are those reported as covered by the UK government's plan (November 2026); the full list had not been published.",
-          },
-        ),
       ],
     },
   ],
-  timeEstimates: est(40, 30),
-  changelog: "1.0 (D-89): how often shopping apps or websites are used and what for, and a view on the under-16 social media plans.",
+  timeEstimates: est(30, 25),
+  changelog:
+    "1.0 (D-89): how often shopping apps or websites are used and what for, and an agree-disagree view on the under-16 social media plans. 1.0 as kept here (D-92): the view on the plans moves to ybm_under16_ban, worded as the parents' questions; 'under16_ban' stays in the releases that asked it.",
 };
 
 // ---------------------------------------------------------------------------
+
+/**
+ * The planned under-16 social media ban (D-92): the pupils' versions of the
+ * two questions the study asks parents, so a child's view can be set beside
+ * their parent's. Asked of everyone, whatever their age.
+ */
+export const ybmUnder16Ban: ModuleInput = {
+  ...moduleBase,
+  instrument: "ybm_under16_ban",
+  name: "YBM the under-16 social media ban (pupils' versions of the parent questions)",
+  construct: "Support for the planned under-16 social media ban, and its expected effect on oneself",
+  forms: [
+    {
+      language: "en-GB",
+      label: "The under-16 ban (pupil versions of the parent questions, D-92)",
+      items: [
+        single("support", "under16_ban_support", "", "How much do you support or oppose the planned ban on social media for under-16s?", "scale.support_oppose_5_dk", {
+          lede: {
+            text: "The government is planning to stop under-16s from using some social media apps, like Snapchat, TikTok, YouTube, Instagram, Facebook and X. Messaging apps like WhatsApp would still be allowed.",
+          },
+          researcherNote: "D-92. Pupils' version of the parent question, same wording. Replaces ybm_online_life.under16_ban (agree-disagree, D-89). 6 = I don't know.",
+        }),
+        single("effect", "under16_ban_effect", "", "If the ban goes ahead, what effect do you think it will have on you?", "scale.ban_effect_5_dk", {
+          researcherNote: "D-92. Pupils' version of the parent question ('…on [child's name]?'). Asked of everyone: pupils of 16 or over may answer 'No real effect'. 6 = I don't know.",
+        }),
+      ],
+    },
+  ],
+  timeEstimates: est(25, 20),
+  changelog: "1.0 (D-92): support for the planned under-16 ban, and its expected effect on the pupil, as the parents are asked.",
+};
 
 /**
  * Hearing (D-91): two established self-report questions, asked of everyone in
@@ -1523,4 +1543,5 @@ export const allModules: ModuleInput[] = attachProvenance([
   ybmAiOutlook,
   ybmOnlineLife,
   ybmHearing,
+  ybmUnder16Ban,
 ]);

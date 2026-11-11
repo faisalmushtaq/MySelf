@@ -1356,3 +1356,27 @@ proxy under 16, here pupils answer themselves. The second is UK Biobank
 data-field 2257 word for word, with Biobank's "Yes" split by how often and its
 "Prefer not to answer" left out; where the split comes from is not recorded,
 to confirm with the PI. Each question's record says so.
+
+### The under-16 ban, asked as the parents are asked (2026-11-11, D-92)
+
+**Asked.** The PI: pupil versions of the two questions on the planned ban that
+the study asks parents, where they do not duplicate what the survey already
+asks: "How much do you support or oppose the planned ban on social media for
+under-16s?" (strongly oppose to strongly support, plus I don't know) and "If
+the ban goes ahead, what effect do you think it will have on [child's name]?"
+(a very bad effect, through no real effect, to a very good effect, plus I don't
+know).
+
+**Decided.** The first covers the same ground as D-89's agree-disagree
+question, live in 21.0.0; the PI chose the parents' wording, so a child's view
+can be set beside their parent's. A module, `ybm_under16_ban`, replaces it in
+the same place: support or oppose, with D-89's line of context (the apps
+covered; messaging apps not), then "If the ban goes ahead, what effect do you
+think it will have on you?". Both are asked of everyone; pupils of 16 or over
+can answer "No real effect". `ybm_online_life.under16_ban` is archived: its
+answers stay in 21.0.0's data, under its own variable.
+
+**Provenance.** Each question's record names the parents' question it mirrors.
+The in-between answer labels (Oppose / Neither support nor oppose / Support;
+A fairly bad effect / A fairly good effect) are the team's: to match to the
+parents' version, which the record says.

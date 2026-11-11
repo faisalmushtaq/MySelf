@@ -1184,6 +1184,42 @@ export const hearingNoise: ResponseScale = {
   scoringNote: "1-2 = yes (UK Biobank 2257's 'Yes', split by how often), 3 = no, 4 = do not know (missing for analysis).",
 };
 
+// --- The under-16 social media ban (D-92) -------------------------------------------
+
+/** Support for the ban: 1 = strongly oppose … 5 = strongly support; 6 = don't know. */
+export const supportOppose5: ResponseScale = {
+  key: "scale.support_oppose_5_dk",
+  version: "1.0.0",
+  name: "Support or oppose, 5 points, with I don't know",
+  direction: "ascending",
+  options: [
+    opt(1, "Strongly oppose"),
+    opt(2, "Oppose"),
+    opt(3, "Neither support nor oppose"),
+    opt(4, "Support"),
+    opt(5, "Strongly support"),
+    opt(6, "I don't know", undefined, "dont_know"),
+  ],
+  scoringNote: "1 = strongly oppose … 5 = strongly support; 6 = I don't know (missing for analysis).",
+};
+
+/** Expected effect of the ban: 1 = a very bad effect … 5 = a very good effect; 6 = don't know. */
+export const banEffect5: ResponseScale = {
+  key: "scale.ban_effect_5_dk",
+  version: "1.0.0",
+  name: "Expected effect of the ban, very bad to very good, with I don't know",
+  direction: "ascending",
+  options: [
+    opt(1, "A very bad effect"),
+    opt(2, "A fairly bad effect"),
+    opt(3, "No real effect"),
+    opt(4, "A fairly good effect"),
+    opt(5, "A very good effect"),
+    opt(6, "I don't know", undefined, "dont_know"),
+  ],
+  scoringNote: "1 = very bad … 3 = no real effect … 5 = very good; 6 = I don't know (missing for analysis).",
+};
+
 export const allScales: ResponseScale[] = [
   yesNo,
   yesNoUnsure,
@@ -1253,4 +1289,6 @@ export const allScales: ResponseScale[] = [
   shoppingActivity,
   hearingCondition,
   hearingNoise,
+  supportOppose5,
+  banEffect5,
 ];
