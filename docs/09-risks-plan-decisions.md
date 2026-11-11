@@ -1380,3 +1380,18 @@ answers stay in 21.0.0's data, under its own variable.
 The in-between answer labels (Oppose / Neither support nor oppose / Support;
 A fairly bad effect / A fairly good effect) are the team's: to match to the
 parents' version, which the record says.
+
+### Which AI chatbots, as one list (2026-11-11, D-93)
+
+**Asked.** The PI: seven Yes/No screens, one per chatbot, are laborious; ask it
+as one select-all list, with an option for others.
+
+**Decided.** A module, `ybm_ai_tools`: Pew's TCHATSPEC question ("Which of the
+following artificial intelligence (AI) chatbots do you ever use?") with Pew's
+six chatbots in Pew's order, Snapchat's My AI and "Something else", named in a
+box; asked of users, straight after how often they use them. The seven
+`ybm_ai_chatbots.tool_*` questions (D-88) are archived: their answers stay in
+21.0.0 and 22.0.0's data. A select-all list tends to give lower percentages
+than Pew's Yes/No per chatbot, so comparisons with Pew's chatbot figures are
+made with care; the provenance record says so. The other Pew grids (what
+chatbots are used for, school tasks) stay one screen per row, as Pew asks them.
