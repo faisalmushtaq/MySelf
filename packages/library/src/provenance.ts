@@ -206,6 +206,14 @@ export const LIBRARY_PROVENANCE: Record<string, ProvenanceInput> = {
       "None yet; study-written. Context: the UK government announced in June 2026 that it intends to stop under-16s using social media, and in November 2026 said it was considering adding selling and shopping apps such as Vinted and eBay.",
     decisions: ["D-89"],
   },
+  ybm_under16_ban: {
+    kind: "researcher_developed",
+    developedBy: TEAM,
+    basedOn: "The study's own questions for parents on the planned under-16 social media ban, as given by the PI (November 2026), reworded for the pupil.",
+    evidence: "None yet; study-written. Asked in the same words as the parents' questions so that a pupil's answers can be compared with their parent's.",
+    decisions: ["D-92"],
+    notes: "To confirm: where the parents' versions are asked (and their exact middle answer labels), so the two can be matched in analysis.",
+  },
   ybm_hearing: {
     kind: "existing_items",
     basedOn:
@@ -303,13 +311,19 @@ export const QUESTION_PROVENANCE: Record<string, Record<string, ProvenanceInput>
       decisions: ["D-91"],
     },
   },
+  ybm_under16_ban: {
+    support: added(
+      ["D-92"],
+      "The parents' question in the same words (“How much do you support or oppose the planned ban on social media for under-16s?”, strongly oppose to strongly support, plus I don't know), as given by the PI. The middle labels (Oppose / Neither support nor oppose / Support) are the team's; to match to the parents' version. The line of context (apps covered; messaging apps not) is carried over from D-89. Replaces the agree-disagree question ybm_online_life.under16_ban (D-89), whose answers stay in the releases that asked it.",
+    ),
+    effect: added(
+      ["D-92"],
+      "The parents' question (“If the ban goes ahead, what effect do you think it will have on [child's name]?”, a very bad effect through no real effect to a very good effect, plus I don't know) asked about the pupil themselves. 'A fairly bad effect' and 'A fairly good effect' are the team's labels for the in-between points; to match to the parents' version.",
+    ),
+  },
   ybm_online_life: {
     shopping_frequency: added(["D-89"], "Study-written, November 2026. Examples (Vinted, eBay, Depop, Amazon) chosen because selling and shopping apps were reported as being considered for the under-16 ban. No benchmark."),
     shopping_activity: added(["D-89"], "Study-written, November 2026. Asked unless shopping_freq = never. No benchmark."),
-    under16_ban: added(
-      ["D-89"],
-      "Study-written, November 2026, at the PI's request: one sentence of context, then the survey's agree-first scale with Don't know. The apps named are those the PI gave from news coverage of the UK government's plan (Snapchat, TikTok, YouTube, Instagram, Facebook, X; messaging apps such as WhatsApp not included); the full list had not been published. No benchmark.",
-    ),
   },
   ybm_ai_chatbots: {
     heard: pew("TCHATAWARE", "How much have you heard about artificial intelligence (AI) chatbots like ChatGPT, Copilot or Character.ai?", SAME, "a lot 56%, a little 39%, nothing at all 5%."),
