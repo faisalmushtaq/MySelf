@@ -1123,7 +1123,7 @@ export const aiTalkedWith: ResponseScale = {
     opt(1, "Yes, both my parents or carers and my teachers"),
     opt(2, "Yes, only my teachers"),
     opt(3, "Yes, only my parents or carers"),
-    opt(4, "No, not really"),
+    opt(4, "No"),
   ],
 };
 
@@ -1241,6 +1241,28 @@ export const aiChatbotsUsed: ResponseScale = {
   ],
 };
 
+/**
+ * What AI chatbots are used for (D-94; select all): Pew's TCHATWHY rows in
+ * Pew's order, with "Something else".
+ */
+export const aiChatbotUses: ResponseScale = {
+  key: "scale.ai_chatbot_uses",
+  version: "1.0.0",
+  name: "What AI chatbots are used for (select all)",
+  direction: "unordered",
+  options: [
+    opt(1, "Search for information"),
+    opt(2, "Get news"),
+    opt(3, "Get help with schoolwork"),
+    opt(4, "For fun or entertainment"),
+    opt(5, "Create or edit images or videos"),
+    opt(6, "Get emotional support or advice"),
+    opt(7, "Summarise an article, book or video"),
+    opt(8, "Casual conversation"),
+    opt(9, "Something else", undefined, "other_specify"),
+  ],
+};
+
 export const allScales: ResponseScale[] = [
   yesNo,
   yesNoUnsure,
@@ -1313,4 +1335,5 @@ export const allScales: ResponseScale[] = [
   supportOppose5,
   banEffect5,
   aiChatbotsUsed,
+  aiChatbotUses,
 ];
