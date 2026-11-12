@@ -234,6 +234,13 @@ export const LIBRARY_PROVENANCE: Record<string, ProvenanceInput> = {
     decisions: ["D-92"],
     notes: "To confirm: where the parents' versions are asked (and their exact middle answer labels), so the two can be matched in analysis.",
   },
+  ybm_linkage_choice: {
+    kind: "researcher_developed",
+    developedBy: TEAM,
+    involvement: [{ group: "MyPhone/MyBrain team (review of the linkage process)", role: "said pupils of 16 or over decide about linkage themselves", when: "2026-11" }],
+    evidence: "Not a measure: a consent decision. Under 16, linkage is opt-out by a parent or carer; at 16 or over the young person decides.",
+    decisions: ["D-95"],
+  },
   ybm_hearing: {
     kind: "existing_items",
     basedOn:
@@ -334,12 +341,15 @@ export const QUESTION_PROVENANCE: Record<string, Record<string, ProvenanceInput>
   ybm_under16_ban: {
     support: added(
       ["D-92"],
-      "The parents' question in the same words (“How much do you support or oppose the planned ban on social media for under-16s?”, strongly oppose to strongly support, plus I don't know), as given by the PI. The middle labels (Oppose / Neither support nor oppose / Support) are the team's; to match to the parents' version. The line of context (apps covered; messaging apps not) is carried over from D-89. Replaces the agree-disagree question ybm_online_life.under16_ban (D-89), whose answers stay in the releases that asked it.",
+      "The parents' question in the same words (“How much do you support or oppose the planned ban on social media for under-16s?”, strongly oppose to strongly support, plus I don't know), as given by the PI. The middle labels (Oppose / Neither support nor oppose / Support) are the team's; to match to the parents' version. The line above it is the parents' own (D-95): “The UK government plans to stop under-16s using major social media apps, such as TikTok, Snapchat and Instagram. It is expected to start in spring 2027.” Replaces the agree-disagree question ybm_online_life.under16_ban (D-89), whose answers stay in the releases that asked it.",
     ),
     effect: added(
       ["D-92"],
       "The parents' question (“If the ban goes ahead, what effect do you think it will have on [child's name]?”, a very bad effect through no real effect to a very good effect, plus I don't know) asked about the pupil themselves. 'A fairly bad effect' and 'A fairly good effect' are the team's labels for the in-between points; to match to the parents' version.",
     ),
+  },
+  ybm_linkage_choice: {
+    agree_16: added(["D-95"], "Study-written, November 2026, after a review of the linkage process. Not a measure: records a 16+ pupil's own decision on linkage."),
   },
   ybm_online_life: {
     shopping_frequency: added(["D-89"], "Study-written, November 2026. Examples (Vinted, eBay, Depop, Amazon) chosen because selling and shopping apps were reported as being considered for the under-16 ban. No benchmark."),

@@ -1263,6 +1263,15 @@ export const aiChatbotUses: ResponseScale = {
   ],
 };
 
+/** A 16+ pupil's own decision on record linkage (D-95): 1 = yes, 2 = no. */
+export const linkageChoice: ResponseScale = {
+  key: "scale.linkage_choice",
+  version: "1.0.0",
+  name: "Records linked: yes or no",
+  direction: "unordered",
+  options: [opt(1, "Yes, link my records"), opt(2, "No, don't link my records")],
+};
+
 export const allScales: ResponseScale[] = [
   yesNo,
   yesNoUnsure,
@@ -1336,4 +1345,5 @@ export const allScales: ResponseScale[] = [
   banEffect5,
   aiChatbotsUsed,
   aiChatbotUses,
+  linkageChoice,
 ];
