@@ -1415,3 +1415,48 @@ questions are archived; their answers stay in 21.0.0-23.0.0's data. As with
 D-93, select-all figures may run below Pew's Yes/No ones. The adults question's
 last answer reads "No" (studio-ops `relabel-option`): same value, so answers
 before and after combine.
+
+### Record linkage, as the pupil reads it (2026-11-12, D-95)
+
+**Asked.** A review of the linkage process (passed on by the PI) found the
+school survey's consent screen did not say which records are linked, what study
+information goes with them, how the matching keeps names from researchers, that
+pupils of 16 or over decide for themselves, what stopping means, or their
+rights; that the ban question's context and the safeguarding wording should be
+the parents' and the website's own; and that participants should read
+"survey", not "questionnaire".
+
+**Changed (school survey).**
+- The consent screen's explanation names the records (GP, hospital, community
+  and mental health services including CAMHS, and Department for Education
+  records on attendance, results and special educational needs) and the study
+  information linked (EEG, the attention task, survey answers and, where shared,
+  a parent's answers and screen-time screenshots); says the University keeps
+  names apart and an independent organisation does the matching; that under 16
+  linking is part of taking part unless a parent or carer opted the child out,
+  and at 16 or over the young person decides; and that stopping means no
+  further linking, while results already worked out are about large groups.
+- `record_linkage` becomes "I understand…" for everyone, adding that pupils of
+  16 or over are asked separately. A module, `ybm_linkage_choice`, asks them,
+  after the identity questions and only if their date of birth makes them 16 or
+  over: "Yes, link my records" / "No, don't link my records", required. A no,
+  or a sitting that ends before the question, leaves the pupil out of the
+  linkage list. The "kept separately… not identifiable" statement
+  (`no_identification`) already sat before the identity questions and covers
+  reports, so it stays as it is.
+- The information panel gains YOUR RIGHTS (see, correct or delete; the ICO) and
+  says who decides about linking at which age.
+- "Why your answers matter" says the website's words: answers aren't read
+  straight away; tell a researcher, a teacher or an adult you trust; Childline
+  0800 1111.
+- The ban support question carries the parents' line above it, word for word
+  (the answer labels already matched the parents').
+- The survey's title reads "survey", not "questionnaire".
+
+**Not added.** A Yes/No statement on being contacted if linkage changes: the
+survey holds no contact details for pupils, so a yes could not be acted on.
+Contact for linkage stays Dr Sarmad Ali, as elsewhere in the survey and the
+amendment.
+
+**For the linkage procedure.** Before names go to Connected West Yorkshire,
+leave out pupils with `linkage_agree_16` = 2, and 16+ pupils with no answer.

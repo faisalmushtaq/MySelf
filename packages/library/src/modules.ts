@@ -1247,9 +1247,9 @@ export const ybmUnder16Ban: ModuleInput = {
       items: [
         single("support", "under16_ban_support", "", "How much do you support or oppose the planned ban on social media for under-16s?", "scale.support_oppose_5_dk", {
           lede: {
-            text: "The government is planning to stop under-16s from using some social media apps, like Snapchat, TikTok, YouTube, Instagram, Facebook and X. Messaging apps like WhatsApp would still be allowed.",
+            text: "The UK government plans to stop under-16s using major social media apps, such as TikTok, Snapchat and Instagram. It is expected to start in spring 2027.",
           },
-          researcherNote: "D-92. Pupils' version of the parent question, same wording. Replaces ybm_online_life.under16_ban (agree-disagree, D-89). 6 = I don't know.",
+          researcherNote: "D-92. Pupils' version of the parent question, same wording, with the line the parents see above it (D-95). Replaces ybm_online_life.under16_ban (agree-disagree, D-89). 6 = I don't know.",
         }),
         single("effect", "under16_ban_effect", "", "If the ban goes ahead, what effect do you think it will have on you?", "scale.ban_effect_5_dk", {
           researcherNote: "D-92. Pupils' version of the parent question ('…on [child's name]?'). Asked of everyone: pupils of 16 or over may answer 'No real effect'. 6 = I don't know.",
@@ -1259,6 +1259,44 @@ export const ybmUnder16Ban: ModuleInput = {
   ],
   timeEstimates: est(25, 20),
   changelog: "1.0 (D-92): support for the planned under-16 ban, and its expected effect on the pupil, as the parents are asked.",
+};
+
+/**
+ * A 16+ pupil's own decision on record linkage (D-95). Under 16, linkage is
+ * part of taking part (a parent or carer can opt the child out); at 16 or over
+ * the young person decides. Asked only of pupils whose date of birth makes
+ * them 16 or over on the day, after the identity questions. A "No", or a
+ * skipped answer, means the pupil is left out of the linkage list.
+ */
+export const ybmLinkageChoice: ModuleInput = {
+  ...moduleBase,
+  instrument: "ybm_linkage_choice",
+  name: "YBM record linkage: the 16+ decision",
+  construct: "Agreement to record linkage, pupils aged 16 or over",
+  forms: [
+    {
+      language: "en-GB",
+      label: "Record linkage decision, 16 or over (D-95)",
+      items: [
+        single(
+          "agree_16",
+          "linkage_agree_16",
+          "",
+          "You are 16 or over, so you decide for yourself: are you happy for your records to be linked with your answers, as described at the start?",
+          "scale.linkage_choice",
+          {
+            lede: { text: "You can change your mind at any time by emailing Dr Sarmad Ali at S.A.Ali1@leeds.ac.uk." },
+            displayIf: { op: "age_gte", target: { item: { instrument: "ybm_identity", item: "dob", revision: 1 } }, years: 16 },
+            required: "hard",
+            researcherNote:
+              "D-95. Asked if the date of birth makes the pupil 16 or over on the day of the sitting. 2 = no: leave the pupil out of the linkage list. Required, so a 16+ pupil cannot reach the rest of the survey without deciding; a sitting that ends before it is treated as no.",
+          },
+        ),
+      ],
+    },
+  ],
+  timeEstimates: est(10, 10),
+  changelog: "1.0 (D-95): pupils aged 16 or over decide for themselves whether their records are linked.",
 };
 
 /**
@@ -1627,4 +1665,5 @@ export const allModules: ModuleInput[] = attachProvenance([
   ybmOnlineLife,
   ybmHearing,
   ybmUnder16Ban,
+  ybmLinkageChoice,
 ]);
