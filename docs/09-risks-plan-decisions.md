@@ -1460,3 +1460,20 @@ amendment.
 
 **For the linkage procedure.** Before names go to Connected West Yorkshire,
 leave out pupils with `linkage_agree_16` = 2, and 16+ pupils with no answer.
+
+### RCADS-25 back (2026-11-15, D-96)
+
+**Asked.** The PI: approval has been given to bring RCADS-25 back into the
+school survey.
+
+**Changed.** The 25 questions archived on 6 November 2026 (after a pupil's
+disclosure, D-85) are restored where they were: in "How you've been feeling",
+straight after SWEMWBS, with the same IDs, variables and answer codes, so
+answers join up with sittings from 18.0.0 and earlier. Restoring one restores
+its whole block (studio-ops `restore --items rcads25.q1`). The tap-a-word
+explanation of "Nothing is much fun anymore" (D-79) comes back with it. Since
+it was removed, the safeguarding wording has changed (D-85, D-95): pupils are
+told answers aren't read straight away, to tell a researcher, a teacher or an
+adult they trust, and are given Childline; nobody reviews RCADS answers during
+a session (D-11). The amendment documents say RCADS-25 is reinstated with
+approval.
