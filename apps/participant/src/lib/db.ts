@@ -449,6 +449,34 @@ export async function findResumableSession(participantCode: string, scope: Resum
 }
 
 /**
+ * Every unfinished sitting under a code, newest first, within the scope (D-97).
+ * A code can be shared by a whole group, so a code alone never says whose
+ * sitting is whose: the carry-on screen checks each one's first name and date
+ * of birth against what is typed.
+ */
+export function pickAllResumable(
+  rows: readonly SessionRow[],
+  scope: ResumeScope,
+  defaults: { study: string; surveyId: string } = ROW_DEFAULTS,
+): SessionRow[] {
+  const choice = scope.choice;
+  return rows
+    .filter((session) => session.state === "in_progress")
+    .filter((session) => "anyRelease" in scope || session.releaseHash === scope.releaseHash)
+    .filter((session) => {
+      if (!choice) return true;
+      const own = choiceOfRow(session, defaults);
+      return own.study === choice.study && own.surveyId === choice.surveyId;
+    })
+    .sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1));
+}
+
+export async function findResumableSessions(participantCode: string, scope: ResumeScope): Promise<SessionRow[]> {
+  const rows = await db.sessions.where("participantCode").equals(participantCode).toArray();
+  return pickAllResumable(rows, scope);
+}
+
+/**
  * Unfinished sittings of this survey on this iPad, touched within `withinMs`,
  * newest first: what staff can carry on from the panel (D-73).
  */

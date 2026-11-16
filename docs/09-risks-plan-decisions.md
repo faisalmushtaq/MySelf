@@ -1477,3 +1477,27 @@ told answers aren't read straight away, to tell a researcher, a teacher or an
 adult they trust, and are given Childline; nobody reviews RCADS answers during
 a session (D-11). The amendment documents say RCADS-25 is reinstated with
 approval.
+
+### Start is always new; carrying on is its own button (2026-11-16, D-97)
+
+**Asked.** The PI: the code typed at the start is a group code, yet typing it
+put pupils into "Welcome back" whenever anyone in the group had left a survey
+unfinished on that iPad. Only a matching name and date of birth should mark
+someone as returning; better still, the start screen should offer carrying on
+separately from starting.
+
+**Changed (participant app).** Start always starts a new sitting: a code no
+longer looks for unfinished ones. Under it, "Carry on a survey I started" asks
+for the first name and date of birth, then checks every unfinished sitting
+under that code on this iPad (newest first, each drawn with its own release)
+and opens the one whose date of birth, and first name where it holds one,
+match. Nothing of any sitting is shown before that. No match counts as a wrong
+try against the code on this iPad; the third locks carrying on under it until
+staff allow it in the panel, as before (D-74). A locked code never stops
+anyone starting. The "I'm new — start a new survey" button (D-77) is gone from
+that screen, since pupils who are new press Start.
+
+**Consequences.** A sitting stopped before the date of birth (or holding no
+date of birth) cannot be carried on by a pupil; staff can still carry it on
+from the panel (D-73), or the pupil starts again. Resuming under the
+release a sitting started with is unchanged (`sittingsToResume`).

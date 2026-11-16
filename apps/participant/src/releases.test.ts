@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import { ENGINE_VERSIONS } from "@myself/release/gate";
 import { contentHashAsync } from "@myself/schema";
 import type { CachedReleaseRow, ReleaseStateRow, SessionRow } from "./lib/db.js";
-import { pickResumable, releasesToPrune } from "./lib/db.js";
+import { pickAllResumable, pickResumable, releasesToPrune } from "./lib/db.js";
 import {
   BUILT_IN,
   describeCheck,
@@ -18,7 +18,7 @@ import {
   type LoadedRelease,
   type ReleaseCache,
 } from "./lib/releases.js";
-import { sittingToResume, type ResumeLookup } from "./lib/resume.js";
+import { sittingToResume, sittingsToResume, type ResumeLookup } from "./lib/resume.js";
 import { buildRuntime } from "./lib/runtime.js";
 
 /**
@@ -631,6 +631,10 @@ describe("which sitting a code resumes", () => {
     expect(pickResumable(rows, { releaseHash: NEW })?.sessionId).toBe("ses_older_new");
     expect(pickResumable(rows, { releaseHash: `sha256:${"d".repeat(64)}` })).toBeUndefined();
   });
+  it("lists every unfinished one under a code shared by a group, newest first (D-97)", () => {
+    expect(pickAllResumable(rows, { anyRelease: true }).map((r) => r.sessionId)).toEqual(["ses_old", "ses_older_new"]);
+    expect(pickAllResumable(rows, { releaseHash: NEW }).map((r) => r.sessionId)).toEqual(["ses_older_new"]);
+  });
 });
 
 /**
@@ -680,6 +684,24 @@ describe("which release a resumed sitting is drawn with", () => {
     // Drawn with that release's content, not the newer one on screen.
     expect(onScreen.manifest.composition.studyLabel).toBe("Published from the Studio");
     expect(chosen.runtime.manifest.composition.studyLabel).toBe(BUILT_IN.manifest.composition.studyLabel);
+  });
+
+  it("lists every unfinished sitting under a shared code, each with its own release, leaving out one whose release cannot be opened (D-97)", async () => {
+    const next = await nextRelease();
+    const verified = await verifyRelease(next.json, next.hash);
+    if (!verified.ok) throw new Error(verified.reason);
+    const onScreen = buildRuntime(verified.manifest, "cached");
+    const missing = `sha256:${"e".repeat(64)}`;
+    const rows = [
+      row("ses_old", BUILT_IN_HASH, "2026-09-28T10:00:00.000Z"),
+      row("ses_now", onScreen.hash, "2026-09-28T11:00:00.000Z"),
+      row("ses_lost", missing, "2026-09-28T12:00:00.000Z"),
+    ];
+    const lookup = { ...device(rows, { [BUILT_IN_HASH]: BUILT_IN }), findAll: async (_code: string, scope: Parameters<ResumeLookup["find"]>[1]) => pickAllResumable(rows, scope) };
+    const all = await sittingsToResume("NDC0042", onScreen, lookup);
+    expect(all.map((x) => x.session.sessionId)).toEqual(["ses_now", "ses_old"]);
+    expect(all[0]!.runtime).toBe(onScreen);
+    expect(all[1]!.runtime.hash).toBe(BUILT_IN_HASH);
   });
 
   it("keeps the release on screen when the sitting was started under it", async () => {

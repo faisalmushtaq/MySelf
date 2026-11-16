@@ -309,10 +309,16 @@ test.describe("a participant link", () => {
     const rows = await sittings(page);
     expect(rows.map((r) => r.study ?? "ybm").sort()).toEqual(["future", "ybm"]);
 
-    // Moved back, the code resumes the default's sitting where it stopped.
+    // Moved back, the default's sitting is carried on where it stopped (staff,
+    // from the panel, which lists only this survey's sittings; D-97).
     await page.goto("./");
     await useSurvey(page, null);
-    await start(page, "NDC0902");
+    await expect(buildLine(page)).toContainText("release 8.0.0 (built in)", { timeout: 15_000 });
+    // A fresh panel, listing this survey's unfinished sittings.
+    await page.reload();
+    await openStaffPanel(page);
+    await page.locator(".handover").getByRole("button", { name: /Carry on NDC0902/ }).click();
+    await expect(page.locator(".survey")).toBeVisible();
     await expect(heading(page)).toContainText(OLD_CONSENT);
     await expect(heading(page)).not.toHaveText(WHY);
   });
