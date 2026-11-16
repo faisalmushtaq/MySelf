@@ -1134,7 +1134,7 @@ export default function App({ initial, initialRuntime }: { initial: Startup; ini
    *  returning to a question is visible in the log rather than inferred. */
   const enterItem = useCallback(
     (index: number) => {
-      if (phase.kind === "start" || phase.kind === "finished" || phase.kind === "ended") return;
+      if (phase.kind === "start" || phase.kind === "finished" || phase.kind === "ended" || phase.kind === "verify") return;
       const key = unitKeyOf(index);
       if (!key) return;
       const { visit, returning, tooFastMs } = timing.current.enter(key, wordsAt(index));
@@ -1146,7 +1146,7 @@ export default function App({ initial, initialRuntime }: { initial: Startup; ini
   /** Close a viewing of an item, recording how long it was on screen. */
   const leaveItem = useCallback(
     async (index: number, answered: boolean) => {
-      if (phase.kind === "start" || phase.kind === "finished" || phase.kind === "ended") return;
+      if (phase.kind === "start" || phase.kind === "finished" || phase.kind === "ended" || phase.kind === "verify") return;
       const key = unitKeyOf(index);
       if (!key) return;
       const payload = timing.current.leave(key, answered);
