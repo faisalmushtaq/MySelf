@@ -9,6 +9,8 @@ import { buildRuntime, type Runtime } from "./runtime.js";
  */
 export interface ResumeLookup {
   find(participantCode: string, scope: ResumeScope): Promise<SessionRow | undefined>;
+  /** Every unfinished sitting under the code, newest first (D-97); `find`'s one if absent. */
+  findAll?(participantCode: string, scope: ResumeScope): Promise<SessionRow[]>;
   releaseForHash(hash: string): Promise<LoadedRelease | null>;
 }
 
@@ -54,4 +56,39 @@ export async function sittingToResume(
     // Treated as unavailable, below.
   }
   return { session: await lookup.find(code, { releaseHash: current.hash, ...only }), runtime: current };
+}
+
+/**
+ * Every unfinished sitting a code could carry on, each with the release to
+ * render it with (D-97): a code shared by a group may have several. Pinned as
+ * `sittingToResume` is: a sitting whose own release cannot be loaded is left
+ * out, unless it is of the release running now.
+ */
+export async function sittingsToResume(
+  code: string,
+  current: Runtime,
+  lookup: ResumeLookup,
+  choice?: { study: string; surveyId: string },
+): Promise<{ session: SessionRow; runtime: Runtime }[]> {
+  const only = choice ? { choice } : {};
+  const rows = lookup.findAll
+    ? await lookup.findAll(code, { anyRelease: true, ...only })
+    : [await lookup.find(code, { anyRelease: true, ...only })].filter((r): r is SessionRow => r !== undefined);
+  const out: { session: SessionRow; runtime: Runtime }[] = [];
+  for (const session of rows) {
+    if (session.releaseHash === current.hash) {
+      out.push({ session, runtime: current });
+      continue;
+    }
+    try {
+      const pinned = await lookup.releaseForHash(session.releaseHash);
+      if (pinned) {
+        const runtime = buildRuntime(pinned.manifest, pinned.source);
+        if (runtime.hash === session.releaseHash) out.push({ session, runtime });
+      }
+    } catch {
+      // Its release is unavailable: it stays on the iPad and uploads as the partial sitting it is.
+    }
+  }
+  return out;
 }

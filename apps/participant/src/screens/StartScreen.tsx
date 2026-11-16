@@ -67,6 +67,8 @@ export interface StartScreenProps {
   /** A start is under way, so Start cannot be pressed twice. */
   busy: boolean;
   onStart: () => Promise<void>;
+  /** "Carry on a survey I started" (D-97): asks for the first name and date of birth. */
+  onResume?: () => Promise<void>;
   accessibility: AccessibilityPreferences;
   onAccessibilityChange: (patch: Partial<AccessibilityPreferences>) => void;
   durability: Durability | null;
@@ -92,6 +94,7 @@ export function StartScreen({
   onCodeErrorClear,
   busy,
   onStart,
+  onResume,
   accessibility,
   onAccessibilityChange,
   durability,
@@ -152,6 +155,13 @@ export function StartScreen({
       <button type="button" className="next big" disabled={code.trim().length < 2 || busy} onClick={() => void onStart()}>
         Start
       </button>
+      {/* Its own button (D-97): a code can be shared by a whole group, so Start
+          always starts a new survey, and carrying one on asks who it is. */}
+      {onResume && (
+        <button type="button" className="decline resume-start" disabled={code.trim().length < 2 || busy} onClick={() => void onResume()}>
+          Carry on a survey I started
+        </button>
+      )}
         </>
       )}
       <details className="reading-settings">

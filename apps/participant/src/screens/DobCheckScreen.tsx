@@ -4,8 +4,10 @@ import type { ItemDefinition } from "@myself/schema";
 import { DateControl } from "../components/controls/DateControl.js";
 
 /**
- * "To carry on, enter your date of birth" — between a code that matches an
- * unfinished sitting and that sitting (lib/dob.ts says when it is asked).
+ * "To carry on, enter your first name and your date of birth" — after "Carry on
+ * a survey I started" (D-97): the details are matched against every
+ * unfinished sitting under the code, so a code shared by a group opens only the
+ * sitting whose name and date match.
  *
  * Drawn with the sitting's own date question, through the same control the
  * survey uses, so the picker, its limits and the "that makes you 12" read-back
@@ -29,9 +31,10 @@ export interface DobCheckScreenProps {
   /**
    * Someone new with the same code (a code shared for the day, D-77): a new
    * survey starts under it. The unfinished one is left as it is and still
-   * uploads; nothing of it is shown.
+   * uploads; nothing of it is shown. Not offered when the screen was reached
+   * by choosing to carry on (D-97).
    */
-  onStartNew: () => void;
+  onStartNew?: () => void;
 }
 
 export function DobCheckScreen({ item, askName, note, locked, busy, onCheck, onCancel, onStartNew }: DobCheckScreenProps) {
@@ -45,14 +48,16 @@ export function DobCheckScreen({ item, askName, note, locked, busy, onCheck, onC
     return (
       <div className="screen checkin dob-check" role="alert">
         <h1>Let&apos;s get some help</h1>
-        <p>This sitting can&apos;t be carried on with on this iPad. Please put your hand up and ask a member of the research team.</p>
+        <p>An unfinished survey with this code can&apos;t be carried on with on this iPad. Please put your hand up and ask a member of the research team.</p>
         <div className="checkin-actions">
           <button type="button" className="next big" onClick={() => onCancel()}>
             OK
           </button>
-          <button type="button" className="decline start-new" disabled={busy} onClick={() => onStartNew()}>
-            I&apos;m new — start a new survey
-          </button>
+          {onStartNew && (
+            <button type="button" className="decline start-new" disabled={busy} onClick={() => onStartNew()}>
+              I&apos;m new — start a new survey
+            </button>
+          )}
         </div>
       </div>
     );
@@ -100,9 +105,11 @@ export function DobCheckScreen({ item, askName, note, locked, busy, onCheck, onC
         <button type="button" className="next big" disabled={!ready || busy} onClick={() => onCheck(iso, name)}>
           Carry on
         </button>
-        <button type="button" className="decline start-new" disabled={busy} onClick={() => onStartNew()}>
-          I&apos;m new — start a new survey
-        </button>
+        {onStartNew && (
+          <button type="button" className="decline start-new" disabled={busy} onClick={() => onStartNew()}>
+            I&apos;m new — start a new survey
+          </button>
+        )}
         <button type="button" className="decline dob-cancel" onClick={() => onCancel()}>
           Back
         </button>

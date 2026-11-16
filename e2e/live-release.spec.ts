@@ -202,6 +202,18 @@ async function cachedHashes(page: Page): Promise<string[]> {
 const buildLine = (page: Page) => page.locator("p.demo-note");
 const heading = (page: Page) => page.locator(".survey h1");
 
+/**
+ * Staff carry an unfinished sitting on from the panel (D-73). Start always
+ * starts a new sitting (D-97), and a sitting stopped before the date of birth
+ * can only be carried on by staff; the release it is drawn with is chosen the
+ * same way either way (lib/resume.ts).
+ */
+async function carryOnFromPanel(page: Page, code: string): Promise<void> {
+  await openStaffPanel(page);
+  await page.locator(".handover").getByRole("button", { name: new RegExp(`Carry on ${code}`) }).click();
+  await expect(page.locator(".survey")).toBeVisible();
+}
+
 async function start(page: Page, code: string): Promise<void> {
   await page.locator("input.code").fill(code);
   await page.locator("button.next.big").click();
@@ -267,9 +279,9 @@ test.describe("a survey published after this build", () => {
     await page.reload();
     await expect(page.locator("p.study-title")).toHaveText(NEW_LABEL, { timeout: 15_000 });
 
-    // The same code resumes the same sitting, on the same question, in the old
+    // Carried on, the same sitting is on the same question, in the old
     // wording — not the question at that position in the new release.
-    await start(page, "NDC0202");
+    await carryOnFromPanel(page, "NDC0202");
     await expect(heading(page)).toContainText(OLD_CONSENT);
     await expect(heading(page)).not.toContainText(NEW_CONSENT);
 
@@ -319,9 +331,9 @@ test.describe("a survey published after this build", () => {
     // Taking it prunes the cache, and the short release is kept: a sitting needs it.
     await expect.poll(() => cachedHashes(page)).toEqual(expect.arrayContaining([short.hash, next.hash]));
 
-    // The same code resumes under the short release, on its own second screen —
+    // Carried on, it is under the short release, on its own second screen —
     // in the live release that position is the consent question.
-    await start(page, "NDC0505");
+    await carryOnFromPanel(page, "NDC0505");
     await expect(heading(page)).toHaveText(WHY);
     await page.locator("button.next:not(.big)").first().click();
     await expect(page.locator(".screen.finish")).toBeVisible();
@@ -388,8 +400,9 @@ test.describe("a survey published after this build", () => {
               releaseHash,
               state: "in_progress",
               currentIndex: 1,
-              startedAt: "2026-09-28T09:00:00.000Z",
-              updatedAt: "2026-09-28T09:05:00.000Z",
+              // Today's, so staff can carry it on from the panel (D-73).
+              startedAt: new Date(Date.now() - 10 * 60_000).toISOString(),
+              updatedAt: new Date(Date.now() - 5 * 60_000).toISOString(),
               eventCount: 3,
             });
           };
@@ -404,7 +417,7 @@ test.describe("a survey published after this build", () => {
 
     await page.goto("./");
     await expect(page.locator("p.study-title")).toHaveText(NEW_LABEL, { timeout: 15_000 });
-    await start(page, "NDC0707");
+    await carryOnFromPanel(page, "NDC0707");
     // Position 1 of r8.0.0 is the consent question; in the new release it is the new wording.
     await expect(heading(page)).toContainText(OLD_CONSENT);
     await expect(heading(page)).not.toContainText(NEW_CONSENT);

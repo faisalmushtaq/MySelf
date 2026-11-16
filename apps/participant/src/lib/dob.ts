@@ -4,6 +4,14 @@ import type { RecordedAnswer } from "./db.js";
 /**
  * Who may carry on an unfinished sitting.
  *
+ * SINCE D-97: Start always starts a new sitting, because a code can be shared
+ * by a whole group. Carrying one on is its own button on the start screen: it
+ * asks for the first name and date of birth, and opens the unfinished sitting
+ * under the code whose name and date both match. The rule below still says
+ * which sittings can be carried on that way (`verify`); `open` and `fresh`
+ * sittings are no longer reached from the code at all (staff can still carry
+ * them on from the panel).
+ *
  * THE HOLE THIS CLOSES. Resuming used to need only the participant code, so a
  * child who typed another child's code — a neighbour's, one read off a card,
  * or one guessed from the example on the start screen — was put back into that

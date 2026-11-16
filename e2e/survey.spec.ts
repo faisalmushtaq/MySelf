@@ -255,7 +255,13 @@ async function walkPastDateOfBirthAs(page: Page, first: string, last: string, li
   throw new Error(`did not get past the date of birth within ${limit} screens`);
 }
 
-/** The check a code that matches an unfinished sitting meets: its date of birth. */
+/** "Carry on a survey I started" with the code (D-97): Start always starts a new survey. */
+async function chooseCarryOn(page: Page, code = CODE): Promise<void> {
+  await page.locator("input.code").fill(code);
+  await page.locator("button.resume-start").click();
+}
+
+/** The check carrying on meets: the first name and date of birth. */
 async function carryOnWith(page: Page, dob: string, name = "1"): Promise<void> {
   const check = page.locator(".screen.dob-check");
   await expect(check).toContainText("To carry on, enter your first name and your date of birth");
@@ -298,8 +304,7 @@ test.describe("a sitting on a device with no study configured", () => {
     expect(before).toBeGreaterThan(0);
 
     await page.reload();
-    await page.locator("input.code").fill(CODE);
-    await page.locator("button.next.big").click();
+    await chooseCarryOn(page);
     await carryOnWith(page, DOB);
 
     // Resumed, not restarted: the same screen, one sitting, and the log still
@@ -590,10 +595,9 @@ test.describe("a shared iPad", () => {
     await walkPastDateOfBirth(page);
     const where = await position(page);
 
-    // Another child, the same code: asked for the date of birth, shown nothing.
+    // Carrying on asks for the first name and date of birth, and shows nothing until they match.
     await page.reload();
-    await page.locator("input.code").fill(CODE);
-    await page.locator("button.next.big").click();
+    await chooseCarryOn(page);
     const check = page.locator(".screen.dob-check");
     await expect(check).toContainText("To carry on, enter your first name and your date of birth");
     await expect(page.locator(".survey")).toHaveCount(0);
@@ -604,8 +608,7 @@ test.describe("a shared iPad", () => {
     await expect(page.locator("input.code")).toHaveValue("");
 
     // The right date carries on, where it stopped, and Back reaches the answers given.
-    await page.locator("input.code").fill(CODE);
-    await page.locator("button.next.big").click();
+    await chooseCarryOn(page);
     await carryOnWith(page, DOB);
     await expect(page.locator(".survey")).toBeVisible();
     expect(await position(page)).toBe(where);
@@ -619,14 +622,13 @@ test.describe("a shared iPad", () => {
 
     // Her twin: the same code (swapped cards), the same birthday, her own name. Refused, and nothing shown.
     await page.reload();
-    await page.locator("input.code").fill(CODE);
-    await page.locator("button.next.big").click();
+    await chooseCarryOn(page);
     const check = page.locator(".screen.dob-check");
     await expect(check).toContainText("enter your first name and your date of birth");
     await check.locator("input.first-name").fill("Sara");
     await chooseDate(check, DOB);
     await check.getByRole("button", { name: "Carry on" }).click();
-    await expect(check.locator(".error")).toContainText("That doesn't match");
+    await expect(check.locator(".error")).toContainText("couldn't find");
     await expect(page.locator(".survey")).toHaveCount(0);
     await expect(page.locator("body")).not.toContainText("Sam");
 
@@ -681,16 +683,51 @@ test.describe("a shared iPad", () => {
     await startSitting(page);
     await walkPastDateOfBirth(page);
 
-    // The next child, with the same code for the day: "Welcome back" is not them.
+    // The next child, with the same code for the day: Start starts their own survey, asking nothing (D-97).
     await page.reload();
     await page.locator("input.code").fill(CODE);
     await page.locator("button.next.big").click();
-    const check = page.locator(".screen.dob-check");
-    await expect(check).toContainText("Welcome back");
-    await check.getByRole("button", { name: "I'm new — start a new survey" }).click();
+    await expect(page.locator(".screen.dob-check")).toHaveCount(0);
 
     // A new survey, and the unfinished one kept beside it.
     await expect(page.locator(".survey")).toBeVisible();
+    expect(await countRows(page, "sessions")).toBe(2);
+  });
+
+  test("a code shared by a group: each carries on their own unfinished survey, by name and date of birth (D-97)", async ({ page }) => {
+    // Two children with the group's code each leave a survey unfinished: Sam
+    // several screens further on than Ali.
+    await startSitting(page);
+    await walkPastDateOfBirthAs(page, "Sam", "Khan");
+    const before = await position(page);
+    for (let i = 0; i < 6 && (await position(page)) === before; i += 1) await step(page);
+    for (let i = 0; i < 4; i += 1) await step(page);
+    const saved = await countStoredEvents(page);
+    await expect.poll(() => countStoredEvents(page)).toBeGreaterThanOrEqual(saved);
+    await page.reload();
+    await chooseCarryOn(page);
+    await carryOnWith(page, DOB, "Sam");
+    const samAt = await position(page);
+    expect(samAt).not.toBe(before);
+    await page.reload();
+    await page.locator("input.code").fill(CODE);
+    await page.locator("button.next.big").click();
+    await walkPastDateOfBirthAs(page, "Ali", "Shah");
+    const aliAt = await position(page);
+    expect(aliAt).not.toBe(samAt);
+    expect(await countRows(page, "sessions")).toBe(2);
+
+    // Sam carries on hers, though Ali's is newer.
+    await page.reload();
+    await chooseCarryOn(page);
+    await carryOnWith(page, DOB, "Sam");
+    expect(await position(page)).toBe(samAt);
+
+    // Ali carries on his.
+    await page.reload();
+    await chooseCarryOn(page);
+    await carryOnWith(page, DOB, "ali");
+    expect(await position(page)).toBe(aliAt);
     expect(await countRows(page, "sessions")).toBe(2);
   });
 
@@ -701,14 +738,13 @@ test.describe("a shared iPad", () => {
     await page.reload();
     const events = await countStoredEvents(page);
     const check = page.locator(".screen.dob-check");
-    await page.locator("input.code").fill(CODE);
-    await page.locator("button.next.big").click();
+    await chooseCarryOn(page);
     // The right first name (the walk's "1"), the wrong dates.
     await check.locator("input.first-name").fill("1");
     for (const [wrong, left] of [["2011-01-01", 2], ["2012-05-15", 1]] as const) {
       await chooseDate(check, wrong);
       await check.getByRole("button", { name: "Carry on" }).click();
-      await expect(check.locator(".error")).toContainText(`That doesn't match`);
+      await expect(check.locator(".error")).toContainText(`couldn't find`);
       await expect(check.locator(".error")).toContainText(`${left} ${left === 1 ? "try" : "tries"} left`);
       await expect(page.locator(".survey")).toHaveCount(0);
     }
@@ -721,8 +757,7 @@ test.describe("a shared iPad", () => {
 
     // Locked on this iPad, even with the right date, and across a reload.
     await page.reload();
-    await page.locator("input.code").fill(CODE);
-    await page.locator("button.next.big").click();
+    await chooseCarryOn(page);
     await expect(check).toContainText("can't be carried on with on this iPad");
     await check.getByRole("button", { name: "OK" }).click();
 
@@ -730,9 +765,8 @@ test.describe("a shared iPad", () => {
     await openStaffPanel(page);
     await page.getByRole("button", { name: `Allow ${CODE} to carry on` }).click();
     await expect(page.locator(".handover")).toContainText(`${CODE} can carry on its unfinished sitting again`);
-    await page.locator("input.code").fill(CODE);
-    await page.locator("button.next.big").click();
-    // Starting closed the panel.
+    await chooseCarryOn(page);
+    // Carrying on closed the panel.
     await expect(page.locator(".handover")).toHaveCount(0);
     await carryOnWith(page, DOB);
     await expect(page.locator(".survey")).toBeVisible();
@@ -767,8 +801,7 @@ test.describe("a shared iPad", () => {
     await expect(page.locator(".survey")).toHaveCount(0);
 
     // Recorded as suspended, and carried on only with the date of birth.
-    await page.locator("input.code").fill(CODE);
-    await page.locator("button.next.big").click();
+    await chooseCarryOn(page);
     await carryOnWith(page, DOB);
     await expect(page.locator(".survey")).toBeVisible();
     expect(await position(page)).toBe(where);

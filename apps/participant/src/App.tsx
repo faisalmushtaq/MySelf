@@ -10,6 +10,7 @@ import {
   countStoredSessions,
   createSession,
   findResumableSession,
+  findResumableSessions,
   loadAnswers,
   saveAccessibilityPreferences,
   deviceSummary,
@@ -24,7 +25,7 @@ import {
   type SessionRow,
   type StoredSessionCounts,
 } from "./lib/db.js";
-import { asksFirstName, dobUnit, initialsLabel, nameKeys, resumeRule, tryDob, unitKey, whoOf, type Who } from "./lib/dob.js";
+import { asksFirstName, dobMatches, dobUnit, firstNameMatches, initialsLabel, nameKeys, resumeRule, tryDob, unitKey, whoOf } from "./lib/dob.js";
 import { HAND_BACK_IDLE, PAUSED_IDLE, SURVEY_IDLE, sittingIdle, useIdleTimer, type IdlePolicy } from "./lib/idle.js";
 import {
   applyAccessibilityPreferences,
@@ -46,7 +47,7 @@ import {
 import { SessionTiming } from "./lib/timing.js";
 import { BUILT_IN, describeCheck, pruneReleases, type CheckRecord, type LoadedRelease } from "./lib/releases.js";
 import { buildRuntime, type Runtime } from "./lib/runtime.js";
-import { sittingToResume, type ResumeLookup } from "./lib/resume.js";
+import { sittingToResume, sittingsToResume, type ResumeLookup } from "./lib/resume.js";
 import {
   checkChoice,
   DEFAULT_CHOICE,
@@ -111,18 +112,15 @@ type Phase =
   /** A researcher paused the sitting (D-73): nothing of it shown until "Carry on". */
   | { kind: "paused"; session: SessionRow; index: number }
   /**
-   * A code matched an unfinished sitting that holds a date of birth: it is
-   * carried on only once the same date is entered again (lib/dob.ts). The
-   * decrypted answers wait here, unrendered, so they are not read twice.
+   * "Carry on a survey I started" (D-97): the code was typed, and the first
+   * name and date of birth are asked before any unfinished sitting under it is
+   * looked at. A code can be shared by a group, so the code alone opens nothing.
    */
   | {
       kind: "verify";
-      session: SessionRow;
-      runtime: Runtime;
-      answers: Map<string, RecordedAnswer>;
-      dob: string;
+      code: string;
       item: ItemDefinition;
-      who: Who;
+      askName: boolean;
     }
   /**
    * Staff chose the sitting from the panel: its first name is shown, "is this
@@ -228,7 +226,7 @@ export default function App({ initial, initialRuntime }: { initial: Startup; ini
    * The rule, and its fallback, is `lib/resume.ts`.
    */
   const resumeLookup = useMemo<ResumeLookup>(
-    () => ({ find: findResumableSession, releaseForHash: (hash) => serviceFor(choiceRef.current).releaseForHash(hash) }),
+    () => ({ find: findResumableSession, findAll: findResumableSessions, releaseForHash: (hash) => serviceFor(choiceRef.current).releaseForHash(hash) }),
     [],
   );
   const showRuntime = useCallback((next: Runtime) => {
@@ -835,9 +833,11 @@ export default function App({ initial, initialRuntime }: { initial: Startup; ini
   );
 
   /**
-   * The date-of-birth check's answer (lib/dob.ts). Right: the sitting carries
-   * on, and the code's wrong-date count is forgotten. Wrong: counted, on this
-   * iPad, and the third wrong one locks the code until staff allow it again.
+   * The carry-on check (D-97): every unfinished sitting under the code is
+   * looked at, and the one whose first name and date of birth match is carried
+   * on. None matching counts as a wrong try, on this iPad, against the code;
+   * the third locks carrying on under that code until staff allow it again.
+   * Nothing of any sitting is shown, right or wrong.
    */
   const confirmDob = useCallback(
     async (typed: string, typedName: string) => {
@@ -846,27 +846,38 @@ export default function App({ initial, initialRuntime }: { initial: Startup; ini
       setBusy(true);
       starting.current = true;
       try {
-        const code = verify.session.participantCode;
-        const withName = asksFirstName(verify.who);
-        const attempt = tryDob(verify.dob, typed, await getResumeGuard(code), new Date(), withName ? { who: verify.who, typed: typedName } : undefined);
-        await saveResumeGuard(code, attempt.guard);
-        if (attempt.kind === "accepted") {
-          setDobNote({ text: null, locked: false });
-          await begin(code, verify.session, verify.runtime, verify.answers);
-        } else if (attempt.kind === "locked") {
+        const code = verify.code;
+        const guard = await getResumeGuard(code);
+        if (guard?.lockedAt) {
           setDobNote({ text: null, locked: true });
-        } else {
+          return;
+        }
+        for (const found of await sittingsToResume(code, runtime, resumeLookup, choiceRef.current)) {
+          const answers = await loadAnswers(found.session.sessionId);
+          const dob = dobUnit(found.runtime.flattened.units);
+          const rule = resumeRule(answers, dob ? unitKey(dob) : undefined, nameKeys(found.runtime.flattened.units));
+          if (rule.kind !== "verify" || !dobMatches(rule.dob, typed)) continue;
+          if (asksFirstName(rule.who) && !firstNameMatches(rule.who, typedName)) continue;
+          await saveResumeGuard(code, null);
+          setDobNote({ text: null, locked: false });
+          await begin(code, found.session, found.runtime, answers);
+          return;
+        }
+        // No sitting matched: a wrong try (a date nothing is checked against never matches).
+        const attempt = tryDob("", typed, guard, new Date());
+        await saveResumeGuard(code, attempt.guard);
+        if (attempt.kind === "locked") setDobNote({ text: null, locked: true });
+        else if (attempt.kind === "refused")
           setDobNote({
-            text: `${withName ? "That doesn't match. Please check your first name and date of birth" : "That date doesn't match. Please check it"} and try again (${attempt.triesLeft} ${attempt.triesLeft === 1 ? "try" : "tries"} left).`,
+            text: `We couldn't find an unfinished survey with ${verify.askName ? "that first name and date of birth" : "that date of birth"}. Please check ${verify.askName ? "them" : "it"} and try again (${attempt.triesLeft} ${attempt.triesLeft === 1 ? "try" : "tries"} left).`,
             locked: false,
           });
-        }
       } finally {
         starting.current = false;
         setBusy(false);
       }
     },
-    [busy, begin],
+    [busy, begin, runtime, resumeLookup],
   );
 
   /**
@@ -907,29 +918,6 @@ export default function App({ initial, initialRuntime }: { initial: Startup; ini
     [unfinishedHere, busy, runtime, resumeLookup, begin, closeStaffPanel],
   );
 
-  /**
-   * "I'm new — start a new survey" (D-77): a code shared for the day matched
-   * someone else's unfinished sitting. A new sitting starts under the code, in
-   * the release new sittings use; the unfinished one is left alone.
-   */
-  const startNewInstead = useCallback(async () => {
-    const verify = phaseRef.current;
-    if (verify.kind !== "verify" || busy) return;
-    if (studyClosed) {
-      setDobNote({ text: CLOSED_TO_NEW, locked: false });
-      return;
-    }
-    setBusy(true);
-    starting.current = true;
-    try {
-      setDobNote({ text: null, locked: false });
-      await begin(verify.session.participantCode, undefined, activeRuntime.current ?? runtime, null);
-    } finally {
-      starting.current = false;
-      setBusy(false);
-    }
-  }, [busy, studyClosed, begin, runtime]);
-
   /** "Yes, that's me" (D-75): the sitting carries on where it stopped. */
   const confirmItsThem = useCallback(async () => {
     const confirm = phaseRef.current;
@@ -968,47 +956,46 @@ export default function App({ initial, initialRuntime }: { initial: Startup; ini
     // Whoever sits down next is not staff: the panel, and what was typed into it, go.
     closeStaffPanel();
     try {
-      // `rt` is the release this sitting is rendered and stamped under: the
-      // active one for a new sitting, the sitting's own for a resumed one.
-      const found = await sittingToResume(trimmed, runtime, resumeLookup, choiceRef.current);
-      let existing = found.session;
-      let rt = found.runtime;
-      let answers: Map<string, RecordedAnswer> | null = null;
-      if (existing) {
-        /**
-         * Who may carry this sitting on (lib/dob.ts). One holding a date of
-         * birth waits for it to be entered again; one holding answers but no
-         * date of birth is left as the partial sitting it is, and a new one
-         * starts; one holding nothing carries on as before.
-         */
-        answers = await loadAnswers(existing.sessionId);
-        const dob = dobUnit(rt.flattened.units);
-        const rule = resumeRule(answers, dob ? unitKey(dob) : undefined, nameKeys(rt.flattened.units));
-        if (rule.kind === "verify" && dob) {
-          // A locked code still lets someone new start (D-77): only carrying on is refused.
-          setDobNote({ text: null, locked: Boolean((await getResumeGuard(trimmed))?.lockedAt) });
-          const verify: Phase = { kind: "verify", session: existing, runtime: rt, answers, dob: rule.dob, item: dob.item, who: rule.who };
-          phaseRef.current = verify;
-          setPhase(verify);
-          return;
-        }
-        if (rule.kind === "fresh") {
-          existing = undefined;
-          answers = null;
-          rt = runtime;
-        }
-      }
+      // Start always starts a new sitting (D-97): a code can be shared by a
+      // whole group, so it never says whose unfinished sitting is whose.
+      // Carrying one on is its own button, which asks for the name and date.
       // A closed study finishes what it started and starts nothing new (D-56).
-      if (!existing && studyClosed) {
+      if (studyClosed) {
         setCodeError(CLOSED_TO_NEW);
         return;
       }
-      await begin(trimmed, existing, rt, answers);
+      await begin(trimmed, undefined, runtime, null);
     } finally {
       starting.current = false;
       setBusy(false);
     }
-  }, [code, busy, runtime, codeRule, loaded, linkBlocks, studyClosed, resumeLookup, begin, closeStaffPanel]);
+  }, [code, busy, runtime, codeRule, loaded, linkBlocks, studyClosed, begin, closeStaffPanel]);
+
+  /**
+   * "Carry on a survey I started" (D-97): the code is checked as Start checks
+   * it, then the first name and date of birth are asked. Allowed in a closed
+   * study, which still finishes what it started.
+   */
+  const resumeStart = useCallback(async () => {
+    const trimmed = code.trim();
+    if (trimmed.length < 2 || busy) return;
+    if (!loaded || linkBlocks) return;
+    if (codeRule && !new RegExp(codeRule.pattern).test(trimmed)) {
+      setCodeError(codeHint(codeRule));
+      return;
+    }
+    const dob = dobUnit(runtime.flattened.units);
+    if (!dob) {
+      setCodeError("An unfinished survey can't be carried on here. Please ask a member of the research team.");
+      return;
+    }
+    setCodeError(null);
+    closeStaffPanel();
+    setDobNote({ text: null, locked: Boolean((await getResumeGuard(trimmed))?.lockedAt) });
+    const verify: Phase = { kind: "verify", code: trimmed, item: dob.item, askName: Boolean(nameKeys(runtime.flattened.units).first) };
+    phaseRef.current = verify;
+    setPhase(verify);
+  }, [code, busy, runtime, codeRule, loaded, linkBlocks, closeStaffPanel]);
 
   /**
    * Do a write, and stop the survey if it fails.
@@ -1147,7 +1134,7 @@ export default function App({ initial, initialRuntime }: { initial: Startup; ini
    *  returning to a question is visible in the log rather than inferred. */
   const enterItem = useCallback(
     (index: number) => {
-      if (phase.kind === "start" || phase.kind === "finished" || phase.kind === "ended") return;
+      if (phase.kind === "start" || phase.kind === "finished" || phase.kind === "ended" || phase.kind === "verify") return;
       const key = unitKeyOf(index);
       if (!key) return;
       const { visit, returning, tooFastMs } = timing.current.enter(key, wordsAt(index));
@@ -1159,7 +1146,7 @@ export default function App({ initial, initialRuntime }: { initial: Startup; ini
   /** Close a viewing of an item, recording how long it was on screen. */
   const leaveItem = useCallback(
     async (index: number, answered: boolean) => {
-      if (phase.kind === "start" || phase.kind === "finished" || phase.kind === "ended") return;
+      if (phase.kind === "start" || phase.kind === "finished" || phase.kind === "ended" || phase.kind === "verify") return;
       const key = unitKeyOf(index);
       if (!key) return;
       const payload = timing.current.leave(key, answered);
@@ -1617,6 +1604,7 @@ export default function App({ initial, initialRuntime }: { initial: Startup; ini
           onCodeErrorClear={() => setCodeError(null)}
           busy={busy}
           onStart={start}
+          onResume={resumeStart}
           accessibility={accessibility}
           onAccessibilityChange={updateAccessibility}
           durability={durability}
@@ -1689,15 +1677,14 @@ export default function App({ initial, initialRuntime }: { initial: Startup; ini
       {phase.kind === "verify" && (
         <DobCheckScreen
           // A new control for every check, so nothing typed for one code is left for the next.
-          key={phase.session.sessionId}
+          key={phase.code}
           item={phase.item}
-          askName={asksFirstName(phase.who)}
+          askName={phase.askName}
           note={dobNote.text}
           locked={dobNote.locked}
           busy={busy}
           onCheck={(iso, name) => void confirmDob(iso, name)}
           onCancel={handover}
-          onStartNew={() => void startNewInstead()}
         />
       )}
 
