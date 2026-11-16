@@ -551,6 +551,43 @@ export const ybmEegPractical: ModuleInput = {
 
 // ---------------------------------------------------------------------------
 
+/**
+ * Hairstyle on the day (D-98): asked straight after hair type. Hair type is the
+ * hair's own texture; this is how it is worn, since braids, cornrows, locs and
+ * extensions also change how the EEG cap fits and the recording's quality.
+ */
+export const ybmHairstyle: ModuleInput = {
+  ...moduleBase,
+  instrument: "ybm_hairstyle",
+  name: "YBM hairstyle on the day (EEG cap fitting)",
+  construct: "How the hair is worn on the day of the EEG (for cap fitting and recording quality)",
+  forms: [
+    {
+      language: "en-GB",
+      label: "Hairstyle (D-98)",
+      items: [
+        {
+          responseType: "multi_choice",
+          key: "hairstyle",
+          revision: 1,
+          variable: "hairstyle",
+          stem: { text: "How is your hair today?" },
+          lede: { text: "This also helps us fit the EEG cap. Choose all that apply." },
+          scale: "scale.hairstyle",
+          scaleVersion: "1.0.0",
+          minSelections: 1,
+          researcherNote:
+            "Study-written (D-98), at the request of the EEG team: hair worn in braids, cornrows, twists or locs, or with extensions, a weave or a wig, affects cap fit and signal quality. Asked of everyone, after hair_type.",
+        },
+      ],
+    },
+  ],
+  timeEstimates: est(15, 10),
+  changelog: "1.0 (D-98): how the hair is worn on the day.",
+};
+
+// ---------------------------------------------------------------------------
+
 export const ybmSleepPriorities: ModuleInput = {
   ...moduleBase,
   instrument: "ybm_sleep_priorities",
@@ -1664,6 +1701,7 @@ export const allModules: ModuleInput[] = attachProvenance([
   ybmAiOutlook,
   ybmOnlineLife,
   ybmHearing,
+  ybmHairstyle,
   ybmUnder16Ban,
   ybmLinkageChoice,
 ]);

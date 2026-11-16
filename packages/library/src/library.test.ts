@@ -17,8 +17,8 @@ const everything = [...parsedInstruments, ...parsedModules];
 const scaleKeys = new Set(parsedScales.map((s) => s.key));
 
 describe("scales", () => {
-  it("all 73 scales parse", () => {
-    expect(parsedScales).toHaveLength(73);
+  it("all 74 scales parse", () => {
+    expect(parsedScales).toHaveLength(74);
   });
 
   it("scale keys are unique", () => {
@@ -313,9 +313,9 @@ describe("provenance (D-68)", () => {
 });
 
 describe("instruments and modules", () => {
-  it("13 instruments and 23 modules parse", () => {
+  it("13 instruments and 24 modules parse", () => {
     expect(parsedInstruments).toHaveLength(13);
-    expect(parsedModules).toHaveLength(23);
+    expect(parsedModules).toHaveLength(24);
   });
 
   it("every scale reference resolves", () => {

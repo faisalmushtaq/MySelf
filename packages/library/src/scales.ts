@@ -309,6 +309,27 @@ const hairDescriptions: Record<string, string> = {
   "4c": "Tight coils",
 };
 
+/**
+ * How the hair is worn on the day (D-98; select all). Braids, cornrows, locs,
+ * extensions and the like change how the EEG cap sits and how well the
+ * electrodes reach the scalp, which hair type alone does not record.
+ */
+export const hairstyle: ResponseScale = {
+  key: "scale.hairstyle",
+  version: "1.0.0",
+  name: "How the hair is worn today (select all)",
+  direction: "unordered",
+  options: [
+    opt(1, "Loose or down"),
+    opt(2, "Tied up or back, like a ponytail or bun"),
+    opt(3, "Braids or cornrows"),
+    opt(4, "Twists or locs"),
+    opt(5, "Extensions, a weave or a wig"),
+    opt(6, "Very short or shaved"),
+    opt(7, "Something else", undefined, "other_specify"),
+  ],
+};
+
 export const hairType12: ResponseScale = {
   key: "scale.hair_type_12",
   version: "2.0.0",
@@ -1287,6 +1308,7 @@ export const allScales: ResponseScale[] = [
   sqs11,
   smFamilyControlHow,
   hairType12,
+  hairstyle,
   month12,
   kss9Canonical,
   kss9AsAdministered,

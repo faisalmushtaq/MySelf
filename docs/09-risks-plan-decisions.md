@@ -1501,3 +1501,24 @@ that screen, since pupils who are new press Start.
 date of birth) cannot be carried on by a pupil; staff can still carry it on
 from the panel (D-73), or the pupil starts again. Resuming under the
 release a sitting started with is unchanged (`sittingsToResume`).
+
+### Hairstyle on the day, after hair type (2026-11-16, D-98)
+
+**Asked.** The EEG team: hair type records the hair's own texture, not how it
+is worn, so braids, cornrows, extensions and weaves, which change how the EEG
+cap fits and the recording's quality, were not captured. The PI asked if the
+hair type options came from a standard scale.
+
+**Decided.** A new question straight after `ybm_eeg_practical.hair_type`, in the
+module `ybm_hairstyle` (study-written, provenance recorded): "How is your hair
+today?", choose all that apply: loose or down; tied up or back; braids or
+cornrows; twists or locs; extensions, a weave or a wig; very short or shaved;
+something else (typed). Hair type's own lede now says to pick the hair's own
+texture if it is braided or has extensions. Head coverings are not asked about
+(they could reveal religion); staff note them on the day if needed.
+
+**On the hair type options.** They follow the 1a-4c (Andre Walker) hair typing
+system, a hairdressing classification,
+not a validated research measure.
+
+**Ethics.** A minor change, covered by the chair's clearance (D-90).
