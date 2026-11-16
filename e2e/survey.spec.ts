@@ -257,8 +257,14 @@ async function walkPastDateOfBirthAs(page: Page, first: string, last: string, li
 
 /** "Carry on a survey I started" with the code (D-97): Start always starts a new survey. */
 async function chooseCarryOn(page: Page, code = CODE): Promise<void> {
-  await page.locator("input.code").fill(code);
-  await page.locator("button.resume-start").click();
+  // Straight after a reload WebKit can still be mounting the start screen, which
+  // clears the box: type the code again until the button takes it.
+  const button = page.locator("button.resume-start");
+  await expect(async () => {
+    await page.locator("input.code").fill(code);
+    await expect(button).toBeEnabled({ timeout: 1000 });
+  }).toPass({ timeout: 15000 });
+  await button.click();
 }
 
 /** The check carrying on meets: the first name and date of birth. */
