@@ -244,9 +244,9 @@ export const LIBRARY_PROVENANCE: Record<string, ProvenanceInput> = {
   ybm_hairstyle: {
     kind: "researcher_developed",
     developedBy: TEAM,
-    involvement: [{ group: "MyPhone/MyBrain EEG team", role: "asked for hairstyles such as braids, cornrows and extensions to be recorded, since they affect EEG cap fit and quality", when: "2026-11" }],
+    involvement: [{ group: "MyPhone/MyBrain EEG team", role: "asked for hairstyles such as thick cornrows, a weave and extensions to be recorded, as picture options, since they affect EEG cap fit and quality", when: "2026-11" }],
     evidence: "Not a measure: a practical record for EEG cap fitting and recording quality, read alongside hair_type.",
-    decisions: ["D-98"],
+    decisions: ["D-98", "D-99"],
   },
   ybm_hearing: {
     kind: "existing_items",

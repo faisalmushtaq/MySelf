@@ -309,24 +309,39 @@ const hairDescriptions: Record<string, string> = {
   "4c": "Tight coils",
 };
 
+/** A hairstyle option with its picture (D-99): the participant chooses by looking. */
+const pictured = (code: number, token: string, label: string, description?: string) => ({
+  ...opt(code, label),
+  ...(description ? { description } : {}),
+  illustration: `hairstyle:${token}`,
+});
+
 /**
- * How the hair is worn on the day (D-98; select all). Braids, cornrows, locs,
- * extensions and the like change how the EEG cap sits and how well the
- * electrodes reach the scalp, which hair type alone does not record.
+ * How the hair is worn on the day (D-98, pictures D-99; select all). Braids,
+ * cornrows, locs, a weave, extensions and the like change how the EEG cap
+ * sits and how well the electrodes reach the scalp, which hair type alone
+ * does not record. Each style is its own picture tile, drawn from behind, so
+ * a participant chooses by looking: thick and thin cornrows are separate, as
+ * are a weave, extensions and a wig, since each affects the cap differently.
  */
-export const hairstyle: ResponseScale = {
-  key: "scale.hairstyle",
+export const hairstyleWorn: ResponseScale = {
+  key: "scale.hairstyle_worn",
   version: "1.0.0",
-  name: "How the hair is worn today (select all)",
+  name: "How the hair is worn today, in pictures (select all)",
   direction: "unordered",
   options: [
-    opt(1, "Loose or down"),
-    opt(2, "Tied up or back, like a ponytail or bun"),
-    opt(3, "Braids or cornrows"),
-    opt(4, "Twists or locs"),
-    opt(5, "Extensions, a weave or a wig"),
-    opt(6, "Very short or shaved"),
-    opt(7, "Something else", undefined, "other_specify"),
+    pictured(1, "loose", "Loose or out", "Worn down or out, including an afro"),
+    pictured(2, "tied", "Tied up", "A ponytail, bun or puff"),
+    pictured(3, "cornrows_thick", "Thick cornrows", "A few wide rows braided flat to the head"),
+    pictured(4, "cornrows_thin", "Thin cornrows", "Many narrow rows braided flat to the head"),
+    pictured(5, "braids", "Braids", "Box braids, plaits or knotless braids that hang down"),
+    pictured(6, "twists", "Twists", "Two-strand or Senegalese twists"),
+    pictured(7, "locs", "Locs", "Dreadlocks or faux locs"),
+    pictured(8, "weave", "A weave", "Hair sewn or woven in"),
+    pictured(9, "extensions", "Extensions", "Clip-in, glued or taped hair"),
+    pictured(10, "wig", "A wig", "Including a lace or half wig"),
+    pictured(11, "short", "Very short or shaved"),
+    opt(12, "Something else"),
   ],
 };
 
@@ -1308,7 +1323,7 @@ export const allScales: ResponseScale[] = [
   sqs11,
   smFamilyControlHow,
   hairType12,
-  hairstyle,
+  hairstyleWorn,
   month12,
   kss9Canonical,
   kss9AsAdministered,

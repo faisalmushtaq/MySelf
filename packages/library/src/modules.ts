@@ -555,6 +555,9 @@ export const ybmEegPractical: ModuleInput = {
  * Hairstyle on the day (D-98): asked straight after hair type. Hair type is the
  * hair's own texture; this is how it is worn, since braids, cornrows, locs and
  * extensions also change how the EEG cap fits and the recording's quality.
+ * From D-99 each style is a picture tile (thick and thin cornrows, a weave,
+ * extensions and a wig each their own), under a new variable, since the
+ * options changed before any answers were collected.
  */
 export const ybmHairstyle: ModuleInput = {
   ...moduleBase,
@@ -564,26 +567,26 @@ export const ybmHairstyle: ModuleInput = {
   forms: [
     {
       language: "en-GB",
-      label: "Hairstyle (D-98)",
+      label: "Hairstyle (D-98, D-99)",
       items: [
         {
           responseType: "multi_choice",
-          key: "hairstyle",
+          key: "hairstyle_today",
           revision: 1,
-          variable: "hairstyle",
+          variable: "hairstyle_today",
           stem: { text: "How is your hair today?" },
-          lede: { text: "This also helps us fit the EEG cap. Choose all that apply." },
-          scale: "scale.hairstyle",
+          lede: { text: "This also helps us fit the EEG cap. Tap every picture that matches." },
+          scale: "scale.hairstyle_worn",
           scaleVersion: "1.0.0",
           minSelections: 1,
           researcherNote:
-            "Study-written (D-98), at the request of the EEG team: hair worn in braids, cornrows, twists or locs, or with extensions, a weave or a wig, affects cap fit and signal quality. Asked of everyone, after hair_type.",
+            "Study-written (D-98, pictures D-99), at the request of the EEG team: thick or thin cornrows, braids, twists, locs, a weave, extensions or a wig affect cap fit and signal quality. Asked of everyone, after hair_type.",
         },
       ],
     },
   ],
   timeEstimates: est(15, 10),
-  changelog: "1.0 (D-98): how the hair is worn on the day.",
+  changelog: "1.0 (D-98): how the hair is worn on the day. D-99: each style a picture; variable hairstyle_today.",
 };
 
 // ---------------------------------------------------------------------------

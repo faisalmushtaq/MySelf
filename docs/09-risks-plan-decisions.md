@@ -1513,12 +1513,41 @@ hair type options came from a standard scale.
 module `ybm_hairstyle` (study-written, provenance recorded): "How is your hair
 today?", choose all that apply: loose or down; tied up or back; braids or
 cornrows; twists or locs; extensions, a weave or a wig; very short or shaved;
-something else (typed). Hair type's own lede now says to pick the hair's own
+something else. (Replaced by picture options before it was published: D-99.) Hair type's own lede now says to pick the hair's own
 texture if it is braided or has extensions. Head coverings are not asked about
 (they could reveal religion); staff note them on the day if needed.
 
 **On the hair type options.** They follow the 1a-4c (Andre Walker) hair typing
 system, a hairdressing classification,
 not a validated research measure.
+
+**Ethics.** A minor change, covered by the chair's clearance (D-90).
+
+### Hairstyle as pictures, one per style (2026-11-17, D-99)
+
+**Asked.** The PI: D-98 did not do the job. Thick cornrows, a weave and
+extensions were folded into shared text options ("braids or cornrows";
+"extensions, a weave or a wig"), and they should simply be picture options.
+
+**Decided.** "How is your hair today?" is now a grid of picture tiles, any
+number of which can be ticked, each drawn from behind (no face or skin shown):
+loose or out; tied up; thick cornrows; thin cornrows; braids; twists; locs;
+a weave; extensions; a wig; very short or shaved; and "Something else" with
+no picture. Thick and thin cornrows are separate because row width changes how
+far the electrodes are from the scalp; a weave, extensions and a wig are
+separate because each sits differently under the cap. Each tile has a short
+description below its label (e.g. "Hair sewn or woven in"), and the screen
+reader reads label and description; the pictures are decorative, as the hair
+type pictures are. A ticked tile shows a tick as well as its colour.
+
+**Data.** New option list `scale.hairstyle_worn` and new variable
+`hairstyle_today` (instrument `ybm_hairstyle`). The D-98 question
+(`hairstyle`, `scale.hairstyle`) was in the YBM draft only, never published,
+so no answers exist under it; it is archived in the draft rather than reused,
+so its name can never hold answers to a different list of options.
+
+**Code.** Multi-choice questions whose options carry pictures are shown as
+tiles (`apps/participant/src/components/controls/MultiChoice.tsx`); the
+drawings are in `apps/participant/src/components/illustrations.tsx`.
 
 **Ethics.** A minor change, covered by the chair's clearance (D-90).

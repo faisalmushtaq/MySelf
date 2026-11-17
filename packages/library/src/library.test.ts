@@ -21,6 +21,19 @@ describe("scales", () => {
     expect(parsedScales).toHaveLength(74);
   });
 
+  it("hairstyle is a picture per style, thick and thin cornrows, a weave, extensions and a wig apart (D-99)", () => {
+    const s = parsedScales.find((x) => x.key === "scale.hairstyle_worn")!;
+    expect(s.options.map((o) => o.label)).toEqual([
+      "Loose or out", "Tied up", "Thick cornrows", "Thin cornrows", "Braids", "Twists",
+      "Locs", "A weave", "Extensions", "A wig", "Very short or shaved", "Something else",
+    ]);
+    // Every style but "Something else" has its picture; the participant app
+    // draws each of these names (apps/participant/src/illustrations.test.tsx).
+    expect(s.options.filter((o) => o.illustration).map((o) => o.illustration)).toEqual(
+      ["loose", "tied", "cornrows_thick", "cornrows_thin", "braids", "twists", "locs", "weave", "extensions", "wig", "short"].map((n) => `hairstyle:${n}`),
+    );
+  });
+
   it("scale keys are unique", () => {
     expect(scaleKeys.size).toBe(parsedScales.length);
   });
