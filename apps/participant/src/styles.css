@@ -1093,6 +1093,24 @@ input[type="range"] {
   color: var(--accent);
 }
 
+/* Multi-select tiles (hairstyle) show a tick as well as the colour, so a
+   chosen picture is not marked by colour alone. */
+.tile {
+  position: relative;
+}
+
+.tile-tick {
+  position: absolute;
+  top: 0.4rem;
+  right: 0.5rem;
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.tile-grid > .hint {
+  grid-column: 1 / -1;
+}
+
 .tile-label {
   font-family: var(--font-ui);
   font-size: 1.1rem;
