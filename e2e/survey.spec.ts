@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { openStaffPanel } from "./support/staff.js";
 import { accepted, advance, chooseDate, DATE_DAY, installClock, position, settle } from "./support/walker.js";
+import { hasStatementToTick, tickEveryStatement } from "./support/consent.js";
 
 /**
  * A sitting, from the start screen to a file a researcher can read.
@@ -42,10 +43,8 @@ async function startSitting(page: Page, code = CODE): Promise<void> {
 async function answerCurrentScreen(page: Page): Promise<boolean> {
   // A consent statement set needs EVERY statement ticked — each one is required —
   // so it comes first, and the count is re-read rather than assumed.
-  const consent = page.locator(".consent-list input[type=checkbox]:visible");
-  const statements = await consent.count();
-  if (statements > 0) {
-    for (let i = 0; i < statements; i += 1) await consent.nth(i).check();
+  if (await hasStatementToTick(page)) {
+    await tickEveryStatement(page);
     return true;
   }
 

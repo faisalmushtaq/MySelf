@@ -1551,3 +1551,48 @@ tiles (`apps/participant/src/components/controls/MultiChoice.tsx`); the
 drawings are in `apps/participant/src/components/illustrations.tsx`.
 
 **Ethics.** A minor change, covered by the chair's clearance (D-90).
+
+### A quicker start on the iPad: no scrolling, just Next (2026-11-17, D-100)
+
+**Asked.** The PI, from participants finding the survey tedious: drop the
+screen that explains why answers matter, and make the start of the survey
+something a child can get through by tapping Next, with no scrolling on the
+iPad.
+
+**Found.** On an iPad (810×1080 and 820×1180, either way up) the welcome
+screen ran 470–740 px past the bottom and the consent screen 1,400–1,700 px:
+both had to be scrolled before anyone reached a question.
+
+**Decided.**
+- "Why your answers matter" (`ybm_intro_consent.why_it_matters`, D-30) is
+  archived in the YBM draft. Its last paragraph is not lost: the support
+  message (questions about feelings can be skipped, Childline 0800 1111,
+  answers are private, the safety exception) moves to the new "The questions"
+  screen. The rest (no right or wrong answers; rushed answers make the
+  research less true) is dropped.
+- The welcome text and the explanation above the consent statements are split,
+  word for word, into short information screens, each one tap of Next:
+  welcome and EEG; the questions (with the support message); keeping your
+  answers private; taking part is your choice (with the ethics reference);
+  linking your records; how linking works; your choice about linking; how long
+  linking lasts. Two phrases change to fit: "we explain this on the consent
+  screen" becomes "on the next few screens", and "as the statements below say"
+  becomes "as the consent statements say". The line under the consent heading
+  is now "These cover the linking on the last few screens."
+- A consent set of more than three statements is shown one statement at a
+  time ("Statement 2 of 8"), larger; ticking one moves straight to the next,
+  and the screen moves on once all are ticked, as before. "Previous statement"
+  goes back. The answer recorded is unchanged: the same statements, the same
+  variable. This applies to every survey's long consent set.
+
+**Checked.** With the draft as revision 148, every screen from the welcome to
+the first name fits without scrolling on a 10.2" and a 10.9" iPad in both
+orientations, and on an iPad mini upright. On an iPad mini held sideways the
+first welcome screen and the consent screen still run a few lines over. The
+start screen's study-code page is unchanged: the browser-only "Add to Home
+Screen" note can push it a few lines over in landscape, and the installed app
+does not show that note.
+
+**Ethics.** No consent wording, statement or procedure changes; the same
+approved text is shown on more, shorter screens. A minor change, covered by
+the chair's clearance (D-90).
