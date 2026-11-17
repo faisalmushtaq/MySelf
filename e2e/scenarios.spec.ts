@@ -4,6 +4,7 @@ import { expect, test, type Page } from "@playwright/test";
 import { CANDIDATE, openOnCandidate } from "./support/candidate.js";
 import { openStaffPanel } from "./support/staff.js";
 import { chooseDate, installClock, settle } from "./support/walker.js";
+import { hasStatementToTick, tickEveryStatement } from "./support/consent.js";
 
 /**
  * Whole sittings through the real app, down different paths, handed over and read
@@ -188,9 +189,8 @@ const nextButton = (page: Page) => page.locator("button.next:not(.big)").first()
 
 /** Whatever the screen is, give a plausible answer (the first option, mostly). */
 async function answerGenerally(page: Page): Promise<void> {
-  const consent = page.locator(".consent-list input[type=checkbox]:visible");
-  if ((await consent.count()) > 0) {
-    for (let i = 0; i < (await consent.count()); i += 1) await consent.nth(i).check();
+  if (await hasStatementToTick(page)) {
+    await tickEveryStatement(page);
     return;
   }
   const radios = page.locator('[role="radiogroup"] button:visible');

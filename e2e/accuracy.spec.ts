@@ -4,6 +4,7 @@ import { expect, test, type Locator, type Page } from "@playwright/test";
 import { openOnCandidate } from "./support/candidate.js";
 import { openStaffPanel } from "./support/staff.js";
 import { accepted, advance, chooseDate, DATE_DAY, installClock, position, settle } from "./support/walker.js";
+import { hasStatementToTick, statementCount, tickEveryStatement } from "./support/consent.js";
 
 /**
  * What the child tapped, against what the study stored.
@@ -122,10 +123,8 @@ async function definitions(): Promise<Definitions> {
  * walk can continue, and are checked by the survey suite rather than here.
  */
 async function answerAndRecord(page: Page, ledger: Tapped[]): Promise<void> {
-  const consent = page.locator(".consent-list input[type=checkbox]:visible");
-  const statements = await consent.count();
-  if (statements > 0) {
-    for (let i = 0; i < statements; i += 1) await consent.nth(i).check();
+  if (await hasStatementToTick(page)) {
+    await tickEveryStatement(page);
     return;
   }
 
@@ -332,29 +331,34 @@ test.describe("on the r9.0.0 candidate", () => {
     test.slow();
     dateOfBirth = "2012-05-14";
     const statements = page.locator(".consent-list input[type=checkbox]");
+    const heading = page.locator(".survey-body h1");
     await walk(page, [], async () => (await statements.count()) > 0, { candidate: true });
 
-    await expect(page.locator(".survey-body h1")).toContainText("We'll move on once they're all ticked");
+    await expect(heading).toContainText("We'll move on once they're all ticked");
     // Linkage is part of consent (D-58): explained above the statements, and one of them.
     await expect(page.locator(".survey-body .lede")).toContainText("Connected Yorkshire");
     await expect(page.locator(".survey-body .lede")).toContainText("brainpop@leeds.ac.uk");
-    await expect(page.locator(".consent-list")).toContainText("health records");
-    await expect(page.locator(".consent-list")).toContainText("education records");
-    const total = await statements.count();
-    for (let i = 0; i < total - 1; i += 1) await statements.nth(i).check();
+    // A long set is shown one statement at a time (D-100), so it fits the screen.
+    await expect(page.locator(".consent-count")).toHaveText(/^Statement 1 of \d+$/);
+    await expect(statements).toHaveCount(1);
+    const total = await statementCount(page);
+    const ticked = await tickEveryStatement(page, { leave: 1 });
+    expect(ticked).toHaveLength(total - 1);
     // Not yet: one statement is still unticked.
     await page.waitForTimeout(900);
-    await expect(statements).toHaveCount(total);
+    await expect(heading).toContainText("We'll move on once they're all ticked");
     // The last tick moves the screen on without Next being pressed.
-    await statements.nth(total - 1).check();
-    await expect(page.locator(".survey-body h1")).toHaveText("Why your answers matter");
+    ticked.push(...(await tickEveryStatement(page)));
+    expect(ticked.join(" ")).toContain("health records");
+    expect(ticked.join(" ")).toContain("education records");
+    await expect(heading).toHaveText("Why your answers matter");
     await expect(page.locator("button.next:not(.big)")).toHaveText("I understand");
 
     // Coming back to the finished consent screen does not throw anyone forward.
     await page.locator("button.back").click();
     await expect(statements.first()).toBeChecked();
     await page.waitForTimeout(1_200);
-    await expect(statements).toHaveCount(total);
+    await expect(heading).toContainText("We'll move on once they're all ticked");
   });
 
   test("the address screen opens on a search: start typing, choose the street, the postcode optional (D-53, D-80)", async ({ page }) => {

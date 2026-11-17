@@ -1478,6 +1478,80 @@ input[type="range"] {
   accent-color: var(--accent);
 }
 
+/* One statement at a time (D-100): a long consent set fits an iPad screen with
+   no scrolling. The statement is larger, since it is the only thing to read. */
+.consent-list.paged .consent-item {
+  font-size: 1.15rem;
+  padding: 1.2rem 1.3rem;
+}
+
+.consent-count {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .consent-current {
+    animation: consent-in 0.22s ease;
+  }
+}
+
+@keyframes consent-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.consent-steps {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.consent-step {
+  width: 0.7rem;
+  height: 0.7rem;
+  border-radius: 50%;
+  border: 1.5px solid var(--hairline-strong);
+}
+
+.consent-step.on {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.consent-step.here {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.consent-nav {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  min-height: 44px;
+}
+
+.consent-prev,
+.consent-fwd {
+  min-height: 44px;
+  padding: 0 0.4rem;
+  background: none;
+  border: none;
+  color: var(--accent);
+  font: inherit;
+  cursor: pointer;
+}
+
+.consent-fwd {
+  margin-left: auto;
+}
+
 /* ── Spectrum (handedness): the layout carries the meaning ─────────────── */
 .spectrum {
   width: 100%;
