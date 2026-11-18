@@ -1596,3 +1596,25 @@ does not show that note.
 **Ethics.** No consent wording, statement or procedure changes; the same
 approved text is shown on more, shorter screens. A minor change, covered by
 the chair's clearance (D-90).
+
+### A swipe anywhere on the iPad scrolls (2026-11-18, D-101)
+
+**Reported.** The research team: on the iPads a page only scrolls if you swipe
+in the middle of the screen; swiping on either side does nothing. Many
+children struggle with this, and some keep trying without asking for help.
+
+**Cause.** The app was a 720px column centred on the screen, and each screen
+scrolled inside that column. An iPad is wider than 720px either way up (810 to
+1180px), so the strips either side of the column, 45px each upright and up to
+230px each sideways, belonged to nothing that scrolls.
+
+**Decided.** The app now spans the whole screen and each screen scrolls edge
+to edge; a side gutter keeps the text, buttons and headings exactly where the
+column put them (`.app`, `.screen` and `.status-strip` in
+`apps/participant/src/styles.css`). Checked on 810×1080, 1080×810 and
+1180×820: before, a swipe 12px from either edge did not scroll and one in the
+middle did; after, all three scroll, and screenshots of the screens are
+otherwise unchanged. Phones are unaffected (the gutter is the same 1.75rem
+there). `e2e/ipad-swipe.spec.ts` checks it, and fails on the old layout.
+
+**Ethics.** No change to what participants are asked or told.
