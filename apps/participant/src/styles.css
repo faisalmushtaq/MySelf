@@ -160,12 +160,24 @@ textarea {
   color: inherit;
 }
 
+/*
+ * The app spans the whole screen; only its content is a 720px column.
+ *
+ * It used to be the column itself, centred with margins, and the scrolling
+ * screen inside it was no wider: on an iPad (810-1180px across) a swipe in the
+ * strip either side of the column landed on nothing that scrolls, and children
+ * who swiped there thought the page was stuck (D-101). Now each screen, and so
+ * its scrolling, runs edge to edge, and a side gutter keeps the text, buttons
+ * and heading exactly where the column put them.
+ */
 .app {
+  --column: 720px;
+  /* The column's own side padding: wider from tablet size up. */
+  --inset: 1.75rem;
+  --gutter: max(var(--inset), calc((100vw - var(--column)) / 2 + var(--inset)));
   display: flex;
   flex-direction: column;
   height: 100%;
-  max-width: 720px;
-  margin: 0 auto;
   width: 100%;
 }
 
@@ -174,7 +186,7 @@ textarea {
   display: flex;
   align-items: center;
   gap: 0.55rem;
-  padding: calc(env(safe-area-inset-top, 0px) + 0.85rem) 1.75rem 0.5rem;
+  padding: calc(env(safe-area-inset-top, 0px) + 0.85rem) var(--gutter) 0.5rem;
   font-size: 0.78rem;
   font-weight: 500;
   letter-spacing: 0.03em;
@@ -323,7 +335,7 @@ textarea {
   flex: 1;
   display: flex;
   flex-direction: column;
-  padding: 0.5rem 1.75rem calc(env(safe-area-inset-bottom, 0px) + 1.5rem);
+  padding: 0.5rem var(--gutter) calc(env(safe-area-inset-bottom, 0px) + 1.5rem);
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
 }
@@ -2078,13 +2090,8 @@ input[type="range"] {
   body {
     font-size: 22px;
   }
-  .screen {
-    padding-left: 3rem;
-    padding-right: 3rem;
-  }
-  .status-strip {
-    padding-left: 3rem;
-    padding-right: 3rem;
+  .app {
+    --inset: 3rem;
   }
 }
 
