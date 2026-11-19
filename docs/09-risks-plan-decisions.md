@@ -1618,3 +1618,25 @@ otherwise unchanged. Phones are unaffected (the gutter is the same 1.75rem
 there). `e2e/ipad-swipe.spec.ts` checks it, and fails on the old layout.
 
 **Ethics.** No change to what participants are asked or told.
+
+### The under-16 ban: what should happen, and getting round it (2026-11-19, D-102)
+
+**Asked.** The PI: two more questions among the pupils' ban questions (D-92):
+after "How much do you support or oppose…", which one of a set of rules is
+closest to what they think should happen for under-16s; after "If the ban goes
+ahead, what effect…", how many people their age would find a way round it.
+
+**Decided.** A module of its own, `ybm_under16_ban_views`, so the two
+published D-92 questions keep their IDs and columns, placed in the draft so
+the four read: support, should happen, effect, get round.
+- `under16_ban_should_happen` (`scale.ban_should_happen`): no new rules; only
+  for a set time each day; some apps but not others; not at all; something
+  else; I don't know. The PI's "other (type in)" is "Something else", followed
+  by "What do you think should happen?" (`under16_ban_should_happen_other`,
+  free text, only when it is chosen), as the survey asks for other typed
+  answers. Unordered: a time limit and an app limit are different rules.
+- `under16_ban_get_round` (`scale.ban_get_round_5_dk`): none, a few, about
+  half, most, almost all (1-5); 6 = I don't know.
+Wording otherwise as the PI gave it. Asked of everyone.
+
+**Ethics.** A minor change, covered by the chair's clearance (D-90).

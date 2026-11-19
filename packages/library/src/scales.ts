@@ -1257,6 +1257,44 @@ export const banEffect5: ResponseScale = {
 };
 
 /**
+ * What should happen for under-16s (D-102): the pupil's own view of the rules,
+ * from none to a full ban. Unordered: limits by time (2) and by app (3) are
+ * different kinds of rule, not steps between 1 and 4.
+ */
+export const banShouldHappen: ResponseScale = {
+  key: "scale.ban_should_happen",
+  version: "1.0.0",
+  name: "What should happen for under-16s on social media",
+  direction: "unordered",
+  options: [
+    opt(1, "They should be able to use social media with no new rules"),
+    opt(2, "They should be able to use social media, but only for a set time each day"),
+    opt(3, "They should be able to use some social media apps but not others"),
+    opt(4, "They should not be able to use social media at all"),
+    opt(5, "Something else"),
+    opt(6, "I don't know", undefined, "dont_know"),
+  ],
+  scoringNote: "1 = no new rules, 2 = a daily time limit, 3 = some apps only, 4 = no social media at all, 5 = something else (described in under16_ban_should_happen_other), 6 = I don't know (missing for analysis).",
+};
+
+/** How many people their age would get round the ban (D-102): 1 = none … 5 = almost all; 6 = don't know. */
+export const banGetRound5: ResponseScale = {
+  key: "scale.ban_get_round_5_dk",
+  version: "1.0.0",
+  name: "How many would get round the ban, none to almost all, with I don't know",
+  direction: "ascending",
+  options: [
+    opt(1, "None"),
+    opt(2, "A few"),
+    opt(3, "About half"),
+    opt(4, "Most"),
+    opt(5, "Almost all"),
+    opt(6, "I don't know", undefined, "dont_know"),
+  ],
+  scoringNote: "1 = none … 3 = about half … 5 = almost all; 6 = I don't know (missing for analysis).",
+};
+
+/**
  * Which AI chatbots are used (D-93; select all): Pew's TCHATSPEC list in
  * Pew's order, then Snapchat's My AI and "Something else".
  */
@@ -1380,6 +1418,8 @@ export const allScales: ResponseScale[] = [
   hearingNoise,
   supportOppose5,
   banEffect5,
+  banShouldHappen,
+  banGetRound5,
   aiChatbotsUsed,
   aiChatbotUses,
   linkageChoice,

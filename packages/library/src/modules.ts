@@ -1302,6 +1302,60 @@ export const ybmUnder16Ban: ModuleInput = {
 };
 
 /**
+ * More on the planned ban (D-102), asked in among the two D-92 questions: after
+ * "support or oppose", what the pupil thinks should happen for under-16s; after
+ * "what effect on you", how many people their age would get round it. A module
+ * of its own, so the two published questions keep their IDs and columns; the
+ * draft orders the four as support, should happen, effect, get round.
+ */
+const banViewsRef = (item: string) => ({ instrument: "ybm_under16_ban_views", item, revision: 1 });
+
+export const ybmUnder16BanViews: ModuleInput = {
+  ...moduleBase,
+  instrument: "ybm_under16_ban_views",
+  name: "YBM the under-16 social media ban: what should happen, and getting round it",
+  construct: "The rules the pupil thinks should apply to under-16s on social media, and how many people their age they think would get round a ban",
+  forms: [
+    {
+      language: "en-GB",
+      label: "The under-16 ban, more (D-102)",
+      items: [
+        single(
+          "should_happen",
+          "under16_ban_should_happen",
+          "",
+          "Which ONE of these is closest to what you think should happen for people under 16?",
+          "scale.ban_should_happen",
+          {
+            researcherNote: "D-102. Study-written. Asked after under16_ban_support. 5 = something else, described in under16_ban_should_happen_other; 6 = I don't know.",
+          },
+        ),
+        {
+          responseType: "text_short",
+          key: "should_happen_other",
+          revision: 1,
+          variable: "under16_ban_should_happen_other",
+          displayIf: { op: "selected", target: { item: banViewsRef("should_happen") }, code: 5 },
+          stem: { text: "What do you think should happen?" },
+          maxChars: 200,
+          researcherNote: "Free text, asked only when 'Something else' is chosen in under16_ban_should_happen (D-102).",
+        },
+        single(
+          "get_round",
+          "under16_ban_get_round",
+          "",
+          "If the ban goes ahead, how many people your age do you think would find a way to get round it?",
+          "scale.ban_get_round_5_dk",
+          { researcherNote: "D-102. Study-written. Asked after under16_ban_effect. 6 = I don't know." },
+        ),
+      ],
+    },
+  ],
+  timeEstimates: est(30, 20),
+  changelog: "1.0 (D-102): what should happen for under-16s, and how many would get round the ban.",
+};
+
+/**
  * A 16+ pupil's own decision on record linkage (D-95). Under 16, linkage is
  * part of taking part (a parent or carer can opt the child out); at 16 or over
  * the young person decides. Asked only of pupils whose date of birth makes
@@ -1706,5 +1760,6 @@ export const allModules: ModuleInput[] = attachProvenance([
   ybmHearing,
   ybmHairstyle,
   ybmUnder16Ban,
+  ybmUnder16BanViews,
   ybmLinkageChoice,
 ]);
