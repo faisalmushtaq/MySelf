@@ -17,8 +17,8 @@ const everything = [...parsedInstruments, ...parsedModules];
 const scaleKeys = new Set(parsedScales.map((s) => s.key));
 
 describe("scales", () => {
-  it("all 74 scales parse", () => {
-    expect(parsedScales).toHaveLength(74);
+  it("all 76 scales parse", () => {
+    expect(parsedScales).toHaveLength(76);
   });
 
   it("hairstyle is a picture per style, thick and thin cornrows, a weave, extensions and a wig apart (D-99)", () => {
@@ -302,7 +302,7 @@ describe("provenance (D-68)", () => {
   });
 
   it("every new question records where it came from, and Pew's questions are Pew's words (D-88, D-89)", () => {
-    const decision: Record<string, string> = { ybm_ai_chatbots: "D-88", ybm_ai_tools: "D-93", ybm_ai_uses: "D-94", ybm_ai_outlook: "D-88", ybm_online_life: "D-89", ybm_hearing: "D-91", ybm_under16_ban: "D-92", ybm_linkage_choice: "D-95" };
+    const decision: Record<string, string> = { ybm_ai_chatbots: "D-88", ybm_ai_tools: "D-93", ybm_ai_uses: "D-94", ybm_ai_outlook: "D-88", ybm_online_life: "D-89", ybm_hearing: "D-91", ybm_under16_ban: "D-92", ybm_under16_ban_views: "D-102", ybm_linkage_choice: "D-95" };
     for (const instrument of Object.keys(decision)) {
       const def = parsedModules.find((m) => m.instrument === instrument)!;
       for (const item of def.forms[0]!.items) {
@@ -326,9 +326,9 @@ describe("provenance (D-68)", () => {
 });
 
 describe("instruments and modules", () => {
-  it("13 instruments and 24 modules parse", () => {
+  it("13 instruments and 25 modules parse", () => {
     expect(parsedInstruments).toHaveLength(13);
-    expect(parsedModules).toHaveLength(24);
+    expect(parsedModules).toHaveLength(25);
   });
 
   it("every scale reference resolves", () => {

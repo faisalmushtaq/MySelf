@@ -234,6 +234,13 @@ export const LIBRARY_PROVENANCE: Record<string, ProvenanceInput> = {
     decisions: ["D-92"],
     notes: "To confirm: where the parents' versions are asked (and their exact middle answer labels), so the two can be matched in analysis.",
   },
+  ybm_under16_ban_views: {
+    kind: "researcher_developed",
+    developedBy: TEAM,
+    basedOn: "Questions given by the PI (November 2026) to sit among the pupils' versions of the parent questions on the planned under-16 ban.",
+    evidence: "None yet; study-written.",
+    decisions: ["D-102"],
+  },
   ybm_linkage_choice: {
     kind: "researcher_developed",
     developedBy: TEAM,
@@ -354,6 +361,11 @@ export const QUESTION_PROVENANCE: Record<string, Record<string, ProvenanceInput>
       ["D-92"],
       "The parents' question (“If the ban goes ahead, what effect do you think it will have on [child's name]?”, a very bad effect through no real effect to a very good effect, plus I don't know) asked about the pupil themselves. 'A fairly bad effect' and 'A fairly good effect' are the team's labels for the in-between points; to match to the parents' version.",
     ),
+  },
+  ybm_under16_ban_views: {
+    should_happen: added(["D-102"], "As given by the PI, word for word, with 'other (type in)' as 'Something else' and a follow-up question for the typed answer."),
+    should_happen_other: added(["D-102"], "The typed answer for 'Something else' in should_happen."),
+    get_round: added(["D-102"], "As given by the PI, word for word."),
   },
   ybm_linkage_choice: {
     agree_16: added(["D-95"], "Study-written, November 2026, after a review of the linkage process. Not a measure: records a 16+ pupil's own decision on linkage."),
