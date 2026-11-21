@@ -17,8 +17,8 @@ const everything = [...parsedInstruments, ...parsedModules];
 const scaleKeys = new Set(parsedScales.map((s) => s.key));
 
 describe("scales", () => {
-  it("all 76 scales parse", () => {
-    expect(parsedScales).toHaveLength(76);
+  it("all 77 scales parse", () => {
+    expect(parsedScales).toHaveLength(77);
   });
 
   it("hairstyle is a picture per style, thick and thin cornrows, a weave, extensions and a wig apart (D-99)", () => {
@@ -326,8 +326,8 @@ describe("provenance (D-68)", () => {
 });
 
 describe("instruments and modules", () => {
-  it("13 instruments and 25 modules parse", () => {
-    expect(parsedInstruments).toHaveLength(13);
+  it("14 instruments and 25 modules parse", () => {
+    expect(parsedInstruments).toHaveLength(14);
     expect(parsedModules).toHaveLength(25);
   });
 

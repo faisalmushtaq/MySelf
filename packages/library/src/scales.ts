@@ -519,6 +519,21 @@ export const bisbas4: ResponseScale = {
   scoringNote: "1 = very true; most items reverse-scored per Carver & White (1994) so higher = more of trait.",
 };
 
+/**
+ * Grit-S response options (D-103), in the published order, worded exactly as
+ * Duckworth's Short Grit Scale sheet. 1 = very much like me … 5 = not like me
+ * at all; the scoring turns these into Duckworth's points (score.grit_s).
+ */
+export const grit5: ResponseScale = {
+  key: "scale.grit_5pt",
+  version: "1.0.0",
+  name: "Grit-S 5-point 'like me' scale (very much like me first)",
+  direction: "descending",
+  options: opts(["Very much like me", "Mostly like me", "Somewhat like me", "Not much like me", "Not like me at all"]),
+  scoringNote:
+    "1 = very much like me … 5 = not like me at all. Duckworth's points: items 2, 4, 7, 8 score 6 minus the code (very much like me = 5); items 1, 3, 5, 6 score the code (very much like me = 1).",
+};
+
 export const doomscroll7: ResponseScale = {
   key: "scale.doomscroll_7pt",
   version: "1.0.0",
@@ -1375,6 +1390,7 @@ export const allScales: ResponseScale[] = [
   stai4,
   bisbas4,
   doomscroll7,
+  grit5,
   agree5Desc,
   agree5LostTrack,
   abstainEffect5,

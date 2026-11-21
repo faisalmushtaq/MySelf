@@ -113,6 +113,14 @@ export const LIBRARY_PROVENANCE: Record<string, ProvenanceInput> = {
     evidence: "The full scales are validated (Carver & White, 1994); this subset has not been, as far as the record shows.",
     decisions: ["D-07"],
   },
+  grit_s: {
+    kind: "validated",
+    basedOn:
+      "Short Grit Scale, Grit-S (Duckworth & Quinn, 2009), from the 8-item sheet on angeladuckworth.com ('8-item Grit 4.pdf', © 2013 Angela Duckworth), read 2026-11-21.",
+    adaptations: "None: directions, the eight items, the five answers and their order as on the sheet. Shown one statement per screen, as the survey shows every questionnaire.",
+    evidence: "Published validation (Duckworth & Quinn, 2009), in adolescents and adults.",
+    decisions: ["D-103"],
+  },
   doomscroll4: {
     kind: "validated_adapted",
     basedOn: "Probably a short subset of the Doomscrolling Scale (Sharma, Lee & Johnson, 2022). Not verified (A-23).",

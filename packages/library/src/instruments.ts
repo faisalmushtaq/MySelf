@@ -960,6 +960,59 @@ export const doomscroll4: InstrumentInput = {
   owner: "ybm",
 };
 
+// ---------------------------------------------------------------------------
+// Short Grit Scale (Grit-S), 8 items (D-103)
+// ---------------------------------------------------------------------------
+
+/** Duckworth's eight items, in the published order and words; * marks the reverse-scored ones on her sheet. */
+const gritItems: [string, string][] = [
+  ["q1", "New ideas and projects sometimes distract me from previous ones."], // *
+  ["q2", "Setbacks don’t discourage me."],
+  ["q3", "I have been obsessed with a certain idea or project for a short time but later lost interest."], // *
+  ["q4", "I am a hard worker."],
+  ["q5", "I often set a goal but later choose to pursue a different one."], // *
+  ["q6", "I have difficulty maintaining my focus on projects that take more than a few months to complete."], // *
+  ["q7", "I finish whatever I begin."],
+  ["q8", "I am diligent."],
+];
+
+export const gritS: InstrumentInput = {
+  instrument: "grit_s",
+  version: "1.0",
+  name: "Short Grit Scale (Grit-S)",
+  abbreviation: "Grit-S",
+  construct: "Grit: perseverance and passion for long-term goals (consistency of interest, 4 items; perseverance of effort, 4 items)",
+  citation:
+    "Duckworth, A. L., & Quinn, P. D. (2009). Development and validation of the Short Grit Scale (Grit-S). Journal of Personality Assessment, 91(2), 166-174.",
+  ageRange: { min: 11, max: 120 },
+  licence: {
+    status: "open",
+    holder: "Angela Duckworth",
+    modifiable: "no",
+    evidence:
+      "angeladuckworth.com/grit (Permissions, read 2026-11-21): no restrictions on non-commercial use for research, translation or education; reproduction in books, magazines or other outlets, and commercial use, are not allowed. The 8-item version (Duckworth & Quinn, 2009) is one of the two English versions she endorses.",
+    verified: true,
+  },
+  forms: [
+    {
+      language: "en-GB",
+      label: "Grit-S (en-GB), as Duckworth's Short Grit Scale sheet",
+      instructions:
+        "Here are a number of statements that may or may not apply to you. For the most accurate score, when responding, think of how you compare to most people -- not just the people you know well, but most people in the world. There are no right or wrong answers, so just answer honestly!",
+      items: gritItems.map(([key, text], i) => row(key, `grit_s_q${i + 1}`, "", text, "scale.grit_5pt")),
+    },
+  ],
+  subscales: [
+    { key: "consistency", name: "Consistency of interest", itemKeys: ["q1", "q3", "q5", "q6"] },
+    { key: "perseverance", name: "Perseverance of effort", itemKeys: ["q2", "q4", "q7", "q8"] },
+  ],
+  scoringKey: "score.grit_s",
+  timeEstimates: est([90, 70]),
+  changelog:
+    "1.0 (D-103): from Duckworth's Short Grit Scale sheet (8-item Grit, © 2013 Angela Duckworth), directions, items and options word for word.",
+  owner: "ybm",
+};
+
 export const allInstruments: InstrumentInput[] = attachProvenance([
   kss,
   sqs,
@@ -974,4 +1027,5 @@ export const allInstruments: InstrumentInput[] = attachProvenance([
   stai5S,
   bisbas12Ybm,
   doomscroll4,
+  gritS,
 ]);

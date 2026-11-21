@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { scoringDefinition } from "@myself/schema";
 import { executeScoring, type ItemValues } from "./executor.js";
-import { allScoring, scoreEhiSf, scorePhq4, scoreSdq25S, scoreStai5, scoreSwemwbs } from "./definitions.js";
+import { allScoring, scoreEhiSf, scoreGritS, scorePhq4, scoreSdq25S, scoreStai5, scoreSwemwbs } from "./definitions.js";
 import { scoringItemKeys, scoringReferenceProblems } from "./references.js";
 
 const sdq = scoringDefinition.parse(scoreSdq25S);
@@ -199,3 +199,33 @@ describe("PHQ-4 (Kroenke et al., 2009)", () => {
     expect(out["phq2"]).toBeNull();
   });
 });
+
+describe("Grit-S (D-103): Duckworth's sheet, mean of eight, 1 to 5", () => {
+  const grit = scoringDefinition.parse(scoreGritS);
+  const answers = (odd: number, even: number): ItemValues =>
+    // Items 1, 3, 5, 6 are scored as coded; 2, 4, 7, 8 are reversed.
+    ({ q1: odd, q3: odd, q5: odd, q6: odd, q2: even, q4: even, q7: even, q8: even });
+
+  it("scores the grittiest answers 5: 'not like me at all' to 1, 3, 5, 6 and 'very much like me' to 2, 4, 7, 8", () => {
+    const { outputs } = executeScoring(grit, answers(5, 1));
+    expect(outputs["grit"]).toBe(5);
+    expect(outputs["consistency_of_interest"]).toBe(5);
+    expect(outputs["perseverance_of_effort"]).toBe(5);
+  });
+
+  it("scores the least gritty answers 1", () => {
+    expect(executeScoring(grit, answers(1, 5)).outputs["grit"]).toBe(1);
+  });
+
+  it("scores 'very much like me' to every statement 3, the two halves pulling apart", () => {
+    const { outputs } = executeScoring(grit, answers(1, 1));
+    expect(outputs["grit"]).toBe(3);
+    expect(outputs["consistency_of_interest"]).toBe(1);
+    expect(outputs["perseverance_of_effort"]).toBe(5);
+  });
+
+  it("gives no grit score with a statement unanswered, as the sheet divides by 8", () => {
+    expect(executeScoring(grit, { ...answers(5, 1), q8: null }).outputs["grit"]).toBeNull();
+  });
+});
+
