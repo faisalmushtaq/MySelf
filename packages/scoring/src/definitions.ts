@@ -202,6 +202,28 @@ export const scorePhq4: ScoringInput = {
   verified: false,
 };
 
+/** Grit-S (D-103), as Duckworth's sheet scores it. Codes run 1 = very much
+ * like me … 5 = not like me at all. Items 2, 4, 7 and 8 score 5 for "very much
+ * like me", so their codes are reversed (6 − code); items 1, 3, 5 and 6 score
+ * the code as it is. Grit is the mean of all eight, 1 (not at all gritty) to 5
+ * (extremely gritty). The two subscale means are Duckworth & Quinn's (2009)
+ * factors. */
+export const scoreGritS: ScoringInput = {
+  key: "score.grit_s",
+  version: "1.0.0",
+  instrument: "grit_s",
+  instrumentVersion: "1.0",
+  steps: [
+    { op: "reverse", items: q([2, 4, 7, 8]), maxPlusMin: 6 },
+    { op: "mean", items: q([1, 2, 3, 4, 5, 6, 7, 8]), output: "grit", minValid: 8 },
+    { op: "mean", items: q([1, 3, 5, 6]), output: "consistency_of_interest", minValid: 4 },
+    { op: "mean", items: q([2, 4, 7, 8]), output: "perseverance_of_effort", minValid: 4 },
+  ],
+  provenance:
+    "Duckworth's Short Grit Scale sheet: items 2, 4, 7, 8 score 5 (very much like me) to 1 (not like me at all); items 1, 3, 5, 6 score 1 to 5; 'Add up all the points and divide by 8', 1 = not at all gritty to 5 = extremely gritty. Subscales (consistency of interest 1, 3, 5, 6; perseverance of effort 2, 4, 7, 8) from Duckworth & Quinn (2009).",
+  verified: false,
+};
+
 export const allScoring: ScoringInput[] = [
   scoreSdq25S,
   scoreSdq25S18,
@@ -211,4 +233,5 @@ export const allScoring: ScoringInput[] = [
   scoreBisbas12,
   scoreEhiSf,
   scorePhq4,
+  scoreGritS,
 ];

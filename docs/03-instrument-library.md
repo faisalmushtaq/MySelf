@@ -17,6 +17,7 @@ Every recognised validated scale becomes a separately versioned instrument; besp
 | `stai5_s` | STAI-5 (state short form) | State anxiety | 5 | Zsido et al. (2020), *Psychiatry Res* 291:113223 | **Review required**: parent STAI licensed by Mind Garden ([STAI page](https://www.mindgarden.com/145-state-trait-anxiety-inventory-for-adults)); status of the 5-item derivative for electronic research use to be confirmed. |
 | `bisbas12_ybm` | BIS/BAS – 12-item YBM subset | Behavioural inhibition/approach | 12 (BIS 4, RR 4, Drive 4) | Carver & White (1994), *JPSP* 67 | Widely used without fee (**to confirm**); the 12-item subset is an explicit adapted form — provenance (possibly the AoW study) to document. |
 | `doomscroll4` | Doomscrolling items (4) | Compulsive negative-news consumption | 4 | Possibly Sharma, Lee & Johnson (2022), *Technol Mind Behav* — **to verify** | **To confirm** (citation + reproduction rights). |
+| `grit_s` | Short Grit Scale (Grit-S) | Grit: consistency of interest (4) + perseverance of effort (4) | 8 | Duckworth & Quinn (2009), *J Pers Assess* 91(2):166-174 | **Verified: free for non-commercial research, translation and education; no reproduction in books or other outlets, no commercial use** — [angeladuckworth.com/grit](https://angeladuckworth.com/grit#scale). Directions, items and answers word for word from her 8-item sheet; score = mean of the eight (items 2, 4, 7, 8 reversed), 1–5 (D-103). |
 
 ## Bespoke modules (named, versioned, owned by the YBM programme)
 

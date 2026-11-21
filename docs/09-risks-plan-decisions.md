@@ -1640,3 +1640,35 @@ the four read: support, should happen, effect, get round.
 Wording otherwise as the PI gave it. Asked of everyone.
 
 **Ethics.** A minor change, covered by the chair's clearance (D-90).
+
+### The Short Grit Scale in the social media break study (2026-11-21, D-103)
+
+**Asked.** The PI: add the 8-item grit scale to the social media break study,
+in the right place.
+
+**Decided.** The Short Grit Scale (Grit-S; Duckworth & Quinn, 2009) is added to
+the library as a validated questionnaire, `grit_s`, from Duckworth's own 8-item
+sheet ("8-item Grit 4.pdf", © 2013 Angela Duckworth, linked from
+angeladuckworth.com), read on 2026-11-21: her directions, the eight items in
+order and the five answers (very much like me … not like me at all) word for
+word, one statement per screen. Variables `grit_s_q1` … `grit_s_q8`, coded
+1 = very much like me … 5 = not like me at all.
+
+**Scoring** (`score.grit_s`, as the sheet): items 2, 4, 7, 8 reversed so
+"very much like me" scores 5; items 1, 3, 5, 6 as coded; grit = the mean of
+all eight (1 = not at all gritty, 5 = extremely gritty), and only with all
+eight answered, as the sheet divides by 8. Consistency of interest (1, 3, 5,
+6) and perseverance of effort (2, 4, 7, 8) means as Duckworth & Quinn's two
+factors. Marked unverified, like every scoring rule, until the team checks it.
+
+**Licence.** Duckworth's site: no restrictions on non-commercial use for
+research, translation or education; not for reproduction in books, magazines
+or other outlets, or commercial use. She also says it is for research and
+self-reflection, not for decisions about individuals.
+
+**Where.** In the break study's last section ("Right now"), straight after
+the 12-item BIS/BAS, the survey's other trait questionnaire.
+
+**Ethics.** Adding a questionnaire to the break study is a change to its
+materials; whether it needs an amendment for that study is for the PI to
+confirm.
