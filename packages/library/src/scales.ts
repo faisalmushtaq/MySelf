@@ -519,6 +519,45 @@ export const bisbas4: ResponseScale = {
   scoringNote: "1 = very true; most items reverse-scored per Carver & White (1994) so higher = more of trait.",
 };
 
+/** ASRS-5 frequency answers (D-104), as the form: Never (0) … Very often (4). */
+export const asrsFrequency5: ResponseScale = {
+  key: "scale.asrs_frequency_5",
+  version: "1.0.0",
+  name: "ASRS-5 frequency, never to very often (0-4)",
+  direction: "ascending",
+  options: opts(["Never", "Rarely", "Sometimes", "Often", "Very often"], 0),
+  scoringNote: "0 = never, 1 = rarely, 2 = sometimes, 3 = often, 4 = very often, as on the ASRS-5 form.",
+};
+
+/**
+ * Whether a participant has a condition (D-104; ADHD, or another
+ * neurodevelopmental condition), as the break study's team wrote it: a formal
+ * diagnosis, self-identified, or on the way to an assessment are kept apart.
+ */
+export const conditionStatus5: ResponseScale = {
+  key: "scale.condition_status_5",
+  version: "1.0.0",
+  name: "Has the condition: diagnosed, self-identified, awaiting assessment, no, prefer not to say",
+  direction: "unordered",
+  options: [
+    opt(1, "Yes, formally diagnosed"),
+    opt(2, "Yes, self-identified (no formal diagnosis)"),
+    opt(3, "Currently seeking or awaiting assessment"),
+    opt(4, "No"),
+    opt(5, "Prefer not to say", undefined, "decline"),
+  ],
+  scoringNote: "1 = formally diagnosed, 2 = self-identified, 3 = seeking or awaiting assessment, 4 = no, 5 = prefer not to say (declined).",
+};
+
+/** Yes / No / Prefer not to say (D-104), for health questions a participant may decline. */
+export const yesNoDecline: ResponseScale = {
+  key: "scale.yes_no_decline",
+  version: "1.0.0",
+  name: "Yes / No / Prefer not to say",
+  direction: "unordered",
+  options: [opt(1, "Yes"), opt(2, "No"), opt(3, "Prefer not to say", undefined, "decline")],
+};
+
 /**
  * Grit-S response options (D-103), in the published order, worded exactly as
  * Duckworth's Short Grit Scale sheet. 1 = very much like me … 5 = not like me
@@ -1391,6 +1430,9 @@ export const allScales: ResponseScale[] = [
   bisbas4,
   doomscroll7,
   grit5,
+  asrsFrequency5,
+  conditionStatus5,
+  yesNoDecline,
   agree5Desc,
   agree5LostTrack,
   abstainEffect5,

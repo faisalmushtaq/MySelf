@@ -113,6 +113,16 @@ export const LIBRARY_PROVENANCE: Record<string, ProvenanceInput> = {
     evidence: "The full scales are validated (Carver & White, 1994); this subset has not been, as far as the record shows.",
     decisions: ["D-07"],
   },
+  asrs5: {
+    kind: "validated",
+    basedOn:
+      "Adult ADHD Self-Report Screening Scale for DSM-5 (Ustun et al., 2017), from the WHO CIDI-5.0; the form supplied by the break study team (November 2026).",
+    adaptations:
+      "Questions and answers word for word. The form's instructions are addressed to a clinician ('Ask the patient to complete…'), so the participant sees a plain equivalent: the last six months, how often.",
+    evidence: "Published validation (Ustun et al., 2017), adults 18 and over.",
+    notes: "D-104: terms of use and the published screening rule still to be confirmed from Harvard's or NYU's own pages and the paper.",
+    decisions: ["D-104"],
+  },
   grit_s: {
     kind: "validated",
     basedOn:
@@ -255,6 +265,13 @@ export const LIBRARY_PROVENANCE: Record<string, ProvenanceInput> = {
     involvement: [{ group: "MyPhone/MyBrain team (review of the linkage process)", role: "said pupils of 16 or over decide about linkage themselves", when: "2026-11" }],
     evidence: "Not a measure: a consent decision. Under 16, linkage is opt-out by a parent or carer; at 16 or over the young person decides.",
     decisions: ["D-95"],
+  },
+  ybm_neurodevelopment: {
+    kind: "researcher_developed",
+    developedBy: "Social media break study team",
+    basedOn: "The two questions on ADHD and other neurodevelopmental conditions as written by the break study team (November 2026), with medication questions added so ADHD medication can be allowed for.",
+    evidence: "Not a measure: a description of the sample, and a covariate for the lab tasks.",
+    decisions: ["D-104"],
   },
   ybm_hairstyle: {
     kind: "researcher_developed",

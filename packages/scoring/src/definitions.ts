@@ -224,6 +224,21 @@ export const scoreGritS: ScoringInput = {
   verified: false,
 };
 
+/** ASRS-5 (D-104): PROVISIONAL, NOT the published score. Ustun et al. (2017)
+ * built the scale with "optimal integer weights" (RiskSLIM), so the screening
+ * score weights each answer by question; those weights and the cut-point are
+ * still to be taken from the paper or the Harvard/NYU scoring sheet. Until
+ * then, only the plain 0-24 total of the six answers. */
+export const scoreAsrs5: ScoringInput = {
+  key: "score.asrs5",
+  version: "1.0.0",
+  instrument: "asrs5",
+  instrumentVersion: "1.0",
+  steps: [{ op: "sum", items: q([1, 2, 3, 4, 5, 6]), output: "total", minValid: 6 }],
+  provenance: "Provisional plain total (0-24), not the published weighted score: Ustun et al. (2017) use item-specific integer weights (RiskSLIM). Replace with the published weights and cut-point before use.",
+  verified: false,
+};
+
 export const allScoring: ScoringInput[] = [
   scoreSdq25S,
   scoreSdq25S18,
@@ -234,4 +249,5 @@ export const allScoring: ScoringInput[] = [
   scoreEhiSf,
   scorePhq4,
   scoreGritS,
+  scoreAsrs5,
 ];

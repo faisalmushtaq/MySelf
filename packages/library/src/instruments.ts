@@ -1013,6 +1013,55 @@ export const gritS: InstrumentInput = {
   owner: "ybm",
 };
 
+// ---------------------------------------------------------------------------
+// ASRS-5, adult ADHD self-report screening scale for DSM-5 (D-104)
+// ---------------------------------------------------------------------------
+
+/** The six questions, in order and word for word as on the ASRS-5 form. */
+const asrsItems: [string, string][] = [
+  ["q1", "How often do you have difficulty concentrating on what people are saying to you even when they are speaking to you?"],
+  ["q2", "How often do you leave your seat in meetings or other situations in which you are expected to remain seated?"],
+  ["q3", "How often do you have difficulty unwinding and relaxing when you have time to yourself?"],
+  ["q4", "When you’re in a conversation, how often do you find yourself finishing the sentences of the people you are talking to before they can finish them themselves?"],
+  ["q5", "How often do you put things off until the last minute?"],
+  ["q6", "How often do you depend on others to keep your life in order and attend to details?"],
+];
+
+/** Until its terms of use are confirmed from Harvard's or NYU's own page, it cannot be published. */
+const LICENCE_ASRS5: LicenceInput = {
+  status: "permission_required",
+  holder: "New York University and President and Fellows of Harvard College (CIDI-5.0)",
+  modifiable: "no",
+  evidence: "© NYU and Harvard, from the CIDI-5.0, as on the form supplied. Terms of use for research still to be confirmed (D-104).",
+  verified: false,
+};
+
+export const asrs5: InstrumentInput = {
+  instrument: "asrs5",
+  version: "1.0",
+  name: "Adult ADHD Self-Report Screening Scale for DSM-5 (ASRS-5)",
+  abbreviation: "ASRS-5",
+  construct: "Possible adult ADHD symptoms in the last six months (a screen, not a diagnosis)",
+  citation:
+    "Ustun, B., Adler, L. A., Rudin, C., Faraone, S. V., Spencer, T. J., Berglund, P., Gruber, M. J., & Kessler, R. C. (2017). The World Health Organization Adult Attention-Deficit/Hyperactivity Disorder Self-Report Screening Scale for DSM-5. JAMA Psychiatry, 74(5), 520-526.",
+  ageRange: { min: 18, max: 120 },
+  licence: LICENCE_ASRS5,
+  forms: [
+    {
+      language: "en-GB",
+      label: "ASRS-5 (en-GB), as the form supplied by the break study team",
+      instructions:
+        "The next six questions ask about things you may have experienced in the last six months. For each one, choose how often it has happened.",
+      items: asrsItems.map(([key, text], i) => row(key, `asrs5_q${i + 1}`, "", text, "scale.asrs_frequency_5")),
+    },
+  ],
+  scoringKey: "score.asrs5",
+  timeEstimates: est([70, 60]),
+  changelog:
+    "1.0 (D-104): the six ASRS-5 questions and five answers (Never 0 … Very often 4) word for word from the form the break study team supplied (© New York University and President and Fellows of Harvard College, from the CIDI-5.0). Its instructions are written for a clinician handing over a paper form, so the participant sees a plain equivalent.",
+  owner: "ybm",
+};
+
 export const allInstruments: InstrumentInput[] = attachProvenance([
   kss,
   sqs,
@@ -1028,4 +1077,5 @@ export const allInstruments: InstrumentInput[] = attachProvenance([
   bisbas12Ybm,
   doomscroll4,
   gritS,
+  asrs5,
 ]);

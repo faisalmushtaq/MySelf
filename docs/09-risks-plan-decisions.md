@@ -1672,3 +1672,52 @@ the 12-item BIS/BAS, the survey's other trait questionnaire.
 **Ethics.** Adding a questionnaire to the break study is a change to its
 materials; whether it needs an amendment for that study is for the PI to
 confirm.
+
+### ADHD and neurodevelopmental conditions, and the ASRS-5, for the break study (2026-11-24, D-104)
+
+**Asked.** Michelle (break study), via the PI: two self-report questions,
+"Do you have ADHD?" and "Do you have any other neurodevelopmental condition,
+other than ADHD (e.g. autism, dyslexia, dyspraxia)?" (formally diagnosed /
+self-identified / seeking or awaiting assessment / no / prefer not to say),
+with "If you're happy to, please say which:" after a yes to the second; the
+ASRS-5 (adult ADHD screener, supplied as a PDF); and a check that ADHD
+medication is accounted for.
+
+**Decided.**
+- `ybm_neurodevelopment` (study-written): her two questions word for word
+  (`nd_adhd`, `nd_other_condition`, `scale.condition_status_5`); "please say
+  which" (`nd_other_condition_which`, free text, optional) after formally
+  diagnosed or self-identified. For medication: "Are you currently
+  prescribed medication for ADHD?" (with common examples), asked after any
+  yes or awaiting assessment, and "Have you taken your ADHD medication today,
+  before this session?", since stimulant medication can change performance on
+  the lab tasks (`nd_adhd_medication`, `nd_adhd_medication_today`, Yes / No /
+  Prefer not to say). None is required: special-category health data.
+- The existing medication question's example becomes "For example,
+  antidepressants or ADHD medication." in the break study draft, so ADHD
+  medication is not left out of it.
+- In the break study draft: after the medication question in "About you".
+- `asrs5` (ASRS-5; Ustun et al., 2017) is in the library: the six questions
+  and the five answers (Never 0 … Very often 4) word for word from the
+  supplied form; the form's clinician-facing instructions become a plain line
+  for the participant. **Not yet in the draft**, for two reasons:
+  1. Terms of use: © NYU and Harvard (CIDI-5.0); Harvard's ASRS page could
+     not be read (unavailable), so it is marked `permission_required`, which
+     would stop the whole draft being published.
+  2. Scoring: the paper says the scale was built with "optimal integer
+     weights" (RiskSLIM), so its screening score is a weighted sum with a
+     cut-point, not the plain 0-24 total. `score.asrs5` is a provisional plain
+     total, unverified, until the weights are taken from the paper or the
+     Harvard/NYU scoring sheet.
+  Once both are confirmed it can go into the "How you've been feeling"
+  section after the PHQ-4. The break study is for 18-24 year olds, so the
+  adult-only ASRS-5 fits.
+
+**Access.** Michelle could not open the survey in the Studio. Both people on
+the break study's Studio list are admins and project owners, so she is most
+likely signed in with an account not on the list; an admin adds her address
+in the Studio.
+
+**Ethics.** New health questions (special-category data) in the break study:
+for the PI to confirm with its ethics approval and data protection
+assessment.
