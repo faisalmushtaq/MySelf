@@ -224,6 +224,18 @@ export const scoreGritS: ScoringInput = {
   verified: false,
 };
 
+/** ASRS-5 (D-104): provisional. The total of the six 0-4 answers (0-24); the
+ * published screening rule is still to be checked against Ustun et al. (2017). */
+export const scoreAsrs5: ScoringInput = {
+  key: "score.asrs5",
+  version: "1.0.0",
+  instrument: "asrs5",
+  instrumentVersion: "1.0",
+  steps: [{ op: "sum", items: q([1, 2, 3, 4, 5, 6]), output: "total", minValid: 6 }],
+  provenance: "Provisional: sum of six 0-4 answers. To check against Ustun et al. (2017) before use.",
+  verified: false,
+};
+
 export const allScoring: ScoringInput[] = [
   scoreSdq25S,
   scoreSdq25S18,
@@ -234,4 +246,5 @@ export const allScoring: ScoringInput[] = [
   scoreEhiSf,
   scorePhq4,
   scoreGritS,
+  scoreAsrs5,
 ];

@@ -1736,6 +1736,75 @@ export const ybmPhonePickups: ModuleInput = {
   changelog: "1.0 (D-67): the phone's own pickup or unlock count for yesterday.",
 };
 
+// ---------------------------------------------------------------------------
+
+/**
+ * ADHD and other neurodevelopmental conditions (D-104), for the social media
+ * break study: the team's two questions, as they wrote them, and whether ADHD
+ * medication is prescribed and was taken before the session, so its effect on
+ * the lab tasks can be allowed for. Special-category health data: every
+ * question can be declined, and none is required.
+ */
+const ndRef = (item: string) => ({ instrument: "ybm_neurodevelopment", item, revision: 1 });
+const anyOf = (item: string, codes: number[]) => ({
+  op: "any" as const,
+  args: codes.map((code) => ({ op: "selected" as const, target: { item: ndRef(item) }, code })),
+});
+
+export const ybmNeurodevelopment: ModuleInput = {
+  ...moduleBase,
+  instrument: "ybm_neurodevelopment",
+  name: "ADHD and other neurodevelopmental conditions, and ADHD medication",
+  construct: "Self-reported ADHD and other neurodevelopmental conditions (diagnosed, self-identified or awaiting assessment), and ADHD medication on the day",
+  forms: [
+    {
+      language: "en-GB",
+      label: "Neurodevelopmental conditions (D-104)",
+      items: [
+        single("adhd", "nd_adhd", "", "Do you have ADHD?", "scale.condition_status_5", {
+          required: "soft",
+          researcherNote: "D-104. The break study team's question, word for word. Special-category health data. 5 = prefer not to say.",
+        }),
+        single("adhd_medication", "nd_adhd_medication", "", "Are you currently prescribed medication for ADHD?", "scale.yes_no_decline", {
+          required: "soft",
+          displayIf: anyOf("adhd", [1, 2, 3]),
+          lede: {
+            text: "For example, methylphenidate (such as Ritalin, Concerta or Medikinet), lisdexamfetamine (Elvanse), dexamfetamine, atomoxetine or guanfacine.",
+          },
+          researcherNote: "D-104. Asked when nd_adhd is 1-3. So ADHD medication can be allowed for (the team asked for it). 3 = prefer not to say.",
+        }),
+        single("adhd_medication_today", "nd_adhd_medication_today", "", "Have you taken your ADHD medication today, before this session?", "scale.yes_no_decline", {
+          required: "soft",
+          displayIf: { op: "selected", target: { item: ndRef("adhd_medication") }, code: 1 },
+          lede: { text: "Some of the tasks can be affected by it, so it helps us to know." },
+          researcherNote: "D-104. Asked when nd_adhd_medication = 1. Whether the lab session was on or off medication. 3 = prefer not to say.",
+        }),
+        single(
+          "other_condition",
+          "nd_other_condition",
+          "",
+          "Do you have any other neurodevelopmental condition, other than ADHD (e.g. autism, dyslexia, dyspraxia)?",
+          "scale.condition_status_5",
+          { required: "soft", researcherNote: "D-104. The break study team's question, word for word. 5 = prefer not to say." },
+        ),
+        {
+          responseType: "text_short",
+          key: "other_condition_which",
+          revision: 1,
+          variable: "nd_other_condition_which",
+          required: "optional",
+          displayIf: anyOf("other_condition", [1, 2]),
+          stem: { text: "If you're happy to, please say which:" },
+          maxChars: 200,
+          researcherNote: "D-104. Free text, asked when nd_other_condition is 1 or 2 ('if Yes'), and optional.",
+        },
+      ],
+    },
+  ],
+  timeEstimates: est(40, 30),
+  changelog: "1.0 (D-104): ADHD and other neurodevelopmental conditions, and ADHD medication on the day, for the break study.",
+};
+
 export const allModules: ModuleInput[] = attachProvenance([
   ybmIntroConsent,
   ybmIdentity,
@@ -1762,4 +1831,5 @@ export const allModules: ModuleInput[] = attachProvenance([
   ybmUnder16Ban,
   ybmUnder16BanViews,
   ybmLinkageChoice,
+  ybmNeurodevelopment,
 ]);
