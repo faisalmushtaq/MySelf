@@ -1721,3 +1721,40 @@ in the Studio.
 **Ethics.** New health questions (special-category data) in the break study:
 for the PI to confirm with its ethics approval and data protection
 assessment.
+
+### Generative AI questions from Born in Bradford's Age of Wonder (2026-11-26, D-105)
+
+**Asked.** The PI, after comparing YBM's AI questions with Yap et al. (2026),
+Wellcome Open Research 11:525 (Age of Wonder 2024/25, Bradford, ages 12-15):
+add Age of Wonder's trust and verification questions and the purposes YBM's
+list lacks, for AI users only, in the quickest way to get through them.
+
+**Source.** The Age of Wonder 2024/25 Young People's questionnaire on OSF
+(doi.org/10.17605/OSF.IO/SQMDR), items 433-446. YBM already covers getting
+information, schoolwork, advice, social reasons and images as "ever used"
+(ybm_ai_uses); it lacks checking work (434), generating new ideas (435) and
+writing code (437), trust (441) and verifying answers (442). The four
+usefulness-by-subject items (443-446) were not chosen.
+
+**Decided.** A module, `ybm_ai_aow`, straight after "Have you ever used AI
+chatbots for the following?" (and its "something else"), asked only when
+ai_use = yes:
+- "How often do you use generative AI tools (e.g. ChatGPT) to check your
+  work?" / "… to generate new ideas?" / "… to write code?" (Daily … Never,
+  1-5, `ai_aow_check_work`, `ai_aow_new_ideas`, `ai_aow_write_code`). Age of
+  Wonder asks these as rows under one heading; on the iPad each row becomes
+  the question, and the heading's definition of generative AI is shown once,
+  above the first (spelling corrected).
+- "How much do you trust generative AI (e.g. ChatGPT)?" (Entirely …
+  Not at all, `ai_aow_trust`) and "When using generative AI (e.g. ChatGPT),
+  how often do you verify the answers it provides you?" (Almost always …
+  Never, `ai_aow_verify`), word for word.
+Codes as Age of Wonder's, so answers line up with Bradford's. Each is one
+tap and moves on by itself: five taps for a chatbot user, nothing for anyone
+else.
+
+**Note.** YBM's own trust question (`ai_trust`, D-72, 4 points) stays, later
+in the section; the two differ in wording and scale. Dropping it is the PI's
+call.
+
+**Ethics.** A minor change, covered by the chair's clearance (D-90).
