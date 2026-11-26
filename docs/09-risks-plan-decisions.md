@@ -1721,3 +1721,42 @@ in the Studio.
 **Ethics.** New health questions (special-category data) in the break study:
 for the PI to confirm with its ethics approval and data protection
 assessment.
+
+### Linkage with Connected West Yorkshire is not asked for now (2026-11-26, D-105)
+
+**Asked.** The PI: make it clear everywhere that we are not asking for consent
+to linkage with Connected West Yorkshire now, and that we intend to contact
+people about it in future, so that the Connected West Yorkshire team can be
+assured no immediate linkage is promised.
+
+**Changed (school survey, Studio draft of `ybm_nd2026_standard`, revisions
+151 to 162; live was 25.0.0 with other unpublished edits already in the
+draft).**
+- The "How we look after your information" panel: what we collect no longer
+  includes linking; "who can see it" and "your address" say nothing is sent to
+  anyone else; "Linking with other records" says not now, that we would like
+  to ask in future through Connected West Yorkshire, and that nothing will be
+  linked unless it is agreed then.
+- "Keeping your answers private": the name, date of birth and address are used
+  to keep answers together and to find them for removal; only the research
+  team sees them.
+- "Linking your records" becomes "Linking your records: not now", with the same
+  message; "How linking works", "Your choice about linking" and "How long
+  linking lasts" are archived (restorable), as is the 16+ linkage question
+  (`ybm_linkage_choice.agree_16`, D-95).
+- The consent screen: its line now says none of the statements agrees to
+  linking; `no_identification` says the details are used only to keep answers
+  together and to find them for removal; `record_linkage` is removed; a new
+  statement, `no_linking_now`, says linkage is not being asked about today,
+  nothing is linked now, and nothing will be linked unless it is agreed if the
+  team asks in future.
+
+**Not changed.** The library record (`modules.ts`) still holds the D-95
+wording and the drift-tested releases are untouched: the live survey is the
+Studio's. The social media break study's surveys never mentioned Connected
+West Yorkshire and are unchanged. The draft is saved, not published: the team
+reviews it in the Studio and publishes, together with the edits already in it.
+
+**For the linkage procedure.** No pupil's details go to Connected West
+Yorkshire on the strength of this survey. Linkage will need its own approach to
+families, and its own approval, in future.
