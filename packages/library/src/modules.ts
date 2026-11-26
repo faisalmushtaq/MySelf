@@ -1739,6 +1739,62 @@ export const ybmPhonePickups: ModuleInput = {
 // ---------------------------------------------------------------------------
 
 /**
+ * Born in Bradford: Age of Wonder's generative AI questions (D-105), so YBM can
+ * be set beside Bradford's 2024/25 figures (Yap et al., 2026): how often AI is
+ * used to check work, generate ideas and write code (the purposes YBM's list
+ * lacks), how much it is trusted, and how often its answers are checked.
+ * Asked only of those who use AI chatbots, straight after what they use them
+ * for. One tap a screen, each moving on by itself. Age of Wonder asks each
+ * purpose as a row under one heading; on the iPad each row becomes the
+ * question, heading and row together, and the heading's definition is shown
+ * once, above the first.
+ */
+const aowNote = (n: number, what: string) =>
+  `Born in Bradford Age of Wonder 2024/25 item ${n}${what} (D-105). Asked if ai_use = yes. Codes as Age of Wonder.`;
+
+export const ybmAiAgeOfWonder: ModuleInput = {
+  ...moduleBase,
+  instrument: "ybm_ai_aow",
+  name: "YBM generative AI questions from Born in Bradford's Age of Wonder",
+  construct: "How often generative AI is used to check work, generate ideas and write code; trust in it; how often its answers are checked",
+  forms: [
+    {
+      language: "en-GB",
+      label: "Age of Wonder generative AI items 434, 435, 437, 441, 442 (D-105)",
+      items: [
+        single("check_work", "ai_aow_check_work", "", "How often do you use generative AI tools (e.g. ChatGPT) to check your work?", "scale.aow_ai_frequency_5", {
+          displayIf: usesChatbots,
+          lede: {
+            text: "Generative artificial intelligence is capable of generating text, images, videos or other data using generative models, often in response to prompts and include popular chatbots such as ChatGPT and Snapchat AI.",
+          },
+          researcherNote: aowNote(434, ", 'To check my work', under 'How often do you use generative AI tools (e.g. ChatGPT) for the following?'; the heading's definition shown here once"),
+        }),
+        single("new_ideas", "ai_aow_new_ideas", "", "How often do you use generative AI tools (e.g. ChatGPT) to generate new ideas?", "scale.aow_ai_frequency_5", {
+          displayIf: usesChatbots,
+          researcherNote: aowNote(435, ", 'To generate new ideas'"),
+        }),
+        single("write_code", "ai_aow_write_code", "", "How often do you use generative AI tools (e.g. ChatGPT) to write code?", "scale.aow_ai_frequency_5", {
+          displayIf: usesChatbots,
+          researcherNote: aowNote(437, ", 'To write code'"),
+        }),
+        single("trust", "ai_aow_trust", "", "How much do you trust generative AI (e.g. ChatGPT)?", "scale.aow_ai_trust_5", {
+          displayIf: usesChatbots,
+          researcherNote: aowNote(441, ", word for word"),
+        }),
+        single("verify", "ai_aow_verify", "", "When using generative AI (e.g. ChatGPT), how often do you verify the answers it provides you?", "scale.aow_ai_verify_5", {
+          displayIf: usesChatbots,
+          researcherNote: aowNote(442, ", word for word"),
+        }),
+      ],
+    },
+  ],
+  timeEstimates: est(30, 25),
+  changelog: "1.0 (D-105): Age of Wonder 2024/25 items 434, 435, 437, 441 and 442, for AI chatbot users.",
+};
+
+// ---------------------------------------------------------------------------
+
+/**
  * ADHD and other neurodevelopmental conditions (D-104), for the social media
  * break study: the team's two questions, as they wrote them, and whether ADHD
  * medication is prescribed and was taken before the session, so its effect on
@@ -1832,4 +1888,5 @@ export const allModules: ModuleInput[] = attachProvenance([
   ybmUnder16BanViews,
   ybmLinkageChoice,
   ybmNeurodevelopment,
+  ybmAiAgeOfWonder,
 ]);

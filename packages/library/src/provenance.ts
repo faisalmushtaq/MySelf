@@ -266,6 +266,16 @@ export const LIBRARY_PROVENANCE: Record<string, ProvenanceInput> = {
     evidence: "Not a measure: a consent decision. Under 16, linkage is opt-out by a parent or carer; at 16 or over the young person decides.",
     decisions: ["D-95"],
   },
+  ybm_ai_aow: {
+    kind: "existing_items",
+    basedOn:
+      "Born in Bradford: Age of Wonder 2024/25 Young People's survey (OSF, doi.org/10.17605/OSF.IO/SQMDR, 'Age-of-Wonder-24-25-Questionnaire.pdf'), items 434, 435, 437 (how often generative AI is used to check work, generate new ideas, write code), 441 (trust) and 442 (verifying answers); reported in Yap et al. (2026), Wellcome Open Research 11:525.",
+    adaptations:
+      "Answers and codes as Age of Wonder. Each purpose row asked as its own question, heading and row together ('… to check your work?' for 'To check my work'); the heading's definition shown once, above the first, with its spelling corrected. Trust and verification word for word. Asked only of AI chatbot users (Age of Wonder asks everyone).",
+    developedBy: "Born in Bradford Age of Wonder team",
+    evidence: "Descriptive items, not a validated scale; Bradford figures for ages 12-15 in Yap et al. (2026).",
+    decisions: ["D-105"],
+  },
   ybm_neurodevelopment: {
     kind: "researcher_developed",
     developedBy: "Social media break study team",

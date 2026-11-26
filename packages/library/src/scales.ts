@@ -519,6 +519,40 @@ export const bisbas4: ResponseScale = {
   scoringNote: "1 = very true; most items reverse-scored per Carver & White (1994) so higher = more of trait.",
 };
 
+// --- Born in Bradford: Age of Wonder 2024/25, generative AI (D-105) -----------
+// Codes and labels as the Age of Wonder questionnaire (items 433-442), so answers
+// can be set beside Bradford's (Yap et al., 2026, Wellcome Open Research 11:525).
+
+/** How often, for one purpose: 1 = daily … 5 = never (Age of Wonder 433-440). */
+export const aowAiFrequency5: ResponseScale = {
+  key: "scale.aow_ai_frequency_5",
+  version: "1.0.0",
+  name: "Age of Wonder: how often generative AI is used for a purpose, daily to never",
+  direction: "descending",
+  options: opts(["Daily", "Once or twice per week", "Once or twice per month", "Once or twice per year", "Never"]),
+  scoringNote: "1 = daily … 5 = never, as Age of Wonder codes it.",
+};
+
+/** Trust in generative AI: 1 = entirely … 5 = not at all (Age of Wonder 441). */
+export const aowAiTrust5: ResponseScale = {
+  key: "scale.aow_ai_trust_5",
+  version: "1.0.0",
+  name: "Age of Wonder: how much generative AI is trusted, entirely to not at all",
+  direction: "descending",
+  options: opts(["Entirely", "Somewhat", "Undecided", "Not really", "Not at all"]),
+  scoringNote: "1 = entirely … 5 = not at all, as Age of Wonder codes it; 3 = undecided is its middle point.",
+};
+
+/** How often AI answers are checked: 1 = almost always … 5 = never (Age of Wonder 442). */
+export const aowAiVerify5: ResponseScale = {
+  key: "scale.aow_ai_verify_5",
+  version: "1.0.0",
+  name: "Age of Wonder: how often generative AI answers are verified, almost always to never",
+  direction: "descending",
+  options: opts(["Almost always", "Sometimes", "Every once in a while", "Rarely", "Never"]),
+  scoringNote: "1 = almost always … 5 = never, as Age of Wonder codes it.",
+};
+
 /** ASRS-5 frequency answers (D-104), as the form: Never (0) … Very often (4). */
 export const asrsFrequency5: ResponseScale = {
   key: "scale.asrs_frequency_5",
@@ -1431,6 +1465,9 @@ export const allScales: ResponseScale[] = [
   doomscroll7,
   grit5,
   asrsFrequency5,
+  aowAiFrequency5,
+  aowAiTrust5,
+  aowAiVerify5,
   conditionStatus5,
   yesNoDecline,
   agree5Desc,
