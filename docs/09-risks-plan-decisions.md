@@ -1758,3 +1758,21 @@ in the section; the two differ in wording and scale. Dropping it is the PI's
 call.
 
 **Ethics.** A minor change, covered by the chair's clearance (D-90).
+
+### Hairstyle in the break study; linkage consent deferred in YBM (2026-11-26, D-106)
+
+**Hairstyle.** The PI: the break study, which also records EEG, asks the
+hairstyle question too. `ybm_hairstyle` (the picture tiles, D-99) goes in its
+draft straight after hair type, and its hair type line becomes YBM's ("Pick
+the one closest to your own hair, even if it is braided or has extensions
+today — it helps us fit the EEG cap. Choose just one."). Break study draft
+revision 324, not yet published.
+
+**Linkage (recorded, done by the team in the Studio).** YBM 26.0.0 makes
+clear that consent for record linkage will be asked for later, not now: the
+welcome has one "Linking your records: not now" screen; the other linking
+screens (D-100) and the 16+ linkage question (`linkage_agree_16`, D-95) are
+archived, restorable. For the dashboard's identifying-information export, the
+`linkage_choice_16_plus` column is therefore blank for sittings under 26.0.0
+on; answers given under earlier releases keep theirs. The record linkage
+consent, when it is asked, will need its own procedure for the linkage list.
